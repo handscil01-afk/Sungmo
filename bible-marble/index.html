@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>성경 부루마블</title>
 <meta name="theme-color" content="#e6f3ff">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="성경 부루마블">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet">
@@ -45,6 +52,20 @@ h1,h2,h3,p{margin:0}
 .ib svg{width:22px;height:22px}
 .ib .lb{display:none}
 @media (min-width:700px){.ib .lb{display:inline}}
+
+#bFS .ic-off{display:none} body.fs #bFS .ic-on{display:none} body.fs #bFS .ic-off{display:inline}
+body.standalone #bFS{display:none}
+.inst{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--paper);border-radius:22px;padding:14px 16px;box-shadow:var(--shadow);margin-bottom:16px;border-left:8px solid var(--mint)}
+.inst img{width:56px;height:56px;border-radius:14px;flex:none;box-shadow:0 2px 0 rgba(61,52,88,.12)}
+.inst .tx{flex:1 1 220px;min-width:0}
+.inst .tx b{display:block;font-family:var(--f-cute);font-weight:400;font-size:19px}
+.inst .tx small{display:block;color:var(--ink-2);font-size:14px}
+.inst .bt{display:flex;gap:8px;flex-wrap:wrap}
+.inst .btn{min-height:44px;font-size:17px;padding:0 16px}
+.steps{list-style:none;margin:0;padding:0;counter-reset:st;display:flex;flex-direction:column;gap:8px}
+.steps li{position:relative;padding:10px 12px 10px 50px;border-radius:14px;background:var(--cream);font-size:15.5px;color:var(--ink);line-height:1.5}
+.steps li::before{counter-increment:st;content:counter(st);position:absolute;left:12px;top:10px;width:28px;height:28px;border-radius:50%;background:var(--mint);color:#fff;display:grid;place-items:center;font-family:var(--f-cute)}
+.kbd{display:inline-block;padding:0 8px;border-radius:8px;background:#fff;box-shadow:inset 0 0 0 1.5px var(--line);font-family:var(--f-cute)}
 
 /* ---------- 공통 ---------- */
 .box{background:var(--paper);border-radius:22px;padding:16px;box-shadow:var(--shadow)}
@@ -285,6 +306,7 @@ body:not(.tab) .money{font-size:24px}
   <button class="ib" id="bLog" aria-label="진행 기록" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg><span class="lb">기록</span></button>
   <button class="ib" id="bRules" aria-label="게임 방법"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.4 2.4c-.7.3-1 .8-1 1.6V14M12 17.2v.3"/></svg><span class="lb">규칙</span></button>
   <button class="ib" id="bSound" aria-label="효과음"></button>
+  <button class="ib" id="bFS" aria-label="전체화면"><svg class="ic-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><svg class="ic-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg><span class="lb">전체화면</span></button>
   <button class="ib" id="bMenu" aria-label="설정" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 12h4M12 12h8M4 17h12M20 17h0"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="17" r="2"/></svg><span class="lb">설정</span></button>
 </header>
 
@@ -311,7 +333,7 @@ const IGA=w=>w+(batchim(w)?'이':'가'), EUN=w=>w+(batchim(w)?'은':'는'), REUL
 const store={get(k,d){try{const v=localStorage.getItem('biblemarble.'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},
   set(k,v){try{localStorage.setItem('biblemarble.'+k,JSON.stringify(v))}catch(e){}},
   del(k){try{localStorage.removeItem('biblemarble.'+k)}catch(e){}}};
-const PREF=Object.assign({sound:true,speed:'normal'},store.get('prefs',{}));
+const PREF=Object.assign({sound:true,speed:'normal',autoFS:true,installHide:false},store.get('prefs',{}));
 const savePref=()=>store.set('prefs',PREF);
 const SPD=()=>window.__SPD!=null?window.__SPD:({slow:1.6,normal:1,fast:.45}[PREF.speed]||1);
 const AW=ms=>ms*Math.max(SPD(),.05);
@@ -578,7 +600,8 @@ const SETTINGS=[
     {k:'cards',t:'말씀 카드',d:'끄면 카드 칸은 그냥 쉬어 가는 칸이 돼요.',sw:1},
     {k:'jailTurns',t:'광야에 머무는 차례',seg:[[1,'1번'],[2,'2번'],[3,'3번']]},
   ]},
-  {sec:'컴퓨터와 진행',items:[
+  {sec:'화면과 진행',items:[
+    {k:'autoFS',t:'자동 전체화면',d:'화면을 처음 누르면 전체화면으로 바뀌어요. 위쪽 전체화면 버튼으로 언제든 켜고 끌 수 있어요.',sw:1,pref:1},
     {k:'ai',t:'컴퓨터 실력',d:'컴퓨터의 퀴즈 정답률이 달라져요.',seg:[['easy','쉬움'],['normal','보통'],['hard','어려움']]},
     {k:'speed',t:'진행 속도',seg:[['slow','느리게'],['normal','보통'],['fast','빠르게']],pref:1},
     {k:'sound',t:'효과음',sw:1,pref:1},
@@ -649,7 +672,7 @@ function gain(p,v,why){if(v<=0)return;p.money+=v;float(p,v);SND.play('coin');log
 
 /* ================= 렌더링 ================= */
 function buildBoard(){
-  const b=$('#board');b.innerHTML='';
+  const b=$('#board');document.body.appendChild($('#toast'));b.innerHTML='';
   TILES.forEach((t,i)=>{
     const [r,c]=cellOf(i),s=sideOf(i),el=document.createElement('div');
     el.className=`tile t-${t.t} ${s}`+(s==='corner'?` c-${t.t}`:'');el.style.gridArea=`${r}/${c}`;el.dataset.i=i;el.tabIndex=0;
@@ -1084,14 +1107,66 @@ const showRules=()=>{if(!$('#ov'))openInfo('게임 방법','📖 성경 부루�
 function openMenu(){
   if($('#ov'))return;
   const {ov,seq}=openBox(`<div class="kick">⚙️ 설정</div><h3>게임 설정</h3><div class="mbody">${settingsHTML(G.set,true)}</div>
-    <div class="mbtns"><button class="btn main wide" id="mClose">설정 닫고 계속하기</button><button class="btn wide" id="mNew">새 게임 준비하기</button></div>`,'var(--sky-2)',true);
+    <div class="mbtns"><button class="btn main wide" id="mClose">설정 닫고 계속하기</button>${STANDALONE()?'':'<button class="btn wide" id="mInst">📲 홈 화면에 설치하기</button>'}<button class="btn wide" id="mNew">새 게임 준비하기</button></div>`,'var(--sky-2)',true);
   bindSettings(ov,G.set,()=>{renderAll();save()});
   const close=()=>closeModal(seq);
   $('#mClose',ov).onclick=close;ov.onclick=e=>{if(e.target===ov)close()};
+  if($('#mInst',ov))$('#mInst',ov).onclick=()=>{close();openInstall()};
   const nb=$('#mNew',ov);nb.onclick=()=>{if(nb.dataset.sure){close();abortAll();save();showSetup()}else{nb.dataset.sure=1;nb.textContent='한 번 더 누르면 처음 화면으로 가요 (지금 게임은 저장돼요)'}};
 }
 function openLog(){if($('#ov')||!G)return;openInfo('진행 기록','📒 지금까지 있었던 일',`<ul class="flog">${G.log.map(e=>`<li style="${e.c?'--pc:'+e.c:''}"><i></i><span>${esc(e.m)}</span></li>`).join('')}</ul>`,'var(--sky-2)',true)}
 function drawSoundBtn(){const b=$('#bSound');b.innerHTML=(PREF.sound?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l5 6M22 9l-5 6"/></svg>')+`<span class="lb">${PREF.sound?'소리 켬':'소리 끔'}</span>`;b.setAttribute('aria-label',PREF.sound?'효과음 끄기':'효과음 켜기')}
+
+/* ================= 홈 화면 설치 · 전체화면 ================= */
+/* 홈 화면 앱으로 열리면 주소창이 없고, 브라우저에서는 첫 터치 때 전체화면으로 바꿉니다 */
+(function moveHeadTags(){try{document.head.append(...document.querySelectorAll('link[rel=manifest],link[rel=icon],link[rel=apple-touch-icon],meta[name=theme-color],meta[name=mobile-web-app-capable],meta[name^=apple-mobile-web-app]'))}catch(e){}})();
+const EMB=(()=>{try{return window.self!==window.top}catch(e){return true}})();
+const IOS=/iP(hone|ad|od)/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const ANDROID=/Android/i.test(navigator.userAgent), SAMSUNG=/SamsungBrowser/i.test(navigator.userAgent);
+const STANDALONE=()=>{try{return matchMedia('(display-mode: standalone)').matches||matchMedia('(display-mode: fullscreen)').matches||navigator.standalone===true}catch(e){return false}};
+let installEvt=null;
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e});
+addEventListener('appinstalled',()=>{installEvt=null;PREF.installHide=true;savePref();toast('📲 홈 화면에 설치했어요!');if(!G)showSetup()});
+const FS={userExit:false,
+  can(){const d=document.documentElement;return !!(d.requestFullscreen||d.webkitRequestFullscreen)&&document.fullscreenEnabled!==false&&document.webkitFullscreenEnabled!==false},
+  is(){return !!(document.fullscreenElement||document.webkitFullscreenElement)},
+  enter(quiet){const d=document.documentElement;
+    if(!this.can()){if(!quiet)openInstall('fs');return}
+    let pr;try{pr=d.requestFullscreen?d.requestFullscreen({navigationUI:'hide'}):(d.webkitRequestFullscreen(),null)}catch(e){pr=Promise.reject(e)}
+    Promise.resolve(pr).catch(()=>{if(!quiet)openInstall('fs')})},
+  exit(){try{(document.exitFullscreen||document.webkitExitFullscreen).call(document)}catch(e){}},
+  toggle(){if(this.is()){this.userExit=true;this.exit()}else{this.userExit=false;this.enter(false)}}};
+function onFSChange(){document.body.classList.toggle('fs',FS.is());$('#bFS').setAttribute('aria-label',FS.is()?'전체화면 끝내기':'전체화면');const l=$('#bFS .lb');if(l)l.textContent=FS.is()?'창 모드':'전체화면';setTimeout(fit,60)}
+document.addEventListener('fullscreenchange',onFSChange);document.addEventListener('webkitfullscreenchange',onFSChange);
+/* 자동 전체화면: 화면을 누를 때 전체화면이 아니면 다시 켭니다. 전체화면 버튼으로 직접 끈 뒤에는 켜지 않습니다 */
+document.addEventListener('click',e=>{if(!PREF.autoFS||FS.userExit||FS.is()||STANDALONE()||!FS.can())return;if(e.target.closest&&e.target.closest('#bFS,#ov'))return;FS.enter(true)},true);
+function installSteps(){
+  if(IOS)return `<ol class="steps"><li><b>Safari</b>로 이 페이지를 열어 주세요.</li><li>공유 버튼 <span class="kbd">⬆︎</span>을 누르세요. 아이패드는 주소창 오른쪽, 아이폰은 화면 아래에 있어요.</li><li>목록에서 <span class="kbd">홈 화면에 추가</span>를 누르고 <span class="kbd">추가</span>를 누르면 끝이에요.</li></ol>`;
+  if(SAMSUNG)return `<ol class="steps"><li>화면 아래의 메뉴 <span class="kbd">≡</span>를 누르세요.</li><li><span class="kbd">현재 페이지 추가</span> → <span class="kbd">홈 화면</span>을 누르세요.</li><li>홈 화면에 생긴 아이콘으로 열면 주소창 없이 열려요.</li></ol>`;
+  if(ANDROID)return `<ol class="steps"><li>크롬 오른쪽 위의 메뉴 <span class="kbd">⋮</span>를 누르세요.</li><li><span class="kbd">홈 화면에 추가</span> 또는 <span class="kbd">앱 설치</span>를 누르세요.</li><li><span class="kbd">설치</span>를 누르면 홈 화면에 아이콘이 생겨요.</li></ol>`;
+  return `<ol class="steps"><li>크롬이나 엣지 주소창 오른쪽의 설치 아이콘 <span class="kbd">⊕</span>을 누르세요.</li><li>아이콘이 없으면 메뉴 <span class="kbd">⋮</span>에서 <span class="kbd">앱 설치</span> 또는 <span class="kbd">바로가기 만들기</span>를 누르세요.</li></ol>`;
+}
+async function openInstall(why){
+  if($('#ov'))closeModal();
+  if(STANDALONE()){toast('이미 홈 화면 앱으로 열려 있어요');return}
+  if(installEvt&&why!=='fs'){const e=installEvt;installEvt=null;try{e.prompt();const r=await e.userChoice;if(r&&r.outcome==='accepted'){PREF.installHide=true;savePref()}}catch(err){}return}
+  openInfo(why==='fs'?'전체화면':'홈 화면에 설치',why==='fs'?'📺 이 화면에서는 전체화면이 안 돼요':'📲 홈 화면에 설치하기',
+    `${why==='fs'?'<p>지금 쓰는 브라우저나 화면에서는 전체화면을 막아 두었어요. 홈 화면에 설치해서 아이콘으로 열면 주소창 없이 넓게 쓸 수 있어요.</p>':'<p>홈 화면에 설치하면 앱처럼 아이콘으로 바로 열리고, 주소창 없이 화면을 넓게 쓸 수 있어요.</p>'}
+    ${installSteps()}${EMB?'<p class="ref">지금은 다른 페이지 안에 들어 있는 화면이라 설치가 잘 안 될 수 있어요. 링크를 브라우저에서 직접 연 뒤 위 순서대로 해 주세요.</p>':''}`,'var(--mint)',true);
+}
+function installBanner(){
+  if(STANDALONE()||PREF.installHide)return '';
+  return `<div class="inst" id="instBan"><img src="icon-192.png" alt=""><div class="tx"><b>홈 화면에 설치하고 전체화면으로 즐겨요</b><small>설치하면 아이콘으로 바로 열리고 주소창 없이 넓게 보여요.</small></div>
+    <div class="bt"><button class="btn mint" data-inst>📲 설치하기</button>${FS.can()?'<button class="btn" data-fs>📺 전체화면</button>':''}<button class="btn" data-later>다음에</button></div></div>`;
+}
+function bindInstall(root){
+  $$('[data-inst],#sInstall',root).forEach(b=>b.onclick=()=>openInstall());
+  const f=$('[data-fs]',root);if(f)f.onclick=()=>{FS.userExit=false;FS.enter(false)};
+  const l=$('[data-later]',root);if(l)l.onclick=()=>{PREF.installHide=true;savePref();$('#instBan')?.remove();toast('설치는 아래 "홈 화면에 설치하기"로 언제든 할 수 있어요')};
+}
+/* 게임 중에는 화면이 꺼지지 않게 합니다 (지원하는 기기만) */
+const Wake={l:null,async on(){try{if(navigator.wakeLock&&!this.l){this.l=await navigator.wakeLock.request('screen');this.l.addEventListener('release',()=>{this.l=null})}}catch(e){}}};
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&G&&!G.over)Wake.on()});
 
 /* ================= 화면 크기 ================= */
 function fit(){
@@ -1116,16 +1191,19 @@ function showSetup(){
   const saved=store.get('save',null);
   s.innerHTML=`<div class="logo"><div class="big">${logoHTML('성경 부루마블')}</div>
     <p>주사위를 굴려 우르에서 예루살렘까지 성경의 땅을 여행해요. 말씀 퀴즈를 맞히면 통행료가 반으로 줄어요! 🐑🕊️🐟🦁</p></div>
+    ${installBanner()}
     <div class="scols"><div class="scol">
       ${saved&&saved.players?`<button class="btn mint big wide" id="sResume">이어하기 <small>${saved.players.map(p=>esc(p.name)).join(' · ')} · 라운드 ${saved.round}</small></button>`:''}
       <section class="box"><h2>👥 플레이어 <small>2~4명 · 동물을 누르면 바뀌어요</small></h2><div id="sPlayers"></div></section>
       <button class="btn main big wide" id="sStart">🎲 게임 시작</button>
       <button class="btn wide" id="sRules">📖 게임 방법 보기</button>
+      ${STANDALONE()?'':'<button class="btn wide" id="sInstall">📲 홈 화면에 설치하기</button>'}
     </div><div class="scol"><section class="box"><h2>⚙️ 게임 설정 <small>게임 중에도 바꿀 수 있어요</small></h2><div id="sSets">${settingsHTML(SETUP.set,false)}</div></section></div></div>`;
   drawPlayers();bindSettings($('#sSets'),SETUP.set,saveSetup);
   $('#sStart').onclick=()=>newGame(SETUP);
   $('#sRules').onclick=showRules;
   if($('#sResume'))$('#sResume').onclick=()=>resume(saved);
+  bindInstall(s);
   scrollTo(0,0);
 }
 function drawPlayers(){
@@ -1156,7 +1234,7 @@ function newGame(setup){
 function resume(saved){abortAll();G=saved;G.over=false;G.set=Object.assign({},DEF_SET,G.set||{});if(!G.setup.set)G.setup.set=Object.assign({},G.set);log('저장된 게임을 이어서 시작해요');enterGame()}
 function enterGame(){
   $('#setup').hidden=true;$('#game').hidden=false;$('#bMenu').hidden=false;$('#bLog').hidden=false;
-  buildBoard();$('#center').appendChild($('#toast'));fit();renderAll();scrollTo(0,0);gameLoop();
+  Wake.on();buildBoard();$('#center').appendChild($('#toast'));fit();renderAll();scrollTo(0,0);gameLoop();
 }
 
 /* ================= 시작 ================= */
@@ -1164,6 +1242,8 @@ $('#bRules').onclick=showRules;
 $('#bLog').onclick=openLog;
 $('#bSound').onclick=()=>{PREF.sound=!PREF.sound;savePref();drawSoundBtn();if(PREF.sound){SND.init();SND.play('coin')}};
 $('#bMenu').onclick=openMenu;
+$('#bFS').onclick=()=>FS.toggle();
+document.body.classList.toggle('standalone',STANDALONE());
 drawSoundBtn();fit();
 window.claude?.hot?.snapshot?.(()=>({G:G&&!G.over?JSON.parse(JSON.stringify(G)):null}));
 const boot=data=>{if(data&&data.G&&data.G.players)resume(data.G);else showSetup()};
