@@ -624,24 +624,97 @@ body.fitmode #view{padding-bottom:0;padding-top:4px}
 .optsum{display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;min-height:46px;border-radius:14px;background:var(--surface);border:1px solid var(--line);font-weight:700;font-size:.86rem;color:var(--ink-2);text-align:left}
 .optsum svg{width:18px;height:18px;flex:none}
 .optsum span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-@media (orientation:landscape) and (max-height:560px){:root{--kb-h:clamp(96px,32vh,170px)}}
-@media (orientation:landscape) and (max-height:560px){
-  #pTop{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,40%);grid-template-rows:auto auto auto auto auto 1fr;column-gap:10px;row-gap:6px}
-  #pTop>.fx{grid-column:1;grid-row:1/-1;min-height:0}
-  #pTop>:not(.fx){grid-column:2;min-width:0}
-  #pTop .tools{flex-wrap:wrap}
-  #pTop .tools .btn{min-height:40px}
-  #pTop .choices .btn{min-height:44px}
-  #pTop .row{flex-wrap:wrap}
-  #pTop .plane{display:none}
-  #pTop{overflow:hidden}
-  .screen.fit{gap:6px}
-  .chord-big{font-size:clamp(2rem,26cqh,3.6rem)}
-}
-
+.kbmain{display:flex;gap:6px}
+.kbside{display:none}
+.kbmain .pkb{flex:1;min-width:0}
+.kbbar button b{font-weight:700}
 .land-only{display:none!important}
-@media (orientation:landscape) and (max-height:560px){.land-only{display:inline-flex!important}.dock.ld-hide{display:none}}
+@media (orientation:landscape) and (max-height:560px){
+  /* 머리줄은 얇게 */
+  #hdr{min-height:calc(40px + env(safe-area-inset-top,0px));padding-left:max(8px,env(safe-area-inset-left,0px));padding-right:max(8px,env(safe-area-inset-right,0px))}
+  #hdr .icon-btn{width:38px;height:38px}
+  #hdr .icon-btn svg{width:22px;height:22px}
+  #hdr h1{font-size:1rem}
+  body.fitmode #view{padding:2px max(10px,env(safe-area-inset-right,0px)) 0 max(10px,env(safe-area-inset-left,0px));max-width:none}
+  .screen.fit{gap:6px}
+  /* 위: 왼쪽은 큰 카드, 오른쪽은 단추 */
+  #pTop.fx{flex:0 0 auto!important;height:clamp(92px,34%,160px);display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);grid-template-rows:repeat(5,auto) 1fr;column-gap:8px;row-gap:5px;overflow:hidden}
+  .screen.fit.tall #pTop.fx{height:clamp(120px,48%,230px)}
+  #pTop>.fx{grid-column:1;grid-row:1/-1;min-height:0;padding:6px 10px}
+  #pTop>:not(.fx){grid-column:2;min-width:0}
+  #pTop .tools{flex-wrap:wrap;gap:5px}
+  #pTop .tools .btn{min-height:36px;font-size:.8rem}
+  #pTop .choices{gap:5px}
+  #pTop .choices .btn{min-height:40px;font-size:1rem}
+  #pTop .choices.sans .btn{font-size:.85rem}
+  #pTop .row{flex-wrap:wrap;gap:5px}
+  #pTop .seg{padding:3px}
+  #pTop .seg button{min-height:32px}
+  #pTop .plane{display:none}
+  #pTop .optsum{min-height:38px;padding:4px 10px}
+  #pTop .btn.land-only{min-height:42px}
+  .inbar{gap:4px}
+  .inpill{min-height:28px;padding:3px 8px;font-size:.7rem}
+  .qcard .q{font-size:.78rem}
+  .qcard .sub{font-size:.8rem}
+  .qcard .fb{font-size:.84rem;margin-top:2px;min-height:1.2em}
+  .cnotes{margin-top:2px;gap:4px}
+  .cnotes span{min-width:38px;padding:2px 8px;font-size:.9rem}
+  .cnotes span small{display:none}
+  .chord-big{font-size:clamp(1.8rem,30cqh,3.2rem)}
+  .qcard .dots{margin-top:2px}
+  .formula{margin-top:2px;font-size:.85rem}
+  /* 아래: 건반이 남은 높이를 다 씀. 옮기기·크기 단추는 건반 양옆에 */
+  #pKb{flex:1 1 auto!important;min-height:0;display:flex;flex-direction:column}
+  #pKb .kbwrap{flex:1;min-height:0}
+  .kbbar{display:none}
+  .kbmain{flex:1;min-height:0}
+  .kbside{display:flex;flex-direction:column;gap:5px;width:46px;flex:none}
+  .kbside button{flex:1 1 0;min-height:0;width:46px;border-radius:12px;background:var(--surface);border:1px solid var(--line);font-weight:700;color:var(--ink-2);display:grid;place-items:center;font-size:.72rem;padding:0}
+  .kbside button svg{width:22px;height:22px}
+  .kbside button[data-k="lo"],.kbside button[data-k="hi"]{flex:2 1 0}
+  .kbside button.on{background:var(--peony-soft);border-color:var(--peony);color:var(--peony)}
+  .kbmain .pkb{height:auto}
+  .wk{font-size:.9rem;padding-bottom:9px}
+  .wk .fg{bottom:44px;width:26px;height:26px;font-size:.82rem}
+  /* 탭 메뉴는 왼쪽 세로 줄 */
+  #nav{top:0;right:auto;width:64px;flex-direction:column;border-top:0;border-right:1px solid var(--line);padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);box-shadow:4px 0 16px rgba(0,0,0,.04)}
+  #nav button{height:auto;flex:1;flex-direction:column;gap:2px;font-size:.66rem}
+  #nav button svg{width:24px;height:24px}
+  body.has-nav #hdr,body.has-nav #view{padding-left:calc(64px + 10px + env(safe-area-inset-left,0px))}
+  body.has-nav #view{padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+  body.has-nav.fitmode #view{padding-bottom:0}
+  body.has-nav .dock{left:64px;bottom:0;padding-bottom:calc(8px + env(safe-area-inset-bottom,0px))}
+  #toast{bottom:24px}
+  .land-only{display:inline-flex!important}
+  .dock.ld-hide{display:none}
+}
 .wk .fg{top:auto;bottom:38px}
+.outrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px 8px 14px;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.outrow>span{font-size:.86rem;font-weight:700;color:var(--ink-2)}
+.outb{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;min-height:40px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line);font:inherit;font-size:.86rem;font-weight:700;color:var(--ink);white-space:nowrap;max-width:62%;overflow:hidden}
+.outb svg{width:18px;height:18px;flex:none}
+.outb span{overflow:hidden;text-overflow:ellipsis}
+.olist{display:flex;flex-direction:column;gap:8px;margin:8px 0}
+.orow{display:flex;gap:12px;align-items:center;width:100%;text-align:left;padding:12px;border-radius:14px;border:1px solid var(--line);background:var(--surface);font:inherit;color:var(--ink)}
+.orow i{width:20px;height:20px;border-radius:50%;border:2px solid var(--ink-3);flex:none}
+.orow.on{border-color:var(--peony);background:var(--peony-soft)}
+.orow.on i{border-color:var(--peony);background:radial-gradient(circle,var(--peony) 0 42%,transparent 46%)}
+.lvl{position:relative;height:14px;border-radius:7px;background:var(--surface-2);overflow:hidden}
+.lvl i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--jade);transition:width .08s}
+.qcard>*{flex:none}
+.pulse.on{background:var(--btn)}
+@media (orientation:landscape) and (max-height:560px){
+  .land-hide{display:none!important}
+  #lsCard{padding:8px 12px!important}
+  #lsCard h3{font-size:1.05rem!important;margin:2px 0 4px!important}
+  #lsCard .chord-big{font-size:2rem!important}
+  #lsCard .helpbody{font-size:.9rem;line-height:1.55}
+  .screen.fit.mtl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto auto 1fr;column-gap:10px;align-content:stretch}
+  .screen.fit.mtl>.card{grid-column:1;grid-row:1/-1}
+  .screen.fit.mtl>:not(.card){grid-column:2}
+}
+@media (max-width:430px){.kbbar .kbr{visibility:hidden}}
 
 </style>
 </head>
@@ -768,7 +841,7 @@ function pianoArt() {
 const STORE_KEY = 'nanjang_piano_v1';
 const DEFAULTS = {
   theme: 'light', fontScale: 1, noteStyle: 'ko', keyLabels: 'white', showFingers: true,
-  tapMode: 'latch', kbSize: 'mid', useMic: false, midiOn: true, midiEcho: false,
+  tapMode: 'latch', kbL: 0, kbP: 0, useMic: false, midiOn: true, midiEcho: false,
   synthVol: 0.8, metroVol: 0.8, noise: 0.004, micSens: 1,
   onboarded: false, installDismissed: false, autoFS: true, wakeLock: true
 };
@@ -934,7 +1007,7 @@ function confirmSheet(msg, okText = '확인', danger = false) {
 function fitNow() {
   const el = $('#view > .screen.fit'); document.body.classList.toggle('fitmode', !!el); if (!el) return;
   const hdr = $('#hdr').getBoundingClientRect().height; const d = $('#dock'); const dh = d ? d.getBoundingClientRect().height : 0;
-  const nav = $('#nav'); const nh = nav.classList.contains('hidden') ? 0 : nav.getBoundingClientRect().height;
+  const nav = $('#nav'); const nr = nav.getBoundingClientRect(); const nh = nav.classList.contains('hidden') || nr.height > nr.width ? 0 : nr.height;
   el.style.height = Math.max(180, Math.floor(window.innerHeight - hdr - dh - nh - 10)) + 'px';
   $$('[data-kb]', el).forEach(k => k._kb && k._kb.layout());
 }
@@ -1360,7 +1433,7 @@ class Ticker {
       }
     };
     loop(); this.timer = setInterval(loop, 25);
-    const vis = () => { this.raf = requestAnimationFrame(vis); const c = AudioEng.ctx.currentTime - AudioEng.outLat(); while (this.queue.length && this.queue[0].time <= c) { const ev = this.queue.shift(); if (this.onBeat) this.onBeat(ev); } };
+    const vis = () => { this.raf = requestAnimationFrame(vis); const c = audibleNow(); while (this.queue.length && this.queue[0].time <= c) { const ev = this.queue.shift(); if (this.onBeat) this.onBeat(ev); } };
     vis();
   }
   stop() { this.running = false; clearInterval(this.timer); cancelAnimationFrame(this.raf); this.queue = []; }
@@ -1370,9 +1443,10 @@ class Ticker {
 /* ================= 입력 모음 (화면 건반·MIDI) ================= */
 const Input = {
   held: new Map(), recent: [], subs: new Set(), last: 0,
-  down(m, src = 'screen', vel = 0.8) {
-    this.held.set(m, { t: performance.now(), src, vel }); this.last = performance.now();
-    this.emit({ type: 'down', m, src, vel });
+  down(m, src = 'screen', vel = 0.8, ts) {
+    const t = ts && ts > 0 ? ts : performance.now();
+    this.held.set(m, { t, src, vel }); this.last = t; this.lastSrc = src;
+    this.emit({ type: 'down', m, src, vel, t });
   },
   up(m, src = 'screen') {
     const h = this.held.get(m); if (!h) return;
@@ -1406,7 +1480,7 @@ const Midi = {
   msg(e) {
     if (!S().midiOn) return;
     const [st, d1, d2] = e.data; const cmd = st & 0xf0;
-    if (cmd === 0x90 && d2 > 0) { Input.down(d1, 'midi', d2 / 127); if (S().midiEcho) Synth.on(d1, d2 / 127); }
+    if (cmd === 0x90 && d2 > 0) { Input.down(d1, 'midi', d2 / 127, e.timeStamp); if (S().midiEcho) Synth.on(d1, d2 / 127); }
     else if (cmd === 0x80 || (cmd === 0x90 && d2 === 0)) { Input.up(d1, 'midi'); if (S().midiEcho) Synth.off(d1); }
     else if (cmd === 0xB0 && d1 === 64) this.pedal = d2 >= 64;
   },
@@ -1417,50 +1491,106 @@ const Midi = {
 
 /* ================= 마이크: 여러 음을 함께 듣기 (크로마) ================= */
 // 스펙트럼(dB)에서 음마다 세기를 구하고, 아래 음의 배음으로 생긴 ‘가짜 음’은 덜어 냄
-const HARM = [[12, 0.9], [19, 0.6], [24, 0.45], [28, 0.35], [31, 0.3], [34, 0.22], [36, 0.2]];
-function spectrumNotes(db, sr, N, lo = 43, hi = 88) {
-  const bw = sr / N, L = db.length, top = hi + 36;
+const HARM = [[12, 0.95], [19, 0.7], [24, 0.55], [28, 0.45], [31, 0.4], [34, 0.32], [36, 0.3], [38, 0.25], [40, 0.22]];
+function spectrumNotes(db, sr, N, lo = 40, hi = 84) {
+  const bw = sr / N, L = db.length, top = hi + 40;
   const i0 = Math.max(2, Math.floor(m2f(lo - 1) / bw)), i1 = Math.min(L - 2, Math.ceil(m2f(top + 1) / bw));
   const arr = []; for (let i = i0; i < i1; i += 3) arr.push(db[i]);
-  arr.sort((x, y) => x - y); const floorDb = arr[Math.floor(arr.length * 0.5)] || -120; const floor = Math.pow(10, floorDb / 20);
-  const thr = floorDb + 15;
+  arr.sort((x, y) => x - y); const floorDb = arr[Math.floor(arr.length * 0.5)] || -120;
+  const thr = floorDb + 18;
   // 진짜 봉우리만 골라 가장 가까운 음에 배정 (옆 반음으로 번진 소리는 무시)
-  const P = new Float32Array(130);
+  const P = new Float32Array(140);
   for (let i = i0; i < i1; i++) {
     const c = db[i]; if (c < thr || c <= db[i - 1] || c < db[i + 1]) continue;
     const a = db[i - 1], e = db[i + 1]; const den = a - 2 * c + e; const d = den ? 0.5 * (a - e) / den : 0;
     const f = (i + d) * bw, pk = c - 0.25 * (a - e) * d;
-    const mf = f2m(f), m = Math.round(mf); if (Math.abs(mf - m) > 0.35 || m < lo || m > top) continue;
+    const mf = f2m(f), m = Math.round(mf); if (Math.abs(mf - m) > 0.4 || m < lo || m > top) continue;
     const amp = Math.pow(10, pk / 20); if (amp > P[m]) P[m] = amp;
   }
-  // 아래 음의 배음으로 생긴 ‘가짜 음’은 덜어 냄
-  const R = new Float32Array(130), exp = new Float32Array(170);
+  // 아래 음부터 차례로, 그 음의 배음 자리에 생긴 소리를 덜어 냄
+  const R = new Float32Array(140), exp = new Float32Array(190);
   for (let m = lo; m <= top; m++) {
     R[m] = Math.max(0, P[m] - exp[m]);
-    if (R[m] > 0 && m <= hi) HARM.forEach(([dd, k]) => { exp[m + dd] += R[m] * k; });
+    if (R[m] > 0 && m <= hi + 12) HARM.forEach(([dd, k]) => { exp[m + dd] += R[m] * k; if (dd >= 34) exp[m + dd + 1] += R[m] * k * 0.5; });
   }
-  const E = {}; let max = 0;
+  const E = new Float32Array(hi + 1); let max = 0;
   for (let m = lo; m <= hi; m++) { E[m] = R[m]; if (E[m] > max) max = E[m]; }
-  const chroma = new Array(12).fill(0);
-  for (let m = lo; m <= hi; m++) if (E[m] > max * 0.08) chroma[pc(m)] += E[m];
-  const cm = Math.max(...chroma) || 1;
-  return { E, chroma: chroma.map(x => x / cm), max, floor };
+  return { E, max, lo, hi };
 }
-// 들어야 할 음(pcs)이 다 들리고, 다른 음은 크게 안 들리면 맞음
+function chromaOf(E, lo, hi, rel = 0.12) {
+  let max = 0; for (let m = lo; m <= hi; m++) if (E[m] > max) max = E[m];
+  const c = new Array(12).fill(0); if (!max) return c;
+  for (let m = lo; m <= hi; m++) if (E[m] > max * rel) c[pc(m)] += E[m];
+  const cm = Math.max(...c) || 1; return c.map(x => x / cm);
+}
+// 마이크 화음 추적: 건반을 친 순간 직후의 ‘새로 생긴 소리’를 따로 봄 (앞에서 울리던 소리는 덜어 냄)
+function ChromaTracker() {
+  const T = { env: 0, slow: 0, armed: true, onset: -1e9, preE: null, lastE: null, hist: [] };
+  const mark = (t, pre) => { T.onset = t; T.preE = pre; };
+  T.level = (t, rms, gate, muted) => {
+    T.env = rms > T.env ? T.env + (rms - T.env) * 0.7 : T.env + (rms - T.env) * 0.15;
+    T.slow += (T.env - T.slow) * 0.03;
+    let on = false;
+    if (T.armed && T.env > gate * 1.3 && T.env > T.slow * 1.5) { T.armed = false; if (!muted && t - T.onset > 450) { mark(t, T.lastE); on = true; } }
+    if (!T.armed && (T.env < T.slow * 1.1 || T.env < gate)) T.armed = true;
+    T.muted = muted;
+    return on;
+  };
+  T.spectrum = (t, db, sr, N) => {
+    const r = spectrumNotes(db, sr, N); const { E, lo, hi } = r;
+    // 소리 크기로 못 잡은 ‘친 순간’: 음별 세기가 0.1초 사이에 크게 늘면 새로 친 것
+    let old = null; for (let i = T.hist.length - 1; i >= 0; i--) if (t - T.hist[i].t >= 90) { old = T.hist[i]; break; }
+    if (old && !T.muted && t - T.onset > 600) { let up = 0, tot = 0; for (let m = lo; m <= hi; m++) { up += Math.max(0, E[m] - old.E[m] * 1.1); tot += E[m]; } if (tot > 0 && up / tot > 0.45) mark(old.t + 40, old.E); }
+    T.hist.push({ t, E }); if (T.hist.length > 6) T.hist.shift();
+    let fresh = E;
+    if (T.preE && t - T.onset < 2500) {
+      const F = new Float32Array(E.length); let fm = 0;
+      for (let m = lo; m <= hi; m++) { const pv = T.preE[m] || 0; F[m] = E[m] > pv * 1.15 ? Math.max(E[m] - 0.9 * pv, E[m] * 0.5) : Math.max(0, E[m] - 0.9 * pv); if (F[m] > fm) fm = F[m]; }
+      if (fm > r.max * 0.2) fresh = F;
+    }
+    if (t - T.onset > 380 || T.onset < 0) T.lastE = E; // 친 직후(분석 구간이 새 소리로 다 차기 전)는 ‘앞 소리’로 저장하지 않음
+    let top = 0, tv = 0; for (let m = lo; m <= hi; m++) if (fresh[m] > tv) { tv = fresh[m]; top = m; }
+    return { E: fresh, chroma: chromaOf(fresh, lo, hi), chromaRaw: chromaOf(E, lo, hi), top, max: r.max };
+  };
+  return T;
+}
+// 비교할 코드 후보 (12근음 × 코드 종류)
+const MIC_CANDS = (() => { const a = []; for (let r = 0; r < 12; r++) Object.keys(QUAL).forEach(q => { const pcs = Array.from(new Set(QUAL[q].iv.map(x => pc(r + x[1])))); a.push({ r, q, pcs, key: pcs.slice().sort((x, y) => x - y).join(), main: QUAL[q].lvl > 0 }); }); return a; })();
+function fitScore(c, pcs, n2) { let s = 0; for (const p of pcs) s += c[p]; return s / Math.sqrt(pcs.length * n2 + 1e-9); }
+// 들어야 할 음이 다 들리고, 그 코드가 비슷한 다른 코드보다 더 잘 맞으면 맞음
 function micChordCheck(chroma, pcs, ignore = []) {
-  const T = new Set(pcs);
-  const tv = pcs.map(p => chroma[p]); const tmin = Math.min(...tv);
-  const present = pcs.filter(p => chroma[p] >= 0.16);
-  const wrong = []; for (let p = 0; p < 12; p++) if (!T.has(p) && !ignore.includes(p) && chroma[p] >= Math.max(0.42, tmin * 0.9)) wrong.push(p);
-  const heard = []; for (let p = 0; p < 12; p++) if (chroma[p] >= 0.3) heard.push(p);
-  heard.sort((a, b) => chroma[b] - chroma[a]);
-  return { ok: present.length === pcs.length && !wrong.length, present, wrong, heard: heard.slice(0, 5) };
+  const T = new Set(pcs); const key = pcs.slice().sort((x, y) => x - y).join();
+  const c = chroma.map((v, p) => (ignore.includes(p) && !T.has(p) ? 0 : v));
+  const n2 = c.reduce((a, x) => a + x * x, 0);
+  // 장·단3화음, 7화음의 5음은 근음의 배음과 겹쳐 구별이 어렵고 빠져도 코드가 바뀌지 않으므로 꼭 들리지 않아도 됨
+  const opt = pcs.length >= 3 && pcs.includes(pc(pcs[0] + 7)) ? pc(pcs[0] + 7) : -1;
+  const present = pcs.filter(p => c[p] >= 0.2 || p === opt);
+  const ts = fitScore(c, pcs, n2);
+  let bs = -1, best = null;
+  for (const k of MIC_CANDS) { if (!k.main || k.key === key) continue; const s = fitScore(c, k.pcs, n2); if (s > bs) { bs = s; best = k; } }
+  const strong = []; for (let p = 0; p < 12; p++) if (!T.has(p) && c[p] >= 0.75) strong.push(p);
+  const ok = present.length === pcs.length && ts >= bs * 0.985 && !strong.length;
+  const wrong = []; for (let p = 0; p < 12; p++) if (!T.has(p) && c[p] >= 0.45) wrong.push(p);
+  wrong.sort((a, b) => c[b] - c[a]);
+  return { ok, present, wrong: wrong.slice(0, 2), heard: micHeard(c), score: ts, rival: best };
+}
+// 들린 소리를 사람이 이해할 만큼만: 가장 잘 맞는 코드의 음, 아니면 센 음 4개까지
+function micHeard(c) {
+  const id = micIdentify(c); if (id && id.score > 0.86) return id.pcs.slice();
+  const ps = []; for (let p = 0; p < 12; p++) if (c[p] >= 0.45) ps.push(p);
+  return ps.sort((a, b) => c[b] - c[a]).slice(0, 4);
+}
+function micIdentify(c) {
+  const n2 = c.reduce((a, x) => a + x * x, 0); if (!n2) return null;
+  let best = null, bs = -1;
+  for (const k of MIC_CANDS) { const s = fitScore(c, k.pcs, n2) - (k.main ? 0 : 0.02) - (k.pcs.length > 4 ? 0.02 : 0); if (s > bs) { bs = s; best = k; } }
+  return best ? { r: best.r, q: best.q, pcs: best.pcs, score: bs } : null;
 }
 
 const Mic = {
   state: 'idle', stream: null, src: null, an: null, tbuf: null, fbuf: null, hp: null,
   subs: new Set(), stateSubs: new Set(), raf: 0, relT: 0, perm: null, frame: null, zeroSince: 0, silentWarned: false, detail: '',
-  env: 0, slow: 0, lastOnset: 0, armed: true, n: 0,
+  lastOnset: 0, n: 0, trk: null,
   secure() { return !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia); },
   embeddedBlocked() { try { const pp = document.permissionsPolicy || document.featurePolicy; if (pp && pp.allowsFeature) return !pp.allowsFeature('microphone'); } catch (e) { } return false; },
   running() { return !!(this.stream && this.stream.active && this.an); },
@@ -1497,8 +1627,8 @@ const Mic = {
         this.src.connect(this.hp); this.hp.connect(this.an);
         const tr = this.stream.getAudioTracks()[0]; this.label = tr ? tr.label : '';
         if (tr) tr.onended = () => { this.teardown(); this.setState('ended'); };
-        this.zeroSince = performance.now(); this.env = 0; this.slow = 0;
-        this.setState('on'); this.loop();
+        this.zeroSince = performance.now(); this.trk = ChromaTracker();
+        this.setState('on'); this.loop(); setTimeout(autoOut, 300);
         return true;
       } catch (e) { this.teardown(); this.setState('error', e.message || ''); return false; }
     })();
@@ -1523,19 +1653,15 @@ const Mic = {
     const rms = Math.sqrt(ss / b.length);
     if (peak > 1e-6) this.zeroSince = pnow; else if (!this.silentWarned && pnow - this.zeroSince > 3000) { this.silentWarned = true; toast('마이크 소리가 전혀 들어오지 않아요. 폰의 ‘마이크 접근’이 켜져 있는지 확인해 주세요.', 6000); }
     const gate = Math.max(S().noise * 2.5, 0.002) / clamp(S().micSens || 1, 0.4, 3);
-    this.env = rms > this.env ? this.env + (rms - this.env) * 0.7 : this.env + (rms - this.env) * 0.15;
-    this.slow += (this.env - this.slow) * 0.03;
     const muted = ctx.currentTime < synthMuteUntil;
-    if (this.armed && this.env > gate * 1.3 && this.env > this.slow * 1.5) { this.armed = false; if (!muted) this.lastOnset = pnow; }
-    if (!this.armed && (this.env < this.slow * 1.1 || this.env < gate)) this.armed = true;
+    const T = this.trk || (this.trk = ChromaTracker());
+    T.level(pnow, rms, gate, muted); this.lastOnset = T.onset;
     this.n++;
-    const fr = { pt: pnow, rms, loud: rms > gate, muted, onset: this.lastOnset, chroma: null, E: null };
+    const fr = { pt: pnow, rms, loud: rms > gate, muted, onset: T.onset, chroma: null, chromaRaw: null, E: null };
     if (fr.loud && !muted && this.n % 2 === 0) {
       this.an.getFloatFrequencyData(this.fbuf);
-      const r = spectrumNotes(this.fbuf, sr, this.an.fftSize);
-      fr.chroma = r.chroma; fr.E = r.E;
-      let bm = 0, bv = 0; for (const k in r.E) if (r.E[k] > bv) { bv = r.E[k]; bm = +k; }
-      fr.top = bv > 0 ? bm : 0;
+      const r = T.spectrum(pnow, this.fbuf, sr, this.an.fftSize);
+      fr.chroma = r.chroma; fr.chromaRaw = r.chromaRaw; fr.E = r.E; fr.top = r.top;
     }
     this.frame = fr;
     this.subs.forEach(fn => { try { fn(fr); } catch (e) { console.error(e); } });
@@ -1599,7 +1725,7 @@ function Judge(on) {
     let why = '';
     if (ok && target.exact) { const ex = target.exact.slice().sort((a, b) => a - b); ok = ex.length === ns.length && ex.every((m, i) => m === ns[i]); if (!ok) why = 'voicing'; }
     else if (ok && target.bass != null && pc(ns[0]) !== target.bass) { ok = false; why = 'bass'; }
-    if (ok) { done = true; on.ok({ notes: ns, ms: performance.now() - since, src: 'keys' }); return; }
+    if (ok) { done = true; on.ok({ notes: ns, ms: performance.now() - since, src: 'keys', t: Input.last, inSrc: Input.lastSrc }); return; }
     const latch = Array.from(Input.held.values()).some(h => h.src === 'screen') && S().tapMode === 'latch';
     const enough = ns.length >= target.pcs.length || extra.length > 0 || why;
     if (!enough) return;
@@ -1609,10 +1735,12 @@ function Judge(on) {
   const unIn = Input.sub(ev => { if (ev.type === 'down' || ev.type === 'up') evalExact(); });
   const unMic = Mic.sub(fr => {
     if (!target || done || !S().useMic || !fr.chroma) return;
-    if (fr.onset < since || fr.pt - fr.onset > 2500) { micOk = 0; return; }
-    const r = micChordCheck(fr.chroma, target.single ? [target.pcs[0]] : target.pcs, target.ignore || []);
-    if (target.single) { let best = 0; for (let p = 1; p < 12; p++) if (fr.chroma[p] > fr.chroma[best]) best = p; const second = Math.max(...fr.chroma.filter((_, p) => p !== best)); r.ok = best === target.pcs[0] && second < 0.75; r.heard = [best]; r.present = r.ok ? [best] : []; }
-    if (r.ok) { micBad = 0; if (++micOk >= 3) { done = true; on.ok({ ms: performance.now() - since, src: 'mic', heard: r.heard }); } }
+    if (fr.onset < since - 150 || fr.pt - fr.onset > 1400) { micOk = 0; return; }
+    if (fr.pt - fr.onset < 110) return;
+    let r;
+    if (target.single) { const c = fr.chroma; let best = 0; for (let p = 1; p < 12; p++) if (c[p] > c[best]) best = p; const second = Math.max(...c.filter((_, p) => p !== best)); r = { ok: best === target.pcs[0] && second < 0.7, heard: [best], present: [], wrong: [] }; if (r.ok) r.present = [best]; }
+    else r = micChordCheck(fr.chroma, target.pcs, target.ignore || []);
+    if (r.ok) { micBad = 0; if (++micOk >= 3) { done = true; on.ok({ ms: performance.now() - since, src: 'mic', heard: r.heard, t: fr.onset, inSrc: 'mic' }); } }
     else { micOk = 0; if (++micBad === 14) { const key = r.heard.join(','); if (key !== lastWrongKey) { lastWrongKey = key; on.wrong({ src: 'mic', heard: r.heard, missing: target.pcs.filter(p => !r.present.includes(p)), wrongPcs: r.wrong }); } } }
   });
   return {
@@ -1624,15 +1752,91 @@ function Judge(on) {
   };
 }
 
+/* ================= 듣는 장치·지연 시간 ================= */
+// 장치마다 따로 저장: tap(화면 두드림 지연), play(피아노 MIDI·마이크 지연), vis(화면 늦춤, null이면 자동)
+function outsInit() {
+  const s = S();
+  if (!Array.isArray(s.outs) || !s.outs.length) s.outs = [
+    { id: 'base', name: '폰 스피커 · 유선 이어폰', bt: false, tap: null, play: null, rep: null, vis: null },
+    { id: 'bt', name: '블루투스 이어폰', bt: true, tap: null, play: null, rep: null, vis: null }];
+  if (!s.outs.some(o => o.id === s.out)) s.out = s.outs[0].id;
+  if (s.autoOut == null) s.autoOut = true;
+}
+function curOut() { const s = S(); if (!Array.isArray(s.outs) || !s.outs.length) outsInit(); return s.outs.find(o => o.id === s.out) || s.outs[0]; }
+function outShort(o) { return o.bt ? '블루투스' : o.id === 'base' ? '스피커' : o.name; }
+const latOf = o => typeof o.tap === 'number' ? o.tap : typeof o.play === 'number' ? o.play : null;
+function visAuto(o) { const b = S().outs[0]; if (!o || o === b) return 0; const a = latOf(o), c = latOf(b); if (a == null || c == null) return 0; const d = (a - c) - ((o.rep || 0) - (b.rep || 0)); return clamp(Math.round(d * 200) * 5, 0, 400); }
+function visOf(o) { return o.vis != null ? o.vis : visAuto(o); }
+function visDelay() { try { return visOf(curOut()) / 1000; } catch (e) { return 0; } }
+// 입력 방식별로 빼 줄 지연 (초)
+function inLat(src) {
+  const o = curOut(), def = AudioEng.outLat() * 0.3 + 0.07;
+  if (src === 'screen') return typeof o.tap === 'number' ? o.tap : typeof o.play === 'number' ? o.play + 0.02 : def;
+  return typeof o.play === 'number' ? o.play : typeof o.tap === 'number' ? o.tap - 0.02 : def;
+}
+function measured(src) { const o = curOut(); return src === 'screen' ? typeof o.tap === 'number' : typeof o.play === 'number'; }
+// performance.now() 시각 → 소리 시계(스피커에서 지금 나오는 소리 기준)
+function perfToCtx(tp) {
+  const c = AudioEng.ctx; if (!c) return 0;
+  try { const ts = c.getOutputTimestamp && c.getOutputTimestamp(); if (ts && ts.performanceTime > 0 && ts.contextTime > 0) return ts.contextTime + (tp - ts.performanceTime) / 1000; } catch (e) { }
+  return c.currentTime - AudioEng.outLat() - (performance.now() - tp) / 1000;
+}
+// 화면에 보여 줄 ‘지금 들리는 박’ 시각
+function audibleNow() { return perfToCtx(performance.now()) - visDelay(); }
+function outDesc(o) { const f = v => typeof v === 'number' ? Math.round(v * 1000) + 'ms' : '아직 안 잼'; return `화면 두드림 ${f(o.tap)} · 피아노 ${f(o.play)} · 화면 늦춤 ${visOf(o)}ms${o.vis == null ? ' (자동)' : ''}`; }
+const outHooks = new Set();
+function onOut(fn) { outHooks.add(fn); return () => outHooks.delete(fn); }
+function setOut(id) { const s = S(); const o = s.outs.find(x => x.id === id); if (!o || id === s.out) return false; s.out = id; if (o.bt) s.lastBt = id; saveDB(); drawOutBtns(); outHooks.forEach(fn => { try { fn(); } catch (e) { } }); return true; }
+function outBtnHTML(full) { const o = curOut(); return `<button class="outb" type="button" data-outbtn${full ? ' data-full' : ''} aria-label="듣는 장치 바꾸기">${ICONS.ear}<span>${esc(full ? o.name : outShort(o))}</span></button>`; }
+function drawOutBtns() { const o = curOut(); $$('[data-outbtn]').forEach(b => { const s = $('span', b); if (s) s.textContent = b.hasAttribute('data-full') ? o.name : outShort(o); }); }
+function outListHTML() { return `<div class="olist">${S().outs.map(o => `<button class="orow${o.id === S().out ? ' on' : ''}" type="button" data-oid="${o.id}"><i></i><span class="grow"><b>${esc(o.name)}</b><br><span class="tiny muted">${outDesc(o)}</span></span></button>`).join('')}</div>`; }
+function outSheet() {
+  const sh = openSheet(`<h3>듣는 장치</h3><p class="small muted" style="margin:0 0 4px">소리를 듣는 장치를 고르면, 그 장치로 잰 지연 시간으로 박자를 판정하고 화면도 소리에 맞춰 늦춰요.</p>${outListHTML()}<button class="btn wide mt" type="button" data-gost="1">${ICONS.metro}지연 시간 재기 · 장치 관리</button>`);
+  sh.addEventListener('click', e => {
+    const r = e.target.closest('[data-oid]'); if (r) { const ch = setOut(r.dataset.oid); sheetDone(() => { if (ch) { toast('듣는 장치: ' + curOut().name); } }); return; }
+    if (e.target.closest('[data-gost]')) sheetDone(() => go('latency'));
+  });
+}
+document.addEventListener('click', e => { if (e.target.closest && e.target.closest('[data-outbtn]')) outSheet(); });
+/* 블루투스 연결 감지: 마이크 장치 이름으로 판단 (마이크를 한 번 허용해야 이름이 보임) */
+const isBtLabel = l => /bluetooth|airpods|buds|hands-?free|블루투스/i.test(l || '');
+let btSeen = null;
+async function autoOut() {
+  const s = S(); if (!s.autoOut || !navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+  let L = []; try { L = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.label && (d.kind === 'audioinput' || d.kind === 'audiooutput')); } catch (e) { return; }
+  if (!L.length) return;
+  const bt = L.some(d => isBtLabel(d.label)), prev = btSeen; btSeen = bt;
+  if (prev !== null && prev === bt) return;
+  if (prev === null && !bt) return;
+  if (bt === !!curOut().bt) return;
+  const pick = bt ? (s.outs.find(o => o.bt && o.id === s.lastBt) || s.outs.find(o => o.bt)) : s.outs.find(o => !o.bt);
+  if (pick && setOut(pick.id)) toast(`${bt ? '블루투스가 연결되어' : '블루투스 연결이 끊겨'} 듣는 장치를 ‘${pick.name}’${euro(pick.name)} 바꿨어요`, 3500);
+}
+if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) navigator.mediaDevices.addEventListener('devicechange', () => setTimeout(autoOut, 500));
+// 박자 맞춘 시각들에서 지연 구하기 (박보다 조금 일찍 친 것도 맞게 계산)
+function offsetFrom(xs, I) {
+  if (xs.length < 8) return null;
+  let sx = 0, sy = 0; xs.forEach(x => { const a = 2 * Math.PI * x / I; sx += Math.cos(a); sy += Math.sin(a); });
+  let mu = Math.atan2(sy, sx) / (2 * Math.PI) * I; if (mu < -0.15) mu += I;
+  const diffs = xs.map(x => x - Math.round((x - mu) / I) * I); const med = median(diffs), mad = median(diffs.map(x => Math.abs(x - med)));
+  return mad < 0.05 ? med : null;
+}
+
 /* ================= 화면 건반 ================= */
 const WHITE_OF_PC = [0, -1, 1, -1, 2, 3, -1, 4, -1, 5, -1, 6];
 const BLACK_OFF = { 1: -0.1, 3: 0.1, 6: -0.12, 8: 0, 10: 0.12 };
 function wIndex(m) { const o = Math.floor(m / 12), p = pc(m); return WHITE_OF_PC[p] >= 0 ? o * 7 + WHITE_OF_PC[p] : o * 7 + WHITE_OF_PC[p - 1] + 1; }
 function whiteAt(wi) { const o = Math.floor(wi / 7), k = ((wi % 7) + 7) % 7; return o * 12 + LET_PC[k]; }
 const KB_MIN = 36, KB_MAX = 96; // C2 ~ C7
-function kbKeyW() { return { big: 46, mid: 37, small: 29 }[S().kbSize || 'mid'] || 37; }
+// 한 화면에 보일 흰 건반 수: 가로·세로 화면마다 따로 정함 (0이면 화면 크기에 맞춰 자동)
+const isLand = () => window.innerWidth > window.innerHeight;
+function kbCount(w) { const land = isLand(); const v = S()[land ? 'kbL' : 'kbP']; if (v) return clamp(v, 5, 29); return land ? clamp(Math.round(w / 84), 8, 15) : clamp(Math.floor(w / 37), 7, 29); }
+const KB_STEPS = [5, 6, 7, 8, 9, 10, 11, 12, 14, 15, 17, 19, 22];
 function Keyboard(host, o = {}) {
-  host.innerHTML = `<div class="kbwrap"><div class="kbbar"><button type="button" data-k="lo" aria-label="왼쪽(낮은 음)으로">${ICONS.left}</button><span class="kbr"></span>${o.latchBar !== false ? `<button type="button" data-k="mode" aria-label="누르는 방식"></button><button type="button" data-k="clr" aria-label="건반 모두 떼기">${ICONS.eraser}</button>` : ''}<button type="button" data-k="hi" aria-label="오른쪽(높은 음)으로">${ICONS.right}</button></div><div class="pkb"><div class="pkb-in"></div></div></div>`;
+  const lb = o.latchBar !== false;
+  const B = (k, lab, inner) => `<button type="button" data-k="${k}" aria-label="${lab}">${inner}</button>`;
+  host.innerHTML = `<div class="kbwrap"><div class="kbbar">${B('lo', '왼쪽(낮은 음)으로', ICONS.left)}<span class="kbr"></span>${B('zm', '건반 크게 (적게 보기)', '크게')}${B('zp', '건반 작게 (많이 보기)', '작게')}${lb ? B('mode', '누르는 방식', '') + B('clr', '건반 모두 떼기', ICONS.eraser) : ''}${B('hi', '오른쪽(높은 음)으로', ICONS.right)}</div>
+    <div class="kbmain"><div class="kbside">${B('lo', '왼쪽(낮은 음)으로', ICONS.left)}${lb ? B('mode', '누르는 방식', '') + B('clr', '건반 모두 떼기', ICONS.eraser) : ''}</div><div class="pkb"><div class="pkb-in"></div></div><div class="kbside">${B('hi', '오른쪽(높은 음)으로', ICONS.right)}${B('zm', '건반 크게 (적게 보기)', '크게')}${B('zp', '건반 작게 (많이 보기)', '작게')}</div></div></div>`;
   host.setAttribute('data-kb', '1');
   const inner = $('.pkb-in', host), rl = $('.kbr', host);
   let start = wIndex(o.start || 60), n = 9, marks = {}, labels = {}, fingers = {};
@@ -1640,7 +1844,7 @@ function Keyboard(host, o = {}) {
   const latchMode = () => o.latch !== false && S().tapMode === 'latch';
   function layout() {
     const w = inner.clientWidth || host.clientWidth || 340;
-    n = clamp(Math.floor(w / kbKeyW()), 7, 29);
+    n = kbCount(w);
     start = clamp(start, wIndex(KB_MIN), wIndex(KB_MAX) - n + 1);
     draw();
   }
@@ -1661,7 +1865,7 @@ function Keyboard(host, o = {}) {
     }
     inner.innerHTML = h;
     rl.textContent = `${noteFull(whiteAt(start))} ~ ${noteFull(whiteAt(end))}`;
-    const mb = $('[data-k="mode"]', host); if (mb) { mb.textContent = latchMode() ? '콕콕' : '꾹'; mb.classList.toggle('on', latchMode()); mb.title = latchMode() ? '하나씩 눌러 켜고 끄기' : '누르는 동안만 소리'; }
+    $$('[data-k="mode"]', host).forEach(mb => { mb.textContent = latchMode() ? '콕콕' : '꾹'; mb.classList.toggle('on', latchMode()); mb.title = latchMode() ? '하나씩 눌러 켜고 끄기' : '누르는 동안만 소리'; });
     paint();
   }
   function paint() {
@@ -1672,11 +1876,11 @@ function Keyboard(host, o = {}) {
     });
   }
   function keyAt(x, y) { const e = document.elementFromPoint(x, y); const k = e && e.closest && e.closest('[data-m]'); return k && inner.contains(k) ? +k.dataset.m : null; }
-  function press(m) {
+  function press(m, ts) {
     if (latchMode()) {
       if (latch.has(m)) { latch.delete(m); Input.up(m, 'screen'); }
-      else { latch.add(m); if (o.sound !== false) Synth.play(m, 1.1, 0, 0.7); Input.down(m, 'screen'); }
-    } else { if (o.sound !== false) Synth.on(m, 0.72); Input.down(m, 'screen'); }
+      else { latch.add(m); if (o.sound !== false) Synth.play(m, 1.1, 0, 0.7); Input.down(m, 'screen', 0.8, ts); }
+    } else { if (o.sound !== false) Synth.on(m, 0.72); Input.down(m, 'screen', 0.8, ts); }
     if (o.onPress) o.onPress(m);
     paint();
   }
@@ -1685,7 +1889,7 @@ function Keyboard(host, o = {}) {
     e.preventDefault(); AudioEng.ensure();
     const m = keyAt(e.clientX, e.clientY); if (m == null) return;
     try { inner.setPointerCapture(e.pointerId); } catch (err) { }
-    ptr.set(e.pointerId, m); press(m);
+    ptr.set(e.pointerId, m); press(m, e.timeStamp);
   });
   inner.addEventListener('pointermove', e => {
     if (!ptr.has(e.pointerId) || latchMode()) return;
@@ -1696,9 +1900,15 @@ function Keyboard(host, o = {}) {
   const end = e => { if (!ptr.has(e.pointerId)) return; const m = ptr.get(e.pointerId); ptr.delete(e.pointerId); if (![...ptr.values()].includes(m)) release(m); };
   ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => inner.addEventListener(t, end));
   inner.addEventListener('contextmenu', e => e.preventDefault());
-  $('.kbbar', host).addEventListener('click', e => {
+  host.addEventListener('click', e => {
     const b = e.target.closest('[data-k]'); if (!b) return; const k = b.dataset.k;
-    if (k === 'lo') { start -= 7; layout(); } else if (k === 'hi') { start += 7; layout(); }
+    if (k === 'lo') { start -= Math.min(7, Math.max(3, n - 3)); layout(); } else if (k === 'hi') { start += Math.min(7, Math.max(3, n - 3)); layout(); }
+    else if (k === 'zm' || k === 'zp') {
+      const key = isLand() ? 'kbL' : 'kbP'; let i = KB_STEPS.findIndex(x => x >= n); if (i < 0) i = KB_STEPS.length - 1;
+      const nv = KB_STEPS[clamp(i + (k === 'zp' ? (KB_STEPS[i] === n ? 1 : 0) : -1), 0, KB_STEPS.length - 1)];
+      S()[key] = nv; saveDB(); const mid = start + n / 2; n = nv; start = Math.round(mid - nv / 2); layout(); if (api.onResize) api.onResize();
+      toast(`흰 건반 ${nv}개씩 보여요 (${isLand() ? '가로' : '세로'} 화면)`, 1600);
+    }
     else if (k === 'mode') { clearLatch(); S().tapMode = latchMode() ? 'hold' : 'latch'; saveDB(); draw(); toast(latchMode() ? '콕콕 모드: 건반을 하나씩 눌러 켜 두고, 다시 누르면 꺼져요' : '꾹 모드: 누르고 있는 동안만 소리가 나요. 여러 손가락으로 함께 누르세요', 3500); }
     else if (k === 'clr') clearLatch();
   });
@@ -1739,9 +1949,9 @@ function clearKb(kb) { kb.setLabels({}); kb.setFingers({}); kb.mark({}); }
 function InputBar(host, o = {}) {
   const draw = () => {
     const midi = Midi.state === 'ready';
-    host.innerHTML = `<div class="inbar"><span class="inpill on">${ICONS.touch}화면 건반</span>
+    host.innerHTML = `<div class="inbar"><span class="inpill on land-hide">${ICONS.touch}화면 건반</span>
       ${Midi.supported() && S().midiOn ? `<button type="button" class="inpill ${midi ? 'on' : ''}" data-ib="midi">${ICONS.midi}${midi ? 'MIDI 연결됨' : 'MIDI 없음'}</button>` : ''}
-      ${o.mic !== false ? `<button type="button" class="inpill ${S().useMic && Mic.running() ? 'on live' : ''}" data-ib="mic">${ICONS.mic}${S().useMic ? (Mic.running() ? '마이크 듣는 중' : '마이크 켜는 중…') : '마이크 끔'}</button>` : ''}</div>`;
+      ${o.mic !== false ? `<button type="button" class="inpill ${S().useMic && Mic.running() ? 'on live' : ''}" data-ib="mic">${ICONS.mic}${S().useMic ? (Mic.running() ? '마이크 듣는 중' : '마이크 켜는 중…') : '마이크 끔'}</button>` : ''}${o.out ? `<button type="button" class="inpill on" data-outbtn>${ICONS.ear}<span>${esc(outShort(curOut()))}</span></button>` : ''}</div>`;
   };
   host.addEventListener('click', async e => {
     const b = e.target.closest('[data-ib]'); if (!b) return;
@@ -1751,10 +1961,10 @@ function InputBar(host, o = {}) {
     const ok = await micOn(); if (!ok) { S().useMic = false; saveDB(); }
     draw(); if (o.onMic) o.onMic(ok);
   });
-  const un1 = Midi.onState(draw), un2 = Mic.onState(draw);
+  const un1 = Midi.onState(draw), un2 = Mic.onState(draw), un3 = onOut(draw);
   draw();
   if (S().useMic && o.mic !== false) micOn().then(ok => { if (!ok) { S().useMic = false; saveDB(); } draw(); });
-  return { destroy() { un1(); un2(); }, draw };
+  return { destroy() { un1(); un2(); un3(); }, draw };
 }
 
 /* ================= 공통 조각 ================= */
@@ -1788,7 +1998,19 @@ function fixText(ch, info) {
   miss.forEach(p => parts.push(`${nameOfPc(p, ch)}${iga(nameOfPc(p, ch))} 빠졌어요`));
   return parts.join(' · ');
 }
+// 마이크로 들은 소리를 코드 이름 하나로 정리
+function micReading(fr) {
+  const heard = micHeard(fr.chroma); const id = micIdentify(fr.chroma);
+  if (id && id.score > 0.86 && heard.length >= 3) {
+    const ch = makeChord(id.r, id.q); const b = fr.top ? pc(fr.top) : id.r; let inv = 0;
+    if (b !== id.r && ch.pcs.includes(b)) { inv = ch.pcs.indexOf(b); ch.bass = ch.tones[inv]; }
+    return { kind: 'chord', ch, inv, heard };
+  }
+  if (heard.length === 1 && fr.top) return { kind: 'note', m: fr.top, heard };
+  return heard.length ? { kind: 'none', pcs: heard, heard } : null;
+}
 function practiceShell(el, topHTML, o = {}) {
+  if (o.tall) el.classList.add('tall');
   el.innerHTML = `<div class="col fx" id="pTop">${o.bar !== false ? '<div id="pBar"></div>' : ''}${topHTML}</div><div id="pKb"></div>`;
   const bar = o.bar !== false ? InputBar($('#pBar', el), o) : null;
   const kb = Keyboard($('#pKb', el), o.kb || {});
@@ -1930,10 +2152,8 @@ defScreen('play', {
     const un = Input.sub(() => requestAnimationFrame(upd));
     const unM = Mic.sub(fr => {
       if (!S().useMic || !fr.chroma || Input.notes().length) return;
-      if (fr.pt - fr.onset > 1500 || fr.pt - micT < 250) return; micT = fr.pt;
-      const ps = []; for (let p = 0; p < 12; p++) if (fr.chroma[p] >= 0.35) ps.push(p);
-      if (!ps.length) return; const lo = fr.top ? pc(fr.top) : ps[0];
-      showIds(identify(ps.map(p => 60 + pc(p - lo) + lo)), true);
+      if (fr.pt - fr.onset < 110 || fr.pt - fr.onset > 1400 || fr.pt - micT < 250) return; micT = fr.pt;
+      const r = micReading(fr); if (r) showIds(r, true);
     });
     showIds(null);
     return () => { un(); unM(); ui.destroy(); };
@@ -1966,7 +2186,7 @@ defScreen('chord', {
   title: p => { const c = chordFromId(p.id); return c ? `${c.sym} 코드` : '코드'; }, fit: true, practice: 'dict', wake: true,
   render(el, p) {
     let ch = chordFromId(p.id); let inv = 0, okN = 0;
-    const ui = practiceShell(el, `<div class="card qcard fx" id="cdCard"></div><div class="tools"><button class="btn" data-pl="both">${ICONS.sound}들어보기</button><button class="btn" data-pl="arp">${ICONS.arp}한 음씩</button><button class="btn" data-pl="block">${ICONS.chord}함께</button></div><div id="cdInv"></div>`);
+    const ui = practiceShell(el, `<div class="card qcard fx" id="cdCard"></div><div class="tools"><button class="btn" data-pl="both">${ICONS.sound}들어보기</button><button class="btn" data-pl="arp">${ICONS.arp}한 음씩</button><button class="btn" data-pl="block">${ICONS.chord}함께</button></div><div id="cdInv"></div>`, { tall: true })
     const judge = Judge({ ok: () => { okN++; chime(true); const v = voicing(ch, inv); const mk = {}; Input.notes().forEach(m => mk[m] = 'ok'); ui.kb.mark(mk); $('#cdFb', el).className = 'fb good'; $('#cdFb', el).textContent = okN > 1 ? `맞았어요! (${okN}번째)` : '맞았어요! 손 모양을 기억해 두세요'; setTimeout(() => { ui.kb.clearLatch(); showChordOnKb(ui.kb, v); judge.set({ pcs: ch.pcs }); }, 1200); }, wrong: info => { $('#cdFb', el).className = 'fb bad'; $('#cdFb', el).textContent = fixText(ch, info); } });
     function render() {
       const v = voicing(ch, inv);
@@ -2050,7 +2270,7 @@ defScreen('lesson', {
   title: p => (LESSONS[p.lvl] || LESSONS[1]).t, fit: true, wake: true, practice: 'lesson',
   render(el, p) {
     const L = LESSONS[p.lvl] || LESSONS[1]; let i = clamp(pref('lsn_' + p.lvl, 0), 0, L.pages.length - 1); let passed = false;
-    const ui = practiceShell(el, `<div class="card fx" id="lsCard" style="overflow:auto;padding:14px 16px"></div><div class="row" style="gap:6px"><button class="btn" id="lsPrev">${ICONS.left}</button><span class="grow center"><button class="btn ghost sm hidden" id="lsNo">건너뛰기</button></span><button class="btn primary" id="lsNext">다음${ICONS.right}</button></div>`);
+    const ui = practiceShell(el, `<div class="card fx" id="lsCard" style="overflow:auto;padding:14px 16px"></div><div class="row" style="gap:6px"><button class="btn" id="lsPrev">${ICONS.left}</button><span class="grow center"><button class="btn ghost sm hidden" id="lsNo">건너뛰기</button></span><button class="btn primary" id="lsNext">다음${ICONS.right}</button></div>`, { tall: true })
     const judge = Judge({
       ok: () => { passed = true; chime(true); const mk = {}; Input.notes().forEach(m => mk[m] = 'ok'); ui.kb.mark(mk); $('#lsFb', el).className = 'fb good'; $('#lsFb', el).textContent = '맞았어요! 다음으로 넘어가세요'; $('#lsNext', el).disabled = false; },
       wrong: info => { const pg = L.pages[i]; const ch = parseSym(pg.task); $('#lsFb', el).className = 'fb bad'; $('#lsFb', el).textContent = fixText(Object.assign(ch, pg.inv ? { bass: voicing(ch, pg.inv)[0].sp } : {}), info); }
@@ -2100,15 +2320,16 @@ defScreen('find', {
       wrong: info => { tries++; if (info.src === 'mic') { fb('bad', `${info.heard.length ? nameOfPc(info.heard[0]) + '처럼 들려요' : '잘 안 들려요'}`); return; } const m = info.notes[info.notes.length - 1]; const mk = {}; mk[m] = 'bad'; ui.kb.mark(mk); fb('bad', exact === 'exact' && pc(m) === pc(cur) ? '이름은 맞았어요. 높이(옥타브)가 달라요' : `그건 ${noteName(m)}${ieyo(noteName(m))}`); setTimeout(() => { if (!judge.done) { ui.kb.clearLatch(); ui.kb.mark({}); } }, 600); }
     });
     const fb = (c, t) => { const f = $('#fdFb', el); if (f) { f.className = 'fb ' + c; f.textContent = t; } };
-    function pool() { const [lo, hi] = exact === 'exact' ? [55, 79] : [60, 71]; const a = []; for (let m = lo; m <= hi; m++) if (range === 'all' || !isBlack(m)) a.push(m); return a; }
+    function pool() { const r = ui.kb.range(); const [lo, hi] = exact === 'exact' ? [Math.max(r[0], 48), Math.min(r[1], 84)] : [60, 71]; const a = []; for (let m = lo; m <= hi; m++) if (range === 'all' || !isBlack(m)) a.push(m); return a; }
     function next() {
       ui.kb.clearLatch(); ui.kb.mark({}); ui.kb.setLabels(Object.fromEntries(Array.from({ length: 61 }, (_, k) => [36 + k, ''])));
       if (cur != null) qi++;
       if (qi >= N) return finish();
+      if (exact === 'exact' && !cur) ui.kb.fit([55, 79]);
       let m; do { m = pick(pool()); } while (m === cur && pool().length > 1); cur = m; tries = 0; t0 = performance.now();
       const sp = isBlack(m) ? (Math.random() < 0.5 ? DEF_SP[pc(m)] : ALT_SP[pc(m)]) : DEF_SP[pc(m)];
       $('#fdCard', el).innerHTML = `<div class="q">이 건반을 찾아 누르세요</div><div class="chord-big">${esc(spName(sp))}</div><div class="sub">${exact === 'exact' ? esc(noteFull(m, sp)) : `어느 자리의 ${esc(spKo(sp))}${hasBatchim(spKo(sp)) ? '이든' : '든'} 괜찮아요`}</div>${isBlack(m) ? `<div class="tiny muted">${esc(sameKeyHint(sp))}</div>` : ''}<div class="fb" id="fdFb"></div>${dotsHTML(N, qi, res)}`;
-      if (exact === 'exact') ui.kb.fit([55, 79]); else ui.kb.fit([60, 71]);
+      if (exact !== 'exact') ui.kb.fit([60, 71]);
       judge.set(exact === 'exact' ? { pcs: [pc(m)], single: true, exact: [m] } : { pcs: [pc(m)], single: true });
     }
     function finish() {
@@ -2146,7 +2367,7 @@ defScreen('steps', {
       cur = { m0, n }; tries = 0;
       const word = Math.abs(n) === 2 && lvl === '12' ? '온음 하나' : `반음 ${Math.abs(n)}칸`;
       $('#stCard', el).innerHTML = `<div class="q">${esc(noteName(m0))}에서</div><div class="chord-big" style="font-size:clamp(2rem,18cqh,3.4rem)">${word} ${n > 0 ? '위' : '아래'}는?</div><div class="sub">${Math.abs(n) === 1 ? '바로 옆 건반이에요' : Math.abs(n) === 2 ? '반음 두 칸이에요' : '검은 건반도 한 칸으로 세요'}</div><div class="fb" id="stFb"></div>${dotsHTML(N, qi, res)}`;
-      ui.kb.fit([m0 - 8, m0 + 8]); const lab = {}; lab[m0] = noteName(m0); ui.kb.setLabels(lab); const mk = {}; mk[m0] = 'tgt'; ui.kb.mark(mk);
+      ui.kb.fit([Math.min(m0, m0 + n) - 1, Math.max(m0, m0 + n) + 1], true); const lab = {}; lab[m0] = noteName(m0); ui.kb.setLabels(lab); const mk = {}; mk[m0] = 'tgt'; ui.kb.mark(mk);
       judge.set({ pcs: [pc(m0 + n)], single: true, exact: [m0 + n] });
     }
     function finish() {
@@ -2257,7 +2478,7 @@ defScreen('name', {
   render(el, p) {
     const qs = NAME_SETS[p.set] || NAME_SETS[1]; const N = 10;
     let qi = 0, res = [], cur = null, prevId = '', names = pref('nmNames', 1), roots = pref('nmRoots', 'white'), timer = 0;
-    const ui = practiceShell(el, `<div class="card qcard fx" id="nmCard"></div><div class="choices" id="nmCh"></div><div class="tools"><button class="btn" id="nmPlay" style="flex:none;padding:0 14px">${ICONS.sound}소리</button><div style="flex:1">${segHTML('nn', [[1, '건반 이름 보기'], [0, '이름 숨기기']], names)}</div></div>`, { bar: false, kb: { latch: false, latchBar: false } });
+    const ui = practiceShell(el, `<div class="card qcard fx" id="nmCard"></div><div class="choices" id="nmCh"></div><div class="tools"><button class="btn" id="nmPlay" style="flex:none;padding:0 14px">${ICONS.sound}소리</button><div style="flex:1">${segHTML('nn', [[1, '건반 이름 보기'], [0, '이름 숨기기']], names)}</div></div>`, { bar: false, tall: true, kb: { latch: false, latchBar: false } });
     function opts(ch) {
       const pool = [];
       qs.forEach(q => { if (q !== ch.q) pool.push(makeChord(ch.root, q)); });
@@ -2303,7 +2524,7 @@ defScreen('ear', {
   render(el, p) {
     const qs = EAR_SETS[p.set] || EAR_SETS[1]; const N = 10;
     let qi = 0, res = [], cur = null, timer = 0, stats = {};
-    const ui = practiceShell(el, `<div class="card qcard fx" id="erCard"></div><div class="choices sans${qs.length > 4 ? ' c3' : ''}" id="erCh">${qs.map(q => `<button class="btn" data-q="${q}"><span>${esc(QUAL[q].read)}</span><small class="muted" style="font-weight:700">${esc(EAR_HINT[q])}</small></button>`).join('')}</div><div class="tools"><button class="btn primary" id="erPlay">${ICONS.sound}다시 듣기</button><button class="btn" id="erArp">${ICONS.arp}한 음씩</button><button class="btn" id="erBlk">${ICONS.chord}함께</button></div>`, { bar: false, kb: { latch: false, latchBar: false } });
+    const ui = practiceShell(el, `<div class="card qcard fx" id="erCard"></div><div class="choices sans${qs.length > 4 ? ' c3' : ''}" id="erCh">${qs.map(q => `<button class="btn" data-q="${q}"><span>${esc(QUAL[q].read)}</span><small class="muted" style="font-weight:700">${esc(EAR_HINT[q])}</small></button>`).join('')}</div><div class="tools"><button class="btn primary" id="erPlay">${ICONS.sound}다시 듣기</button><button class="btn" id="erArp">${ICONS.arp}한 음씩</button><button class="btn" id="erBlk">${ICONS.chord}함께</button></div>`, { bar: false, tall: true, kb: { latch: false, latchBar: false } });
     function next() {
       if (cur) qi++; if (qi >= N) return finish();
       const ch = makeChord(Math.floor(Math.random() * 12), pick(qs));
@@ -2326,7 +2547,7 @@ defScreen('ear', {
       else {
         const mine = makeChord(cur.ch.root, b.dataset.q);
         $('#erCmp', el).onclick = () => { const ctx = AudioEng.ensure(); const t = ctx.currentTime + 0.05; Synth.chord(voicing(mine, 0, 55).map(x => x.m), { when: t, dur: 1.3 }); Synth.chord(cur.v.map(x => x.m), { when: t + 1.6, dur: 1.5 }); };
-        setDock(`<button class="btn primary big wide" id="erNext">다음 문제</button>`).querySelector('#erNext').onclick = () => { setDock(''); next(); };
+        f.insertAdjacentHTML('afterend', `<button class="btn primary sm" id="erNext" style="margin-top:6px">다음 문제${ICONS.right}</button>`); $('#erNext', el).onclick = () => next();
       }
     });
     function finish() {
@@ -2372,7 +2593,7 @@ defScreen('run', {
     let beatsPer = pref('runBeats', 4), bpm = pref('runBpm_' + p.id, isSong ? sg.bpm : 72);
     let seq = [], idx = -1, running = false, t0 = 0, raf = 0, tk = null, bus = null, timers = [], tries = 0, state = [];
     const ts = isSong ? sg.ts : 4;
-    const ui = practiceShell(el, `<div class="plane" id="rnLane"></div><div class="card qcard fx" id="rnCard"></div><button class="optsum" id="rnOpt">${ICONS.sliders}<span id="rnSum"></span>${chev()}</button><button class="btn primary land-only" id="rnGo2"></button>`);
+    const ui = practiceShell(el, `<div class="plane" id="rnLane"></div><div class="card qcard fx" id="rnCard"></div><button class="optsum" id="rnOpt">${ICONS.sliders}<span id="rnSum"></span>${chev()}</button><button class="btn primary land-only" id="rnGo2"></button>`, { out: true });
     $('#rnGo2', el).onclick = () => running ? stop() : start();
     const judge = Judge({ ok: onOk, wrong: info => { tries++; const it = seq[idx]; if (it && it.ch) fb('bad', fixText(it.ch, info)); } });
     const fb = (c, t) => { const f = $('#rnFb', el); if (f) { f.className = 'fb ' + c; f.textContent = t; } };
@@ -2452,10 +2673,14 @@ defScreen('run', {
           timers.push(setTimeout(() => advance(), dur * 1000 + 60));
         } else timers.push(setTimeout(() => advance(), 420));
       } else {
-        const pos = beatPos(); const late = pos - it.start;
-        state[idx] = late <= 0.75 ? 'ok' : 'mid'; chordStat(it.ch.sym, state[idx] === 'ok', info.ms); lane();
+        // 친 시각에서 이 장치·입력 방식의 지연을 빼고, 코드가 바뀐 박과 비교
+        const spb = 60 / bpm, src = info.inSrc === 'midi' ? 'midi' : info.inSrc === 'mic' ? 'mic' : 'screen';
+        const hit = (info.t ? perfToCtx(info.t) : audibleNow()) - inLat(src);
+        const late = (hit - (t0 + it.start * spb)) / spb; const prevSame = idx > 0 && seq[idx - 1].ch && seq[idx - 1].ch.id === it.ch.id;
+        const tol = 0.3, ms = Math.round(Math.abs(late) * spb * 1000);
+        state[idx] = Math.abs(late) <= tol || (late < -tol && prevSame) ? 'ok' : 'mid'; chordStat(it.ch.sym, state[idx] === 'ok', info.ms); lane();
         const mk = {}; Input.notes().forEach(m => mk[m] = 'ok'); ui.kb.mark(mk);
-        fb(state[idx] === 'ok' ? 'good' : 'mid', state[idx] === 'ok' ? '딱 맞았어요!' : '조금 늦었어요');
+        fb(state[idx] === 'ok' ? 'good' : 'mid', state[idx] === 'ok' ? '딱 맞았어요!' : late > 0 ? `조금 늦었어요 (${ms}ms)` : `조금 빨랐어요 (${ms}ms)`);
       }
     }
     function advance() {
@@ -2468,9 +2693,10 @@ defScreen('run', {
         timers.push(setTimeout(advance, seq[n].d * spb * 1000 + 80));
       }
     }
-    const beatPos = () => (AudioEng.ctx.currentTime - AudioEng.outLat() - t0) / (60 / bpm);
-    function start() {
+    const beatPos = () => (audibleNow() - t0) / (60 / bpm);
+    async function start() {
       const ctx = AudioEng.ensure(); if (!ctx) return;
+      if (mode === 'tempo' && await calPrompt(Midi.state === 'ready' ? 'midi' : S().useMic ? 'mic' : 'screen')) return;
       stop(true); build(); running = true; dockBtn();
       bus = ctx.createGain(); bus.gain.value = S().useMic ? 0.6 : 1; bus.connect(AudioEng.master);
       if (mode === 'wait') { idx = -1; advance(); return; }
@@ -2529,6 +2755,7 @@ defScreen('metro', {
   help: '<p>빠르기는 1분에 치는 박 수예요. − + 를 길게 누르면 5씩 바뀌어요.</p><p>탭 단추를 박자에 맞춰 3번 이상 두드리면 그 빠르기로 맞춰요.</p><p>처음 코드를 바꿔 칠 때는 60 정도로 아주 느리게 시작해, 틀리지 않고 칠 수 있으면 조금씩 올려 보세요.</p>',
   render(el) {
     const M = DB.metro; let tk = null, taps = [], holdT = 0, holdI = 0;
+    el.classList.add('mtl');
     function render() {
       el.innerHTML = `<div class="card center fx cq" style="display:flex;flex-direction:column;justify-content:center;gap:4px">
         <div class="beats" id="mtBeats">${Array.from({ length: M.beats }, (_, i) => `<i class="${i === 0 ? 'acc' : ''}"></i>`).join('')}</div>
@@ -2627,12 +2854,10 @@ defScreen('mictest', {
       $('#mtS', el).textContent = '듣고 있어요';
       un = Mic.sub(fr => {
         const lv = $('#mtLv', el); if (lv) lv.style.width = Math.min(100, Math.sqrt(fr.rms) * 260) + '%';
-        if (!fr.chroma || fr.pt - lastT < 200) return; lastT = fr.pt;
-        const ps = []; for (let p = 0; p < 12; p++) if (fr.chroma[p] >= 0.35) ps.push(p);
-        ps.sort((a, b) => fr.chroma[b] - fr.chroma[a]);
-        const lo = fr.top ? pc(fr.top) : ps[0]; const r = ps.length >= 3 ? identify(ps.map(p => 60 + pc(p - lo) + lo)) : null;
-        $('#mtH', el).innerHTML = r && (r.kind === 'chord') ? symHTML(r.ch) : esc(ps.slice(0, 4).map(p => nameOfPc(p)).join(' '));
-        $('#mtS', el).textContent = `들리는 음: ${ps.slice(0, 5).map(p => nameOfPc(p)).join(' ')}`;
+        if (!fr.chroma || fr.pt - lastT < 200 || fr.pt - fr.onset < 110 || fr.pt - fr.onset > 1400) return; lastT = fr.pt;
+        const r = micReading(fr); if (!r) return;
+        $('#mtH', el).innerHTML = r.kind === 'chord' ? symHTML(r.ch) : esc(r.heard.map(p => nameOfPc(p)).join(' '));
+        $('#mtS', el).textContent = `들리는 음: ${(r.kind === 'chord' ? r.ch.tones.map(t => spName(t)) : r.heard.map(p => nameOfPc(p))).join(' ')}`;
       });
     });
     return () => { if (un) un(); };
@@ -2671,9 +2896,15 @@ defScreen('settings', {
       <div class="sec-title" style="margin-top:8px">화면 건반</div>
       <div class="card stack">
         <div><span class="label">누르는 방식</span>${segHTML('tm', [['latch', '콕콕 (하나씩 켜기)'], ['hold', '꾹 (누르는 동안)']], s.tapMode)}<div class="tiny muted" style="margin-top:6px">폰에서 코드를 짚을 때는 ‘콕콕’이 편해요. 건반 위 단추로도 바꿀 수 있어요.</div></div>
-        <div><span class="label">건반 크기 (작게 하면 건반이 많이 보여요)</span>${segHTML('ks', [['big', '크게'], ['mid', '보통'], ['small', '작게']], s.kbSize)}</div>
+        <div><span class="label">가로 화면에 보이는 흰 건반 수</span>${segHTML('kL', [[0, '자동'], [8, '8개'], [10, '10개'], [12, '12개'], [15, '15개']], s.kbL || 0)}<div class="tiny muted" style="margin-top:6px">10개면 한 옥타브 반이에요. 적을수록 건반이 커져요. 건반 옆 ‘크게·작게’ 단추로도 바꿀 수 있어요.</div></div>
+        <div><span class="label">세로 화면에 보이는 흰 건반 수</span>${segHTML('kP', [[0, '자동'], [7, '7개'], [9, '9개'], [12, '12개']], s.kbP || 0)}</div>
         <div><span class="label">건반에 이름 쓰기</span>${segHTML('kl', [['all', '모두'], ['white', '흰 건반'], ['c', '도만'], ['none', '안 씀']], s.keyLabels)}</div>
         <div class="row"><span class="grow"><b>손가락 번호 보이기</b><div class="tiny muted">코드를 보여 줄 때 1·3·5 같은 번호를 함께 보여 줘요</div></span><label class="switch"><input type="checkbox" id="stFg" ${s.showFingers ? 'checked' : ''}><span></span></label></div>
+      </div>
+      <div class="sec-title">박자 맞추기 · 지연 시간</div>
+      <div class="list">
+        <div class="li"><span class="grow"><span class="t">듣는 장치</span><br><span class="d">${esc(outDesc(curOut()))}</span></span>${outBtnHTML()}</div>
+        <button class="li" data-go="latency"><span class="grow"><span class="t">지연 시간 재기</span><br><span class="d">화면 터치·이어폰(블루투스)·피아노의 늦음을 재서 박자 판정을 보정해요</span></span>${chev()}</button>
       </div>
       <div class="sec-title">디지털피아노 (MIDI)</div>
       <div class="list">
@@ -2704,12 +2935,14 @@ defScreen('settings', {
         <div class="row"><span class="grow"><b>자동 전체화면</b><div class="tiny muted">화면을 누르면 주소창 없이 전체화면으로 바뀌어요</div></span><label class="switch"><input type="checkbox" id="stFs" ${s.autoFS ? 'checked' : ''}><span></span></label></div>
         <div class="row"><span class="grow"><b>연습 중 화면 켜 두기</b></span><label class="switch"><input type="checkbox" id="stWl" ${s.wakeLock ? 'checked' : ''}><span></span></label></div>
         <div id="stInst"></div>
+        <button class="btn wide" id="stHow">${ICONS.install}홈 화면에 설치하는 방법</button>
       </div>
       <div class="list mt2"><button class="li" data-go="onboard"><span class="grow"><span class="t">처음 안내 다시 보기</span></span>${chev()}</button></div>
       <p class="center mt2" style="font-family:var(--hand);font-size:1.9rem;margin-bottom:0;color:var(--peony)">Made by 장작&amp;난로</p>
       <p class="center tiny muted" style="margin-top:0">난장이의 피아노 교실 1.0</p>`;
       bindSeg(el, 'tm', v => { s.tapMode = v; saveDB(); });
-      bindSeg(el, 'ks', v => { s.kbSize = v; saveDB(); });
+      bindSeg(el, 'kL', v => { s.kbL = +v; saveDB(); });
+      bindSeg(el, 'kP', v => { s.kbP = +v; saveDB(); });
       bindSeg(el, 'kl', v => { s.keyLabels = v; saveDB(); });
       $('#stFg', el).onchange = e => { s.showFingers = e.target.checked; saveDB(); };
       $('#stMd', el).onchange = async e => { s.midiOn = e.target.checked; saveDB(); if (s.midiOn) { s.midiAsked = true; saveDB(); await Midi.init(); } render(); };
@@ -2728,11 +2961,12 @@ defScreen('settings', {
       if (FS.standalone()) inst.innerHTML = '<div class="small muted">지금 홈 화면 앱으로 실행 중이에요.</div>';
       else if (installEvt) { inst.innerHTML = `<button class="btn primary wide" id="stI">${ICONS.install}홈 화면에 앱으로 설치</button>`; $('#stI', el).onclick = async () => { await doInstall(); render(); }; }
       else inst.innerHTML = `<div class="small muted">${Mic.secure() ? '브라우저 메뉴(⋮)에서 ‘홈 화면에 추가’를 누르면 앱처럼 설치돼요.' : '웹 주소(https)로 열면 홈 화면에 앱으로 설치할 수 있어요.'}</div>`;
+      $('#stHow', el).onclick = () => installSheet(true);
       micStatusText().then(r => { const p = $('#stMic', el); if (p) { p.className = 'status-pill ' + r.cls; p.innerHTML = `<i></i>${r.t}`; } });
     }
     el.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) go(b.dataset.go); });
     render();
-    const un = Midi.onState(() => { if (!el.isConnected) return; });
+    const un = onOut(() => render());
     return () => un();
   }
 });
@@ -2827,7 +3061,7 @@ function runSplash(after) {
     }
   }
   let finished = false, timer = 0;
-  function finish() { if (finished) return; finished = true; clearTimeout(timer); sp.classList.add('out'); splashDone = true; setTimeout(() => { cancelAnimationFrame(raf); sp.remove(); }, 900); }
+  function finish() { if (finished) return; finished = true; clearTimeout(timer); sp.classList.add('out'); splashDone = true; setTimeout(() => { cancelAnimationFrame(raf); sp.remove(); }, 900); maybeInstallOnStart(); }
   const start = () => { put($('#spSmall'), '난장이의', 0.15, false); put($('#spBig'), '피아노 교실', 0.5, true); raf = requestAnimationFrame(draw); timer = setTimeout(finish, matchMedia('(prefers-reduced-motion: reduce)').matches ? 2200 : 4300); after(); };
   sp.addEventListener('click', () => { if (performance.now() - t0 > 300) finish(); });
   const fontsReady = document.fonts && document.fonts.load ? Promise.all([document.fonts.load('40px "Song Myung"', '피아노교실난장이의'), document.fonts.load('30px "Great Vibes"', 'Made by &')]) : Promise.resolve();
@@ -2849,6 +3083,129 @@ initShell();
 Midi.autoInit();
 runSplash(() => go(S().onboarded ? 'home' : 'onboard'));
 if ('serviceWorker' in navigator && location.protocol === 'https:') { window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => { })); }
+
+/* ================= 지연 시간 재기 ================= */
+defScreen('latency', {
+  title: '지연 시간 재기',
+  help: `<p>폰은 소리를 내는 데, 그리고 화면 터치를 알아채는 데 시간이 조금 걸려요. 블루투스 이어폰은 0.1~0.3초나 늦게 들리기도 해요. 이 시간을 재 두면 ‘박자대로’ 연습에서 박자를 정확하게 판정해요.</p><ul><li><b>화면 두드려 재기</b>: 화면 건반으로 연습할 때 쓰는 값이에요.</li><li><b>피아노로 쳐서 재기</b>: 디지털피아노(MIDI)나 마이크로 진짜 피아노를 칠 때 쓰는 값이에요.</li><li>값은 <b>듣는 장치</b>마다 따로 저장돼요. 이어폰을 바꿔 끼면 장치를 먼저 골라 주세요.</li></ul>`,
+  render(el) {
+    let tk = null, timer = 0, unIn = null, unMic = null, raf = 0, prev = null;
+    const f = v => typeof v === 'number' ? `${Math.round(v * 1000)}ms` : '아직 안 잼';
+    const unHook = onOut(() => render());
+    function render() {
+      stopAll(); const o = curOut();
+      el.innerHTML = `<div class="outrow"><span>듣는 장치</span>${outBtnHTML(1)}</div>
+        <div class="kv mt"><div><b>${f(o.tap)}</b><span>화면 두드림</span></div><div><b>${f(o.play)}</b><span>피아노 (MIDI·마이크)</span></div><div><b>${visOf(o)}ms</b><span>화면 늦춤${o.vis == null ? ' (자동)' : ''}</span></div></div>
+        <div class="card mt"><b>화면 두드려 재기</b><p class="small muted" style="margin:6px 0 0">평소처럼 이어폰이나 스피커로 들으면서, ‘틱’ 소리에 맞춰 아래 큰 칸을 16번 두드려 주세요. 화면은 보지 말고 소리에만 맞추세요. 처음 4번은 준비 소리예요.</p><button class="btn primary wide mt" id="lTap">${ICONS.touch}두드려 재기</button></div>
+        <div class="card mt"><b>피아노로 쳐서 재기</b><p class="small muted" style="margin:6px 0 0">디지털피아노(MIDI)를 연결했거나 마이크를 켠 상태에서, ‘틱’ 소리에 맞춰 아무 건반이나 짧게 16번 쳐 주세요.</p><button class="btn wide mt" id="lPlay">${ICONS.keys}피아노로 쳐서 재기</button></div>
+        <div id="lRun"></div>
+        <div class="card mt"><b>화면 늦춤</b><p class="small muted" style="margin:6px 0 0">블루투스 이어폰은 소리가 늦게 들려서 박 표시가 먼저 움직여요. 시작을 누르고, 동그라미가 깜빡이는 순간 ‘틱’이 같이 들리게 맞춰 주세요. 화면이 먼저 보이면 늘리고, 늦게 보이면 줄여요.</p>
+          <div class="row mt" style="justify-content:center;gap:14px"><div class="pulse sm" id="lDot" style="width:64px;height:64px"></div><div class="stepper sm"><button id="lVm">−</button><div class="val"><b id="lV">${visOf(o)}</b><small>ms</small></div><button id="lVp">+</button></div></div>
+          <div class="row mt"><button class="btn grow" id="lVgo">${ICONS.play}보면서 맞추기</button><button class="btn ghost" id="lVa">자동값 ${visAuto(o)}ms</button></div></div>
+        <div class="card mt"><b>장치 관리</b>${outListHTML()}<div class="row wrap" style="gap:6px"><button class="btn sm" id="oAdd">${ICONS.plus}장치 추가</button><button class="btn sm" id="oRen">이름 바꾸기</button>${o.id === S().outs[0].id ? '' : '<button class="btn sm ghost" id="oDel">삭제</button>'}<button class="btn sm ghost" id="lReset">이 장치 값 지우기</button></div>
+          <div class="row mt"><span class="grow"><b>블루투스 연결 자동 감지</b><div class="tiny muted">마이크를 한 번 허용해야 동작해요</div></span><label class="switch"><input type="checkbox" id="oAu" ${S().autoOut ? 'checked' : ''}><span></span></label></div></div>`;
+      $('#lTap', el).onclick = () => run('tap');
+      $('#lPlay', el).onclick = () => run('play');
+      const setV = v => { o.vis = clamp(v, 0, 500); saveDB(); $('#lV', el).textContent = o.vis; };
+      $('#lVm', el).onclick = () => setV(visOf(o) - 10); $('#lVp', el).onclick = () => setV(visOf(o) + 10);
+      $('#lVa', el).onclick = () => { o.vis = null; saveDB(); render(); toast('자동값으로 되돌렸어요'); };
+      $('#lVgo', el).onclick = () => { if (tk) { stopAll(); $('#lVgo', el).innerHTML = ICONS.play + '보면서 맞추기'; return; } preview(); $('#lVgo', el).innerHTML = ICONS.stop + '멈추기'; };
+      $('.olist', el).onclick = e => { const r = e.target.closest('[data-oid]'); if (r) setOut(r.dataset.oid); };
+      $('#oAdd', el).onclick = () => nameSheet('', n => { const x = { id: 'o' + uid(), name: n, bt: true, tap: null, play: null, rep: null, vis: null }; S().outs.push(x); saveDB(); if (!setOut(x.id)) render(); });
+      $('#oRen', el).onclick = () => nameSheet(o.name, n => { o.name = n; saveDB(); render(); drawOutBtns(); });
+      const del = $('#oDel', el); if (del) del.onclick = async () => { if (!(await confirmSheet(`‘${o.name}’ 장치를 지울까요?`, '지우기', true))) return; const id = o.id; setOut(S().outs[0].id); S().outs = S().outs.filter(x => x.id !== id); saveDB(); render(); };
+      $('#lReset', el).onclick = () => { o.tap = o.play = o.rep = null; saveDB(); render(); toast('이 장치의 값을 지웠어요'); };
+      $('#oAu', el).onchange = e => { S().autoOut = e.target.checked; saveDB(); if (e.target.checked) autoOut(); };
+    }
+    function nameSheet(v, done) {
+      const sh = openSheet(`<h3>장치 이름</h3><input class="txt mt" id="nmIn" maxlength="30" placeholder="예: 갤럭시 버즈" value="${esc(v)}"><div class="row mt2"><button class="btn grow" data-a="no">취소</button><button class="btn primary grow" data-a="ok">저장</button></div>`);
+      setTimeout(() => { const i = $('#nmIn', sh); if (i) i.focus(); }, 50);
+      sh.addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (!b) return; const n = ($('#nmIn', sh).value || '').trim(); if (b.dataset.a === 'ok' && n) sheetDone(() => done(n)); else if (b.dataset.a === 'no') sheetDone(); });
+    }
+    function stopAll() { if (tk) tk.stop(); tk = null; clearTimeout(timer); cancelAnimationFrame(raf); if (unIn) unIn(); if (unMic) unMic(); unIn = unMic = null; }
+    function preview() {
+      stopAll(); let T0 = 0; const per = 60 / 80;
+      tk = new Ticker({ bpm: 80, beats: 4, onSched: ev => { if (!T0) T0 = ev.time; } }); tk.start();
+      const step = () => { raf = requestAnimationFrame(step); if (!T0) return; const ph = (audibleNow() - T0) / per; const d = $('#lDot', el); if (d) d.classList.toggle('on', ph >= 0 && (ph % 1) < 0.14); };
+      step();
+    }
+    async function run(mode) {
+      stopAll(); const box = $('#lRun', el);
+      if (mode === 'play' && Midi.state !== 'ready') {
+        if (!S().useMic) { box.innerHTML = `<div class="card mt center small">디지털피아노가 연결되지 않았어요. 마이크로 들을게요.</div>`; }
+        const ok = await micOn(); if (!ok) { box.innerHTML = `<div class="card mt center small">MIDI 연결이나 마이크가 있어야 잴 수 있어요.</div>`; return; }
+      }
+      AudioEng.ensure();
+      const N = 16, PRE = 4, bpm = 90, I = 60 / bpm; const clicks = [], hits = [];
+      box.innerHTML = `<div class="card mt center">${mode === 'tap' ? `<button class="tap" id="lPad" style="min-height:150px;font-size:1.2rem;touch-action:manipulation">‘틱’에 맞춰 여기를 두드리세요</button>` : `<div style="font-family:var(--serif);font-size:1.6rem;margin:10px 0">‘틱’에 맞춰 건반을 치세요</div>`}<div class="small muted mt" id="lCnt">준비 ${PRE}</div></div>`;
+      if (mode === 'tap') $('#lPad', el).addEventListener('pointerdown', e => { e.preventDefault(); hits.push(perfToCtx(e.timeStamp || performance.now())); const c = $('#lCnt', el); if (c && clicks.length) c.textContent = `${hits.length}번 두드렸어요`; });
+      else {
+        unIn = Input.sub(ev => { if (ev.type === 'down' && ev.src === 'midi') { hits.push(perfToCtx(ev.t)); const c = $('#lCnt', el); if (c) c.textContent = `${hits.length}번 들었어요`; } });
+        let lastOn = -1;
+        unMic = Mic.sub(fr => { if (Midi.state === 'ready') return; if (fr.onset > 0 && fr.onset !== lastOn && fr.pt - fr.onset > 110 && fr.pt - fr.onset < 260 && fr.loud && fr.chroma) { lastOn = fr.onset; hits.push(perfToCtx(fr.onset)); const c = $('#lCnt', el); if (c) c.textContent = `${hits.length}번 들었어요`; } });
+      }
+      tk = new Ticker({ bpm, beats: 4, onSched: ev => { if (ev.idx >= PRE && ev.idx < PRE + N) clicks.push(ev.time); if (ev.idx >= PRE + N - 1) tk.sound = false; }, onBeat: ev => { const c = $('#lCnt', el); if (c && ev.idx < PRE) c.textContent = `준비 ${PRE - ev.idx}`; else if (c && ev.idx === PRE && !hits.length) c.textContent = '지금부터 맞춰 주세요'; } });
+      tk.start();
+      timer = setTimeout(() => {
+        stopAll(); if (!clicks.length) return;
+        const t0 = clicks[0], tl = clicks[clicks.length - 1];
+        const xs = hits.filter(t => t > t0 - 0.25 && t < tl + 0.6).map(t => t - t0);
+        const v = offsetFrom(xs, I); const o = curOut();
+        if (v !== null) {
+          o[mode] = +clamp(v, -0.05, 0.6).toFixed(3); o.rep = +AudioEng.outLat().toFixed(3); saveDB();
+          render();
+          $('#lRun', el).innerHTML = `<div class="card mt center"><b>다 됐어요!</b><br>‘${esc(o.name)}’ 장치의 ${mode === 'tap' ? '화면 두드림' : '피아노'} 지연은 <b>${Math.round(o[mode] * 1000)}ms</b>예요. 박자 판정에 이 값을 빼고 계산해요.</div>`;
+        } else $('#lRun', el).innerHTML = `<div class="card mt center"><b>박자가 고르지 않았어요.</b><br>화면은 보지 말고 ‘틱’ 소리에만 맞춰 다시 해 보세요.${mode === 'play' && Midi.state !== 'ready' ? '<br><span class="small muted">마이크로 잴 때는 건반을 짧고 또렷하게 쳐 주세요.</span>' : ''}</div>`;
+      }, (PRE + N) * I * 1000 + 900);
+    }
+    render();
+    return () => { stopAll(); unHook(); };
+  }
+});
+// 박자대로 연습 전에 지연 시간을 아직 안 쟀으면 한 번 권해요
+const askedCal = new Set();
+function calPrompt(src) {
+  return new Promise(res => {
+    const o = curOut(); const key = o.id + src;
+    if (measured(src) || askedCal.has(key)) return res(false);
+    askedCal.add(key);
+    const sh = openSheet(`<h3>지연 시간을 먼저 재 볼까요?</h3><p class="small muted">‘${esc(o.name)}’ 장치는 아직 ${src === 'screen' ? '화면 두드림' : '피아노'} 지연을 재지 않았어요. 30초만 재 두면 ‘딱 맞음’, ‘늦음’ 판정이 정확해져요. 블루투스 이어폰을 쓰신다면 꼭 재 주세요.</p><div class="row mt2"><button class="btn grow" data-a="no">그냥 하기</button><button class="btn primary grow" data-a="go">지금 재기</button></div>`, () => res(false));
+    sh.addEventListener('click', e => { const b = e.target.closest('[data-a]'); if (!b) return; if (b.dataset.a === 'go') { sheetDone(() => { res(true); go('latency'); }); } else sheetDone(); });
+  });
+}
+
+/* ================= 홈 화면에 설치 안내 ================= */
+function installSheet(manual) {
+  if (FS.standalone()) { if (manual) toast('이미 홈 화면 앱으로 실행 중이에요'); return; }
+  let inFrame = false; try { inFrame = window.self !== window.top; } catch (e) { inFrame = true; }
+  if (!manual && (inFrame || S().installNever)) return;
+  const ua = navigator.userAgent;
+  const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const samsung = /SamsungBrowser/i.test(ua), kakao = /KAKAOTALK/i.test(ua), naver = /NAVER/i.test(ua);
+  const kbd = t => `<span class="kbd">${t}</span>`;
+  let how;
+  if (installEvt) how = `<p>아래 <b>설치하기</b>를 누르고, 뜨는 창에서 <b>설치</b>를 누르면 끝이에요.</p>`;
+  else if (kakao || naver) how = `<ol class="steps"><li>오른쪽 아래(또는 위) ${kbd('⋮')} 메뉴를 누르세요</li><li><b>다른 브라우저로 열기</b>(크롬·사파리)를 누르세요</li><li>열린 화면에서 이 안내가 다시 나오면 따라 해 주세요</li></ol>`;
+  else if (ios) how = `<ol class="steps"><li>사파리 아래(또는 위) ${kbd('공유 ⬆')} 단추를 누르세요</li><li>메뉴를 올려 <b>홈 화면에 추가</b>를 누르세요</li><li>오른쪽 위 <b>추가</b>를 누르세요</li></ol>`;
+  else if (samsung) how = `<ol class="steps"><li>아래 ${kbd('≡')} 메뉴를 누르세요</li><li><b>현재 페이지 추가</b> → <b>홈 화면</b>을 누르세요</li></ol>`;
+  else how = `<ol class="steps"><li>오른쪽 위 ${kbd('⋮')} 메뉴를 누르세요</li><li><b>앱 설치</b> 또는 <b>홈 화면에 추가</b>를 누르세요</li><li>뜨는 창에서 <b>설치</b>를 누르세요</li></ol>`;
+  const sh = openSheet(`<div class="center"><div style="width:96px;margin:0 auto 6px">${pianoArt()}</div><h3>홈 화면에 앱으로 설치하세요</h3></div>
+    <p class="small muted">설치하면 아이콘으로 바로 열리고, 주소창 없이 <b>가로 화면 전체</b>를 건반으로 쓸 수 있어요. 인터넷이 없어도 열려요.</p>${how}
+    <div class="row mt2">${installEvt ? '<button class="btn grow" data-a="later">나중에</button><button class="btn primary grow" data-a="inst">설치하기</button>' : '<button class="btn primary grow" data-a="later">알겠어요</button>'}</div>
+    ${manual ? '' : '<button class="btn ghost wide mt" data-a="never">다시 묻지 않기</button>'}`);
+  sh.addEventListener('click', async e => {
+    const b = e.target.closest('[data-a]'); if (!b) return; const a = b.dataset.a;
+    if (a === 'inst') { sheetDone(); await doInstall(); }
+    else if (a === 'never') { S().installNever = true; saveDB(); sheetDone(); toast('설정에서 언제든 설치 방법을 다시 볼 수 있어요'); }
+    else sheetDone();
+  });
+}
+function maybeInstallOnStart() {
+  if (FS.standalone()) return;
+  let waited = 0;
+  const tryShow = () => { if (installEvt || waited >= 2500) { if (!sheetOpen) installSheet(false); return; } waited += 250; setTimeout(tryShow, 250); };
+  setTimeout(tryShow, 300);
+}
 
 </script>
 </body>
