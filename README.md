@@ -1,5 +1,13 @@
 # Sungmo
 
+## 웹에서 열기 (GitHub Pages)
+
+- 앱 목록: https://handscil01-afk.github.io/Sungmo/
+- 성경 부루마블: https://handscil01-afk.github.io/Sungmo/bible-marble/
+- 난장이의 피아노 교실: https://handscil01-afk.github.io/Sungmo/piano/
+
+각 앱은 따로 홈 화면에 설치해서 따로 실행할 수 있습니다. `main` 브랜치에 올린 내용이 몇 분 안에 사이트에 반영됩니다.
+
 ## 성경 부루마블 (`bible-marble/`)
 
 주사위를 굴려 우르에서 예루살렘까지 성경의 땅을 여행하는 보드게임입니다. 파일 하나(`bible-marble/index.html`)로 되어 있어 브라우저로 바로 열 수 있습니다.
