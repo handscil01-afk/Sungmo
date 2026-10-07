@@ -532,3 +532,9 @@ body.np .money{font-size:1.45rem;white-space:nowrap}
 body.np .money small{font-size:.8rem}
 body.np .psub{font-size:.78rem;gap:0 .5rem}
 body.np .ln{font-size:.82rem}
+/* 이어하기 칸: 아래에 "지우기" 작은 버튼 */
+.mi-split{display:flex;flex-direction:column;gap:.35rem;min-width:0}
+.mi-split .mi{flex:1}
+.mi-sub{min-height:2.4rem;border-radius:.9rem;background:var(--paper);color:var(--ink-2);font-family:var(--f-cute);font-size:.95rem;box-shadow:inset 0 0 0 2px var(--line)}
+.mi-sub:hover{color:var(--bad);box-shadow:inset 0 0 0 2px #ffb3c0}
+@media (max-width:640px) and (orientation:portrait){.mi-split{grid-column:1/-1}}

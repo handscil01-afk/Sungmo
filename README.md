@@ -25,12 +25,62 @@
   - **중계 모드**: 방장은 진행자·심판입니다. PC에서는 "게임 화면 창"을 따로 띄워 TV(확장 모니터)에 보여 주고, 진행자 창에서 정답을 보며 판정합니다. 태블릿에서는 한 화면에서 진행하고, 정답은 태블릿에 보이지 않습니다(필요하면 진행자 휴대폰을 PIN으로 "진행자 리모컨"으로 연결해 정답 확인·판정). 참가자 휴대폰에는 내 상황판과 다른 플레이어 목록이 나옵니다. 휴대폰이 없는 팀은 "진행자 조작" 자리로 둘 수 있습니다.
   - 자리마다 고유 ID와 열쇠가 있어서, 새로고침·앱 종료·잠깐 끊김 뒤에도 같은 자리로 돌아갑니다. 방장이 나갔다가 "이어하기"를 누르면 같은 방 코드로 방이 다시 열립니다. 방 코드는 게임판 가운데와 설정 → 멀티플레이에서 보고 복사할 수 있습니다.
   - 게임 중 새 사람이 들어오면 방장에게 "컴퓨터 자리를 넘겨줄지" 묻고, 참가자가 나간 채 돌아오지 않으면 "컴퓨터로 대체할지"(난이도 선택) 묻습니다. 자리를 바꿔도 위치·달란트·땅·건물·카드는 그대로 이어집니다.
-  - 처음 연결할 때 무료 PeerJS 연결 서버를 쓰므로 모든 기기가 인터넷에 연결되어 있어야 하고, 같은 와이파이에서 가장 안정적입니다. PC 중계 모드의 게임 화면 창은 같은 PC 안에서 연결되므로 인터넷이 없어도 됩니다.
+  - 방 공유하기를 누르면 카카오톡·문자 등으로 링크를 보낼 수 있고, 받은 사람은 이름만 적으면 바로 들어옵니다. 다른 브라우저로 다시 들어와도 같은 이름이면 원래 자리로 돌아갑니다.
+  - 대기실에서는 정한 인원까지 컴퓨터로 채워 두고, 사람이 들어오면 컴퓨터 한 자리를 넘겨받습니다(최대 4명). 나간 사람이 잠시 돌아오지 않으면 그 자리는 컴퓨터로 채우고, 인원을 줄여도 들어와 있는 사람은 내보내지 않습니다.
+  - 연결: `js/firebase-config.js`에 Firebase 설정이 있으면 Firebase Realtime Database를 중계 서버로 씁니다(아이폰·카카오톡 앱 안 브라우저·LTE에서도 안정적). 설정이 비어 있으면 PeerJS로 기기끼리 직접 연결합니다. PC 중계 모드의 게임 화면 창은 같은 PC 안에서 연결되므로 인터넷이 없어도 됩니다.
+
+### Firebase 설정 (함께하기 연결)
+
+1. https://console.firebase.google.com 에서 프로젝트를 만듭니다(애널리틱스 끔).
+2. Authentication → 로그인 방법 → **익명**을 켭니다.
+3. Realtime Database → 데이터베이스 만들기(싱가포르 asia-southeast1, 잠금 모드) → 규칙 탭에 아래 규칙을 붙여 넣고 게시합니다.
+4. 프로젝트 설정 → 내 앱 → 웹 앱 등록 → `firebaseConfig` 값을 `bible-marble/js/firebase-config.js`의 `window.FIREBASE_CONFIG`에 넣습니다. 이 값은 공개되어도 되는 식별자이고, 보안은 아래 규칙이 맡습니다(방장만 방 안의 우편함을 읽고, 각 기기는 자기 우편함만 읽고 씀).
+
+```json
+{
+  "rules": {
+    "rooms": {
+      "$code": {
+        "meta": {
+          ".read": "auth != null",
+          ".write": "auth != null && (!data.exists() || data.child('host').val() === auth.uid)",
+          ".validate": "!newData.exists() || newData.child('host').val() === auth.uid"
+        },
+        "hp": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('rooms').child($code).child('meta/host').val() === auth.uid"
+        },
+        "in": {
+          ".read": "auth != null && root.child('rooms').child($code).child('meta/host').val() === auth.uid",
+          ".write": "auth != null && root.child('rooms').child($code).child('meta/host').val() === auth.uid",
+          "$id": {
+            ".write": "auth != null && !data.exists() && newData.child('f').val() === auth.uid",
+            ".validate": "newData.child('s').isString() && newData.child('s').val().length < 8000"
+          }
+        },
+        "q": {
+          "$uid": {
+            ".read": "auth != null && auth.uid === $uid",
+            ".write": "auth != null && (auth.uid === $uid || root.child('rooms').child($code).child('meta/host').val() === auth.uid)"
+          }
+        },
+        "pr": {
+          ".read": "auth != null && root.child('rooms').child($code).child('meta/host').val() === auth.uid",
+          ".write": "auth != null && root.child('rooms').child($code).child('meta/host').val() === auth.uid",
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid"
+          }
+        }
+      }
+    }
+  }
+}
+```
 - 게임 중에는 머리줄을 없애고 게임판을 최대한 크게 보여 줍니다. 게임판 가운데의 ↩️(되돌리기, 확인 후 실행)와 ⚙️(설정) 버튼만 남기고, 설정은 게임·멀티플레이·게임 규칙·퀴즈·컴퓨터·화면·소리·콘텐츠로 나뉩니다.
 - 플레이어 말은 칸 안쪽 가장자리에 놓여 땅 이름과 통행료를 가리지 않고, 같은 칸에 여럿이 있으면 나란히 놓입니다.
 - 홈 화면 설치, 전체화면, 화면 꺼짐 방지, 자동 저장과 이어하기를 지원합니다.
 
-파일 구성: `index.html`(화면 틀), `css/game.css`, `js/`(엔진·AI·화면·통신), `js/data/`(기본 보드·퀴즈·카드), `vendor/peerjs.min.js`(MIT), `sw.js`(오프라인).
+파일 구성: `index.html`(화면 틀), `css/game.css`, `js/`(엔진·AI·화면·통신), `js/data/`(기본 보드·퀴즈·카드), `vendor/peerjs.min.js`(MIT), `vendor/firebase-*-compat.js`(Apache-2.0, 함께하기를 쓸 때만 불러옴), `sw.js`(오프라인).
 
 ## 난장이의 피아노 교실 (`piano/`)
 

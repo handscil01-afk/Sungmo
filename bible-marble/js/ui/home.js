@@ -53,7 +53,8 @@ const Home={
     h.innerHTML=`<div class="logo"><div class="big">${logoHTML('성경 부루마블')}</div><p>주사위를 굴려 성경의 땅을 여행하고, 말씀 퀴즈로 함께 배워요. 🐑🕊️🐟🦁</p></div>
       ${installBanner()}
       <div class="menu">
-        ${save?`<button class="mi resume" data-m="resume"><span class="e">▶️</span><b>이어하기</b><small>${save.G.room?`${MODE_KO[save.G.room.mode]} · 방 ${esc(save.G.room.code)} 다시 열기 · `:''}${esc(save.G.players.map(p=>p.name).join(' · '))} · ${esc(save.G.board.name)} 판 · ${save.G.round}라운드</small></button>`:''}
+        ${save?`<div class="mi-split"><button class="mi resume" data-m="resume"><span class="e">▶️</span><b>이어하기</b><small>${save.G.room?`${MODE_KO[save.G.room.mode]} · 방 ${esc(save.G.room.code)} 다시 열기 · `:''}${esc(save.G.players.map(p=>p.name).join(' · '))} · ${esc(save.G.board.name)} 판 · ${save.G.round}라운드</small></button>
+          <button class="mi-sub" data-m="drop">🗑️ 이어하지 않고 지우기</button></div>`:''}
         ${netSave&&netSave.role==='client'?`<button class="mi resume" data-m="rejoin"><span class="e">📶</span><b>방 다시 들어가기</b><small>방 코드 ${esc(netSave.code)} · 내 자리로 돌아가요</small></button>`:''}
         <button class="mi main" data-m="start"><span class="e">🎲</span><b>게임 시작</b><small>인원과 규칙을 정하고 시작해요</small></button>
         <button class="mi" data-m="net"><span class="e">👥</span><b>함께하기</b><small>방을 만들거나 방 코드로 참가해요</small></button>
@@ -62,7 +63,7 @@ const Home={
         <button class="mi" data-m="settings"><span class="e">⚙️</span><b>화면·소리</b><small>글자 크기, 효과음, 전체화면</small></button>
       </div>`;
     $$('[data-m]',h).forEach(b=>b.onclick=()=>{const m=b.dataset.m;
-      if(m==='resume')App.resume(hasSave());else if(m==='rejoin')Net.rejoin();else if(m==='start')Setup.open();else if(m==='net')NetUI.open();
+      if(m==='resume')App.resume(hasSave());else if(m==='drop')dropSave();else if(m==='rejoin')Net.rejoin();else if(m==='start')Setup.open();else if(m==='net')NetUI.open();
       else if(m==='manage')Manage.open();else if(m==='rules')showRules();else if(m==='settings')Setup.openPrefs()});
     bindInstall(h)}
 };
@@ -144,7 +145,8 @@ const Setup={tab:'people',L:null,
   netHTML(){const host=Net.role==='host',code=Net.code||'',g=this.inGame?VG():null;
     const link=`${location.origin}${location.pathname}#room=${code}`;
     let h=`<div class="sgrid"><div class="srow full"><div class="tx"><b>방 코드 <span class="roomcode">${esc(code)}</span></b><small>${MODE_KO[Net.mode]||''} · 누군가 나갔다가 다시 들어올 때 이 코드를 넣으면 원래 자리로 돌아와요.</small></div>
-      <div class="btnrow"><button class="btn sm" data-copy="${esc(code)}">📋 코드 복사</button><button class="btn sm" data-copy="${esc(link)}">🔗 참가 링크 복사</button></div></div>`;
+      <div class="btnrow"><button class="btn sm main" data-share>📤 방 공유하기</button><button class="btn sm" data-copy="${esc(code)}">📋 코드 복사</button><button class="btn sm" data-copy="${esc(link)}">🔗 링크 복사</button></div></div>
+      <div class="srow full"><div class="tx"><b>연결 상태</b><small>${connInfo()}</small></div></div>`;
     if(!host){const me=g?g.players.find(p=>p.id===Net.mySeat):null;
       h+=`<div class="srow full"><div class="tx"><b>${Net.kind==='remote'?'🎛️ 진행자 리모컨':Net.kind==='display'?'📺 게임 화면':me?`내 자리: ${esc(me.tok)} ${esc(me.name)}`:'구경하는 중'}</b><small>${Net.kind==='remote'?'주관식 정답이 이 기기에만 보여요. 판정과 계속하기를 여기서 할 수 있어요.':me?'내 차례의 행동은 이 기기에서만 할 수 있어요.':'자리가 생기면 방장이 넘겨줄 수 있어요.'}</small></div></div></div>`;return h}
     if(Net.mode==='relay')h+=`<div class="srow"><div class="tx"><b>📺 게임 화면 창 (PC)</b><small>TV·프로젝터(확장 모니터)에 띄울 게임 화면을 새 창으로 열어요. 이 창은 진행자 화면이 되고, 정답은 여기에만 보여요.</small></div><button class="btn sm main" data-disp>📺 게임 화면 창 열기</button></div>
@@ -173,7 +175,7 @@ const Setup={tab:'people',L:null,
       :'사람과 컴퓨터를 섞을 수 있어요. 이 기기 하나로 모두 함께 해요.';
     return `<div class="sgrid" style="margin-bottom:.6rem"><div class="srow full"><div class="tx"><b>몇 명이 할까요?</b><small>${help}</small></div>
       <div class="seg" id="pcount">${[2,3,4].map(n=>`<button type="button" data-v="${n}" class="${P.length===n?'on':''}">${n}명</button>`).join('')}</div></div>
-      ${host?`<div class="srow full"><div class="tx"><b>방 코드 <span class="roomcode">${esc(Net.code)}</span></b><small>참가자 휴대폰에서 함께하기 → 방 참가하기를 누르고 이 코드를 넣어요.</small></div><button class="btn sm" data-copy="${esc(Net.code)}">📋 복사</button></div>`:''}</div>
+      ${host?`<div class="srow full"><div class="tx"><b>방 코드 <span class="roomcode">${esc(Net.code)}</span></b><small>방 공유하기로 링크를 보내면 받은 사람은 이름만 적고 바로 들어와요. 정한 인원까지 컴퓨터로 채워 두고, 사람이 들어오면 컴퓨터 자리를 넘겨받아요.</small></div><div class="btnrow"><button class="btn sm main" data-share>📤 방 공유하기</button><button class="btn sm" data-copy="${esc(Net.code)}">📋 코드 복사</button></div></div>`:''}</div>
       <div class="plist">${P.map((p,k)=>`<div class="pedit" style="--pc:${p.color}">
         <button type="button" class="tok" style="--pc:${p.color}" data-pick="${k}" aria-label="${k+1}번 캐릭터 바꾸기">${esc(p.emoji)}</button>
         <input class="inp" id="pname${k}" maxlength="10" value="${esc(p.name)}" aria-label="${k+1}번 이름" ${p.net?'readonly':''}>
@@ -181,7 +183,10 @@ const Setup={tab:'people',L:null,
         <div class="opts">${kindSeg(p,k)}<button type="button" class="btn sm" data-pick="${k}">🎨 ${PALETTE_KO[PALETTE.indexOf(p.color)]||'색'} · 바꾸기</button></div></div>`).join('')}</div>`},
   bindPane(p){const P=SETUP.players;
     const pc=$('#pcount',p);if(pc)pc.onclick=e=>{const b=e.target.closest('button');if(!b)return;const n=+b.dataset.v;
-      while(P.length>n){const i=P.map(x=>!!x.net||!!x.host).lastIndexOf(false);if(i<0)break;P.splice(i,1)}
+      /* 함께하기 방에서는 컴퓨터(그다음 진행자 조작) 자리만 줄이고, 들어와 있는 사람은 내보내지 않습니다 */
+      if(Net.role==='host'){while(P.length>n){let i=P.map(x=>x.ai&&!x.net&&!x.host).lastIndexOf(true);if(i<0)i=P.map(x=>!!x.op).lastIndexOf(true);if(i<0)break;P.splice(i,1)}
+        if(P.length>n)UI.toast('들어와 있는 사람 자리는 줄일 수 없어요')}
+      else while(P.length>n){const i=P.map(x=>!!x.net||!!x.host).lastIndexOf(false);if(i<0)break;P.splice(i,1)}
       while(P.length<n){const k=P.length,usedC=P.map(x=>x.color),usedE=P.map(x=>x.emoji);P.push({pid:uid('p'),name:DEF_NAMES[k]||'플레이어'+(k+1),ai:true,emoji:TOKENS.find(t=>!usedE.includes(t)),color:PALETTE.find(c=>!usedC.includes(c)),dice:'screen'})}
       saveSetup();Net.lobbyChanged();this.pane()};
     $$('input[id^="pname"]',p).forEach(inp=>inp.oninput=()=>{const k=+inp.id.slice(5);P[k].name=inp.value;saveSetup();Net.lobbyChanged();this.info()});
@@ -200,6 +205,7 @@ const Setup={tab:'people',L:null,
       else if(v==='home'){this.L.close();App.leaveGame()}});
     $$('[data-cm]',p).forEach(b=>b.onclick=()=>Manage.open(b.dataset.cm,()=>this.render()));
     $$('[data-copy]',p).forEach(b=>b.onclick=()=>copyText(b.dataset.copy));
+    $$('[data-share]',p).forEach(b=>b.onclick=()=>shareRoom());
     const dp=$('[data-disp]',p);if(dp)dp.onclick=()=>NetUI.openDisplay();
     $$('[data-toai]',p).forEach(b=>b.onclick=()=>{const q=byId(+b.dataset.toai);pickAiLevel(q.aiLv||G.cfg.ai,lv=>{if(!lv)return;if(q.op){q.op=false;q.ai=true;q.aiLv=lv;UI.render();persist();redispatch()}else Net.toAI(q,lv);this.pane()})});
     $$('[data-lv]',p).forEach(b=>b.onclick=()=>{const q=byId(+b.dataset.lv);pickAiLevel(q.aiLv||G.cfg.ai,lv=>{if(!lv)return;q.aiLv=lv;UI.render();persist();this.pane()})});
@@ -220,6 +226,20 @@ const Setup={tab:'people',L:null,
     saveSetup();this.starting=true;closeLayer('info');this.starting=false;
     startGame({players:P.map(p=>({...p})),cfg:{...SETUP.cfg},room:mode==='local'?null:{code:Net.code,mode}})}
 };
+/* 방 공유: 휴대폰은 공유 창(카카오톡·문자 등), PC는 링크 복사 */
+function roomLink(){return `${location.origin}${location.pathname}#room=${Net.code}`}
+function shareRoom(){if(!Net.code)return;const url=roomLink(),text=`성경 부루마블 방에 초대해요! 링크를 누르고 이름만 적으면 바로 들어와요. (방 코드 ${Net.code})`;
+  if(navigator.share)navigator.share({title:'성경 부루마블',text,url}).catch(e=>{if(e&&e.name!=='AbortError')copyText(url)});else copyText(url)}
+function connInfo(){const via=FB.configured()?'Firebase 중계 서버':window.__NET==='bc'?'같은 기기 안':'PeerJS 직접 연결';
+  if(Net.role==='client')return `${via} · ${Net.conn?'🟢 연결됨':'⚪ 다시 연결하는 중'}${Net.rtt!=null?` · 응답 ${Net.rtt}ms`:''}`;
+  const ms=[...Net.members.values()].filter(m=>m.kind==='player');
+  return `${via} · 참가 기기 ${ms.filter(m=>m.online).length}대 접속 중${ms.some(m=>!m.online)?` · 끊김: ${ms.filter(m=>!m.online).map(m=>esc(m.name)).join(', ')}`:''}`}
+/* 저장된 게임 지우기(이어하지 않음) */
+function dropSave(){const save=hasSave();if(!save)return;
+  const L=openLayer('edit',`<div class="bigpic">🗑️</div><h3>저장된 게임을 지울까요?</h3><div class="mbody"><p>${esc(save.G.players.map(p=>p.name).join(' · '))} · ${esc(save.G.board.name)} 판 · ${save.G.round}라운드 게임을 지워요. 지우면 이어할 수 없어요.${save.G.room?` 방 ${esc(save.G.room.code)}도 다시 열 수 없게 돼요.`:''}</p></div>
+    <div class="mbtns row"><button class="btn wide" data-c>취소</button><button class="btn bad wide" data-ok>지우기</button></div>`,{close:true,tone:'#ff9d9d'});
+  $('[data-c]',L.box).onclick=L.close;
+  $('[data-ok]',L.box).onclick=()=>{L.close();store.del('save');const ss=store.get('net.session',null);if(ss&&ss.role==='host'){store.del('net.session');store.del('net.keys')}UI.toast('저장된 게임을 지웠어요');Home.show()}}
 function copyText(t){const done=()=>UI.toast('📋 복사했어요: '+t);
   try{navigator.clipboard.writeText(t).then(done,()=>fallback())}catch(e){fallback()}
   function fallback(){const i=document.createElement('textarea');i.value=t;document.body.appendChild(i);i.select();try{document.execCommand('copy');done()}catch(e){UI.toast(t)}i.remove()}}

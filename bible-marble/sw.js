@@ -1,9 +1,9 @@
 /* 오프라인 실행: 한 번 열어 둔 게임은 인터넷이 없어도 열립니다.
    화면 파일은 인터넷이 되면 새 버전을, 안 되면 저장해 둔 버전을 씁니다. */
-const CACHE='biblemarble-v5';
+const CACHE='biblemarble-v6';
 const CORE=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./css/game.css','./vendor/peerjs.min.js',
   './js/util.js','./js/xlsx-lite.js','./js/data/boards.js','./js/data/quiz.js','./js/data/cards.js','./js/content.js','./js/bible.js',
-  './js/engine.js','./js/ai.js','./js/ui/board.js','./js/ui/prompts.js','./js/ui/home.js','./js/ui/manage.js','./js/net.js','./js/app.js'];
+  './js/engine.js','./js/ai.js','./js/ui/board.js','./js/ui/prompts.js','./js/ui/home.js','./js/ui/manage.js','./js/firebase-config.js','./js/fb.js','./js/net.js','./vendor/firebase-app-compat.js','./vendor/firebase-auth-compat.js','./vendor/firebase-database-compat.js','./js/app.js'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k.startsWith('biblemarble-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 self.addEventListener('fetch',e=>{const req=e.request;if(req.method!=='GET')return;const url=new URL(req.url);
