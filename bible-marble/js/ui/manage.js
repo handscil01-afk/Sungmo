@@ -58,7 +58,7 @@ const Manage={tab:'quiz',L:null,f:{s:'',t:'',lv:'',era:'',cat:'',src:''},boardId
     const L=openLayer('edit',html(),{close:true,wide:true,tone:'var(--accent)'});
     const read=()=>{q.q=$('#eq',L.box).value;if(q.t==='mc'){$$('[data-c]',L.box).forEach(i=>q.c[+i.dataset.c]=i.value);const r=$('input[name=ans]:checked',L.box);q.ai=r?+r.value:0}
       else{q.a=$('#ea',L.box).value;q.alt=$('#ealt',L.box).value}q.cat=$('#ecat',L.box).value;q.ref=$('#eref',L.box).value;q.ex=$('#eex',L.box).value;q.rw=$('#erw',L.box).value;q.on=$('#eon',L.box).getAttribute('aria-checked')==='true'};
-    const redraw=()=>{read();const box=$('.mbox',L.ov);box.innerHTML='<button class="xclose" data-x aria-label="닫기">×</button>'+html();$('[data-x]',box).onclick=L.close;bind()};
+    const redraw=()=>{const box=$('.mbox',L.ov);box.innerHTML='<button class="xclose" data-x aria-label="닫기">×</button>'+html();$('[data-x]',box).onclick=L.close;bind()};
     const bind=()=>{
       $$('[data-v]',L.box).forEach(seg=>seg.onclick=e=>{const b=e.target.closest('button');if(!b)return;read();const k=seg.dataset.v;q[k]=b.dataset.x;
         if(k==='t'&&q.t==='mc'&&(!q.c||q.c.length<2)){q.c=['','','',''];q.ai=0}if(k==='t'&&q.t==='sa'&&!q.a)q.a=q.c&&q.c[q.ai]||'';redraw()});
@@ -171,7 +171,9 @@ const Manage={tab:'quiz',L:null,f:{s:'',t:'',lv:'',era:'',cat:'',src:''},boardId
     let era=c.era||'all';$('#cera',L.box).onclick=e=>{const x=e.target.closest('button');if(!x)return;era=x.dataset.x;$$('#cera button',L.box).forEach(y=>y.classList.toggle('on',y===x))};
     bindFx(L.box);$('[data-cancel]',L.box).onclick=L.close;
     $('[data-save]',L.box).onclick=()=>{const fx=readFx(L.box),t=$('#ct',L.box).value.trim();if(!t)return $('#cerr',L.box).textContent='⚠️ 제목을 적어 주세요';if(fx.err)return $('#cerr',L.box).textContent='⚠️ '+fx.err;
-      const n={...c,t,r:$('#cr',L.box).value.trim(),d:$('#cd',L.box).value.trim()||fxText(fx),era,fx};const on=n.on!==false;const id=Content.cardSave(n);Content.cardSetOn([id],on);L.close();UI.toast('💾 저장했어요');this.pane()};
+      const n={...c,t,r:$('#cr',L.box).value.trim(),d:$('#cd',L.box).value.trim()||fxText(fx),era,fx};const on=n.on!==false;const id=Content.cardSave(n);Content.cardSetOn([id],on);L.close();
+      let msg='💾 저장했어요';if(fx.k==='move_to'&&!fx.to.startsWith('@')){const bs=Content.boardAll().filter(b=>findTileIn(b,fx.to)>=0).map(b=>b.name);msg=bs.length?`💾 저장했어요. ${bs.join('·')} 판에서만 나와요`:`💾 저장했어요. 지금은 "${fx.to}" 칸이 있는 판이 없어서 게임에 나오지 않아요`}
+      UI.toast(msg,4000);this.pane()};
     const d=$('[data-del]',L.box);if(d)d.onclick=()=>{if(!d.dataset.sure){d.dataset.sure=1;d.textContent='한 번 더 누르면 지워요';return}Content.cardRemove([c.id]);L.close();this.pane()};
     const rs=$('[data-reset]',L.box);if(rs)rs.onclick=()=>{Content.cardReset(c.id);L.close();this.pane()}},
 

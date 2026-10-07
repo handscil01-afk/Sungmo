@@ -1,6 +1,6 @@
 /* 오프라인 실행: 한 번 열어 둔 게임은 인터넷이 없어도 열립니다.
    화면 파일은 인터넷이 되면 새 버전을, 안 되면 저장해 둔 버전을 씁니다. */
-const CACHE='biblemarble-v3';
+const CACHE='biblemarble-v4';
 const CORE=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./css/game.css','./vendor/peerjs.min.js',
   './js/util.js','./js/xlsx-lite.js','./js/data/boards.js','./js/data/quiz.js','./js/data/cards.js','./js/content.js','./js/bible.js',
   './js/engine.js','./js/ai.js','./js/ui/board.js','./js/ui/prompts.js','./js/ui/home.js','./js/ui/manage.js','./js/net.js','./js/app.js'];

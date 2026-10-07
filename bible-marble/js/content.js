@@ -82,7 +82,7 @@ function quizRows(list){return [QUIZ_HEAD,...list.map(q=>{const c=q.t==='mc'?q.c
   return [q.id,q.on?'O':'X',TYPE_KO[q.t],LV_KO[q.lv],ERA_KO[q.era],q.cat,q.q,c[0]||'',c[1]||'',c[2]||'',c[3]||'',c[4]||'',c[5]||'',q.t==='mc'?q.ai+1:q.a,q.t==='sa'?(q.alt||[]).join(', '):'',q.ex||'',q.ref||'',q.rw||'']})]}
 const QUIZ_GUIDE=[['항목','적는 방법'],['ID','비워 두면 새 문제로 추가돼요. 내보낸 파일의 ID를 그대로 두면 그 문제를 고쳐요.'],['사용','O이면 게임에 나오고, X이면 나오지 않아요.'],
   ['유형','객관식 또는 주관식'],['난이도','쉬움 · 보통 · 어려움'],['시대','구약 · 신약 · 공통 (판에 맞는 문제만 나와요)'],['카테고리','자유롭게 적어요. 예: 인물, 장소, 말씀 암송, 교회'],
-  ['문제','문제 문장'],['보기1~보기6','객관식만 적어요. 2개 이상 필요해요.'],['정답','객관식은 정답 보기 번호(1~6), 주관식은 정답 문장'],['인정 답안','주관식에서 함께 정답으로 인정할 답을 쉼표로 구분해 적어요.'],
+  ['문제','문제 문장'],['보기1~보기6','객관식만 적어요. 2개 이상 필요해요.'],['정답','객관식은 정답 보기 번호(1~6)나 정답 보기의 글자, 주관식은 정답 문장'],['오답1~오답5','보기1~6 대신 "정답"과 "오답" 열만 만들어도 돼요. 보기 순서는 게임에서 섞여 나와요.'],['인정 답안','주관식에서 함께 정답으로 인정할 답을 쉼표로 구분해 적어요.'],
   ['해설','정답을 보여 줄 때 함께 나오는 설명'],['성경 구절','예: 창 1:1, 요 3:16 (누르면 말씀 보기 창이 열려요)'],['보상','퀴즈 칸에서 맞혔을 때 받는 달란트. 비우면 난이도에 따라 100·150·200']];
 /* 표의 머리글을 찾아 열 번호로 바꿉니다 */
 function headMap(head,names){const m={};head.forEach((h,i)=>{const k=String(h||'').replace(/\s/g,'');for(const n of names)if(k===n.replace(/\s/g,''))m[n]=i});return m}
@@ -90,7 +90,7 @@ function quizFromRows(rows,existing){
   const out={items:[],errors:[],add:0,upd:0};
   const hi=rows.findIndex(r=>r.some(c=>String(c).trim()==='문제'));
   if(hi<0){out.errors.push({row:0,msg:'첫 줄에 "문제" 머리글이 없어요. 내보내기로 받은 양식을 써 주세요.'});return out}
-  const H=headMap(rows[hi],QUIZ_HEAD),get=(r,k)=>H[k]==null?'':String(r[H[k]]==null?'':r[H[k]]).trim();
+  const H=headMap(rows[hi],[...QUIZ_HEAD,'오답1','오답2','오답3','오답4','오답5']),get=(r,k)=>H[k]==null?'':String(r[H[k]]==null?'':r[H[k]]).trim();
   const ids=new Set(existing.map(q=>q.id));
   for(let i=hi+1;i<rows.length;i++){const r=rows[i],line=i+1;if(!r||r.every(c=>String(c==null?'':c).trim()===''))continue;
     const errs=[];const tKo=get(r,'유형')||'객관식',t=KO_TYPE[tKo];if(!t)errs.push(`"유형"은 객관식 또는 주관식으로 적어 주세요 (지금: ${tKo})`);
@@ -100,7 +100,10 @@ function quizFromRows(rows,existing){
     const item={id:get(r,'ID'),t,lv,era,cat:get(r,'카테고리')||'성경',q,ref:get(r,'성경 구절'),ex:get(r,'해설'),rw:get(r,'보상')};
     const on=!/^(x|아니|no|0|false)$/i.test(get(r,'사용'));
     if(item.rw&&!(+item.rw>0))errs.push('"보상"은 숫자로 적어 주세요');
-    if(t==='mc'){const c=[1,2,3,4,5,6].map(n=>get(r,'보기'+n)).filter(Boolean);if(c.length<2)errs.push('객관식은 보기를 2개 이상 적어 주세요');
+    if(t==='mc'){let c=[1,2,3,4,5,6].map(n=>get(r,'보기'+n)).filter(Boolean);
+      /* "정답 + 오답1~5" 열로 만든 표도 읽습니다: 정답이 첫 번째 보기가 돼요 */
+      const wrong=[1,2,3,4,5].map(n=>get(r,'오답'+n)).filter(Boolean);if(!c.length&&wrong.length&&get(r,'정답'))c=[get(r,'정답'),...wrong];
+      if(c.length<2)errs.push('객관식은 보기를 2개 이상 적어 주세요');
       const a=get(r,'정답');let ai=-1;if(/^\d+$/.test(a))ai=+a-1;else if(a)ai=c.indexOf(a);
       if(!a)errs.push('"정답" 칸이 비어 있어요');else if(ai<0||ai>=c.length)errs.push(`"정답"은 보기 번호(1~${Math.max(2,c.length)})로 적어 주세요 (지금: ${a})`);
       item.c=c;item.ai=ai}
