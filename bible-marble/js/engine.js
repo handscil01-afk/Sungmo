@@ -201,7 +201,7 @@ async function rollDice(p,label){
   if(p.ai){setMsg(`${esc(IGA(p.name))} 주사위를 굴려요…`);await sleep(750)}
   else v=await ask({kind:'roll',who:'player',pid:p.id,mode:p.dice,label:label||'',undo:p.dice==='real'?1:0});
   const real=Array.isArray(v.d),[a,b]=real?v.d:rnd('dice',()=>[1+(Math.random()*6|0),1+(Math.random()*6|0)]);
-  if(!REPLAY){sfx('roll');Net.event({t:'dice',a,b,anim:!real});await UI.rollDice(a,b,!real)}
+  if(!REPLAY){const id=RUN;sfx('roll');Net.event({t:'dice',a,b,anim:!real});await UI.rollDice(a,b,!real);if(id!==RUN||!G)throw ABORT}
   setMsg(`<b>${a} + ${b} = ${a+b}</b>${a===b?' · 더블!':''}`);log(`${p.name}: 주사위 ${a}+${b}${a===b?' (더블)':''}${real?' · 실물':''}`,p);
   await sleep(300);return[a,b]}
 function passStart(p){const v=G.cfg.salary;p.money+=v;float(p,v);sfx('coin');log(`${p.name}: 출발 칸을 지나 축복금 +${v}`,p);render()}
