@@ -73,27 +73,56 @@ function rnd(kind,gen){const r=nextReplay(kind);if(r)return clone(r.v);
 async function ask(spec){
   const r=nextReplay(spec.kind);if(r)return clone(r.v);
   spec.id=++PSEQ;PROMPT=spec;persist();
-  const p=spec.pid!=null?byId(spec.pid):null,allAI=!G.players.some(q=>!q.ai);
-  /* 컴퓨터가 답하는 요청서는 되돌리기 대상이 아닙니다 (되돌리기는 사람의 선택만 되돌립니다) */
-  const byAI=(spec.who==='player'&&p&&p.ai)||(spec.who!=='player'&&allAI&&spec.kind!=='end');
-  const v=await waitFor(done=>{spec.resolve=val=>{if(PROMPT===spec&&validate(spec,val))done(val)};
-    if(byAI)AI.respond(spec).then(val=>spec.resolve(val)).catch(()=>{});
-    UI.showPrompt(spec);Net.prompt(spec)});
+  const v=await waitFor(done=>{spec.resolve=(val,by='local')=>{if(PROMPT===spec&&mayResolve(spec,by,val)&&validate(spec,val)){spec.by=by;done(val)}};dispatch(spec)});
   PROMPT=null;UI.clearPrompt();Net.prompt(null);
-  J.cur.steps.push({k:spec.kind,v:clone(v),u:spec.undo&&!byAI?1:0});persist();
+  /* 컴퓨터가 답한 요청서는 되돌리기 대상이 아닙니다 (되돌리기는 사람의 선택만 되돌립니다) */
+  J.cur.steps.push({k:spec.kind,v:clone(v),u:spec.undo&&spec.by!=='ai'?1:0});persist();
   return v}
+/* 요청서를 답할 사람에게 보냅니다. 자리 주인이 바뀌면(사람↔컴퓨터) 다시 부릅니다 */
+function dispatch(spec){spec.actor=actorOf(spec);
+  if(spec.actor.t==='ai'){const seq=spec.aiSeq=(spec.aiSeq||0)+1;
+    AI.respond(spec).then(val=>{if(spec.aiSeq===seq&&actorOf(spec).t==='ai')spec.resolve(val,'ai')}).catch(()=>{})}
+  UI.showPrompt(spec);Net.prompt(spec)}
+function redispatch(){if(PROMPT&&PROMPT.resolve)dispatch(PROMPT)}
+/* ---------- 권한: 이 요청서에 누가 답할 수 있나 ----------
+   local: 이 기기(혼자·한 기기 게임, 플레이어 모드의 방장 자리) · net: 그 자리 주인의 참가 기기
+   judge: 중계 모드의 진행자(진행자 기기·진행자 리모컨) · ai: 컴퓨터 */
+const MODE=()=>(G&&G.room&&G.room.mode)||'local';
+function seatActor(p){if(!p||p.ai)return {t:'ai'};const m=MODE();
+  if(m==='local')return {t:'local'};
+  if(p.net)return {t:'net',cid:p.net};
+  if(m==='relay')return {t:'judge'};
+  return p.host?{t:'local'}:{t:'ai'}}
+function actorOf(spec){const m=MODE(),p=spec.pid!=null?byId(spec.pid):null;
+  if(spec.who==='player')return seatActor(p);
+  if(m==='local')return !G.players.some(q=>!q.ai)&&spec.kind!=='end'?{t:'ai'}:{t:'local'};
+  if(m==='relay')return {t:'judge'};
+  /* 플레이어 모드: 진행자가 없으므로 결과·알림의 계속하기는 그 자리 주인이, 게임 끝 화면은 방장이 누릅니다 */
+  if(spec.kind==='end')return {t:'local'};
+  return seatActor(p)}
+/* 화면 버튼과 상관없이, 답을 보낸 쪽이 이 요청서의 답할 사람인지 엔진에서 한 번 더 확인합니다.
+   (참가 기기에서 온 답은 net.js가 기기 주인까지 확인한 뒤 'net'으로 넘깁니다) */
+function mayResolve(spec,by,val){const a=spec.actor||actorOf(spec);
+  if(by==='timer')return spec.kind==='qa'&&val===-1;
+  if(a.t==='ai')return by==='ai';
+  if(a.t==='net')return by==='net';
+  if(a.t==='judge')return by==='local'||by==='net';
+  return by==='local'}
+/* 되돌리기: 한 기기 게임과 중계 모드의 진행자만 씁니다 (여럿이 하는 플레이어 모드에서는 끕니다) */
+const undoAllowed=()=>!!G&&MODE()!=='player'
 function validate(spec,v){
   switch(spec.kind){
     case 'roll':return (v&&v.s===1)||(v&&Array.isArray(v.d)&&v.d.length===2&&v.d.every(x=>Number.isInteger(x)&&x>=1&&x<=6));
     case 'buy':case 'upgrade':case 'ark':case 'qj':return v===true||v===false;
     case 'wild':return (spec.opts||[]).includes(v);
     case 'fly':return Number.isInteger(v)&&v>=0&&v<N()&&T(v).t!=='fly';
-    case 'qa':return spec.quiz.q.t==='mc'?(Number.isInteger(v)&&v>=-1&&v<spec.quiz.q.choices.length&&!(spec.quiz.tries||[]).some(t=>t.choice===v&&v>=0)):(v==='reveal'||v===-1);
+    case 'qa':return spec.quiz.q.t==='mc'?(Number.isInteger(v)&&v>=-1&&v<spec.quiz.q.choices.length&&!(spec.quiz.tries||[]).some(t=>t.choice===v&&v>=0)):(v==='reveal'||v===-1||(v&&typeof v==='object'&&typeof v.text==='string'&&v.text.length<=80));
+    case 'qo':return v===true||v===false;
     case 'qs':return v===-1||(spec.cands||[]).includes(v);
     case 'end':return v==='again'||v==='home';
     default:return true}}
 function beginTurn(){J.cur={base:clone(G),steps:[]};J.turns.push(J.cur);while(J.turns.length>8)J.turns.shift()}
-function canUndo(){return !!G&&J.turns.some(t=>t.steps.some(s=>s.u))}
+function canUndo(){return undoAllowed()&&J.turns.some(t=>t.steps.some(s=>s.u))}
 /* 되돌리기: 가장 최근의 사람 선택 하나를 지우고 그 직전 상태로 다시 재생합니다 */
 function undo(){
   if(!canUndo())return false;
@@ -120,15 +149,17 @@ function makeGame(setup){
   const ids=Content.cardAll().filter(c=>c.on&&eraFits(c.era,board.era)&&(c.fx.k!=='move_to'||findTileIn(board,c.fx.to)>=0));
   const cards=ids.length?ids:DEFAULT_CARDS.filter(c=>eraFits(c.era,board.era));
   return {v:3,cfg,board,cards:cards.map(c=>({id:c.id,t:c.t,r:c.r,d:c.d,fx:c.fx})),
-    players:setup.players.map((p,k)=>({id:k,name:(p.name||'').trim()||DEF_NAMES[k],ai:!!p.ai,tok:p.emoji||TOKENS[k],col:p.color||SEAT[k],dice:p.dice==='real'?'real':'screen',
-      net:p.net||null,money:cfg.money,pos:0,jail:0,skip:0,ark:0,song:0,out:false})),
+    room:setup.room||null,
+    players:setup.players.map((p,k)=>({id:k,pid:p.pid||uid('p'),name:(p.name||'').trim()||DEF_NAMES[k],ai:!!p.ai,aiLv:p.aiLv||cfg.ai,tok:p.emoji||TOKENS[k],col:p.color||SEAT[k],dice:p.dice==='real'?'real':'screen',
+      net:p.net||null,host:!!p.host,op:!!p.op,money:cfg.money,pos:0,jail:0,skip:0,ark:0,song:0,out:false})),
     own:{},pot:0,turn:0,round:1,dbl:0,deck:[],used:{},log:[],over:false,started:Date.now()}}
 function findTileIn(board,to){return to==='@start'?0:to==='@fly'?board.tiles.findIndex(t=>t.t==='fly'):to==='@jail'?board.tiles.findIndex(t=>t.t==='jail'):board.tiles.findIndex(t=>t.name===to)}
 function startGame(setup){abortFlow();G=makeGame(setup);J.turns=[];J.cur=null;J.replay=null;J.reserve=[];REPLAY=false;RESUME=false;
   log(`새 게임을 시작했어요. ${G.board.name} 판 · ${G.board.tiles[0].name}에서 출발해요!`);UI.enterGame();gameLoop()}
-function resumeGame(save){abortFlow();G=save.G;J.turns=save.J&&save.J.turns||[];J.reserve=save.J&&save.J.reserve||[];
+function migrateGame(g){for(const p of g.players){if(!p.pid)p.pid=uid('p');if(!p.aiLv)p.aiLv=g.cfg.ai||'normal'}return g}
+function resumeGame(save){abortFlow();G=migrateGame(save.G);J.turns=save.J&&save.J.turns||[];J.reserve=save.J&&save.J.reserve||[];
   const t=J.turns.pop();
-  if(t){J.cur={base:t.base,steps:[]};J.turns.push(J.cur);G=clone(t.base);J.replay=t.steps.length?t.steps.slice():null;REPLAY=!!J.replay;RESUME=true}
+  if(t){J.cur={base:t.base,steps:[]};J.turns.push(J.cur);G=migrateGame(clone(t.base));J.replay=t.steps.length?t.steps.slice():null;REPLAY=!!J.replay;RESUME=true}
   else{J.cur=null;RESUME=false}
   UI.enterGame();gameLoop()}
 
@@ -309,8 +340,8 @@ function drawQuestion(forAI){
   return o}
 /* 화면에 보여 줄 퀴즈 정보: 정답은 판정·결과 단계에서만 담습니다 (참가자 기기에서 미리 볼 수 없게) */
 function pubQuiz(QS){const q={...QS.q},open=QS.stage==='result';delete q.reset;if(!open){delete q.ans;delete q.a;delete q.alt;delete q.ex;delete q.ref}
-  return {purpose:QS.purpose,kick:QS.kick,sub:QS.sub,pid:QS.pid,stage:QS.stage,stealer:QS.stealer,by:QS.by,q,tries:QS.tries.map(t=>({...t}))}}
-function secretQuiz(QS){return {ans:QS.q.ans,a:QS.q.a,alt:QS.q.alt,ex:QS.q.ex}}
+  return {purpose:QS.purpose,kick:QS.kick,sub:QS.sub,pid:QS.pid,stage:QS.stage,stealer:QS.stealer,by:QS.by,q,tries:QS.tries.map(t=>{const o={...t};if(!open)delete o.match;return o})}}
+function secretQuiz(QS,tr){return {ans:QS.q.ans,a:QS.q.a,alt:QS.q.alt,ex:QS.q.ex,match:tr?!!tr.match:undefined}}
 async function quizFlow(p,purpose,o){
   const Q=rnd('q',()=>drawQuestion(p.ai));
   if(Q.reset)G.used={};G.used[Q.id]=1;
@@ -318,10 +349,16 @@ async function quizFlow(p,purpose,o){
   log(`${p.name}: 말씀 퀴즈 (${LV_KO[Q.lv]})`,p);
   let ok=await answerStep(QS,p),by=ok?p.id:null;
   if(!ok&&(purpose==='tile'||purpose==='bonus')&&G.cfg.steal){
-    const cands=alive().filter(x=>x.id!==p.id&&!(Q.t==='sa'&&x.ai)).map(x=>x.id);
+    if(MODE()==='player'){
+      /* 플레이어 모드: 차례 순서대로 다음 사람에게 도전할지 묻고, 컴퓨터 자리는 건너뜁니다 */
+      const n=G.players.length,order=[];for(let k=1;k<n;k++){const x=G.players[(G.players.indexOf(p)+k)%n];if(!x.out&&!x.ai)order.push(x)}
+      QS.stage='steal';
+      for(const x of order){const go=await ask({kind:'qo',who:'player',pid:x.id,quiz:pubQuiz(QS),undo:0});
+        if(go){QS.stealer=x.id;log(`${x.name}: 다른 팀 기회에 도전해요`,x);if(await answerStep(QS,x))by=x.id;break}}}
+    else{const cands=alive().filter(x=>x.id!==p.id&&!(Q.t==='sa'&&x.ai)).map(x=>x.id);
     if(cands.length){QS.stage='steal';
       const sid=await ask({kind:'qs',who:'host',pid:p.id,cands,quiz:pubQuiz(QS),secret:secretQuiz(QS),undo:1});
-      if(sid>=0){QS.stealer=sid;const sp=byId(sid);log(`${sp.name}: 다른 팀 기회를 받았어요`,sp);if(await answerStep(QS,sp))by=sid}}}
+      if(sid>=0){QS.stealer=sid;const sp=byId(sid);log(`${sp.name}: 다른 팀 기회를 받았어요`,sp);if(await answerStep(QS,sp))by=sid}}}}
   QS.stage='result';QS.by=by;
   if(G.cfg.aiQuiz==='auto'&&QS.tries.every(t=>byId(t.pid).ai)){fx(()=>{UI.showQuizResult(pubQuiz(QS));Net.event({t:'qres',quiz:pubQuiz(QS)})});await sleep(2600);fx(()=>UI.clearPrompt())}
   else await ask({kind:'qr',who:'any',pid:p.id,quiz:pubQuiz(QS),undo:1});
@@ -329,16 +366,22 @@ async function quizFlow(p,purpose,o){
 async function answerStep(QS,a){
   const Q=QS.q,tr={pid:a.id};QS.tries.push(tr);
   if(a.ai){QS.stage='view';
-    if(G.cfg.aiQuiz==='manual')await ask({kind:'qv',who:'any',pid:a.id,quiz:pubQuiz(QS),undo:0});else await sleep(1800);
-    const acc=(AIACC[G.cfg.ai]||AIACC.normal)[Q.lv]||.7,ok=rnd('aiq',()=>Math.random()<acc);
+    if(G.cfg.aiQuiz==='manual'&&MODE()!=='player')await ask({kind:'qv',who:'any',pid:a.id,quiz:pubQuiz(QS),undo:0});else await sleep(MODE()==='player'?3200:1800);
+    const acc=(AIACC[a.aiLv||G.cfg.ai]||AIACC.normal)[Q.lv]||.7,ok=rnd('aiq',()=>Math.random()<acc);
     tr.choice=ok?Q.ans:rnd('aiw',()=>{const w=Q.choices.map((_,i)=>i).filter(i=>i!==Q.ans&&!QS.tries.some(t=>t.choice===i));return w.length?w[Math.random()*w.length|0]:-1});
     tr.ok=ok;sfx(ok?'good':'bad');log(`${a.name}: 퀴즈 ${ok?'정답':'오답'}`,a);return ok}
   QS.stage='answer';
-  const v=await ask({kind:'qa',who:'player',pid:a.id,quiz:pubQuiz(QS),time:G.cfg.quizTime||0,undo:1});
+  const v=await ask({kind:'qa',who:'player',pid:a.id,quiz:pubQuiz(QS),time:G.cfg.quizTime||0,undo:1,type:MODE()==='player'&&Q.t==='sa'?'text':'',secret:{ans:Q.ans,a:Q.a}});
   if(Q.t==='mc'){tr.choice=v;tr.ok=v===Q.ans;if(v<0)tr.timeout=1;sfx(tr.ok?'good':'bad');log(`${a.name}: 퀴즈 ${tr.ok?'정답':v<0?'시간 초과':'오답'}`,a);return tr.ok}
-  if(v===-1)tr.timeout=1;QS.stage='judge';
-  const j=await ask({kind:'qj',who:'host',pid:a.id,quiz:pubQuiz(QS),secret:secretQuiz(QS),undo:1});
+  if(v===-1)tr.timeout=1;if(v&&typeof v==='object'){tr.text=v.text.trim().slice(0,80);tr.match=saMatch(tr.text,Q.a,Q.alt)}
+  /* 플레이어 모드: 진행자가 없으므로 입력한 답을 게임이 비교해서 판정합니다 */
+  if(MODE()==='player'){tr.ok=!!tr.match;sfx(tr.ok?'good':'bad');log(`${a.name}: 퀴즈 ${tr.ok?'정답':v===-1?'시간 초과':'오답'}${tr.text?` ("${tr.text}")`:''}`,a);return tr.ok}
+  QS.stage='judge';
+  const j=await ask({kind:'qj',who:'host',pid:a.id,quiz:pubQuiz(QS),secret:secretQuiz(QS,tr),undo:1});
   tr.ok=j===true;sfx(tr.ok?'good':'bad');log(`${a.name}: 퀴즈 ${tr.ok?'정답':'오답'} (진행자 판정)`,a);return tr.ok}
+/* 주관식 답 비교: 띄어쓰기·공백·문장부호·대소문자 차이만 무시하고, 정답이나 함께 인정하는 답과 같아야 정답입니다 */
+const saNorm=s=>String(s||'').normalize('NFC').toLowerCase().replace(/[\s.,!?·ㆍ:;'"‘’“”()\[\]{}~\-_/]+/g,'');
+function saMatch(text,a,alt){const t=saNorm(text);if(!t)return false;return [a,...(alt||[])].some(x=>saNorm(x)===t)}
 
 /* ---------- 컴퓨터가 고를 칸 ---------- */
 function aiFly(p){let best=0,score=150;

@@ -15,10 +15,12 @@ const batchim=w=>{const c=lastCode(w);return c>=0&&c<11172&&c%28!==0};
 const IGA=w=>w+(batchim(w)?'이':'가'), EUN=w=>w+(batchim(w)?'은':'는'), REUL=w=>w+(batchim(w)?'을':'를'), WA=w=>w+(batchim(w)?'과':'와');
 const RO=w=>w+(batchim(w)&&lastCode(w)%28!==8?'으로':'로');
 /* localStorage: 막혀 있어도 게임은 돌아가도록 모두 감쌉니다 */
+/* 저장 이름 앞에 붙는 글자 (시험할 때 한 브라우저에서 여러 기기를 흉내 내려고 바꿀 수 있어요) */
+const SP=()=>window.__SP||'biblemarble.';
 const store={
-  get(k,d){try{const v=localStorage.getItem('biblemarble.'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},
-  set(k,v){try{localStorage.setItem('biblemarble.'+k,JSON.stringify(v));return true}catch(e){return false}},
-  del(k){try{localStorage.removeItem('biblemarble.'+k)}catch(e){}}};
+  get(k,d){try{const v=localStorage.getItem(SP()+k);return v==null?d:JSON.parse(v)}catch(e){return d}},
+  set(k,v){try{localStorage.setItem(SP()+k,JSON.stringify(v));return true}catch(e){return false}},
+  del(k){try{localStorage.removeItem(SP()+k)}catch(e){}}};
 /* IndexedDB: 성경 본문처럼 큰 자료를 저장합니다 */
 const IDB={db:null,
   open(){if(this.db)return Promise.resolve(this.db);return new Promise((res,rej)=>{let q;try{q=indexedDB.open('biblemarble',1)}catch(e){return rej(e)}
