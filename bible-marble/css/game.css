@@ -195,7 +195,7 @@ select.inp{appearance:auto}
 #board{grid-area:b;justify-self:center}
 #pl{grid-area:l} #pr{grid-area:r}
 .pcol{display:flex;flex-direction:column;gap:.6rem;min-width:0;min-height:0}
-body.tab #game{grid-template-columns:var(--pw) var(--bs) var(--pw);grid-template-areas:"l b r";justify-content:center;align-items:stretch;height:calc(100dvh - var(--hdr))}
+body.tab #game{grid-template-columns:var(--pw) var(--bs) var(--pw);grid-template-areas:"l b r";justify-content:center;align-items:center;height:calc(100dvh - var(--hdr))}
 body.tab .pcol{height:var(--bs);align-self:center}
 body.tab .pcol .pc{flex:1 1 0;min-height:0}
 body.port #game{height:calc(100dvh - var(--hdr));grid-template-rows:auto minmax(0,1fr)}
@@ -236,8 +236,10 @@ body.small .tile.corner .sub{display:none}
 .tile .bld .lvp{display:flex;flex-direction:column-reverse;gap:1px;margin-bottom:1px}
 .tile .bld .lvp i{display:block;width:max(4px,calc(var(--u)*1.1));height:max(3px,calc(var(--u)*.75));border-radius:1px;background:rgba(255,255,255,.75);box-shadow:inset 0 0 0 1px var(--oc)}
 .tile .bld .lvp i.on{background:var(--oc)}
-.tile .tk{position:absolute;inset:auto 0 max(1px,calc(var(--u)*.3)) 0;display:flex;flex-wrap:wrap;justify-content:center;gap:1px;pointer-events:none;z-index:4}
-.tile .tk .tok{width:calc(var(--u)*4.3);height:calc(var(--u)*4.3);min-width:15px;min-height:15px;font-size:max(9px,calc(var(--u)*2.7))}
+/* 말: 칸 안쪽(보드 가운데 쪽) 띠에 놓아서 칸의 이름·값을 가리지 않습니다 */
+#tokLayer{position:absolute;inset:0;pointer-events:none;z-index:5}
+#tokLayer .tok{position:absolute;transition:left .16s,top .16s;box-shadow:0 0 0 max(2px,calc(var(--u)*.45)) var(--pc),0 2px 3px rgba(61,52,88,.3)}
+#tokLayer .tok.now{z-index:2;box-shadow:0 0 0 max(2px,calc(var(--u)*.45)) var(--pc),0 0 0 max(4px,calc(var(--u)*.95)) #fff,0 3px 6px rgba(61,52,88,.35)}
 .tok.hop{animation:hop .24s ease-out}
 @keyframes hop{45%{transform:translateY(-40%) scale(1.15)}}
 .tile.pop{animation:pop .55s}
@@ -251,7 +253,7 @@ body.small .tile.corner .sub{display:none}
 @media (prefers-reduced-motion:reduce){.tok.hop,.tile.pop,#board.picking .tile,.tag-burst{animation:none}}
 
 /* ---------- center ---------- */
-#center{grid-area:2/2/9/9;position:relative;border-radius:calc(var(--u)*2.2);background:linear-gradient(180deg,#fffef8 0%,#fffef8 62%,#e9f7dc 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--u)*1.3);padding:calc(var(--u)*2);text-align:center;overflow:hidden;box-shadow:inset 0 0 0 2px #f3e3bd}
+#center{grid-area:2/2/9/9;position:relative;border-radius:calc(var(--u)*2.2);background:linear-gradient(180deg,#fffef8 0%,#fffef8 62%,#e9f7dc 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(var(--u)*1.2);padding:calc(var(--u)*5.6);text-align:center;overflow:hidden;box-shadow:inset 0 0 0 2px #f3e3bd}
 #center .ttl{font-family:var(--f-cute);font-size:calc(var(--u)*4.6);line-height:1}
 #center .ttl span{color:var(--c)}
 #center .rnd{font-family:var(--f-cute);font-size:max(12px,calc(var(--u)*2.4));color:var(--ink-2)}
@@ -437,3 +439,96 @@ table.tbl .pill.user{background:#e6f8f0;color:#1a7a52}
 #toast.on{opacity:1;transform:translate(-50%,0)}
 #center #toast.on{transform:translate(-50%,0)}
 #center #toast{position:absolute;top:auto;bottom:calc(var(--u)*1.4);transform:translate(-50%,14px);padding:.4em 1em;border-radius:1rem;font-size:max(14px,calc(var(--u)*2.6));z-index:5;max-width:92%}
+
+/* ---------- 게임 중: 머리줄 없이 게임판을 크게 ---------- */
+body.ingame #hdr{display:none}
+html:has(body.ingame){overflow:hidden}
+body.ingame{width:100%;overflow:hidden;position:relative}
+#game{width:100%;max-width:100vw;margin:0 auto;padding-top:max(.35rem,env(safe-area-inset-top))}
+.cinfo{display:flex;align-items:center;justify-content:center;gap:calc(var(--u)*1);max-width:100%}
+.cinfo .rnd{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gb{flex:none;width:max(30px,calc(var(--u)*6.4));height:max(30px,calc(var(--u)*6.4));border-radius:50%;display:grid;place-items:center;font-size:max(15px,calc(var(--u)*3.3));background:var(--paper);box-shadow:inset 0 0 0 2px var(--line),0 2px 0 var(--line);line-height:1}
+.gb:hover{box-shadow:inset 0 0 0 2px var(--accent),0 2px 0 var(--line)}
+#gUndo{box-shadow:inset 0 0 0 2px var(--accent),0 2px 0 var(--line)}
+body.display .gb{display:none}
+.dispgo{position:fixed;inset:0;z-index:90;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;background:rgba(230,243,255,.88);font-family:var(--f-cute);color:var(--ink)}
+.dispgo b{font-weight:400;font-size:3rem}.dispgo span{font-size:1.4rem;color:var(--ink-2)}
+.netbar.wait{background:var(--mint)}
+.roomcode{font-family:var(--f-cute);color:var(--accent-2);font-size:1.4em;letter-spacing:.12em;margin-left:.3em}
+.btnrow{display:flex;gap:.4rem;flex-wrap:wrap}
+.srow.mem{box-shadow:inset .35rem 0 0 var(--pc)}
+.srow.mem .tok{display:inline-grid;width:1.8rem;height:1.8rem;font-size:1.05rem;vertical-align:middle;margin-right:.2rem}
+/* 방 만들기: 진행 방식 고르기 */
+.modepick{display:grid;gap:.8rem;grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr));margin-top:.6rem}
+.modepick .mode{display:flex;flex-direction:column;align-items:flex-start;gap:.35rem;padding:1rem 1.1rem;border-radius:1.2rem;background:var(--cream);text-align:left;box-shadow:inset 0 0 0 2px var(--line),0 3px 0 var(--line)}
+.modepick .mode:hover{box-shadow:inset 0 0 0 3px var(--accent),0 3px 0 var(--line)}
+.modepick .e{font-size:2.4rem;line-height:1}.modepick b{font-family:var(--f-cute);font-weight:400;font-size:1.5rem}
+.modepick small{font-size:1rem;color:var(--ink-2);line-height:1.5}.modepick small b{font-size:1em;color:var(--ink)}
+.modepick em{font-style:normal;font-family:var(--f-cute);color:var(--accent-2);font-size:.95rem}
+/* 주관식 입력 */
+.saform{display:flex;gap:.5rem;width:100%}
+.saform .inp{flex:1;min-height:3.4rem;font-size:1.4rem}
+.saform .btn{flex:none}
+.typed{display:block;margin-top:.35rem;font-size:1.1rem;color:var(--ink)}
+.flylist{display:grid;grid-template-columns:repeat(auto-fill,minmax(8.5rem,1fr));gap:.4rem;max-height:60vh;overflow:auto;padding:.2rem}
+/* ---------- 중계 모드 참가자 휴대폰: 내 상황판 ---------- */
+body.dash #pl,body.dash #pr,body.dash #board{display:none}
+body.dash #game{display:block;height:100dvh;padding:max(.4rem,env(safe-area-inset-top)) .5rem .5rem}
+#dash{height:100%;display:grid;grid-template-columns:minmax(6.8rem,28%) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:.5rem}
+#dash .dtop{grid-column:1/-1;display:flex;align-items:center;gap:.5rem;font-family:var(--f-cute);font-size:1rem;color:var(--ink-2)}
+#dash .dtop .room{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#dash .dtop .sp{flex:1}
+#dash .gb{width:2.6rem;height:2.6rem;font-size:1.3rem}
+.dlist{display:flex;flex-direction:column;gap:.4rem;overflow-y:auto;min-height:0}
+.dp{position:relative;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:.4rem;align-items:center;text-align:left;padding:.45rem .5rem;border-radius:1rem;background:var(--paper);box-shadow:var(--shadow);border-left:.35rem solid var(--pc)}
+.dp .tok{grid-row:span 2;width:2.1rem;height:2.1rem;font-size:1.2rem}
+.dp .nm{font-family:var(--f-cute);font-size:1.02rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dp .mo{font-size:.85rem;color:var(--ink-2);white-space:nowrap}
+.dp.on{box-shadow:0 0 0 3px var(--pc),var(--shadow)}
+.dp.out{opacity:.5}
+.dp .tb{position:absolute;top:-.35rem;right:.3rem;font-style:normal;font-family:var(--f-cute);font-size:.72rem;padding:0 .4rem;border-radius:99px;background:var(--pc);color:#fff}
+.dmain{display:flex;flex-direction:column;gap:.5rem;min-height:0;overflow-y:auto}
+#dcard{display:flex;flex-direction:column;gap:.4rem}
+#dcard .pc{flex:none}
+#dcard .pc .lands{display:grid;grid-template-columns:repeat(auto-fill,minmax(7rem,1fr));gap:.4rem;max-height:none}
+#dcard .ln{flex-direction:column;align-items:flex-start;gap:0;padding:.35rem .5rem;min-height:3.4rem;border-radius:.8rem;box-shadow:inset 0 .3rem 0 var(--gc),0 1px 0 rgba(61,52,88,.1);background:var(--paper)}
+#dcard .ln .bgp{display:block;position:absolute;right:-.15em;bottom:-.25em;font-size:2.4rem;opacity:.22;pointer-events:none}
+#dcard .ln .meta{display:block;font-size:.8rem;color:var(--ink-2);font-family:var(--f-body)}
+.dpos{padding:.5rem .8rem;border-radius:1rem;background:var(--paper);box-shadow:var(--shadow);font-size:1rem;cursor:pointer}
+.dact{display:flex;flex-direction:column;align-items:center;gap:.5rem;padding:.6rem;border-radius:1.2rem;background:var(--cream);box-shadow:inset 0 0 0 2px var(--line);--u:4px}
+.dact .tray{width:11rem;height:3.6rem}
+.dact #cMsg{font-size:1.1rem}
+.dact #cAct .btn{min-height:3.4rem;font-size:1.3rem;padding:0 1.6rem}
+.ln[data-tile],.tag[data-tip]{cursor:pointer}
+@media (orientation:landscape){#dash{grid-template-columns:minmax(9rem,22%) minmax(0,1.2fr) }.dmain{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);align-items:start}}
+.dlist{padding-top:.45rem}
+#dcard .pc .lands .none{grid-column:1/-1}
+/* 땅 주인 표시(깃발·건물): 칸 안쪽 가장자리에 따로 띠를 두고 글씨는 그 띠를 피해서 놓습니다 */
+.tile .flag{width:calc(var(--u)*3.4);height:calc(var(--u)*3.4);min-width:13px;min-height:13px;border-radius:50%;font-size:max(7px,calc(var(--u)*2.1));box-shadow:0 0 0 max(1px,calc(var(--u)*.3)) #fff,0 1px 0 rgba(0,0,0,.25)}
+.tile .bld .bi{font-size:max(10px,calc(var(--u)*3))}
+.tile.owned.sb{padding-top:calc(var(--u)*4.4)} .tile.owned.st{padding-bottom:calc(var(--u)*4.4)}
+.tile.owned.sl{padding-right:calc(var(--u)*4.6)} .tile.owned.sr{padding-left:calc(var(--u)*4.6)}
+.tile.sb .flag{top:calc(var(--u)*.5);left:auto;right:calc(50% + var(--u)*.1);bottom:auto;transform:none}
+.tile.sb .bld{top:calc(var(--u)*.4);left:calc(50% + var(--u)*.4);bottom:auto;right:auto}
+.tile.st .flag{bottom:calc(var(--u)*.5);top:auto;left:auto;right:calc(50% + var(--u)*.1);transform:none}
+.tile.st .bld{bottom:calc(var(--u)*.4);left:calc(50% + var(--u)*.4);top:auto;right:auto}
+.tile.sl .flag{right:calc(var(--u)*.6);left:auto;top:auto;bottom:calc(50% + var(--u)*.1);transform:none}
+.tile.sl .bld{right:calc(var(--u)*.4);left:auto;top:calc(50% + var(--u)*.3);bottom:auto}
+.tile.sr .flag{left:calc(var(--u)*.6);right:auto;top:auto;bottom:calc(50% + var(--u)*.1);transform:none}
+.tile.sr .bld{left:calc(var(--u)*.4);right:auto;top:calc(50% + var(--u)*.3);bottom:auto}
+.tile.sl .bld .lvp,.tile.sr .bld .lvp{display:none}
+.tile.sl .bld,.tile.sr .bld{flex-direction:column}
+/* 좁은 상황판(게임판을 크게 쓰는 가로 화면): 이름·달란트가 잘리지 않게 줄입니다 */
+body.np .pc{padding:.5rem .55rem;gap:.2rem}
+body.np .pc-top{gap:.4rem}
+body.np .pc-top .tok{width:2.1rem;height:2.1rem;font-size:1.2rem}
+body.np .pc-top .nm{font-size:1.1rem}
+body.np .pc-top .who{font-size:.75rem}
+body.np .pc.act .pc-top .nmw{padding-right:0}
+/* 좁을 때는 '차례' 글자 대신 카드 테두리 강조와 가운데 '○○의 차례'로 알려 줍니다 */
+body.np .turnb{display:none}
+body.np .pc.act{box-shadow:0 0 0 .25rem var(--pc),0 .8rem 1.6rem color-mix(in srgb,var(--pc) 35%,transparent)}
+body.np .money{font-size:1.45rem;white-space:nowrap}
+body.np .money small{font-size:.8rem}
+body.np .psub{font-size:.78rem;gap:0 .5rem}
+body.np .ln{font-size:.82rem}
