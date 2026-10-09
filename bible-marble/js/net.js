@@ -50,17 +50,18 @@ const Net={
   /* ---------- 엔진·화면이 부르는 함수 (혼자 할 때는 아무 일도 하지 않음) ---------- */
   event(e){if(this.role==='host')this.broadcast({t:'e',e})},
   prompt(spec){if(this.role!=='host')return;this.lastPrompt=spec?this.pubSpec(spec):null;
-    this.lastSecret=spec&&spec.actor&&spec.actor.t==='judge'&&spec.secret?clone(spec.secret):null;
+    /* 정답·해설은 진행자 리모컨에만 보냅니다 (리모컨은 진행자 PIN으로만 연결) */
+    this.lastSecret=spec&&spec.secret?clone(spec.secret):null;
     for(const m of this.members.values())if(m.online&&m.conn)m.conn.send(this.promptMsg(m))},
   promptMsg(m){return {t:'p',p:this.lastPrompt||null,secret:m.kind==='remote'?this.lastSecret:null}},
   pubSpec(spec){const o={};for(const [k,v] of Object.entries(spec))if(!['resolve','secret','aiSeq','by'].includes(k)&&typeof v!=='function')o[k]=v;return clone(o)},
   /* 상태 보내기: 바뀌지 않는 보드·카드는 처음 한 번만(st), 매번은 바뀌는 부분만(s) 보냅니다 */
-  pushState(){if(this.role!=='host'||!G)return;clearTimeout(this.pushT);this.pushT=setTimeout(()=>{if(!G)return;
+  pushState(){if(this.role!=='host'||!G)return;this.publishLobby();clearTimeout(this.pushT);this.pushT=setTimeout(()=>{if(!G)return;
     if(this.sentSid!==G.started){this.sentSid=G.started;this.broadcast({t:'st',S:this.staticPart()})}
     this.broadcast({t:'s',G:this.slim(),online:this.onlineMap()})},60)},
   staticPart(){return {sid:G.started,board:G.board,cards:G.cards}},
   slim(){const o={};for(const [k,v] of Object.entries(G))if(!['board','cards','setup','used'].includes(k))o[k]=v;o.log=G.log.slice(0,40);return o},
-  saveInfo(){return this.role==='host'?{code:this.code,mode:this.mode,keys:this.keys,pin:this.pin}:null},
+  saveInfo(){return this.role==='host'?{code:this.code,mode:this.mode,keys:this.keys,pin:this.pin,room:this.room}:null},
   savedSession(){const s=store.get('net.session',null);return s&&Date.now()-s.t<12*3600e3?s:null},
   isOnline(cid){return this.role==='host'?!!(this.members.get(cid)||{}).online:!!this.online[cid]},
   onlineMap(){const o={};for(const m of this.members.values())if(m.kind==='player')o[m.cid]=!!m.online;return o},
@@ -70,9 +71,11 @@ const Net={
   displays(){return [...this.members.values()].filter(m=>m.kind==='display'&&m.online)},
 
   /* ---------- 방장 ---------- */
-  async host(mode,code,restore){
+  async host(mode,code,restore,room){
     this.leave(true);this.role='host';this.mode=mode==='relay'?'relay':'player';this.members=new Map();this.reqs=[];
     const kept=restore||store.get('net.keys',null);
+    /* 방 이름·공개 여부·비밀번호: 비밀번호는 서버에 올리지 않고 방장 기기만 알고 있다가 들어오는 사람을 확인합니다 */
+    this.room=room||(kept&&kept.code===code&&kept.room)||{title:'',pub:true,pw:''};
     this.keys=kept&&kept.code===code&&kept.keys?kept.keys:{};this.pin=kept&&kept.code===code&&kept.pin?kept.pin:String(1000+Math.random()*9000|0);
     let tries=0;for(;;){this.code=code||genCode();
       try{this.links=[await transport().host(this.code,c=>this.onConn(c,window.__NET==='bc'))];break}
@@ -81,21 +84,32 @@ const Net={
         if(this.mode==='relay'&&window.__NET!=='bc'){this.code=this.code||genCode();this.links=[];UI.toast('인터넷 연결이 없어 같은 기기의 게임 화면 창만 연결할 수 있어요',4000);break}
         this.role=null;this.code=null;throw e}}
     if(window.__NET!=='bc')try{this.links.push(await BCTransport.host(this.code,c=>this.onConn(c,true)))}catch(e){}
-    this.saveKeys();store.set('net.session',{role:'host',code:this.code,mode:this.mode,t:Date.now()});
+    this.lastPub=null;this.saveKeys();store.set('net.session',{role:'host',code:this.code,mode:this.mode,t:Date.now()});this.publishLobby();
     clearInterval(this.watchT);this.watchT=setInterval(()=>this.watch(),2000);UI.updateHeader();return this.code},
-  saveKeys(){if(this.role==='host')store.set('net.keys',{code:this.code,keys:this.keys,pin:this.pin})},
+  saveKeys(){if(this.role==='host')store.set('net.keys',{code:this.code,keys:this.keys,pin:this.pin,room:this.room})},
+  /* 방 목록에 보일 정보 (Firebase로 연결할 때만) */
+  lobbyEntry(){const P=G?G.players:SETUP.players,cfg=G?G.cfg:SETUP.cfg,host=P.find(p=>p.host);
+    const prof=store.get('net.profile',null);
+    return {title:(this.room&&this.room.title)||'',host:host?host.name:(prof&&prof.name)||'진행자',mode:this.mode,pub:!(this.room&&this.room.pw),
+      n:P.filter(p=>p.host||p.net).length,max:P.length,board:G?G.board.name:Content.board(cfg.board).name,diff:cfg.diff,rounds:cfg.rounds||0,started:!!G&&!G.over,v:1}},
+  publishLobby(){if(this.role!=='host')return;clearTimeout(this.pubT);this.pubT=setTimeout(()=>{if(this.role!=='host')return;const e=this.lobbyEntry(),j=JSON.stringify(e);
+    if(j===this.lastPub)return;this.lastPub=j;for(const l of this.links)if(l.publish)l.publish(e)},400)},
   onConn(c,local){let member=null;
     c._d=msg=>{if(!msg||typeof msg!=='object')return;
       if(msg.t==='hello'){member=this.hello(c,msg,local);return}
       if(!member||member.conn!==c)return;member.last=Date.now();
       if(msg.t==='profile')this.profile(member,msg);
       else if(msg.t==='in')this.onInput(member,msg);
+      else if(msg.t==='cmd')this.onCmd(member,msg);
       else if(msg.t==='ping')c.send({t:'pong',at:msg.at})};
     c._c=()=>{if(member&&member.conn===c){member.online=false;member.conn=null;member.offSince=Date.now();member.asked=0;
       this.reqs=this.reqs.filter(r=>r.cid!==member.cid);if(this.reqUI&&this.reqUI.cid===member.cid)this.closeReq();
       if(member.kind==='player')UI.toast(`📴 ${member.name}님 연결이 끊겼어요`);if(!G&&member.kind==='player')this.lobbyLeft(member.cid);this.lobbyChanged();if(G)UI.render()}}},
   hello(c,msg,local){let cid=String(c.vid||msg.cid||'').slice(0,40);if(!cid)return null;const kind=['display','remote'].includes(msg.kind)?msg.kind:'player';
     if(kind==='remote'&&(this.mode!=='relay'||String(msg.pin||'')!==this.pin)){c.send({t:'deny',why:this.mode!=='relay'?'mode':'pin'});return null}
+    /* 비공개 방: 처음 들어오는 기기는 비밀번호가 맞아야 해요 (전에 들어온 적 있는 기기·같은 PC의 게임 화면 창은 통과) */
+    const pw=this.room&&this.room.pw,known=this.keys[cid]&&(c.vid||this.keys[cid]===msg.key);
+    if(pw&&!local&&kind!=='remote'&&!known&&String(msg.pw||'')!==pw){c.send({t:'deny',why:'pw'});return null}
     /* 열쇠가 다르면 다른 기기가 같은 이름표를 쓰는 것이므로 새 기기로 봅니다 */
     if(!c.vid&&kind==='player'&&this.keys[cid]&&this.keys[cid]!==msg.key)cid=cid+'-'+uid('x').slice(-4);
     let m=this.members.get(cid);if(!m){m={cid};this.members.set(cid,m)}
@@ -134,12 +148,23 @@ const Net={
     const P=SETUP.players,k=P.findIndex(p=>p.net===m.cid);if(k<0)return;const usedC=P.filter((x,i)=>i!==k).map(x=>x.color);
     P[k].name=m.name;P[k].emoji=m.emoji;if(PALETTE.includes(msg.color)&&!usedC.includes(msg.color))P[k].color=msg.color;saveSetup();this.lobbyChanged()},
   lobbyChanged(){if(this.role!=='host')return;
-    const lobby={t:'lobby',code:this.code,mode:this.mode,seats:SETUP.players.map(p=>({name:p.name,emoji:p.emoji,color:p.color,ai:p.ai,host:!!p.host,op:!!p.op,net:p.net||null,online:p.net?this.isOnline(p.net):true})),board:Content.board(SETUP.cfg.board).name};
-    this.broadcast(lobby);if(Setup.L&&$('#tabpane')&&Setup.tab==='people'&&!Setup.inGame)Setup.pane();if(Setup.L&&Setup.tab==='net')Setup.pane()},
+    const lobby={t:'lobby',code:this.code,mode:this.mode,title:(this.room&&this.room.title)||'',seats:SETUP.players.map(p=>({name:p.name,emoji:p.emoji,color:p.color,ai:p.ai,host:!!p.host,op:!!p.op,net:p.net||null,online:p.net?this.isOnline(p.net):true})),board:Content.board(SETUP.cfg.board).name};
+    this.broadcast(lobby);this.publishLobby();if(Setup.L&&$('#tabpane')&&Setup.tab==='people'&&!Setup.inGame)Setup.pane();if(Setup.L&&Setup.tab==='net')Setup.pane()},
   /* 참가자의 선택: 지금 요청서의 답할 사람이 이 기기일 때만 받아들입니다 */
   onInput(m,msg){const spec=PROMPT;if(!spec||spec.id!==msg.id||!spec.actor)return;const a=spec.actor;
+    if(msg.v==='skip'&&a.t==='ai'&&m.kind==='remote'&&['notice','card'].includes(spec.kind))return spec.resolve&&spec.resolve(true,'skip');
     const ok=(a.t==='net'&&m.kind==='player'&&a.cid===m.cid)||(a.t==='judge'&&m.kind==='remote');
     if(ok&&spec.resolve)spec.resolve(msg.v,'net')},
+
+  /* 진행자 리모컨의 명령: 리모컨 기기에서 온 것만 받고 값도 검사합니다 */
+  onCmd(m,msg){if(m.kind!=='remote'||!G||this.mode!=='relay')return;const p=G.players.find(x=>x.id===msg.id),lv=['easy','normal','hard'].includes(msg.lv)?msg.lv:null;
+    switch(msg.c){
+      case 'toai':if(!p||!lv||p.out)break;if(p.op){p.op=false;p.ai=true;p.aiLv=lv;log(`${p.name} 자리를 컴퓨터가 이어서 해요`,p);UI.render();persist();redispatch()}else if(p.net)this.toAI(p,lv);else if(p.ai){p.aiLv=lv;UI.render();persist()}break;
+      case 'op':if(p&&p.ai&&!p.out){p.ai=false;p.op=true;log(`${p.name} 자리를 진행자가 조작해요`,p);UI.render();persist();redispatch()}break;
+      case 'money':{const v=+msg.v;if(p&&Number.isInteger(v)&&Math.abs(v)<=100000)adjustMoney(p.id,v,String(msg.why||'').slice(0,30));break}
+      case 'undo':if(canUndo())undo();break;
+      case 'pause':setPause(!!msg.on);break}},
+  cmd(o){if(this.role==='client'&&this.kind==='remote')this.conn?this.conn.send({t:'cmd',...o}):UI.toast('방장과 연결이 끊겨서 보내지 못했어요')},
 
   /* ---------- 게임 중 자리 바꾸기 ---------- */
   freeSeats(cid){if(!G)return [];return G.players.filter(p=>!p.out&&!p.host&&(p.ai||(p.net&&p.net!==cid&&!this.isOnline(p.net))||(p.prev===cid)))},
@@ -186,7 +211,7 @@ const Net={
 
   /* ---------- 참가자 ---------- */
   async join(code,profile,kind,opt={}){
-    this.leave(true);this.role='client';this.kind=kind||'player';this.code=code;this.cid=myDeviceId();this.profileData=profile;this.G=null;this.mySeat=null;this.pin=opt.pin||null;this.localLink=!!opt.local;
+    this.leave(true);this.role='client';this.kind=kind||'player';this.code=code;this.cid=myDeviceId();this.profileData=profile;this.G=null;this.mySeat=null;this.pin=opt.pin||null;this.pw=opt.pw||null;this.localLink=!!opt.local;
     const s=this.savedSession();this.key=s&&s.role==='client'&&s.code===code&&s.cid===this.cid?s.key:null;
     if(s&&s.role==='client'&&s.code===code&&s.cid&&s.cid!==this.cid&&s.cid.startsWith(this.cid))this.cid=s.cid;
     if(this.kind==='player')store.set('net.profile',profile);
@@ -196,12 +221,12 @@ const Net={
     catch(e){if(first){this.role=null;throw e}throw e}
     this.conn._d=msg=>this.onMsg(msg);
     this.conn._c=()=>{if(this.role==='client')this.lost()};
-    const hi=()=>this.conn&&this.conn.send({t:'hello',cid:this.cid,key:this.key,kind:this.kind,pin:this.pin,...this.profileData});
+    const hi=()=>this.conn&&this.conn.send({t:'hello',cid:this.cid,key:this.key,kind:this.kind,pin:this.pin,pw:this.pw,...this.profileData});
     this.conn._re=hi;hi();
     this.saveSession();
     clearInterval(this.pingT);this.pingT=setInterval(()=>this.conn&&this.conn.send({t:'ping',at:Date.now()}),8000);
     $('#netbar')?.remove()},
-  saveSession(){if(this.role!=='client'||this.kind==='display')return;store.set('net.session',{role:'client',code:this.code,cid:this.cid,key:this.key,kind:this.kind,pin:this.kind==='remote'?this.pin:null,t:Date.now()})},
+  saveSession(){if(this.role!=='client'||this.kind==='display')return;store.set('net.session',{role:'client',code:this.code,cid:this.cid,key:this.key,kind:this.kind,pin:this.kind==='remote'?this.pin:null,pw:this.pw||null,t:Date.now()})},
   lost(msg){if(this.role!=='client')return;this.conn=null;
     let b=$('#netbar');if(!b){b=document.createElement('div');b.id='netbar';b.className='netbar';document.body.appendChild(b)}
     if(msg)this.pauseMsg=msg;b.textContent=this.pauseMsg||'📴 방장과 연결이 끊겼어요 · 다시 연결하는 중…';
@@ -210,7 +235,7 @@ const Net={
     switch(msg.t){
       case 'welcome':this.pauseMsg=null;this.mySeat=msg.seat;this.mode=msg.mode||this.mode;if(msg.cid)this.cid=msg.cid;if(msg.key)this.key=msg.key;this.saveSession();
         $('#waitNote')?.remove();if(this.G){UI.enterGame()}break;
-      case 'deny':{const why=msg.why;this.leave();App.home();UI.toast(why==='pin'?'진행자 PIN이 맞지 않아요':'이 방은 중계 모드가 아니라서 리모컨으로 들어갈 수 없어요',4000);break}
+      case 'deny':{const why=msg.why,code=this.code;this.leave();App.home();UI.toast(why==='pin'?'진행자 PIN이 맞지 않아요':why==='pw'?'비밀번호가 맞지 않아요':'이 방은 중계 모드가 아니라서 리모컨으로 들어갈 수 없어요',4000);if(why==='pw')NetUI.quick(code,'',{pub:false});break}
       case 'note':UI.toast(msg.m,3500);if(msg.wait)this.waitNote(msg.m);else $('#waitNote')?.remove();break;
       case 'lobby':this.lastLobby=msg;this.mode=msg.mode||this.mode;if(!this.G)NetUI.lobby();break;
       case 'st':this.GS=msg.S;break;
@@ -243,7 +268,7 @@ const Net={
   /* 새로고침·앱 종료 뒤 다시 들어가기 */
   async rejoin(){const s=this.savedSession();if(!s)return;
     if(s.role==='client'){const prof=store.get('net.profile',{name:'참가자',emoji:'😀',color:PALETTE[0]});
-      try{UI.toast('방에 다시 들어가는 중…');await this.join(s.code,s.kind==='remote'?{name:'진행자',emoji:'🎛️',color:PALETTE[9]}:prof,s.kind||'player',{pin:s.pin});if(this.kind==='player')NetUI.lobby()}
+      try{UI.toast('방에 다시 들어가는 중…');await this.join(s.code,s.kind==='remote'?{name:'진행자',emoji:'🎛️',color:PALETTE[9]}:prof,s.kind||'player',{pin:s.pin,pw:s.pw});if(this.kind==='player')NetUI.lobby()}
       catch(e){UI.toast('방을 찾지 못했어요. 방장이 방을 다시 열면 "방 다시 들어가기"를 눌러 주세요',4500);Home.show()}}
     else{const save=hasSave(),restore=save&&save.net&&save.net.code===s.code?save.net:null;
       try{UI.toast('방을 다시 여는 중… (최대 30초)');await this.host(s.mode||(restore&&restore.mode)||'player',s.code,restore);if(save&&save.G.room)resumeGame(save);else Setup.open('people')}
@@ -258,11 +283,30 @@ function pickAiLevel(cur,done){const L=openLayer('edit',`<div class="kick">🤖 
 /* ---------- 함께하기 화면 ---------- */
 const MODE_KO={player:'플레이어 모드',relay:'중계 모드'};
 const NetUI={
-  open(prefill){
-    if(prefill)return this.quick(prefill);
+  /* 함께하기: Firebase로 연결할 때는 방 목록(대기실)을 먼저 보여 줍니다 */
+  open(prefill,pw){
+    if(prefill)return this.quick(prefill,pw);
+    if(!FB.configured())return this.menu();
+    const L=openLayer('info',`<div class="kick">👥 함께하기</div><h3>방 목록</h3>
+      <div class="tbar"><button class="btn main" data-host>👑 방 만들기</button><button class="btn" data-code>🔢 방 코드로 참가</button><button class="btn" data-more>📺 게임 화면·리모컨</button></div>
+      <div class="rooms" id="rooms"><p class="muted">방 목록을 불러오는 중…</p></div>
+      <p class="ref">방장이 방을 만들면 여기에 나타나요. 🔒 방은 비밀번호가 있어야 들어갈 수 있어요.</p>`,{close:true,tone:'var(--mint)',wide:true,onClose:()=>{off&&off();off=null}});
+    let off=null;
+    $('[data-host]',L.box).onclick=()=>{L.close();this.createRoom()};
+    $('[data-code]',L.box).onclick=()=>{L.close();this.joinForm()};
+    $('[data-more]',L.box).onclick=()=>{L.close();this.joinForm('','display')};
+    const draw=all=>{const box=$('#rooms',L.box);if(!box)return;const now=Date.now();
+      const list=Object.entries(all).filter(([c,r])=>r&&r.v===1&&(!r.t||now-r.t<12*3600e3)).sort((a,b)=>(a[1].started-b[1].started)||(b[1].t||0)-(a[1].t||0));
+      box.innerHTML=list.length?list.map(([c,r])=>`<button class="room ${r.started?'busy':''}" data-room="${esc(c)}"><span class="rt">${r.pub?'':'🔒 '}${esc(r.title||r.host+'의 방')}</span>
+          <span class="rh">👑 ${esc(r.host||'')} · ${MODE_KO[r.mode]||''}</span>
+          <span class="rb"><b>👥 ${r.n}/${r.max}</b><i>${r.pub?'공개':'비공개'}</i><i>${esc(r.board||'')}</i><i>${LV_KO[r.diff]||'섞어서'}</i><i>${r.rounds?r.rounds+'라운드':'파산까지'}</i><i class="${r.started?'on':'wait'}">${r.started?'게임 중':'모집 중'}</i></span></button>`).join('')
+        :'<p class="muted">지금 열린 방이 없어요. 👑 방 만들기를 눌러 첫 방을 만들어 보세요.</p>';
+      $$('[data-room]',box).forEach(b=>b.onclick=()=>{const c=b.dataset.room,r=all[c];L.close();this.quick(c,'',r)})};
+    FB.watchLobby(draw).then(f=>{if(L.ov.isConnected)off=f;else f()}).catch(e=>{const box=$('#rooms',L.box);if(box)box.innerHTML='<p class="muted">방 목록을 불러오지 못했어요. 방 코드로 참가할 수 있어요.</p>'})},
+  /* Firebase 설정이 없을 때의 예전 메뉴 */
+  menu(){
     const L=openLayer('info',`<div class="kick">👥 함께하기</div><h3>여러 기기로 함께 해요</h3>
-      <div class="mbody"><p>방을 만든 기기가 게임을 진행하고, 다른 사람은 각자 휴대폰으로 방 코드를 넣어 참가해요. 각자 <b>자기 자리만</b> 조작할 수 있어요.</p>
-      <p class="ref">모든 기기가 인터넷에 연결되어 있어야 해요. 처음 연결할 때만 무료 연결 서버를 거치고, 그 뒤에는 기기끼리 직접 주고받아요. 같은 와이파이가 가장 안정적이에요.</p></div>
+      <div class="mbody"><p>방을 만든 기기가 게임을 진행하고, 다른 사람은 각자 휴대폰으로 방 코드를 넣어 참가해요. 각자 <b>자기 자리만</b> 조작할 수 있어요.</p></div>
       <div class="mbtns row"><button class="btn main" data-host>👑 방 만들기</button><button class="btn mint" data-join>📱 방 참가하기 <small>방 코드 입력</small></button></div>`,{close:true,tone:'var(--mint)',wide:true});
     $('[data-host]',L.box).onclick=()=>{L.close();this.createRoom()};
     $('[data-join]',L.box).onclick=()=>{L.close();this.joinForm()}},
@@ -273,41 +317,64 @@ const NetUI={
         <button class="mode" data-mode="player"><span class="e">🙂</span><b>플레이어 모드</b><small>방장도 <b>플레이어 한 명</b>으로 참가해요. 진행자 없이 모두 같은 규칙으로 하고, 주관식은 직접 입력하면 게임이 채점해요. 방장도 다른 사람의 행동은 대신할 수 없어요.</small><em>소규모 · 각자 휴대폰</em></button>
         <button class="mode" data-mode="relay"><span class="e">🎤</span><b>중계 모드</b><small>방장은 <b>진행자·심판</b>이 되어 TV에 게임 화면을 띄우고 판정해요. 참가자는 휴대폰으로 자기 상황판을 보며 자기 차례를 조작해요. PC는 게임 화면 창을 따로 띄울 수 있어요.</small><em>교회·교육 프로그램 · TV</em></button>
       </div>`,{close:true,tone:'var(--accent)',wide:true});
-    $$('[data-mode]',L.box).forEach(b=>b.onclick=()=>{L.close();b.dataset.mode==='player'?this.hostAsPlayer():this.openRoom('relay')})},
-  hostAsPlayer(){const P=SETUP.players,me=P.find(p=>p.host)||P.find(p=>!p.ai&&!p.net)||P[0];
+    $$('[data-mode]',L.box).forEach(b=>b.onclick=()=>{L.close();this.roomForm(b.dataset.mode)})},
+  /* 방 이름 · 공개/비공개 · 비밀번호 */
+  roomForm(mode){const prof=store.get('net.profile',null),me=SETUP.players.find(p=>p.host);
+    const def=mode==='relay'?'성경 부루마블 중계':`${(me&&me.name)||(prof&&prof.name)||'우리'}의 방`;
+    let pub=true,auto=true;const autoPw=String(1000+Math.random()*9000|0);
+    const html=()=>`<div class="kick">👑 ${MODE_KO[mode]} · 방 만들기</div><h3>방 정보를 정해 주세요</h3><div class="mbody">
+      <label class="cute">방 이름<input class="inp" id="rtitle" maxlength="20" value="${esc(this._title||def)}"></label>
+      <div class="seg" id="rpub"><button type="button" data-v="1" class="${pub?'on':''}">🔓 공개 방</button><button type="button" data-v="0" class="${pub?'':'on'}">🔒 비공개 방</button></div>
+      ${pub?'<p class="ref">방 목록에 보이고 누구나 들어올 수 있어요.</p>':`<div class="seg" id="rauto"><button type="button" data-v="1" class="${auto?'on':''}">자동 비밀번호</button><button type="button" data-v="0" class="${auto?'':'on'}">직접 정하기</button></div>
+        ${auto?`<p class="ref">비밀번호: <b class="roomcode">${autoPw}</b> · 방 공유 링크에는 비밀번호가 들어 있어서 링크로 오면 바로 들어와요.</p>`:`<label class="cute">비밀번호 (4~12자)<input class="inp" id="rpw" maxlength="12" value="${esc(this._pw||'')}" autocomplete="off"></label>`}`}</div>
+      <div class="mbtns"><button class="btn main wide" data-go>${mode==='player'?'다음: 내 캐릭터 정하기':'방 만들기'}</button></div>`;
+    const L=openLayer('info',html(),{close:true,tone:'var(--accent)'});
+    const keep=()=>{this._title=$('#rtitle',L.box).value;const pw=$('#rpw',L.box);if(pw)this._pw=pw.value};
+    const redraw=()=>{keep();const box=$('.mbox',L.ov);box.innerHTML='<button class="xclose" data-x aria-label="닫기">×</button>'+html();$('[data-x]',box).onclick=L.close;bind()};
+    const bind=()=>{$('#rpub',L.box).onclick=e=>{const b=e.target.closest('button');if(!b)return;pub=b.dataset.v==='1';redraw()};
+      const ra=$('#rauto',L.box);if(ra)ra.onclick=e=>{const b=e.target.closest('button');if(!b)return;auto=b.dataset.v==='1';redraw()};
+      $('[data-go]',L.box).onclick=()=>{keep();const title=(this._title||'').trim()||def;let pw='';
+        if(!pub){pw=auto?autoPw:(this._pw||'').trim();if(!auto&&(pw.length<4||pw.length>12))return UI.toast('비밀번호는 4~12자로 정해 주세요')}
+        const room={title,pub:!pw,pw};this._title='';this._pw='';L.close();mode==='player'?this.hostAsPlayer(room):this.openRoom('relay',room)}};
+    bind()},
+  hostAsPlayer(room){const P=SETUP.players,me=P.find(p=>p.host)||P.find(p=>!p.ai&&!p.net)||P[0];
     const prof=store.get('net.profile',null);
     if(!me.host&&prof){me.name=prof.name||me.name;if(prof.emoji)me.emoji=prof.emoji;if(prof.color&&!P.some(x=>x!==me&&x.color===prof.color))me.color=prof.color}
     const L=openLayer('info',`<div class="kick">🙂 플레이어 모드 · 방장</div><h3>내 캐릭터를 정해 주세요</h3><div class="mbody">
       <label class="cute">내 이름<input class="inp" id="hname" maxlength="10" value="${esc(me.name||'')}" placeholder="예: 베드로"></label>
       <div class="pedit" style="--pc:${me.color};grid-template-columns:auto 1fr"><span class="tok" style="--pc:${me.color}">${esc(me.emoji)}</span><button class="btn sm" data-look>🎨 동물·색깔 고르기</button></div></div>
       <div class="mbtns"><button class="btn main wide" data-go>방 만들기</button></div>`,{close:true,tone:me.color});
-    $('[data-look]',L.box).onclick=()=>{me.name=$('#hname',L.box).value;pickLook(me,P.filter(x=>x!==me),()=>this.hostAsPlayer())};
+    $('[data-look]',L.box).onclick=()=>{me.name=$('#hname',L.box).value;pickLook(me,P.filter(x=>x!==me),()=>this.hostAsPlayer(room))};
     $('[data-go]',L.box).onclick=()=>{const n=$('#hname',L.box).value.trim();if(!n)return UI.toast('이름을 적어 주세요');me.name=n;
       store.set('net.profile',{name:n,emoji:me.emoji,color:me.color});
       P.forEach(p=>{p.host=p===me;if(p===me){p.ai=false;p.net=null;p.op=false}});
-      const k=P.indexOf(me);if(k>0){P.splice(k,1);P.unshift(me)}L.close();this.openRoom('player')}},
-  async openRoom(mode){const P=SETUP.players;
+      const k=P.indexOf(me);if(k>0){P.splice(k,1);P.unshift(me)}L.close();this.openRoom('player',room)}},
+  async openRoom(mode,room){const P=SETUP.players;
     /* 방장 기기에서 조작하는 자리는 플레이어 모드의 방장 자리와 중계 모드의 진행자 조작 자리뿐입니다 */
     P.forEach(p=>{p.net=null;if(mode==='relay')p.host=false;if(!p.host&&!p.op&&!p.ai)p.ai=true;if(mode==='player')p.op=false;if(!p.pid)p.pid=uid('p')});saveSetup();
-    try{UI.toast('방을 만드는 중…');await Net.host(mode);Setup.open('people')}catch(e){netError(e)}},
+    try{UI.toast('방을 만드는 중…');await Net.host(mode,null,null,room||{title:'',pub:true,pw:''});Setup.open('people')}catch(e){netError(e)}},
   /* 공유 링크로 들어왔을 때: 이름만 적으면 바로 참가합니다 (캐릭터는 대기실에서 바꿀 수 있어요) */
-  quick(code){const prof=store.get('net.profile',null)||{name:'',emoji:TOKENS[6+(Math.random()*30|0)],color:PALETTE[Math.random()*PALETTE.length|0]};
-    const L=openLayer('info',`<div class="kick">📱 방 ${esc(code)}</div><h3>이름만 적으면 바로 들어가요</h3><div class="mbody">
+  quick(code,pw,info){const prof=store.get('net.profile',null)||{name:'',emoji:TOKENS[6+(Math.random()*30|0)],color:PALETTE[Math.random()*PALETTE.length|0]};
+    const needPw=info&&info.pub===false&&!pw;
+    const L=openLayer('info',`<div class="kick">📱 방 ${esc(code)}${info&&info.title?` · ${esc(info.title)}`:''}</div><h3>${needPw?'비밀번호와 이름을 적어 주세요':'이름만 적으면 바로 들어가요'}</h3><div class="mbody">
+      ${info&&info.started?'<p class="ref">이미 게임 중인 방이에요. 들어가면 방장이 비어 있는 자리(컴퓨터 자리)를 넘겨줄지 정해요.</p>':''}
+      ${needPw?`<label class="cute">🔒 비밀번호<input class="inp" id="qpw" maxlength="12" autocomplete="off" style="font-size:1.4rem"></label>`:''}
       <label class="cute">내 이름<input class="inp" id="qname" maxlength="10" value="${esc(prof.name||'')}" placeholder="예: 민수" style="font-size:1.6rem;min-height:3.6rem" enterkeyhint="go"></label>
       <p class="ref">동물·색깔은 들어간 뒤 대기실에서 바꿀 수 있어요. 다른 브라우저로 다시 들어와도 같은 이름이면 원래 자리로 돌아가요.</p></div>
       <div class="mbtns"><button class="btn main wide big" data-go>🙂 참가하기</button><button class="linkbtn" data-more>게임 화면(TV)·진행자 리모컨으로 연결하기</button></div>`,{close:true,tone:'var(--mint)'});
-    const go=async()=>{const name=$('#qname',L.box).value.trim();if(!name)return UI.toast('이름을 적어 주세요');prof.name=name;store.set('net.profile',prof);
-      const b=$('[data-go]',L.box);b.disabled=true;b.textContent='들어가는 중…';
-      try{await Net.join(code,{name,emoji:prof.emoji,color:prof.color},'player');L.close();this.lobby()}catch(e){b.disabled=false;b.textContent='🙂 참가하기';netError(e)}};
+    const go=async()=>{const name=$('#qname',L.box).value.trim();if(!name)return UI.toast('이름을 적어 주세요');const p2=needPw?$('#qpw',L.box).value.trim():pw;if(needPw&&!p2)return UI.toast('비밀번호를 적어 주세요');
+      prof.name=name;store.set('net.profile',prof);const b=$('[data-go]',L.box);b.disabled=true;b.textContent='들어가는 중…';
+      try{await Net.join(code,{name,emoji:prof.emoji,color:prof.color},'player',{pw:p2||null});L.close();this.lobby()}catch(e){b.disabled=false;b.textContent='🙂 참가하기';netError(e)}};
     $('[data-go]',L.box).onclick=go;$('#qname',L.box).onkeydown=e=>{if(e.key==='Enter')go()};
     $('[data-more]',L.box).onclick=()=>{L.close();this.joinForm(code,'display')};
-    setTimeout(()=>$('#qname',L.box).focus(),80)},
+    setTimeout(()=>$(needPw?'#qpw':'#qname',L.box).focus(),80)},
   joinForm(prefill,kind){const prof=store.get('net.profile',{name:'',emoji:TOKENS[6],color:PALETTE[1]});kind=kind||'player';
     const draw=()=>`<div class="kick">📱 방 참가하기</div><h3>${kind==='display'?'게임 화면(TV)으로 연결':kind==='remote'?'진행자 리모컨으로 연결':'방 코드와 내 캐릭터'}</h3><div class="mbody">
       <div class="seg" id="jkind"><button type="button" data-v="player" class="${kind==='player'?'on':''}">🙂 플레이어</button><button type="button" data-v="display" class="${kind==='display'?'on':''}">📺 게임 화면</button><button type="button" data-v="remote" class="${kind==='remote'?'on':''}">🎛️ 진행자 리모컨</button></div>
       <label class="cute">방 코드 (6자리)<input class="inp" id="jcode" maxlength="8" style="font-size:2rem;letter-spacing:.2em;text-transform:uppercase;text-align:center" value="${esc(prefill||'')}" placeholder="ABC123" autocomplete="off"></label>
       ${kind==='player'?`<label class="cute">내 이름<input class="inp" id="jname" maxlength="10" value="${esc(prof.name)}" placeholder="예: 민수"></label>
       <div class="pedit" style="--pc:${prof.color};grid-template-columns:auto 1fr"><span class="tok" style="--pc:${prof.color}">${esc(prof.emoji)}</span><button class="btn sm" data-look>🎨 동물·색깔 고르기</button></div>`:''}
+      ${kind!=='remote'?'<label class="cute">🔒 비밀번호 (비공개 방만)<input class="inp" id="jpw" maxlength="12" autocomplete="off"></label>':''}
       ${kind==='display'?'<p class="ref">TV·프로젝터에 연결한 기기에서 고르세요. 모두가 보는 게임판과 문제만 나오고, 정답은 결과가 나올 때까지 나오지 않아요.</p>':''}
       ${kind==='remote'?`<label class="cute">진행자 PIN (4자리)<input class="inp" id="jpin" inputmode="numeric" maxlength="4" style="font-size:1.8rem;letter-spacing:.3em;text-align:center" placeholder="0000"></label><p class="ref">중계 모드의 진행자 기기 설정 → 멀티플레이에 PIN이 있어요. 리모컨에서는 주관식 정답을 보고 판정할 수 있어요. 리모컨은 꼭 쓰지 않아도 돼요.</p>`:''}</div>
       <div class="mbtns"><button class="btn main wide" data-go>연결하기</button></div>`;
@@ -321,7 +388,8 @@ const NetUI={
       else profile=kind==='display'?{name:'게임 화면',emoji:'📺',color:PALETTE[9]}:{name:'진행자',emoji:'🎛️',color:PALETTE[9]};
       const pin=kind==='remote'?$('#jpin',L.box).value.trim():null;if(kind==='remote'&&!/^\d{4}$/.test(pin))return UI.toast('진행자 PIN 4자리를 적어 주세요');
       const b=$('[data-go]',L.box);b.disabled=true;b.textContent='연결하는 중…';
-      try{await Net.join(code,profile,kind,{pin});L.close();if(kind==='player')this.lobby();else this.waiting()}catch(e){b.disabled=false;b.textContent='연결하기';netError(e)}};
+      const jp=$('#jpw',L.box),pw=jp?jp.value.trim():'';
+      try{await Net.join(code,profile,kind,{pin,pw:pw||null});L.close();if(kind==='player')this.lobby();else this.waiting()}catch(e){b.disabled=false;b.textContent='연결하기';netError(e)}};
     setTimeout(()=>$(prefill&&kind==='player'?'#jname':'#jcode',L.box)?.focus(),60)},
   /* 게임 화면·리모컨: 게임이 시작되기를 기다리는 화면 */
   waiting(){if(Net.G)return;const L=openLayer('info',`<div class="kick">${Net.kind==='display'?'📺 게임 화면':'🎛️ 진행자 리모컨'} · 방 ${esc(Net.code)}</div><h3>진행자가 게임을 시작하기를 기다려요</h3>
@@ -329,7 +397,7 @@ const NetUI={
     $('[data-leave]',L.box).onclick=()=>{L.close();Net.leave();App.home()}},
   lobby(){if(Net.role!=='client'||Net.G)return;if(Net.kind!=='player')return this.waiting();const lb=Net.lastLobby,me=Net.cid;
     const seats=lb?lb.seats:[];const mine=seats.find(s=>s.net===me);
-    const html=`<div class="kick">📱 방 ${esc(Net.code)} · ${lb?`${MODE_KO[lb.mode]||''} · ${esc(lb.board)} 판`:''}</div><h3>방장이 게임을 시작하기를 기다려요</h3>
+    const html=`<div class="kick">📱 방 ${esc(Net.code)} · ${lb?`${MODE_KO[lb.mode]||''} · ${esc(lb.board)} 판`:''}</div><h3>${lb&&lb.title?esc(lb.title)+' · ':''}방장이 게임을 시작하기를 기다려요</h3>
       <div class="code">${esc(Net.code)}</div>
       <div class="members">${seats.map(s=>`<div class="m" style="box-shadow:inset .35rem 0 0 ${s.color}"><span class="tok" style="--pc:${s.color}">${esc(s.emoji)}</span>${esc(s.name)}${s.net===me?' (나)':''}<span class="st">${s.ai?'🤖 컴퓨터':s.host?'👑 방장':s.op?'🎤 진행자가 조작':s.net?(s.online?'🟢 접속':'⚪ 끊김'):''}</span></div>`).join('')||'<div class="m">참가자 목록을 받는 중…</div>'}</div>
       ${mine?'':'<p class="ref">빈 자리가 없어서 구경하는 사람으로 들어왔어요.</p>'}

@@ -98,8 +98,8 @@ UI.fit();
   const q=new URLSearchParams(location.search),disp=q.get('display');
   if(disp&&/^[A-Z0-9]{4,8}$/i.test(disp)){document.body.classList.add('display');App.home();
     Net.join(disp.toUpperCase(),{name:'게임 화면',emoji:'📺',color:PALETTE[9]},'display',{local:q.get('local')==='1'}).then(()=>NetUI.waiting()).catch(e=>netError(e));return}
-  const m=location.hash.match(/room=([A-Z0-9]{4,8})/i);
-  if(m){history.replaceState(null,'',location.pathname+location.search);App.home();NetUI.open(m[1].toUpperCase());return}
+  const m=location.hash.match(/room=([A-Z0-9]{4,8})/i),pw=location.hash.match(/[&#]pw=([^&]+)/);
+  if(m){history.replaceState(null,'',location.pathname+location.search);App.home();NetUI.open(m[1].toUpperCase(),pw?decodeURIComponent(pw[1]):'');return}
   App.home();
   /* 새로고침했거나 앱이 잠깐 꺼졌다 켜지면 들어가 있던 방으로 자동으로 돌아갑니다 */
   const ns=Net.savedSession();if(ns&&(ns.role==='client'||(hasSave()&&!ns.paused)))Net.rejoin()})();

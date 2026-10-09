@@ -19,7 +19,7 @@ const AI={
         if(q.t!=='mc')return ok&&h.a?{text:h.a}:-1;
         const tried=(spec.quiz.tries||[]).map(t=>t.choice),w=q.choices.map((_,i)=>i).filter(i=>i!==h.ans&&!tried.includes(i));
         return ok||!w.length?h.ans:w[Math.random()*w.length|0]}
-      case 'notice':case 'card':await sleep(spec.autoMs||1700);return true;
+      case 'notice':case 'card':await sleep(AI_SHOW[spec.kind]||4000);return true;
       default:await sleep(400);return true;
     }
   }

@@ -6,7 +6,7 @@ let LAYER_SEQ=0;
 const LAYER_ID={prompt:'pov',info:'iov',edit:'eov'};
 function openLayer(layer,html,o={}){
   closeLayer(layer);const ov=document.createElement('div');ov.className='ov'+(layer==='info'?' top':layer==='edit'?' top2':'');ov.id=LAYER_ID[layer];
-  ov.innerHTML=`<div class="mbox${o.wide?' wide':''}${o.full?' full':''}" role="dialog" aria-modal="true" style="${o.tone?'--tc:'+o.tone:''}">${o.close?'<button class="xclose" data-x aria-label="닫기">×</button>':''}${html}</div>`;
+  ov.innerHTML=`<div class="mbox${o.wide?' wide':''}${o.full?' full':''}${o.cls?' '+o.cls:''}" role="dialog" aria-modal="true" style="${o.tone?'--tc:'+o.tone:''}">${o.close?'<button class="xclose" data-x aria-label="닫기">×</button>':''}${html}</div>`;
   document.body.appendChild(ov);const seq=++LAYER_SEQ;ov._seq=seq;
   const close=()=>{if(ov.isConnected){ov.remove();o.onClose&&o.onClose()}};
   if(o.close){$('[data-x]',ov).onclick=close;ov.addEventListener('click',e=>{if(e.target===ov)close()});ov._esc=e=>{if(e.key==='Escape'&&topLayer()===ov){e.preventDefault();close()}};document.addEventListener('keydown',ov._esc)}
@@ -35,7 +35,9 @@ function confirmUndo(){if(!canUndo())return UI.toast('되돌릴 선택이 없어
     <div class="mbtns row"><button class="btn wide" data-c>취소</button><button class="btn main wide" data-u>↩️ 되돌리기</button></div>`,{tone:'var(--accent)',close:true});
   $('[data-c]',L.box).onclick=L.close;$('[data-u]',L.box).onclick=()=>{L.close();undo()};setTimeout(()=>$('[data-c]',L.box).focus(),40)}
 
-UI.showPrompt=function(spec){UI.curSpec=spec;const act=canAct(spec);
+UI.showPrompt=function(spec,force){UI.curSpec=spec;const act=canAct(spec);
+  /* 진행자 리모컨: 진행자가 할 일만 창으로 띄우고, 나머지는 리모컨 화면에 요약해서 보여 줍니다 */
+  if(Net.kind==='remote'&&$('#rmt')){UI.renderRemote();if(!act)return}
   switch(spec.kind){
     case 'roll':return showRoll(spec,act);
     case 'buy':case 'upgrade':case 'ark':case 'wild':return act?showChoice(spec):watchMsg(spec);
@@ -44,28 +46,36 @@ UI.showPrompt=function(spec){UI.curSpec=spec;const act=canAct(spec);
     case 'qa':case 'qv':case 'qj':case 'qs':case 'qr':return showQuiz(spec,act);
     case 'end':return showEnd(spec,act);
   }};
-UI.clearPrompt=function(){UI.curSpec=null;closeLayer('prompt');const a=$('#cAct');if(a)a.innerHTML='';document.body.classList.remove('padopen');
+UI.clearPrompt=function(){UI.curSpec=null;closeLayer('prompt');if($('#rmt'))setTimeout(()=>UI.renderRemote(),0);const a=$('#cAct');if(a)a.innerHTML='';document.body.classList.remove('padopen');
   window.__pick=null;$('#board')?.classList.remove('picking');const pb=$('#pickBar');if(pb)pb.hidden=true};
 function watchMsg(spec){const p=pOf(spec);if(!p)return;const what={buy:'땅을 살지',upgrade:'건물을 지을지',ark:'방주 카드를 쓸지',wild:'어떻게 벗어날지',fly:'날아갈 칸을'}[spec.kind]||'';
   UI.setMsg(`<b>${esc(p.name)}</b>${p.ai?' 🤖':''}, ${what} 고르고 있어요…`)}
 
 /* ---------- 주사위 ---------- */
-function showRoll(spec,act){const p=pOf(spec),box=$('#cAct');if(!box)return;
+/* 주사위 차례: 굴릴 사람의 기기에는 화면 전체를 덮는 큰 버튼만 띄워서 다른 조작 없이 주사위만 굴리게 합니다.
+   다른 기기는 게임판을 그대로 보며 기다리고, 굴린 주사위는 모든 기기에서 화면 전체로 크게 보여 줍니다(UI.rollDice) */
+function showRoll(spec,act){const p=pOf(spec),box=$('#cAct');
   UI.setMsg(spec.label||`<b>${esc(p.name)}</b>, 주사위를 굴려 주세요.`);
-  if(!act){box.innerHTML=`<div class="watch">${esc(p.name)}님${(spec.actor||{}).t==='judge'?'(진행자가 조작)':''}이 주사위를 굴리기를 기다려요</div>`;return}
+  if(!act){if(box)box.innerHTML=`<div class="watch">${esc(p.tok)} ${esc(p.name)}님${(spec.actor||{}).t==='judge'?'(진행자가 조작)':''}이 주사위를 굴리기를 기다려요</div>`;return}
+  if(box)box.innerHTML='';
   let sel=[0,0];const real=spec.mode==='real';
-  const padHTML=()=>`<div class="dpad"><span class="pl">🎲 실물 주사위를 굴려서 나온 숫자를 눌러 주세요</span>
-    ${[0,1].map(d=>`<div class="drow"><em>${d?'둘째':'첫째'}</em>${[1,2,3,4,5,6].map(v=>`<button type="button" class="dbtn${sel[d]===v?' on':''}" data-d="${d}" data-v="${v}" aria-label="${d?'둘째':'첫째'} 주사위 ${v}">${pipHTML(v)}</button>`).join('')}</div>`).join('')}
-    <button class="btn main" id="padGo" ${sel[0]&&sel[1]?'':'disabled'}>${sel[0]&&sel[1]?`${sel[0]+sel[1]}칸 이동하기`:'두 숫자를 골라 주세요'}</button>
-    <button class="linkbtn" id="toScreen">화면 주사위로 대신 굴리기</button></div>`;
-  const showPad=()=>{document.body.classList.add('padopen');box.innerHTML=padHTML();
-    $$('.dbtn',box).forEach(b=>b.onclick=()=>{sel[+b.dataset.d]=+b.dataset.v;showPad()});
-    $('#padGo',box).onclick=()=>answer(spec,{d:[sel[0],sel[1]]});$('#toScreen',box).onclick=showBtn};
-  const showBtn=()=>{document.body.classList.remove('padopen');
-    box.innerHTML=`<button class="btn main" id="rollBtn">🎲 주사위 굴리기</button>${real?'<button class="linkbtn" id="toPad">실물 주사위 숫자 입력하기</button>':''}`;
-    const rb=$('#rollBtn',box);rb.onclick=()=>{rb.disabled=true;answer(spec,{s:1})};rb.focus({preventScroll:true});if($('#toPad',box))$('#toPad',box).onclick=showPad};
-  real?showPad():showBtn()}
-document.addEventListener('keydown',e=>{if((e.key===' '||e.key==='Enter')&&!$('#pov')&&!$('#iov')&&$('#rollBtn')&&document.activeElement?.tagName!=='INPUT'){e.preventDefault();$('#rollBtn').click()}});
+  const head=`<div class="mtop"><button class="gb" data-set aria-label="설정" title="설정">⚙️</button><span class="sp"></span>${undoBtn()}</div><div class="rhead"><span class="tok" style="--pc:${p.col}">${esc(p.tok)}</span><span><b>${esc(p.name)}</b>의 차례</span></div>
+    ${spec.label?`<p class="rlabel">${spec.label}</p>`:''}`;
+  const padHTML=()=>`${head}<div class="dpad big"><span class="pl">🎲 실물 주사위를 굴려서 나온 숫자를 눌러 주세요</span>
+    ${[0,1].map(d=>`<div class="drow"><em>${d?'둘째':'첫째'}</em>${[1,2,3,4,5,6].map(v=>`<button type="button" class="dbtn${sel[d]===v?' on':''}" data-d="${d}" data-v="${v}" aria-label="${d?'둘째':'첫째'} 주사위 ${v}">${pipHTML(v)}</button>`).join('')}</div>`).join('')}</div>
+    <button class="btn main big wide" id="padGo" ${sel[0]&&sel[1]?'':'disabled'}>${sel[0]&&sel[1]?`${sel[0]+sel[1]}칸 이동하기`:'두 숫자를 골라 주세요'}</button>
+    <button class="linkbtn" id="toScreen">화면 주사위로 대신 굴리기</button>`;
+  const btnHTML=()=>`${head}<div class="rbig">🎲🎲</div><button class="btn main wide rollgo" id="rollBtn">주사위 굴리기</button>${real?'<button class="linkbtn" id="toPad">실물 주사위 숫자 입력하기</button>':''}`;
+  const L=openLayer('prompt',real?padHTML():btnHTML(),{tone:p.col,cls:'rollbox'});
+  const draw=html=>{L.box.innerHTML=html;bindUndo(L.box);bind()};
+  const bind=()=>{const st=$('[data-set]',L.box);if(st)st.onclick=()=>Net.role==='client'?Setup.openClient():Setup.openInGame();
+    $$('.dbtn',L.box).forEach(b=>b.onclick=()=>{sel[+b.dataset.d]=+b.dataset.v;draw(padHTML())});
+    const pg=$('#padGo',L.box);if(pg)pg.onclick=()=>{pg.disabled=true;answer(spec,{d:[sel[0],sel[1]]})};
+    const ts=$('#toScreen',L.box);if(ts)ts.onclick=()=>draw(btnHTML());
+    const tp=$('#toPad',L.box);if(tp)tp.onclick=()=>draw(padHTML());
+    const rb=$('#rollBtn',L.box);if(rb){rb.onclick=()=>{rb.disabled=true;closeLayer('prompt');answer(spec,{s:1})};rb.focus({preventScroll:true})}};
+  bindUndo(L.box);bind()}
+document.addEventListener('keydown',e=>{if((e.key===' '||e.key==='Enter')&&$('#rollBtn')&&!$('#iov')&&!$('#eov')&&document.activeElement?.tagName!=='INPUT'){e.preventDefault();$('#rollBtn').click()}});
 
 /* ---------- 땅 사기 · 건물 · 방주 · 광야 ---------- */
 function tollTable(g,i,curL){const t=g.board.tiles[i];
@@ -100,14 +110,21 @@ function showFly(spec){const g=VG(),p=pOf(spec),t=g.board.tiles[p.pos];
       $$('[data-fl]',L.box).forEach(b=>b.onclick=()=>{$$('[data-fl]',L.box).forEach(x=>x.disabled=true);answer(spec,+b.dataset.fl)});return}
     UI.setMsg('보드에서 날아갈 칸을 눌러 주세요.');$('#board').classList.add('picking');$('#pickBar').hidden=false;
     window.__pick=i=>{if(g.board.tiles[i].t==='fly')return UI.toast('다른 칸을 골라 주세요');window.__pick=null;$('#board').classList.remove('picking');$('#pickBar').hidden=true;answer(spec,i)}}}
-function showNotice(spec,act){const p=pOf(spec);
+/* 카드·알림: 사람 차례는 그 사람이 확인해야 넘어가고, 컴퓨터 차례는 남은 시간 막대를 보여 주며 몇 초 뒤 넘어갑니다.
+   방장 기기와 진행자 리모컨에서는 눌러서 바로 넘길 수 있어요 */
+const AI_SHOW={card:5000,notice:4000};
+function showNotice(spec,act){const p=pOf(spec),ai=(spec.actor||{}).t==='ai',ms=(AI_SHOW[spec.kind]||4000)*SPD();
+  const skip=ai&&(Net.role!=='client'||Net.kind==='remote');
   const {box}=openLayer('prompt',`${spec.pic?`<div class="bigpic">${esc(spec.pic)}</div>`:''}<div class="kick">${esc(spec.kick||'')}${p?` · ${esc(p.tok)} ${esc(p.name)}`:''}</div><h3>${esc(spec.title||'')}</h3>
-    <div class="mbody">${spec.body||''}${refHTML(spec.ref)}</div>${act?`<div class="mbtns"><button class="btn main wide" data-ok>확인</button></div>`:`<div class="watch">${(spec.actor||{}).t==='ai'?'잠시 뒤 다음으로 넘어가요':`${esc(waitWho(spec))}${(spec.actor||{}).t==='judge'?'가':'이'} 확인하면 넘어가요`}</div>`}`,{tone:spec.tone});
-  if(act){$('[data-ok]',box).onclick=()=>answer(spec,true);focusFirst(box)}}
+    <div class="mbody">${spec.body||''}${refHTML(spec.ref)}</div>${act?`<div class="mbtns"><button class="btn main wide" data-ok>확인</button></div>`
+      :ai?`<div class="autobar"><i style="animation-duration:${Math.max(.2,ms/1000)}s"></i></div>${skip?'<div class="mbtns"><button class="btn wide" data-skip>바로 넘기기</button></div>':'<div class="watch">잠시 뒤 다음으로 넘어가요</div>'}`
+      :`<div class="watch">${esc(waitWho(spec))}${(spec.actor||{}).t==='judge'?'가':'이'} 확인하면 넘어가요</div>`}`,{tone:spec.tone});
+  if(act){$('[data-ok]',box).onclick=()=>answer(spec,true);focusFirst(box)}
+  const sk=$('[data-skip]',box);if(sk)sk.onclick=()=>{sk.disabled=true;if(Net.role==='client')Net.input(spec.id,'skip');else spec.resolve&&spec.resolve(true,'skip')}}
 
 /* ---------- 퀴즈 ---------- */
 function showQuiz(spec,act){UI.renderQuiz(spec.quiz,spec,act)}
-UI.showQuizResult=quiz=>UI.renderQuiz(quiz,{kind:'qr',quiz},false);
+UI.showQuizResult=quiz=>{if($('#rmt'))return UI.renderRemote();UI.renderQuiz(quiz,{kind:'qr',quiz},false)};
 UI.renderQuiz=function(Q,spec,act){
   const g=VG(),q=Q.q,stage=spec.kind;
   /* 지금 답하는 사람: 답하기·컴퓨터 답 보기·판정 단계는 요청서의 사람, 기회 넘기기·결과 단계는 처음 문제를 받은 사람 */
@@ -151,7 +168,7 @@ UI.renderQuiz=function(Q,spec,act){
     btns=`<div class="watch">${stage==='qa'?`${nm(who)}님이 ${isMC?'답을 고르는':'답하는'} 중이에요`:stage==='qo'?`${nm(who)}님이 도전할지 고르는 중이에요`:stage==='qj'||stage==='qs'?'진행자가 고르는 중이에요':stage==='qv'?`${w}${ga} 계속하기를 누르면 컴퓨터의 답이 나와요`:(spec.actor||{}).t==='ai'?'잠시 뒤 넘어가요':`${w}${ga} 계속하기를 누르면 넘어가요`}</div>`}
   const timer=stage==='qa'&&spec.time>0?`<div class="qtimer" id="qt"><i style="width:100%"></i><b>${spec.time}초</b></div>`:'';
   const html=`<div class="mtop"><div class="kick">${Q.kick}<span class="lvchip" style="--lc:${lc}">${LV_KO[q.lv]}</span><span class="lvchip" style="--lc:${isMC?'#8f88aa':'#2f5fb3'}">${isMC?'객관식':'주관식'}</span></div><span class="sp"></span>${act||Net.role!=='client'?undoBtn():''}</div>
-    <div class="quiz two"><div class="qleft">${Q.sub?`<div class="ref">${Q.sub}</div>`:''}<div class="qwho"><span class="tok" style="--pc:${actor.col}">${esc(actor.tok)}</span>${esc(actor.name)}${isSteal?' · 다른 팀 기회':''}</div>${timer}<p class="qtext">${esc(q.q)}</p>${status}</div>
+    <div class="quiz two"><div class="qleft">${Q.sub?`<div class="ref">${Q.sub}</div>`:''}${Net.kind==='remote'&&spec.secret&&stage!=='qj'?`<div class="rans"><span>정답 (리모컨에만 보여요)</span><b>${isMC&&spec.secret.ans!=null?`${spec.secret.ans+1}번 · ${esc(q.choices[spec.secret.ans])}`:esc(spec.secret.a||'')}</b></div>`:''}<div class="qwho"><span class="tok" style="--pc:${actor.col}">${esc(actor.tok)}</span>${esc(actor.name)}${isSteal?' · 다른 팀 기회':''}</div>${timer}<p class="qtext">${esc(q.q)}</p>${status}</div>
     <div class="qright">${opts}${btns}${remoteNote(spec)}</div></div>`;
   const {ov,box}=openLayer('prompt',html,{tone:lc,wide:true});bindUndo(box);
   if(act){
@@ -161,8 +178,8 @@ UI.renderQuiz=function(Q,spec,act){
     const sf=$('#saf',box);if(sf){sf.onsubmit=e=>{e.preventDefault();const t=$('#sai',box).value.trim();if(!t)return UI.toast('답을 입력해 주세요');$$('button',box).forEach(x=>x.disabled=true);answer(spec,{text:t.slice(0,80)})};setTimeout(()=>$('#sai',box).focus({preventScroll:true}),80)}
     focusFirst(box)}
   /* 제한 시간: 방장·혼자 하는 기기가 시간을 재고, 참가자 기기는 남은 시간만 보여 줍니다 */
-  if(stage==='qa'&&spec.time>0){const t0=performance.now()-(spec.elapsed||0),total=spec.time*1000,bar=$('#qt i',box),lab=$('#qt b',box),qt=$('#qt',box);let lastS=spec.time;
-    ov._timer=setInterval(()=>{if(!ov.isConnected){clearInterval(ov._timer);return}const rem=Math.max(0,total-(performance.now()-t0)),s=Math.ceil(rem/1000);
+  if(stage==='qa'&&spec.time>0){let t0=performance.now()-(spec.elapsed||0);const total=spec.time*1000,bar=$('#qt i',box),lab=$('#qt b',box),qt=$('#qt',box);let lastS=spec.time;
+    ov._timer=setInterval(()=>{if(!ov.isConnected){clearInterval(ov._timer);return}if((VG()||{}).paused){t0+=100;return}const rem=Math.max(0,total-(performance.now()-t0)),s=Math.ceil(rem/1000);
       bar.style.width=(rem/total*100)+'%';lab.textContent=s+'초';qt.classList.toggle('hurry',s<=5);if(s<lastS&&s<=5&&s>0)SND.play('tick');lastS=s;
       if(rem<=0){clearInterval(ov._timer);if(Net.role!=='client'&&spec.resolve)spec.resolve(-1,'timer')}},100)}
   const kd=e=>{if(!ov.isConnected){document.removeEventListener('keydown',kd);return}if($('#iov'))return;
