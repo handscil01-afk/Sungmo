@@ -1,7 +1,7 @@
 'use strict';
 /* ================= 화면: 보드 · 상황판 · 가운데 ================= */
 const UI={};
-const PREF=Object.assign({sound:true,volume:.7,bgmVol:.3,speed:'normal',autoFS:true,installHide:false,textScale:1,tokScale:1},store.get('prefs',{}));
+const PREF=Object.assign({sound:true,volume:.7,bgmVol:.3,records:true,celebrate:true,speed:'normal',autoFS:true,installHide:false,textScale:1,tokScale:1},store.get('prefs',{}));
 const savePref=()=>store.set('prefs',PREF);
 const LOGO_COLORS=['#ff7b54','#f7b500','#38b996','#4f8dff','#b06ce8','#ff6fae','#ff7b54'];
 const logoHTML=t=>[...t].map((ch,k)=>ch===' '?'<span class="sp"></span>':`<span style="--c:${LOGO_COLORS[k%LOGO_COLORS.length]};--r:${k%2?3:-3}deg;--d:${k*.12}s">${ch}</span>`).join('');
@@ -86,6 +86,8 @@ function cardHTML(g,p){
   if(p.skip)tags.push('<span class="tag w" data-tip="skip">🕯️ 한 번 쉼</span>');
   if(p.ark)tags.push(`<span class="tag" data-tip="ark">🚢 방주 ${p.ark}</span>`);
   if(p.song)tags.push(`<span class="tag" data-tip="song">🎵 찬송 ${p.song}</span>`);
+  if(p.chars&&Object.keys(p.chars).length)tags.push(`<span class="tag c" data-tip="chars" data-pid="${p.id}">🃏 인물 ${Object.keys(p.chars).length}/${CHARS.length}${Object.values(p.chars).some(v=>v===0)?` · ${Object.entries(p.chars).filter(([,v])=>v===0).map(([id])=>charOf(id).pic).join('')}`:''}</span>`);
+  if(p.mates&&p.mates.length)tags.push(`<span class="tag t">👥 함께: ${p.mates.map(m=>esc(m.name)).join('·')}</span>`);
   const act=k===g.turn&&!g.over,me=Net.role==='client'&&Net.mySeat===p.id;
   const conn=p.net?(Net.isOnline(p.net)?'<span class="on">● 접속 중</span>':'<span class="off">● 연결 끊김</span>'):'';
   const whoT=p.ai?`🤖 컴퓨터(${LV_KO[p.aiLv]||'보통'})`:p.host?'👑 방장':p.op?'🎤 진행자가 조작':p.net?'📱 참가자':'🙂 사람';
@@ -104,7 +106,7 @@ UI.renderPlayers=function(){const g=VG();if(!g)return;const [L,R]=seatsOf(g.play
   $('#pl').innerHTML=L.map(k=>cardHTML(g,g.players[k])).join('');$('#pr').innerHTML=R.map(k=>cardHTML(g,g.players[k])).join('');
   const wide=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--pw'))>=290;$$('.pc').forEach(e=>e.classList.toggle('wide',wide));UI.fanHands()};
 UI.renderCenter=function(){const g=VG();if(!g||!$('#cRnd'))return;
-  $('#cRnd').textContent=`${g.board.name} 판 · 라운드 ${roundText(g)}${Net.code?` · 방 ${Net.code}`:''}`;
+  $('#cRnd').textContent=`${g.board.name} 판 · 라운드 ${roundText(g)}${Net.code?` · 방 ${Net.code}`:''}`;addClock($('#cRnd'),g);
   const p=g.players[g.turn];$('#cWho').innerHTML=g.over?'<span class="chip" style="--pc:var(--g7)">🏆 게임 끝</span>':`<span class="chip" style="--pc:${p.col}"><span class="tok">${tokIn(p.tok)}</span>${esc(p.name)}의 차례</span>`;
   $('#cPot').textContent=fmt(g.pot)};
 UI.renderLog=function(){const g=VG(),el=$('#cLog');if(!g||!el)return;el.innerHTML=g.log.slice(0,3).map(e=>`<li style="${e.c?'--pc:'+e.c:''}"><i></i><span>${esc(e.m)}</span></li>`).join('')};
@@ -226,7 +228,7 @@ const TIPS={ark:['🚢 노아의 방주 카드','남의 땅에 도착했을 때 
   skip:['🕯️ 안식일','다음 차례에 한 번 쉬어요.','출 20:8'],jail:['🌵 광야','퀴즈를 맞히거나, 더블이 나오거나, 헌금 100을 내면 벗어날 수 있어요. 남은 차례가 끝나면 저절로 나와요.','민 14:33']};
 document.addEventListener('click',e=>{if(!document.body.classList.contains('ingame'))return;
   const ln=e.target.closest('.ln[data-tile],.hc[data-tile]');if(ln){onTileClick(+ln.dataset.tile);return}
-  const tg=e.target.closest('.tag[data-tip]');if(tg){const t=TIPS[tg.dataset.tip];if(t)openInfo('상황판',t[0],`<p>${esc(t[1])}</p>${refHTML(t[2])}`,'var(--g7)');return}
+  const tg=e.target.closest('.tag[data-tip]');if(tg&&tg.dataset.tip==='chars'){openChars(+tg.dataset.pid);return}if(tg){const t=TIPS[tg.dataset.tip];if(t)openInfo('상황판',t[0],`<p>${esc(t[1])}</p>${refHTML(t[2])}`,'var(--g7)');return}
   const ot=e.target.closest('[data-see]');if(ot){UI.dashSee=+ot.dataset.see;UI.renderDash();return}});
 document.addEventListener('keydown',e=>{if(e.key!=='Enter')return;const ln=e.target.closest&&e.target.closest('.ln[data-tile],.hc[data-tile]');if(ln)onTileClick(+ln.dataset.tile)});
 
@@ -248,7 +250,7 @@ UI.renderDash=function(){const g=VG(),d=$('#dash');if(!g||!d)return;const me=g.p
   $$('.pc',d).forEach(e=>e.classList.add('wide'));UI.fanHands();
   const dp=$('[data-tile-pos]',d);if(dp)dp.onclick=()=>onTileClick(+dp.dataset.tilePos);
   const tp=g.players[g.turn];
-  $('.dtop .room',d).textContent=`📱 방 ${Net.code||''} · 라운드 ${roundText(g)} · ${g.over?'게임 끝':tp.name+'의 차례'}`};
+  $('.dtop .room',d).textContent=`📱 방 ${Net.code||''} · 라운드 ${roundText(g)} · ${g.over?'게임 끝':tp.name+'의 차례'}`;addClock($('.dtop .room',d),g)};
 
 /* ---------- 잠시 멈춤: 모든 기기에 알리고, 진행자 기기에는 다시 시작 버튼 ---------- */
 UI.pauseOv=function(){const g=VG();let o=$('#pauseov');
@@ -263,24 +265,25 @@ UI.pauseOv=function(){const g=VG();let o=$('#pauseov');
 UI.buildRemote=function(){$('#dash')?.remove();let d=$('#rmt');if(!d){d=document.createElement('div');d.id='rmt';$('#game').appendChild(d)}
   d.innerHTML=`<div class="rtop"><span class="room">🎛️ 진행자 리모컨 · 방 ${esc(Net.code||'')}</span><span class="sp"></span><button class="gb" id="gSet" aria-label="설정">⚙️</button></div>
     <div class="rinfo" id="rinfo"></div><div class="rturn" id="rturn"></div><section class="rnow" id="rnow"></section>
-    <div class="rtools"><button class="btn" data-r="undo">↩️ 되돌리기</button><button class="btn" data-r="pause">⏸️ 잠시 멈춤</button></div>
+    <div class="rtools"><button class="btn" data-r="undo">↩️ 되돌리기</button><button class="btn" data-r="pause">⏸️ 잠시 멈춤</button><button class="btn" data-r="hq">🎤 즉석 문제</button></div>
     <section class="rpl" id="rpl"></section><div hidden><div id="cMsg"></div><div id="cAct"></div><div id="d1"></div><div id="d2"></div></div>`;
   d.appendChild($('#toast'));UI.bindGameBtns(d);
   $('[data-r="undo"]',d).onclick=()=>{const L=openLayer('edit',`<div class="bigpic">↩️</div><h3>이전 게임 상태로 되돌릴까요?</h3><div class="mbody"><p>바로 전 사람의 선택 하나를 취소해요. 주사위 값과 문제는 그대로예요.</p></div><div class="mbtns row"><button class="btn wide" data-c>취소</button><button class="btn main wide" data-u>↩️ 되돌리기</button></div>`,{close:true,tone:'var(--accent)'});
     $('[data-c]',L.box).onclick=L.close;$('[data-u]',L.box).onclick=()=>{L.close();Net.cmd({c:'undo'})}};
+  $('[data-r="hq"]',d).onclick=()=>HostQ.open();
   $('[data-r="pause"]',d).onclick=()=>{const g=VG();Net.cmd({c:'pause',on:!(g&&g.paused)})};
   UI.renderRemote()};
 UI.renderRemote=function(){const g=VG(),d=$('#rmt');if(!g||!d)return;
-  $('#rinfo',d).textContent=`${g.board.name} 판 · 라운드 ${roundText(g)}`;
+  $('#rinfo',d).textContent=`${g.board.name} 판 · 라운드 ${roundText(g)}`;addClock($('#rinfo',d),g);
   /* 차례 순서: 늘 같은 자리에 모든 플레이어를 순서대로 두고 지금 차례만 강조합니다 */
   $('#rturn',d).innerHTML=g.players.map((p,k)=>`<span class="rt ${k===g.turn&&!g.over?'on':''} ${p.out?'out':''}" style="--pc:${p.col}"><span class="tok" style="--pc:${p.col}">${tokIn(p.tok)}</span><b>${esc(p.name)}</b></span>`).join('<i>›</i>');
-  $('[data-r="pause"]',d).textContent=g.paused?'▶️ 다시 시작':'⏸️ 잠시 멈춤';
+  $('[data-r="pause"]',d).textContent=g.paused?'▶️ 다시 시작':'⏸️ 잠시 멈춤';$('[data-r="hq"]',d).hidden=g.cfg.hostQ===false;
   /* 지금 상황 + 정답 미리 보기 */
   const sp=Net.curPrompt,sec=Net.curSecret,Q=sp&&sp.quiz;let h='';
   if(Q){const q=Q.q,who=g.players.find(x=>x.id===(['qa','qv','qj','qo'].includes(sp.kind)?sp.pid:Q.pid)),mc=q.t==='mc';
-    const st={qa:'답하는 중',qv:'컴퓨터가 생각하는 중',qj:'판정을 기다려요',qs:'다른 팀 기회를 고르는 중',qo:'도전할지 고르는 중',qr:'결과'}[sp.kind]||'';
+    const st={qa:'답하는 중',qv:'컴퓨터가 생각하는 중',qj:'판정을 기다려요',qs:'다른 팀 기회를 고르는 중',qo:'도전할지 고르는 중',qr:'결과',qall:'모두 답하는 중',qmark:'맞힌 사람을 골라요'}[sp.kind]||'';
     const ans=sec?(mc&&sec.ans!=null?`${sec.ans+1}번 · ${esc(q.choices[sec.ans])}`:esc(sec.a||'')):mc&&q.ans!=null?`${q.ans+1}번 · ${esc(q.choices[q.ans])}`:esc(q.a||'');
-    const last=(Q.tries||[])[Q.tries.length-1]||{};
+    const tr=Q.tries||[],last=tr[tr.length-1]||{};
     h=`<div class="rq"><div class="kick">${Q.kick} · ${LV_KO[q.lv]} · ${mc?'객관식':'주관식'}</div><div class="rwho">${who?`${tokIn(who.tok)} ${esc(who.name)}`:''} <b>${st}</b></div>
       <p class="rqt">${esc(q.q)}</p>${mc?`<ol class="rch">${q.choices.map((c,k)=>`<li class="${sec&&sec.ans===k?'ok':''}">${esc(c)}</li>`).join('')}</ol>`:''}
       ${last.text?`<div class="rtyped">✍️ 입력한 답: <b>${esc(last.text)}</b></div>`:''}

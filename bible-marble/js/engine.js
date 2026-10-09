@@ -21,7 +21,8 @@ const PALETTE_KO=['빨강','파랑','초록','보라','주황','분홍','청록'
 const SEAT=PALETTE.slice(0,4);
 const TOKENS=['🐑','🕊️','🐟','🦁','🐪','🐴','😃','😎','🐯','🐻','🐼','🐰','🦊','🐸','🐵','🐶','🐱','🐧','🦄','🐢','🐳','🦋','🌟','🍎','🍇','🌻','🌈','⚽','🎈','👑','🎵','🚀','😊','🥰','🤩','🙏','🔥','💎','🌳','🍀','🐝','🦉','🐙','🐬'];
 const DEF_NAMES=['베드로','요한','야고보','안드레'];
-const DEF_CFG={diff:'easy',qmc:true,qsa:true,quizTime:0,quizTimeMc:0,quizTimeSa:0,tollQuiz:true,quizTile:true,jailQuiz:true,steal:false,mcAll:true,aiQuiz:'manual',
+const AI_NAMES=DEF_NAMES.concat(['바울','디모데','룻','에스더']);
+const DEF_CFG={diff:'easy',qmc:true,qsa:true,quizTime:0,quizTimeMc:0,quizTimeSa:0,tollQuiz:true,quizTile:true,jailQuiz:true,steal:false,mcAll:true,chars:true,trade:true,memo:false,timeLimit:0,teams:false,hostQ:true,aiQuiz:'manual',
   rounds:20,money:2000,salary:200,monopoly:true,doubleAgain:true,cards:true,jailTurns:3,ai:'normal',board:'both'};
 
 function waitFor(setup){const id=RUN;return new Promise((res,rej)=>{const e={rej};WAITS.add(e);setup(v=>{if(!WAITS.has(e))return;WAITS.delete(e);id===RUN?res(v):rej(ABORT)})})}
@@ -39,7 +40,7 @@ const alive=()=>G.players.filter(p=>!p.out);
 const T=i=>G.board.tiles[i];
 const N=()=>G.board.tiles.length;
 /* 라운드 0은 "파산까지": 한 명만 남을 때까지 끝없이 진행합니다 */
-const roundLimit=()=>G.cfg.rounds>0?G.cfg.rounds:Infinity;
+const roundLimit=()=>Math.min(G.cfg.rounds>0?G.cfg.rounds:Infinity,G.lastRound||Infinity);
 const spots=()=>G.board.tiles.map((t,i)=>t.t==='spot'?i:-1).filter(i=>i>=0);
 const upCost=i=>r10(T(i).price*.5);
 function hasGroup(pid,g){return G.board.tiles.every((t,i)=>t.t!=='city'||t.g!==g||(G.own[i]&&G.own[i].o===pid))}
@@ -96,7 +97,7 @@ function redispatch(){if(PROMPT&&PROMPT.resolve)dispatch(PROMPT)}
 const MODE=()=>(G&&G.room&&G.room.mode)||'local';
 function seatActor(p){if(!p||p.ai)return {t:'ai'};const m=MODE();
   if(m==='local')return {t:'local'};
-  if(p.net)return {t:'net',cid:p.net};
+  if(p.net)return {t:'net',cid:p.net,cids:(p.mates||[]).map(x=>x.cid)};
   if(m==='relay')return {t:'judge'};
   return p.host?{t:'local'}:{t:'ai'}}
 function actorOf(spec){const m=MODE(),p=spec.pid!=null?byId(spec.pid):null;
@@ -120,7 +121,7 @@ function mayResolve(spec,by,val){const a=spec.actor||actorOf(spec);if(G&&G.pause
 const undoAllowed=()=>!!G&&MODE()!=='player'
 function validate(spec,v){
   switch(spec.kind){
-    case 'roll':return (v&&v.s===1)||(v&&Array.isArray(v.d)&&v.d.length===2&&v.d.every(x=>Number.isInteger(x)&&x>=1&&x<=6));
+    case 'roll':return (v&&typeof v.act==='string'&&(spec.acts||[]).includes(v.act))||(v&&v.s===1)||(v&&Array.isArray(v.d)&&v.d.length===2&&v.d.every(x=>Number.isInteger(x)&&x>=1&&x<=6));
     case 'buy':case 'upgrade':case 'ark':case 'qj':return v===true||v===false;
     case 'wild':return (spec.opts||[]).includes(v);
     case 'fly':return Number.isInteger(v)&&v>=0&&v<N()&&T(v).t!=='fly';
@@ -128,6 +129,9 @@ function validate(spec,v){
     case 'qo':return v===true||v===false;
     case 'qs':return v===-1||(spec.cands||[]).includes(v);
     case 'qall':return v===-1;
+    case 'trade':return v===null||tradeValid(byId(spec.pid),v);
+    case 'tradeok':case 'charuse':return v===true||v===false;
+    case 'qmark':return Array.isArray(v)&&new Set(v).size===v.length&&v.every(x=>(spec.cands||[]).includes(x));
     case 'sell':return (spec.lands||[]).some(x=>x.i===v)&&!!G.own[v]&&G.own[v].o===spec.pid;
     case 'end':return v==='again'||v==='home';
     default:return true}}
@@ -141,7 +145,7 @@ function undo(){
   const keep=t.steps.slice(0,si),reserve=[];
   for(let k=ti;k<J.turns.length;k++)for(const s of (k===ti?t.steps.slice(si+1):J.turns[k].steps))if(s.r)reserve.push({k:s.k,v:s.v});
   abortFlow();
-  J.turns.length=ti;G=clone(t.base);J.cur={base:clone(t.base),steps:[]};J.turns.push(J.cur);
+  const kept={clock:G.clock,lastRound:G.lastRound};J.turns.length=ti;G=clone(t.base);Object.assign(G,kept);J.cur={base:clone(t.base),steps:[]};J.turns.push(J.cur);
   J.reserve=reserve.concat(J.reserve);J.replay=keep.length?keep.slice():null;REPLAY=!!J.replay;RESUME=true;
   UI.toast('↶ 바로 전 선택으로 되돌렸어요');UI.render();gameLoop();return true}
 
@@ -156,17 +160,20 @@ function hasSave(){const s=store.get('save',null);return s&&s.G&&s.G.players&&!s
 function makeGame(setup){
   const cfg=Object.assign({},DEF_CFG,setup.cfg);
   const board=clone(Content.board(cfg.board));
+  /* 말씀 암송 미션: 마지막 퀴즈 칸을 암송 미션 칸으로 바꿉니다 */
+  if(cfg.memo){const qs=board.tiles.map((t,i)=>t.t==='quiz'?i:-1).filter(i=>i>=0);if(qs.length)board.tiles[qs[qs.length-1]]={t:'memo',name:'암송 미션',pic:'📜',note:'구절의 빈칸을 채우면 150 달란트와 성경 인물 카드를 받아요.'}}
   const ids=Content.cardAll().filter(c=>c.on&&eraFits(c.era,board.era)&&(c.fx.k!=='move_to'||findTileIn(board,c.fx.to)>=0));
   const cards=ids.length?ids:DEFAULT_CARDS.filter(c=>eraFits(c.era,board.era));
   return {v:3,cfg,board,cards:cards.map(c=>({id:c.id,t:c.t,r:c.r,d:c.d,fx:c.fx})),
     room:setup.room||null,
     players:setup.players.map((p,k)=>({id:k,pid:p.pid||uid('p'),name:(p.name||'').trim()||DEF_NAMES[k],ai:!!p.ai,aiLv:p.aiLv||cfg.ai,tok:p.emoji||TOKENS[k],col:p.color||SEAT[k],dice:p.dice==='real'?'real':'screen',
-      net:p.net||null,host:!!p.host,op:!!p.op,money:cfg.money,pos:0,jail:0,skip:0,ark:0,song:0,out:false})),
-    own:{},pot:0,turn:0,round:1,dbl:0,deck:[],used:{},log:[],over:false,started:Date.now()}}
+      net:p.net||null,mates:(cfg.teams&&p.mates||[]).map(m=>({cid:m.cid,name:m.name})),host:!!p.host,op:!!p.op,money:cfg.money,pos:0,jail:0,skip:0,ark:0,song:0,chars:{},out:false})),
+    own:{},pot:0,turn:0,round:1,dbl:0,deck:[],used:{},log:[],over:false,started:Date.now(),clock:{used:0,at:Date.now(),run:false},hq:[],st:{}}}
 function findTileIn(board,to){return to==='@start'?0:to==='@fly'?board.tiles.findIndex(t=>t.t==='fly'):to==='@jail'?board.tiles.findIndex(t=>t.t==='jail'):board.tiles.findIndex(t=>t.name===to)}
 function startGame(setup){abortFlow();G=makeGame(setup);J.turns=[];J.cur=null;J.replay=null;J.reserve=[];REPLAY=false;RESUME=false;
   log(`새 게임을 시작했어요. ${G.board.name} 판 · ${G.board.tiles[0].name}에서 출발해요!`);UI.enterGame();gameLoop()}
-function migrateGame(g){for(const p of g.players){if(!p.pid)p.pid=uid('p');if(!p.aiLv)p.aiLv=g.cfg.ai||'normal'}return g}
+function migrateGame(g){for(const p of g.players){if(!p.pid)p.pid=uid('p');if(!p.aiLv)p.aiLv=g.cfg.ai||'normal';if(!p.chars)p.chars={};if(!p.mates)p.mates=[]}
+  g.cfg=Object.assign({},DEF_CFG,g.cfg);if(!g.clock)g.clock={used:0,at:Date.now(),run:false};g.clock.at=Date.now();g.clock.run=false;if(!g.hq)g.hq=[];if(!g.st)g.st={};return g}
 function resumeGame(save){abortFlow();G=migrateGame(save.G);J.turns=save.J&&save.J.turns||[];J.reserve=save.J&&save.J.reserve||[];
   const t=J.turns.pop();
   if(t){J.cur={base:t.base,steps:[]};J.turns.push(J.cur);G=migrateGame(clone(t.base));J.replay=t.steps.length?t.steps.slice():null;REPLAY=!!J.replay;RESUME=true}
@@ -184,12 +191,14 @@ async function gameLoop(){
       if(G.round>roundLimit())break;
       if(RESUME)RESUME=false;else beginTurn();
       render();persist();
+      await runHostQs();if(alive().length<=1)break;
+      if(p.out){nextPlayer();continue}
       await takeTurn(p);
       if(alive().length<=1)break;
       nextPlayer();
       if(G.round>roundLimit())break;
     }
-    G.over=true;REPLAY=false;render();persist();sfx('good');
+    G.endReason=endReason();G.over=true;REPLAY=false;render();persist();sfx('good');saveRecord();
     const v=await ask({kind:'end',who:'any',undo:0});
     UI.afterEnd(v);
   }catch(e){if(e!==ABORT){console.error(e);if(id===RUN)UI.toast('문제가 생겨 게임을 멈췄어요. 되돌리기나 메뉴의 새 게임으로 이어 주세요.',5000)}}
@@ -198,18 +207,23 @@ async function takeTurn(p){
   G.dbl=0;render();
   if(p.skip){p.skip=0;log(`${p.name}: 안식일이라 한 번 쉽니다`,p);setMsg(`<b>${esc(p.name)}</b>, 이번 차례는 쉬어요.`);toast(`🕯️ ${IGA(p.name)} 안식일이라 쉬어요`);await sleep(1200);return}
   if(p.jail>0){const r=await wilderness(p);if(r!=='free')return}
+  if(p.ai)await aiChars(p);
   for(;;){
-    const[a,b]=await rollDice(p),dbl=a===b&&G.cfg.doubleAgain;
+    const rd=await rollDice(p,'',true);if(!rd)return;
+    const[a,b]=rd,dbl=a===b&&G.cfg.doubleAgain;
     if(dbl&&++G.dbl>=3){await goJail(p,'더블을 세 번 연속으로 던졌어요');return}
     await moveBy(p,a+b);await land(p);
     if(!dbl||p.jail>0||p.out||p.skip||alive().length<2)return;
     toast('🎲 더블! 한 번 더 굴려요');setMsg(`<b>더블!</b> ${esc(p.name)}, 한 번 더 굴려요.`);
   }
 }
-async function rollDice(p,label){
+async function rollDice(p,label,main){
   let v={s:1};
   if(p.ai){setMsg(`${esc(IGA(p.name))} 주사위를 굴려요…`);await sleep(750)}
-  else v=await ask({kind:'roll',who:'player',pid:p.id,mode:p.dice,label:label||'',undo:p.dice==='real'?1:0});
+  /* 내 차례 첫 주사위 화면에서는 땅 거래·인물 카드도 고를 수 있습니다. 쓰고 나면 다시 주사위 화면으로 돌아옵니다 */
+  else for(;;){const acts=main?rollActs(p):[];
+    v=await ask({kind:'roll',who:'player',pid:p.id,mode:p.dice,label:label||'',acts,undo:p.dice==='real'||acts.length?1:0});
+    if(!v||!v.act)break;const r=await doAct(p,v.act);if(r==='moved'||p.out)return null}
   const real=Array.isArray(v.d),[a,b]=real?v.d:rnd('dice',()=>[1+(Math.random()*6|0),1+(Math.random()*6|0)]);
   if(!REPLAY){const id=RUN;sfx('roll');Net.event({t:'dice',a,b,anim:!real});await UI.rollDice(a,b,!real);if(id!==RUN||!G)throw ABORT}
   setMsg(`<b>${a} + ${b} = ${a+b}</b>${a===b?' · 더블!':''}`);log(`${p.name}: 주사위 ${a}+${b}${a===b?' (더블)':''}${real?' · 실물':''}`,p);
@@ -264,13 +278,16 @@ async function land(p){
     case 'quiz':
       if(G.cfg.quizTile){setMsg('❓ 말씀 퀴즈 칸!');const r=await quizFlow(p,'tile',{kick:'❓ 말씀 퀴즈 칸'});
         if(r.by!=null){const base=r.rw||QREWARD[r.lv],w=byId(r.by);gain(w,r.by===p.id?base:r10(base/2),r.by===p.id?'말씀 퀴즈 정답':'다른 팀 기회 정답 (상금 절반)')}
-        else if(r.split&&r.split.length)splitPrize(r.split,r.rw||QREWARD[r.lv])}
+        else if(r.split&&r.split.length)splitPrize(r.split,r.rw||QREWARD[r.lv]);
+        if(r.ok)await grantChar(p,'말씀 퀴즈')}
       else gain(p,100,'말씀 묵상');
       break;
     case 'jail':await goJail(p,`${t.name} 칸에 도착했어요`);break;
+    case 'memo':await memoMission(p);break;
     case 'pot':if(G.pot>0){const v=G.pot;G.pot=0;payFx('pot',p.id,v);gain(p,v,`${t.name} 헌금함`);
         await notice(p,{pic:t.pic,kick:t.name,title:`헌금함의 ${fmt(v)} 달란트를 받았어요`,body:t.note?`<p>${esc(t.note)}</p>`:'',ref:t.ref,tone:'var(--g7)'})}
-      else{toast('헌금함이 비어 있어요');log(`${p.name}: 헌금함이 비어 있어요`,p)}break;
+      else{toast('헌금함이 비어 있어요');log(`${p.name}: 헌금함이 비어 있어요`,p)}
+      await grantChar(p,t.name);break;
     case 'fly':await fly(p);break;
     case 'tithe':{const v=Math.max(10,r10(p.money*.1));setMsg(`🪙 십일조 ${fmt(v)} 달란트`);await charge(p,v,'pot','십일조');if(!p.out)toast(`${IGA(p.name)} 십일조 ${fmt(v)}을 헌금함에 넣었어요`);break}
     case 'event':await notice(p,{pic:t.pic,kick:'이벤트',title:t.name,body:`<p>${esc(t.note||fxText(t.fx))}</p>`,ref:t.ref,tone:'var(--g5)'});await runFx(p,t.fx||{k:'none'},t.name);break;
@@ -291,9 +308,12 @@ async function onProperty(p,i){
     return}
   const owner=byId(o.o);let amt=tollOf(i);
   setMsg(`<b>${esc(owner.name)}</b>의 ${esc(t.name)} · 통행료 ${fmt(amt)}`);
+  if(charsLeft(p,'toll').length){const use=await ask({kind:'charuse',who:'player',pid:p.id,c:'david',tile:i,amt,undo:1});
+    if(use){p.chars.david=1;sfx('card');log(`${p.name}: 다윗 카드로 ${t.name} 통행료를 면제받았어요`,p);toast(`🪨 ${IGA(p.name)} 다윗 카드를 썼어요`);render();return}}
   if(p.ark>0){const use=await ask({kind:'ark',who:'player',pid:p.id,tile:i,amt,undo:1});
     if(use){p.ark--;sfx('card');log(`${p.name}: 방주 카드로 ${t.name} 통행료를 면제받았어요`,p);toast(`🚢 ${IGA(p.name)} 방주 카드를 썼어요`);render();return}}
-  if(G.cfg.tollQuiz){const r=await quizFlow(p,'toll',{kick:`💡 말씀 찬스 · ${esc(owner.name)}의 ${esc(t.name)}`,sub:`맞히면 통행료 <b>${fmt(amt)}</b> → <b>${fmt(r10(amt/2))}</b>`});if(r.ok)amt=r10(amt/2)}
+  if(G.cfg.tollQuiz){const r=await quizFlow(p,'toll',{kick:`💡 말씀 찬스 · ${esc(owner.name)}의 ${esc(t.name)}`,sub:`맞히면 통행료 <b>${fmt(amt)}</b> → <b>${fmt(r10(amt/2))}</b>`});if(r.ok)amt=r10(amt/2);
+    if(r.ok&&G.cfg.chars&&rnd('charluck',()=>Math.random()<1/3))await grantChar(p,'말씀 찬스')}
   await charge(p,amt,owner,`${t.name} 통행료`);
   if(!p.out)toast(`${IGA(p.name)} ${owner.name}에게 통행료 ${fmt(amt)}을 냈어요`)}
 async function drawCard(p){
@@ -321,7 +341,8 @@ async function runFx(p,f,why){
     case 'skip':p.skip=1;render();break;
     case 'quiz_bonus':{const r=await quizFlow(p,'bonus',{kick:`📜 ${esc(why)} · 보너스 퀴즈`,sub:`맞히면 <b>${f.n}</b> 달란트`,prize:f.n});
       if(r.by!=null)gain(byId(r.by),r.by===p.id?f.n:r10(f.n/2),r.by===p.id?'보너스 퀴즈 정답':'다른 팀 기회 정답 (상금 절반)');
-      else if(r.split&&r.split.length)splitPrize(r.split,f.n);break}
+      else if(r.split&&r.split.length)splitPrize(r.split,f.n);
+      if(r.ok)await grantChar(p,'보너스 퀴즈');break}
   }}
 async function fly(p){
   const t=T(p.pos);
@@ -330,8 +351,9 @@ async function fly(p){
   await moveTo(p,dest,true);await land(p)}
 async function wilderness(p){
   const t=T(p.pos);setMsg(`<b>${esc(p.name)}</b>, ${t.name}에 있어요 (남은 차례 ${p.jail})`);
-  const opts=[...(G.cfg.jailQuiz?['quiz']:[]),'dice',...(p.song>0?['song']:[]),...(p.money>=100?['pay']:[])];
+  const opts=[...(charsLeft(p,'wild').length?['moses']:[]),...(G.cfg.jailQuiz?['quiz']:[]),'dice',...(p.song>0?['song']:[]),...(p.money>=100?['pay']:[])];
   const ch=await ask({kind:'wild',who:'player',pid:p.id,opts,undo:1});
+  if(ch==='moses'){p.chars.moses=1;p.jail=0;sfx('card');log(`${p.name}: 모세 카드로 ${t.name}을 벗어났어요`,p);toast('🌊 바다가 갈라졌어요!');render();return'free'}
   if(ch==='song'){p.song--;p.jail=0;sfx('card');log(`${p.name}: 찬송 카드로 ${t.name}을 벗어났어요`,p);toast('🎵 옥문이 열렸어요!');render();return'free'}
   if(ch==='pay'){await charge(p,100,'pot',`${t.name} 탈출 헌금`);if(p.out)return'stay';p.jail=0;render();return'free'}
   if(ch==='quiz'){const r=await quizFlow(p,'jail',{kick:`${t.pic} ${esc(t.name)} 탈출 퀴즈`,sub:'맞히면 바로 벗어나 주사위를 굴려요'});
@@ -360,12 +382,12 @@ function drawQuestion(forAI){
   return o}
 /* 화면에 보여 줄 퀴즈 정보: 정답은 판정·결과 단계에서만 담습니다 (참가자 기기에서 미리 볼 수 없게) */
 function pubQuiz(QS){const q={...QS.q},open=QS.stage==='result';delete q.reset;if(!open){delete q.ans;delete q.a;delete q.alt;delete q.ex;delete q.ref}
-  return {purpose:QS.purpose,kick:QS.kick,sub:QS.sub,pid:QS.pid,stage:QS.stage,stealer:QS.stealer,by:QS.by,q,prize:QS.prize,split:QS.split,all:open?QS.all:undefined,tries:QS.tries.map(t=>{const o={...t};if(!open)delete o.match;return o})}}
+  return {purpose:QS.purpose,kick:QS.kick,sub:QS.sub,pid:QS.pid,stage:QS.stage,stealer:QS.stealer,by:QS.by,q,prize:QS.prize,split:QS.split,each:QS.each,all:open?QS.all:undefined,tries:QS.tries.map(t=>{const o={...t};if(!open)delete o.match;return o})}}
 /* 제한 시간: 객관식·주관식을 따로 정합니다 (예전 설정의 하나짜리 시간은 둘 다에 씁니다) */
 function quizTimeFor(cfg,t){const v=t==='mc'?cfg.quizTimeMc:cfg.quizTimeSa;return (v!=null?v:cfg.quizTime)||0}
 function secretQuiz(QS,tr){return {ans:QS.q.ans,a:QS.q.a,alt:QS.q.alt,ex:QS.q.ex,ref:QS.q.ref,match:tr?!!tr.match:undefined}}
 async function quizFlow(p,purpose,o){
-  const Q=rnd('q',()=>drawQuestion(p.ai));
+  const Q=o.q||rnd('q',()=>drawQuestion(p.ai));
   if(Q.reset)G.used={};G.used[Q.id]=1;
   const QS={purpose,kick:o.kick,sub:o.sub||'',pid:p.id,q:Q,tries:[],stage:'answer',stealer:null,by:null};
   log(`${p.name}: 말씀 퀴즈 (${LV_KO[Q.lv]})`,p);
@@ -382,28 +404,28 @@ async function quizFlow(p,purpose,o){
     if(cands.length){QS.stage='steal';
       const sid=await ask({kind:'qs',who:'host',pid:p.id,cands,quiz:pubQuiz(QS),secret:secretQuiz(QS),undo:1});
       if(sid>=0){QS.stealer=sid;const sp=byId(sid);log(`${sp.name}: 다른 팀 기회를 받았어요`,sp);if(await answerStep(QS,sp))by=sid}}}}
-  QS.stage='result';QS.by=by;if(split)QS.split=split;
+  QS.stage='result';QS.by=by;if(split)QS.split=split;quizStats(QS);
   if(G.cfg.aiQuiz==='auto'&&QS.tries.every(t=>byId(t.pid).ai)){fx(()=>{UI.showQuizResult(pubQuiz(QS));Net.event({t:'qres',quiz:pubQuiz(QS)})});await sleep(2600);fx(()=>UI.clearPrompt())}
   else await ask({kind:'qr',who:'any',pid:p.id,quiz:pubQuiz(QS),undo:1});
   return {ok:by===p.id,by,lv:Q.lv,rw:Q.rw,split}}
 /* 객관식 모두 도전: 처음 사람이 틀리면 나머지 모두(컴퓨터 포함)가 동시에 답하고, 맞힌 사람끼리 상금 전부를 나눕니다.
    사람은 각자 자기 기기(플레이어 모드) 또는 공용 화면·진행자 화면에서 고르고, 답은 결과가 나올 때까지 아무에게도 보이지 않습니다. */
 async function allStep(QS,p,prize){
-  const Q=QS.q,cands=alive().filter(x=>x.id!==p.id),humans=cands.filter(x=>!x.ai).map(x=>x.id);
+  const Q=QS.q,cands=alive().filter(x=>!p||x.id!==p.id),humans=cands.filter(x=>!x.ai).map(x=>x.id),pid=p?p.id:QS.pid;
   if(!cands.length)return [];
   QS.stage='all';QS.all={};QS.prize=prize;
-  log(`🙋 모두 도전! ${cands.map(x=>x.name).join(', ')}`,p);
+  log(`🙋 ${p?'모두 도전':'모두 함께'}! ${cands.map(x=>x.name).join(', ')}`,p);
   if(humans.length){
-    const picks=await ask({kind:'qall',who:'all',pid:p.id,cands:cands.map(x=>x.id),humans,done:[],picks:{},prize,t0:Date.now(),quiz:pubQuiz(QS),time:quizTimeFor(G.cfg,'mc'),secret:secretQuiz(QS),undo:1});
+    const picks=await ask({kind:'qall',who:'all',pid,cands:cands.map(x=>x.id),humans,done:[],picks:{},prize,t0:Date.now(),quiz:pubQuiz(QS),time:quizTimeFor(G.cfg,'mc'),secret:secretQuiz(QS),undo:1});
     for(const id of humans)QS.all[id]=Number.isInteger(picks[id])?picks[id]:-1}
   else{/* 컴퓨터만 남았으면 잠깐 모두 도전 화면을 보여 준 뒤 결과로 넘어갑니다 */
-    const view={id:0,kind:'qall',who:'all',pid:p.id,cands:cands.map(x=>x.id),humans:[],done:[],prize,quiz:pubQuiz(QS),actor:{t:'all'}};
+    const view={id:0,kind:'qall',who:'all',pid,cands:cands.map(x=>x.id),humans:[],done:[],prize,quiz:pubQuiz(QS),actor:{t:'all'}};
     fx(()=>{UI.showPrompt(view);Net.prompt(view)});await sleep(MODE()==='player'?2600:1800)}
-  const wrong=QS.tries[0]&&QS.tries[0].choice;
+  const wrong=QS.tries[0]?QS.tries[0].choice:-9;
   for(const x of cands)if(x.ai){const acc=(AIACC[x.aiLv||G.cfg.ai]||AIACC.normal)[Q.lv]||.7,ok=rnd('aiq',()=>Math.random()<acc);
     QS.all[x.id]=ok?Q.ans:rnd('aiw',()=>{const w=Q.choices.map((_,i)=>i).filter(i=>i!==Q.ans&&i!==wrong);return w.length?w[Math.random()*w.length|0]:-1})}
   const win=cands.filter(x=>QS.all[x.id]===Q.ans).map(x=>x.id);
-  sfx(win.length?'good':'bad');log(win.length?`🙋 모두 도전 정답: ${win.map(id=>byId(id).name).join(', ')}`:'🙋 모두 도전: 맞힌 사람이 없어요',p);
+  sfx(win.length?'good':'bad');log(win.length?`🙋 정답: ${win.map(id=>byId(id).name).join(', ')}`:'🙋 맞힌 사람이 없어요',p);
   return win}
 /* 모두 도전에서 한 사람의 답을 받습니다: 보낸 기기가 그 자리의 주인(또는 진행자)인지 엔진에서 확인합니다 */
 function allPart(spec,v,src){
@@ -411,7 +433,7 @@ function allPart(spec,v,src){
   if(!spec.humans.includes(id)||spec.done.includes(id))return;
   if(!Number.isInteger(c)||c<0||c>=spec.quiz.q.choices.length||(spec.quiz.tries||[]).some(t=>t.choice===c))return;
   const a=seatActor(byId(id));
-  const ok=src==='local'?(a.t==='local'||a.t==='judge'):!!src&&((a.t==='net'&&src.kind==='player'&&a.cid===src.cid)||(a.t==='judge'&&src.kind==='remote'));
+  const ok=src==='local'?(a.t==='local'||a.t==='judge'):!!src&&((a.t==='net'&&src.kind==='player'&&(a.cid===src.cid||(a.cids||[]).includes(src.cid)))||(a.t==='judge'&&src.kind==='remote'));
   if(!ok)return;
   spec.picks[id]=c;spec.done.push(id);sfx('tick');
   if(spec.done.length>=spec.humans.length){spec.by=src==='local'?'local':'net';spec.fin(-1)}

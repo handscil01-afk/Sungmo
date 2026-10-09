@@ -21,13 +21,13 @@ function focusFirst(root){const f=$('.btn.main,.btn.good',root)||$('.btn',root);
 /* 화면에서 버튼을 숨기는 것과 별도로, 방장 엔진도 같은 기준(actorOf)으로 보낸 기기를 검사합니다 */
 function canAct(spec){const a=spec&&spec.actor;if(!a)return false;
   if(a.t==='all')return allMine(spec).length>0;
-  if(Net.role==='client')return (a.t==='net'&&a.cid===Net.cid&&Net.kind==='player')||(a.t==='judge'&&Net.kind==='remote');
+  if(Net.role==='client')return (a.t==='net'&&(a.cid===Net.cid||(a.cids||[]).includes(Net.cid))&&Net.kind==='player')||(a.t==='judge'&&Net.kind==='remote');
   return a.t==='local'||a.t==='judge'}
 function answer(spec,v){if(!canAct(spec))return UI.toast('지금은 이 기기에서 고를 수 없어요');if(Net.role==='client')Net.input(spec.id,v);else if(spec.resolve)spec.resolve(v,'local')}
 /* 모두 도전: 이 기기에서 답을 고를 수 있는 사람 (아직 답하지 않은 사람만) */
 function allMine(spec){const g=VG();if(!g||!spec||!spec.humans)return [];const done=spec.done||[];
   return spec.humans.filter(id=>!done.includes(id)).filter(id=>{const p=g.players.find(x=>x.id===id);if(!p||p.ai||p.out)return false;
-    if(Net.role==='client')return Net.kind==='player'?p.net===Net.cid:Net.kind==='remote'&&!p.net&&Net.mode==='relay';
+    if(Net.role==='client')return Net.kind==='player'?p.net===Net.cid||(p.mates||[]).some(x=>x.cid===Net.cid):Net.kind==='remote'&&!p.net&&Net.mode==='relay';
     const m=MODE();return m==='local'||(!p.net&&(m==='relay'||p.host))})}
 function allAnswer(spec,pid,c){if(Net.role==='client')Net.input(spec.id,{pid,c});else allPart(spec,{pid,c},'local')}
 const pOf=spec=>{const g=VG();return spec.pid!=null?g.players.find(x=>x.id===spec.pid):null};
@@ -50,13 +50,17 @@ UI.showPrompt=function(spec,force){UI.curSpec=spec;const act=canAct(spec);
     case 'buy':case 'upgrade':case 'ark':case 'wild':return act?showChoice(spec):watchMsg(spec);
     case 'fly':return act?showFly(spec):watchMsg(spec);
     case 'sell':return act?showSell(spec):watchMsg(spec);
+    case 'trade':return act?showTrade(spec):watchMsg(spec);
+    case 'tradeok':return act?showTradeOk(spec):watchTrade(spec);
+    case 'charuse':return act?showCharUse(spec):watchMsg(spec);
+    case 'qmark':return showQmark(spec,act);
     case 'notice':case 'card':return showNotice(spec,act);
     case 'qa':case 'qv':case 'qj':case 'qs':case 'qr':case 'qall':return showQuiz(spec,act);
     case 'end':return showEnd(spec,act);
   }};
 UI.clearPrompt=function(){UI.curSpec=null;closeLayer('prompt');if($('#rmt'))setTimeout(()=>UI.renderRemote(),0);const a=$('#cAct');if(a)a.innerHTML='';document.body.classList.remove('padopen');
   window.__pick=null;$('#board')?.classList.remove('picking');const pb=$('#pickBar');if(pb)pb.hidden=true};
-function watchMsg(spec){const p=pOf(spec);if(!p)return;const what={buy:'땅을 살지',upgrade:'건물을 지을지',ark:'방주 카드를 쓸지',wild:'어떻게 벗어날지',fly:'날아갈 칸을',sell:'달란트가 모자라서 팔 땅을'}[spec.kind]||'';
+function watchMsg(spec){const p=pOf(spec);if(!p)return;const what={buy:'땅을 살지',upgrade:'건물을 지을지',ark:'방주 카드를 쓸지',wild:'어떻게 벗어날지',fly:'날아갈 칸을',sell:'달란트가 모자라서 팔 땅을',trade:'땅 거래 제안을',tradeok:'거래 제안을 받을지',charuse:'인물 카드를 쓸지'}[spec.kind]||'';
   UI.setMsg(`<b>${esc(p.name)}</b>${p.ai?' 🤖':''}, ${what} 고르고 있어요…`)}
 
 /* ---------- 돈이 모자랄 때 팔 땅 고르기 ---------- */
@@ -82,8 +86,8 @@ function showRoll(spec,act){const p=pOf(spec),box=$('#cAct');
   const padHTML=()=>`${head}<div class="dpad big"><span class="pl">🎲 실물 주사위를 굴려서 나온 숫자를 눌러 주세요</span>
     ${[0,1].map(d=>`<div class="drow"><em>${d?'둘째':'첫째'}</em>${[1,2,3,4,5,6].map(v=>`<button type="button" class="dbtn${sel[d]===v?' on':''}" data-d="${d}" data-v="${v}" aria-label="${d?'둘째':'첫째'} 주사위 ${v}">${pipHTML(v)}</button>`).join('')}</div>`).join('')}</div>
     <button class="btn main big wide" id="padGo" ${sel[0]&&sel[1]?'':'disabled'}>${sel[0]&&sel[1]?`${sel[0]+sel[1]}칸 이동하기`:'두 숫자를 골라 주세요'}</button>
-    <button class="linkbtn" id="toScreen">화면 주사위로 대신 굴리기</button>`;
-  const btnHTML=()=>`${head}<div class="rbig">🎲🎲</div><button class="btn main wide rollgo" id="rollBtn">주사위 굴리기</button>${real?'<button class="linkbtn" id="toPad">실물 주사위 숫자 입력하기</button>':''}`;
+    <button class="linkbtn" id="toScreen">화면 주사위로 대신 굴리기</button>${actsHTML(spec)}`;
+  const btnHTML=()=>`${head}<div class="rbig">🎲🎲</div><button class="btn main wide rollgo" id="rollBtn">주사위 굴리기</button>${real?'<button class="linkbtn" id="toPad">실물 주사위 숫자 입력하기</button>':''}${actsHTML(spec)}`;
   const L=openLayer('prompt',real?padHTML():btnHTML(),{tone:p.col,cls:'rollbox'});
   const draw=html=>{L.box.innerHTML=html;bindUndo(L.box);bind()};
   const bind=()=>{const st=$('[data-set]',L.box);if(st)st.onclick=()=>Net.role==='client'?Setup.openClient():Setup.openInGame();
@@ -91,6 +95,7 @@ function showRoll(spec,act){const p=pOf(spec),box=$('#cAct');
     const pg=$('#padGo',L.box);if(pg)pg.onclick=()=>{pg.disabled=true;answer(spec,{d:[sel[0],sel[1]]})};
     const ts=$('#toScreen',L.box);if(ts)ts.onclick=()=>draw(btnHTML());
     const tp=$('#toPad',L.box);if(tp)tp.onclick=()=>draw(padHTML());
+    bindActs(spec,L.box);
     const rb=$('#rollBtn',L.box);if(rb){rb.onclick=()=>{rb.disabled=true;closeLayer('prompt');answer(spec,{s:1})};rb.focus({preventScroll:true})}};
   bindUndo(L.box);bind()}
 document.addEventListener('keydown',e=>{if((e.key===' '||e.key==='Enter')&&$('#rollBtn')&&!$('#iov')&&!$('#eov')&&document.activeElement?.tagName!=='INPUT'){e.preventDefault();$('#rollBtn').click()}});
@@ -110,15 +115,15 @@ function showChoice(spec){const g=VG(),p=pOf(spec);let o;
       btns:[[`${BLD[o2.l+1]} ${fmt(c)} 달란트로 짓기`,true,'main'],['다음에 짓기',false]]}}
   else if(spec.kind==='ark'){o={pic:'🚢',tone:'#86d5ea',kick:'노아의 방주',title:`통행료 ${fmt(spec.amt)}, 방주 카드를 쓸까요?`,body:`<p>방주 카드를 쓰면 이번 통행료를 내지 않아요. 남은 방주 카드: <b>${p.ark}장</b></p>`,
       btns:[['🚢 방주 카드로 면제받기',true,'main'],[g.cfg.tollQuiz?'카드는 아끼고 말씀 찬스 도전':'카드는 아끼고 통행료 내기',false]]}}
-  else{const t=g.board.tiles[p.pos],L={quiz:['❓ 말씀 퀴즈로 탈출','main'],dice:['🎲 주사위 굴리기 (더블이면 탈출)'],song:[`🎵 찬송 카드 쓰기 (${p.song}장)`],pay:['🪙 헌금 100 내고 나가기']};
+  else{const t=g.board.tiles[p.pos],L={moses:['🌊 모세 카드로 바로 나가기','main'],quiz:['❓ 말씀 퀴즈로 탈출','main'],dice:['🎲 주사위 굴리기 (더블이면 탈출)'],song:[`🎵 찬송 카드 쓰기 (${p.song}장)`],pay:['🪙 헌금 100 내고 나가기']};
     o={pic:t.pic,tone:'#ffcf8a',kick:`${esc(t.name)} · 남은 차례 ${p.jail}`,title:`${esc(p.name)}, 어떻게 벗어날까요?`,body:`<p>${g.cfg.jailQuiz?'<b>말씀 퀴즈</b>를 맞히면 바로 벗어나 주사위를 굴려요. ':''}<b>주사위</b>를 골라 더블이 나오면 나온 수만큼 바로 이동해요.</p>`,
       btns:spec.opts.map(k=>[L[k][0],k,L[k][1]||''])}}
   const {box}=openLayer('prompt',`<div class="mtop"><span class="sp"></span>${undoBtn()}</div>${o.pic?`<div class="bigpic">${esc(o.pic)}</div>`:''}<div class="kick">${o.kick}</div><h3>${esc(o.title)}</h3><div class="mbody">${o.body}${remoteNote(spec)}</div>
     <div class="mbtns${o.btns.length===2?' row':''}">${o.btns.map((b,k)=>`<button class="btn ${b[2]||''} wide" data-k="${k}">${b[0]}</button>`).join('')}</div>`,{tone:o.tone});
   $$('[data-k]',box).forEach(b=>b.onclick=()=>{$$('[data-k]',box).forEach(x=>x.disabled=true);answer(spec,o.btns[+b.dataset.k][1])});bindUndo(box);focusFirst(box)}
 function hasGroupIn(g,pid,grp){const s=G;G=g;try{return hasGroup(pid,grp)}finally{G=s}}
-function showFly(spec){const g=VG(),p=pOf(spec),t=g.board.tiles[p.pos];
-  const {box,close}=openLayer('prompt',`<div class="mtop"><span class="sp"></span>${undoBtn()}</div><div class="bigpic">${esc(t.pic)}</div><div class="kick">${esc(t.name)}</div><h3>원하는 칸으로 날아가요</h3>
+function showFly(spec){const g=VG(),p=pOf(spec),es=spec.why==='esther'?charOf('esther'):null,t=es?{pic:es.pic,name:'에스더 카드',note:es.d,ref:es.ref}:g.board.tiles[p.pos];
+  const {box,close}=openLayer('prompt',`<div class="mtop"><span class="sp"></span>${undoBtn()}</div><div class="bigpic">${esc(t.pic)}</div><div class="kick">${esc(t.name)}</div><h3>원하는 칸으로 ${es?'가요':'날아가요'}</h3>
     <div class="mbody"><p>${esc(t.note||'')}</p>${refHTML(t.ref)}<p>확인을 누른 뒤 <b>보드에서 날아갈 칸</b>을 누르세요. 가는 길에 출발 칸을 지나면 축복금을 받아요.</p>${remoteNote(spec)}</div>
     <div class="mbtns"><button class="btn main wide" id="flyGo">칸 고르기</button></div>`,{tone:'#ffb08a'});
   bindUndo(box);focusFirst(box);
@@ -162,7 +167,7 @@ UI.renderQuiz=function(Q,spec,act){
   /* 정답은 진행자 전용 화면에서만 보여 줍니다: 혼자·한 기기 게임, 진행자 리모컨, 게임 화면 창을 따로 띄운 PC의 진행자 창 */
   const seeAns=act&&spec.secret&&(!Net.role||Net.kind==='remote'||Net.hostSeesAnswers());
   if(isAll){const first=g.players.find(x=>x.id===Q.pid);
-    status=`<div class="qres no"><b class="h">🙋 모두 도전!</b>${nm(first)}님이 틀렸어요. 나머지 모두 <b>동시에</b> 답을 고르세요. 맞힌 사람끼리 상금 <b>${fmt(spec.prize||Q.prize||0)}</b>을 나눠 가져요.
+    status=`<div class="qres no"><b class="h">🙋 모두 ${Q.each?'함께':'도전'}!</b>${Q.each?`모두 <b>동시에</b> 답을 고르세요. 맞힌 사람은 모두 <b>${fmt(spec.prize||Q.prize||0)}</b> 달란트를 받아요.`:`${nm(first)}님이 틀렸어요. 나머지 모두 <b>동시에</b> 답을 고르세요. 맞힌 사람끼리 상금 <b>${fmt(spec.prize||Q.prize||0)}</b>을 나눠 가져요.`}
       <span class="achips">${(spec.cands||[]).map(id=>{const p=g.players.find(x=>x.id===id);if(!p)return '';const d=(spec.done||[]).includes(id);
         return `<span class="ach ${d?'on':''}" style="--pc:${p.col}">${tokIn(p.tok)} ${esc(p.name)} ${p.ai?'🤖':d?'✔':'…'}</span>`}).join('')}</span>
       ${rows?'<span class="ex">고른 답은 결과가 나올 때까지 보이지 않아요.</span>':''}</div>`}
@@ -175,7 +180,7 @@ UI.renderQuiz=function(Q,spec,act){
   else if(stage==='qs')status=`<div class="qres no"><b class="h">😢 ${nm(who)} ${last.timeout?'시간이 다 됐어요':'틀렸어요'}</b>다른 팀에게 기회를 줄까요? 맞히면 <b>상금의 절반</b>을 받아요.</div>`;
   else if(result){const by=Q.by!=null?g.players.find(x=>x.id===Q.by):null,sp=Q.split;
     let head=by?(by.id===Q.pid?`🎉 ${nm(by)} 정답이에요!`:`🎉 ${nm(by)} 기회를 살렸어요!`):(Q.tries.some(t=>t.timeout)?'⏰ 시간이 다 됐어요':'😢 아쉬워요, 틀렸어요');
-    if(sp&&!by)head=sp.length?`🎉 ${sp.map(id=>nm(g.players.find(x=>x.id===id))).join(', ')} 정답! 한 사람에 ${fmt(Math.max(10,Math.round((Q.prize||0)/sp.length/10)*10))}`:'😢 아무도 맞히지 못했어요';
+    if(sp&&!by)head=sp.length?`🎉 ${sp.map(id=>nm(g.players.find(x=>x.id===id))).join(', ')} 정답! 한 사람에 ${fmt(Q.each?Q.prize:Math.max(10,Math.round((Q.prize||0)/sp.length/10)*10))}`:'😢 아무도 맞히지 못했어요';
     const allLine=Q.all?`<span class="achips">${Object.entries(Q.all).map(([id,c])=>{const p=g.players.find(x=>x.id===+id);if(!p)return '';const ok=c===q.ans;
       return `<span class="ach ${ok?'ok':'no'}" style="--pc:${p.col}">${tokIn(p.tok)} ${esc(p.name)} ${c>=0?`${c+1}번`:'시간 초과'} ${ok?'⭕':'❌'}</span>`}).join('')}</span>`:'';
     const said=Q.tries.filter(t=>t.text).map(t=>{const p=g.players.find(x=>x.id===t.pid);return `${p?esc(p.name):''}: ${esc(t.text)}`}).join(' · ');
@@ -199,7 +204,7 @@ UI.renderQuiz=function(Q,spec,act){
   const timed=(stage==='qa'||isAll)&&spec.time>0;
   const timer=timed?`<div class="qtimer" id="qt"><i style="width:100%"></i><b>${spec.time}초</b></div>`:'';
   const html=`<div class="mtop"><div class="kick">${Q.kick}<span class="lvchip" style="--lc:${lc}">${LV_KO[q.lv]}</span><span class="lvchip" style="--lc:${isMC?'#8f88aa':'#2f5fb3'}">${isMC?'객관식':'주관식'}</span></div><span class="sp"></span>${act||Net.role!=='client'?undoBtn():''}</div>
-    <div class="quiz two"><div class="qleft">${Q.sub?`<div class="ref">${Q.sub}</div>`:''}${Net.kind==='remote'&&spec.secret&&stage!=='qj'?`<div class="rans"><span>정답 (리모컨에만 보여요)</span><b>${isMC&&spec.secret.ans!=null?`${spec.secret.ans+1}번 · ${esc(q.choices[spec.secret.ans])}`:esc(spec.secret.a||'')}</b></div>`:''}<div class="qwho"><span class="tok" style="--pc:${actor.col}">${tokIn(actor.tok)}</span>${esc(actor.name)}${isSteal?' · 다른 팀 기회':''}</div>${timer}<p class="qtext">${esc(q.q)}</p>${status}</div>
+    <div class="quiz two"><div class="qleft">${Q.sub?`<div class="ref">${Q.sub}</div>`:''}${Net.kind==='remote'&&spec.secret&&stage!=='qj'?`<div class="rans"><span>정답 (리모컨에만 보여요)</span><b>${isMC&&spec.secret.ans!=null?`${spec.secret.ans+1}번 · ${esc(q.choices[spec.secret.ans])}`:esc(spec.secret.a||'')}</b></div>`:''}${Q.each?'<div class="qwho">👥 모두 함께</div>':`<div class="qwho"><span class="tok" style="--pc:${actor.col}">${tokIn(actor.tok)}</span>${esc(actor.name)}${isSteal?' · 다른 팀 기회':''}</div>`}${timer}<p class="qtext">${esc(q.q)}</p>${status}</div>
     <div class="qright">${opts}${btns}${remoteNote(spec)}</div></div>`;
   const {ov,box}=openLayer('prompt',html,{tone:lc,wide:true});bindUndo(box);
   if(act){
@@ -219,13 +224,18 @@ UI.renderQuiz=function(Q,spec,act){
   document.addEventListener('keydown',kd)};
 
 /* ---------- 게임 결과 ---------- */
-function showEnd(spec,act){const g=VG(),rank=g.players.slice().sort((a,b)=>(a.out-b.out)||worthIn(g,b)-worthIn(g,a)),w=rank[0];
+function showEnd(spec,act){const g=VG(),rank=g.players.slice().sort((a,b)=>(a.out-b.out)||worthIn(g,b)-worthIn(g,a)),w=rank[0],cel=PREF.celebrate!==false;
   UI.setMsg(`🏆 <b>${esc(w.name)}</b> 승리!`);
-  const {box}=openLayer('prompt',`<div class="mtop"><span class="sp"></span>${undoBtn()}</div><div class="bigpic">🏆</div><div class="kick">${g.players.filter(p=>!p.out).length<=1?'한 명만 남았어요':'정해진 라운드가 끝났어요'}</div><h3>${esc(IGA(w.name))} 이겼어요!</h3>
-    <div class="mbody"><ol class="rank">${rank.map((p,k)=>`<li><span class="no">${['🥇','🥈','🥉'][k]||k+1}</span><span class="tok" style="--pc:${p.col}">${tokIn(p.tok)}</span><span class="who">${esc(p.name)}<small>${p.out?'파산':`현금 ${fmt(p.money)} · 땅 ${Object.values(g.own).filter(o=>o.o===p.id).length}곳`}</small></span><span class="amt">${p.out?'-':fmt(worthIn(g,p))}</span></li>`).join('')}</ol>
-    <p class="ref">총자산은 현금과 땅값, 지은 건물값을 모두 더한 금액입니다.</p></div>
+  const why=g.endReason==='last'||g.players.filter(p=>!p.out).length<=1?'한 명만 남았어요':g.endReason==='time'?'정한 시간이 끝났어요':'정한 라운드가 끝났어요';
+  const {box}=openLayer('prompt',`<div class="mtop"><span class="sp"></span>${undoBtn()}</div>${cel?podiumHTML(g,rank):'<div class="bigpic">🏆</div>'}<div class="kick">${why}</div><h3>${esc(IGA(w.name))} 이겼어요!</h3>
+    <div class="mbody"><ol class="rank">${rank.map((p,k)=>`<li><span class="no">${['🥇','🥈','🥉'][k]||k+1}</span><span class="tok" style="--pc:${p.col}">${tokIn(p.tok)}</span><span class="who">${esc(p.name)}<small>${p.out?'파산':`현금 ${fmt(p.money)} · 땅 ${Object.values(g.own).filter(o=>o.o===p.id).length}곳${g.st&&g.st[p.id]?` · 퀴즈 ${g.st[p.id].ok}개`:''}`}</small></span><span class="amt">${p.out?'-':fmt(worthIn(g,p))}</span></li>`).join('')}</ol>
+    <p class="ref">총자산은 현금과 땅값, 지은 건물값을 모두 더한 금액입니다.</p>
+    <div class="endx">${cel?'<button class="btn sm" data-x="img">📸 결과 이미지</button>':''}${PREF.records!==false&&Net.role!=='client'?'<button class="btn sm" data-x="hall">🏆 명예의 전당</button>':''}</div></div>
     <div class="mbtns">${Net.role==='client'?'<button class="btn main wide" data-v="leave">처음 화면으로</button>':'<button class="btn main wide" data-v="again">같은 설정으로 다시 하기</button><button class="btn wide" data-v="home">처음 화면으로</button>'}</div>`,{tone:'var(--g7)'});
-  bindUndo(box);$$('[data-v]',box).forEach(b=>b.onclick=()=>{const v=b.dataset.v;if(v==='leave'){Net.leave();App.home();return}answer(spec,v)});focusFirst(box)}
+  bindUndo(box);$$('[data-v]',box).forEach(b=>b.onclick=()=>{const v=b.dataset.v;if(v==='leave'){Net.leave();App.home();return}answer(spec,v)});
+  $$('[data-x]',box).forEach(b=>b.onclick=()=>b.dataset.x==='img'?ResultImg.open():Hall.open());
+  if(cel&&UI.celebrated!==g.started){UI.celebrated=g.started;confetti();SND.play('good');setTimeout(()=>SND.play('card'),500)}
+  focusFirst(box)}
 
 /* ---------- 보드 칸 정보 ---------- */
 function onTileClick(i){
@@ -285,7 +295,15 @@ function rulesHTML(){const g=VG();const groups=(g?g.board.groups:DEFAULT_BOARDS[
   <li>설정에서 켜면 틀린 문제를 <b>다른 팀</b>이 이어 풀 수 있고, 상금은 절반이에요. 플레이어 모드에서는 차례 순서대로 다음 사람에게 기회가 가요.</li>
   <li>여럿이 함께할 때는 각자 <b>자기 자리만</b> 조작할 수 있어요. 방장도 다른 사람의 주사위나 선택을 대신할 수 없어요.</li>
   <li>잘못 눌렀다면 게임판 가운데의 <b>↩️</b> 버튼으로 바로 전 선택으로 돌아가요(한 번 더 확인해요). 주사위 값과 문제는 그대로예요. 여럿이 하는 플레이어 모드에서는 공평하게 하려고 쓰지 않아요.</li>
-  <li>정해진 라운드가 끝나면 <b>총자산</b>(현금 + 땅값 + 건물값)이 가장 많은 사람이 이겨요.</li></ol>
+  <li>돈이 모자라면 <b>어느 땅을 팔지</b> 골라요. 땅은 건물과 함께 통째로, 들인 돈의 반값에 팔아요. 다 팔아도 모자라면 파산해요.</li>
+  <li>객관식을 틀리면 나머지 모두가 <b>동시에</b> 답하고, 맞힌 사람끼리 상금을 나눠요(설정에서 끌 수 있어요).</li>
+  <li>정해진 라운드(또는 정한 시간)가 끝나면 <b>총자산</b>(현금 + 땅값 + 건물값)이 가장 많은 사람이 이겨요. "파산까지"를 고르면 한 명만 남을 때까지 해요.</li></ol>
+  <p><b>✨ 추가 기능</b> (설정 → 추가 기능에서 켜고 꺼요)</p>
+  <ul><li>🃏 <b>성경 인물 카드</b>: 퀴즈·암송 미션을 맞히거나 헌금함 칸에 가면 받아요. 다윗(통행료 면제)·모세(광야 탈출)·에스더(원하는 칸)·요셉(200 받기)·엘리야(헌금함 절반)·룻(모두에게서 30씩)을 한 번씩 쓸 수 있고, 여섯 명을 모으면 ${fmt(CHAR_SET_BONUS)} 달란트!</li>
+  <li>🤝 <b>땅 거래</b>: 내 차례에 주사위를 굴리기 전에 다른 사람에게 땅·달란트를 바꾸자고 제안해요.</li>
+  <li>📜 <b>암송 미션 칸</b>: 구절의 빈칸(□)에 들어갈 말을 고르면 150 달란트와 인물 카드를 받아요.</li>
+  <li>⏱ <b>시간 제한</b>: 정한 시간이 지나면 그 라운드까지만 해요. 👥 <b>팀전</b>: 한 자리에 팀원 여러 명이 들어와 누구 휴대폰으로든 조작해요.</li>
+  <li>🎤 <b>즉석 문제</b>: 진행자가 문제를 입력하면 다음 차례가 시작될 때 나와요. 🏆 <b>명예의 전당</b>과 🎉 <b>승리 연출·결과 이미지</b>도 있어요.</li></ul>
   <div class="legend">${groups.map((n,i)=>`<span style="--gc:${GROUP_COLORS[i]}"><i></i>${esc(n)}</span>`).join('')}</div>
   <p class="ref">보드의 칸을 누르면 그 장소에 얽힌 성경 이야기를 볼 수 있어요. 📖 표시를 누르면 말씀 보기 창이 열려요.</p>`}
 const showRules=()=>openInfo('게임 방법','📖 성경 부루마블 규칙',rulesHTML(),'var(--g7)',true);
