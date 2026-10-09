@@ -26,7 +26,10 @@ const DEF_CFG={diff:'easy',qmc:true,qsa:true,quizTime:0,tollQuiz:true,quizTile:t
 
 function waitFor(setup){const id=RUN;return new Promise((res,rej)=>{const e={rej};WAITS.add(e);setup(v=>{if(!WAITS.has(e))return;WAITS.delete(e);id===RUN?res(v):rej(ABORT)})})}
 function SPD(){return window.__SPD!=null?window.__SPD:({slow:1.6,normal:1,fast:.45}[PREF.speed]||1)}
-async function sleep(ms){if(REPLAY)return;const id=RUN;await sleepRaw(ms*SPD());if(id!==RUN)throw ABORT}
+async function sleep(ms){if(REPLAY)return;const id=RUN;await sleepRaw(ms*SPD());
+  /* 진행자가 잠시 멈추면 컴퓨터 행동과 자동 진행도 멈춥니다 */
+  while(G&&G.paused){await sleepRaw(250);if(id!==RUN)throw ABORT}
+  if(id!==RUN)throw ABORT}
 function abortFlow(){RUN++;for(const e of WAITS)e.rej(ABORT);WAITS.clear();PROMPT=null;UI.clearPrompt();Net.prompt(null)}
 
 /* ---------- 상태 도우미 ---------- */
@@ -102,9 +105,9 @@ function actorOf(spec){const m=MODE(),p=spec.pid!=null?byId(spec.pid):null;
   return seatActor(p)}
 /* 화면 버튼과 상관없이, 답을 보낸 쪽이 이 요청서의 답할 사람인지 엔진에서 한 번 더 확인합니다.
    (참가 기기에서 온 답은 net.js가 기기 주인까지 확인한 뒤 'net'으로 넘깁니다) */
-function mayResolve(spec,by,val){const a=spec.actor||actorOf(spec);
+function mayResolve(spec,by,val){const a=spec.actor||actorOf(spec);if(G&&G.paused)return false;
   if(by==='timer')return spec.kind==='qa'&&val===-1;
-  if(a.t==='ai')return by==='ai';
+  if(a.t==='ai')return by==='ai'||(by==='skip'&&['notice','card'].includes(spec.kind));
   if(a.t==='net')return by==='net';
   if(a.t==='judge')return by==='local'||by==='net';
   return by==='local'}
@@ -137,7 +140,7 @@ function undo(){
 
 /* ---------- 저장 ---------- */
 let persistT=0;
-function persist(){if(!G||REPLAY)return;clearTimeout(persistT);persistT=setTimeout(()=>{
+function persist(){if(!G||REPLAY)return;clearTimeout(persistT);persistT=setTimeout(()=>{if(!G)return;
   const data={G,J:{turns:J.turns.slice(-6),reserve:J.reserve},net:Net.saveInfo()};
   if(G.over&&!canUndo())store.del('save');else store.set('save',data)},120)}
 function hasSave(){const s=store.get('save',null);return s&&s.G&&s.G.players&&!s.G.over?s:null}
@@ -341,7 +344,7 @@ function drawQuestion(forAI){
 /* 화면에 보여 줄 퀴즈 정보: 정답은 판정·결과 단계에서만 담습니다 (참가자 기기에서 미리 볼 수 없게) */
 function pubQuiz(QS){const q={...QS.q},open=QS.stage==='result';delete q.reset;if(!open){delete q.ans;delete q.a;delete q.alt;delete q.ex;delete q.ref}
   return {purpose:QS.purpose,kick:QS.kick,sub:QS.sub,pid:QS.pid,stage:QS.stage,stealer:QS.stealer,by:QS.by,q,tries:QS.tries.map(t=>{const o={...t};if(!open)delete o.match;return o})}}
-function secretQuiz(QS,tr){return {ans:QS.q.ans,a:QS.q.a,alt:QS.q.alt,ex:QS.q.ex,match:tr?!!tr.match:undefined}}
+function secretQuiz(QS,tr){return {ans:QS.q.ans,a:QS.q.a,alt:QS.q.alt,ex:QS.q.ex,ref:QS.q.ref,match:tr?!!tr.match:undefined}}
 async function quizFlow(p,purpose,o){
   const Q=rnd('q',()=>drawQuestion(p.ai));
   if(Q.reset)G.used={};G.used[Q.id]=1;
@@ -366,12 +369,12 @@ async function quizFlow(p,purpose,o){
 async function answerStep(QS,a){
   const Q=QS.q,tr={pid:a.id};QS.tries.push(tr);
   if(a.ai){QS.stage='view';
-    if(G.cfg.aiQuiz==='manual'&&MODE()!=='player')await ask({kind:'qv',who:'any',pid:a.id,quiz:pubQuiz(QS),undo:0});else await sleep(MODE()==='player'?3200:1800);
+    if(G.cfg.aiQuiz==='manual'&&MODE()!=='player')await ask({kind:'qv',who:'any',pid:a.id,quiz:pubQuiz(QS),secret:secretQuiz(QS),undo:0});else await sleep(MODE()==='player'?3200:1800);
     const acc=(AIACC[a.aiLv||G.cfg.ai]||AIACC.normal)[Q.lv]||.7,ok=rnd('aiq',()=>Math.random()<acc);
     tr.choice=ok?Q.ans:rnd('aiw',()=>{const w=Q.choices.map((_,i)=>i).filter(i=>i!==Q.ans&&!QS.tries.some(t=>t.choice===i));return w.length?w[Math.random()*w.length|0]:-1});
     tr.ok=ok;sfx(ok?'good':'bad');log(`${a.name}: 퀴즈 ${ok?'정답':'오답'}`,a);return ok}
   QS.stage='answer';
-  const v=await ask({kind:'qa',who:'player',pid:a.id,quiz:pubQuiz(QS),time:G.cfg.quizTime||0,undo:1,type:MODE()==='player'&&Q.t==='sa'?'text':'',secret:{ans:Q.ans,a:Q.a}});
+  const v=await ask({kind:'qa',who:'player',pid:a.id,quiz:pubQuiz(QS),time:G.cfg.quizTime||0,undo:1,type:MODE()==='player'&&Q.t==='sa'?'text':'',secret:secretQuiz(QS)});
   if(Q.t==='mc'){tr.choice=v;tr.ok=v===Q.ans;if(v<0)tr.timeout=1;sfx(tr.ok?'good':'bad');log(`${a.name}: 퀴즈 ${tr.ok?'정답':v<0?'시간 초과':'오답'}`,a);return tr.ok}
   if(v===-1)tr.timeout=1;if(v&&typeof v==='object'){tr.text=v.text.trim().slice(0,80);tr.match=saMatch(tr.text,Q.a,Q.alt)}
   /* 플레이어 모드: 진행자가 없으므로 입력한 답을 게임이 비교해서 판정합니다 */
@@ -382,6 +385,14 @@ async function answerStep(QS,a){
 /* 주관식 답 비교: 띄어쓰기·공백·문장부호·대소문자 차이만 무시하고, 정답이나 함께 인정하는 답과 같아야 정답입니다 */
 const saNorm=s=>String(s||'').normalize('NFC').toLowerCase().replace(/[\s.,!?·ㆍ:;'"‘’“”()\[\]{}~\-_/]+/g,'');
 function saMatch(text,a,alt){const t=saNorm(text);if(!t)return false;return [a,...(alt||[])].some(x=>saNorm(x)===t)}
+
+/* ---------- 진행자 도구 (중계 모드): 잠시 멈춤 · 달란트 조정 ---------- */
+function setPause(on){if(!G||G.over)return;G.paused=!!on;log(on?'⏸️ 진행자가 게임을 잠시 멈췄어요':'▶️ 게임을 다시 이어서 해요');render();persist()}
+/* 되돌리기를 해도 조정한 달란트가 사라지지 않도록 기록해 둔 차례 시작 상태에도 같이 반영합니다 */
+function adjustMoney(id,v,why){const p=byId(id);if(!p||p.out||!Number.isInteger(v)||!v)return;
+  const d=Math.max(0,p.money+v)-p.money;if(!d)return;p.money+=d;
+  for(const t of J.turns){const q=t.base&&t.base.players.find(x=>x.id===id);if(q)q.money=Math.max(0,q.money+d)}
+  float(p,d);sfx(d>0?'coin':'pay');log(`🎤 진행자 조정: ${p.name} ${d>0?'+':''}${fmt(d)}${why?` (${why})`:''}`,p);toast(`🎤 ${p.name} ${d>0?'+':''}${fmt(d)} 달란트${why?` · ${why}`:''}`);render();persist()}
 
 /* ---------- 컴퓨터가 고를 칸 ---------- */
 function aiFly(p){let best=0,score=150;

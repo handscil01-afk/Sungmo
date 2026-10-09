@@ -20,13 +20,14 @@ const isDash=()=>Net.role==='client'&&Net.kind==='player'&&Net.mode==='relay'&&N
 UI.buildBoard=function(){
   const g=VG(),b=$('#board');document.body.appendChild($('#toast'));b.innerHTML='';
   document.body.classList.toggle('dash',isDash());document.body.classList.toggle('display',Net.kind==='display');document.body.classList.toggle('remote',Net.kind==='remote');
+  $('#rmt')?.remove();if(Net.kind==='remote')return UI.buildRemote();
   if(isDash())return UI.buildDash();$('#dash')?.remove();
   g.board.tiles.forEach((t,i)=>{
     const [r,c]=cellOf(i),s=sideOf(i),el=document.createElement('div');
-    el.className=`tile t-${t.t} ${s}`+(s==='corner'?` c-${t.t}`:'');el.style.gridArea=`${r}/${c}`;el.dataset.i=i;el.tabIndex=0;el.setAttribute('role','button');
+    el.className=`tile t-${t.t} ${s}`+(s==='corner'?` c-${t.t}`:'')+([...(t.short||t.name)].length>=4?' long':'');el.style.gridArea=`${r}/${c}`;el.dataset.i=i;el.tabIndex=0;el.setAttribute('role','button');
     if(t.t==='city')el.style.setProperty('--gc',GROUP_COLORS[t.g]);
     let h='';
-    if(t.t==='city')h=`<i class="band"></i><span class="pic">${esc(t.pic)}</span><b class="nm">${esc(t.short||t.name)}</b><span class="pr"></span><span class="flag" hidden></span><span class="bld"></span>`;
+    if(t.t==='city')h=`<i class="band"></i><i class="orn"></i><span class="pic">${esc(t.pic)}</span><b class="nm">${esc(t.short||t.name)}</b><span class="pr"></span><span class="flag" hidden></span><span class="bld"></span>`;
     else if(t.t==='spot')h=`<span class="pic">${esc(t.pic)}</span><b class="nm">${esc(t.short||t.name)}</b><span class="pr"></span><span class="flag" hidden></span>`;
     else if(s==='corner')h=`<span class="pic">${esc(t.pic)}</span><b class="nm">${esc(t.short||t.name)}</b><span class="sub">${esc(t.sub||'')}</span>`;
     else h=`<span class="pic">${esc(t.pic)}</span><b class="nm">${esc(t.short||t.name)}</b>`;
@@ -45,7 +46,7 @@ UI.buildBoard=function(){
 UI.renderTiles=function(){const g=VG();if(!g)return;
   $$('#board .tile').forEach(el=>{const i=+el.dataset.i,t=g.board.tiles[i],o=g.own[i];
     if(t.t!=='city'&&t.t!=='spot'){el.setAttribute('aria-label',t.name);return}
-    el.classList.toggle('owned',!!o);const pr=$('.pr',el),fl=$('.flag',el),bd=$('.bld',el);
+    el.classList.toggle('owned',!!o);[0,1,2,3].forEach(l=>el.classList.toggle('lv'+l,!!o&&o.l===l));const pr=$('.pr',el),fl=$('.flag',el),bd=$('.bld',el);
     if(o){const p=g.players.find(x=>x.id===o.o);el.style.setProperty('--oc',p.col);pr.textContent='통행 '+tollOfIn(g,i);fl.hidden=false;fl.textContent=p.tok;
       if(bd)bd.innerHTML=o.l?`<span class="bi">${BLD[o.l]}</span><span class="lvp">${[1,2,3].map(k=>`<i class="${k<=o.l?'on':''}"></i>`).join('')}</span>`:'';
       el.setAttribute('aria-label',`${t.name}, ${p.name}의 땅, ${LV[o.l]}, 통행료 ${tollOfIn(g,i)}`)}
@@ -101,18 +102,40 @@ UI.renderCenter=function(){const g=VG();if(!g||!$('#cRnd'))return;const lim=g.cf
   const p=g.players[g.turn];$('#cWho').innerHTML=g.over?'<span class="chip" style="--pc:var(--g7)">🏆 게임 끝</span>':`<span class="chip" style="--pc:${p.col}"><span class="tok">${esc(p.tok)}</span>${esc(p.name)}의 차례</span>`;
   $('#cPot').textContent=fmt(g.pot)};
 UI.renderLog=function(){const g=VG(),el=$('#cLog');if(!g||!el)return;el.innerHTML=g.log.slice(0,3).map(e=>`<li style="${e.c?'--pc:'+e.c:''}"><i></i><span>${esc(e.m)}</span></li>`).join('')};
-UI.render=function(){if(!VG())return;if($('#dash')){UI.renderDash();UI.updateHeader();return}if(!$('#board .tile'))return;UI.renderTiles();UI.renderTokens();UI.renderPlayers();UI.renderCenter();UI.renderLog();UI.updateHeader();Net.pushState()};
-UI.setMsg=h=>{const m=$('#cMsg');if(m)m.innerHTML=h};
+UI.render=function(){if(!VG())return;UI.pauseOv();if($('#rmt')){UI.renderRemote();return}if($('#dash')){UI.renderDash();UI.updateHeader();return}if(!$('#board .tile'))return;UI.renderTiles();UI.renderTokens();UI.renderPlayers();UI.renderCenter();UI.renderLog();UI.updateHeader();Net.pushState()};
+UI.setMsg=h=>{UI.lastMsg=h;const m=$('#cMsg');if(m)m.innerHTML=h;if($('#rmt'))UI.renderRemote()};
 
-/* ---------- 주사위 굴림: 상자 안에서 튕기며 구르는 가벼운 애니메이션 ---------- */
+/* ---------- 주사위 굴림: 화면 전체에서 튕기며 굴러와 가운데에 크게 멈춥니다 (모든 기기, 컴퓨터 주사위 포함) ---------- */
 UI.rollDice=async function(a,b,anim){
-  const d1=$('#d1'),d2=$('#d2');if(!d1)return;d1.classList.remove('dbl');d2.classList.remove('dbl');
-  if(anim&&SPD()>0&&!reducedMotion()&&d1.animate){
-    const tray=$('.tray'),tw=tray.clientWidth,th=tray.clientHeight,dur=Math.round(950*Math.min(1,SPD()+.25));
-    const path=dir=>{const k=[];let rot=0;for(let s=0;s<5;s++){rot+=(140+Math.random()*160)*dir;k.push({transform:`translate(${(Math.random()-.5)*tw*.55}px,${-Math.random()*th*.9}px) rotate(${rot}deg)`,offset:s/5})}k.push({transform:'translate(0,0) rotate(0deg)',offset:1});return k};
-    d1.animate(path(1),{duration:dur,easing:'cubic-bezier(.25,.7,.35,1)'});d2.animate(path(-1),{duration:dur,easing:'cubic-bezier(.25,.7,.35,1)'});
-    const t0=performance.now();await new Promise(res=>{const f=()=>{if(performance.now()-t0>=dur-90)return res();drawDie(d1,1+(Math.random()*6|0));drawDie(d2,1+(Math.random()*6|0));setTimeout(f,75)};f()})}
-  drawDie(d1,a);drawDie(d2,b);if(a===b){d1.classList.add('dbl');d2.classList.add('dbl')}};
+  const d1=$('#d1'),d2=$('#d2');if(d1){drawDie(d1,a);drawDie(d2,b)}
+  if(SPD()===0)return;
+  let fx=$('#rollfx');if(!fx){fx=document.createElement('div');fx.id='rollfx';fx.setAttribute('aria-live','polite');document.body.appendChild(fx)}
+  clearTimeout(fx._t);const W=innerWidth,H=innerHeight,S=Math.round(clamp(Math.min(W,H)*.26,84,280)),gap=Math.round(S*.22);
+  fx.style.setProperty('--ds',S+'px');fx.className='on';
+  fx.innerHTML=`<div class="rdie" id="rd1"></div><div class="rdie" id="rd2"></div><div class="rsum"></div>`;
+  const r1=$('#rd1',fx),r2=$('#rd2',fx),sum=$('.rsum',fx);
+  const fy=Math.round(H/2-S*.72),fx1=Math.round(W/2-S-gap/2),fx2=Math.round(W/2+gap/2);
+  drawDie(r1,a);drawDie(r2,b);
+  const place=(el,x,y)=>{el.style.transform=`translate(${x}px,${y}px)`};
+  place(r1,fx1,fy);place(r2,fx2,fy);
+  const speed=Math.min(1,SPD()+.25);
+  if(anim&&!reducedMotion()&&r1.animate){
+    const dur=Math.round(1150*speed);
+    /* 화면 아래 양쪽 바깥에서 들어와 벽에 몇 번 튕긴 뒤 가운데에 멈춥니다 */
+    const path=(fromLeft,endX)=>{const k=[];let rot=0,x=fromLeft?-S:W,y=H*.75;
+      k.push({transform:`translate(${x}px,${y}px) rotate(0deg)`,offset:0});
+      for(let s=1;s<=4;s++){rot+=(200+Math.random()*160)*(fromLeft?1:-1);x=Math.random()*(W-S);y=s%2?Math.random()*H*.25:H*.55+Math.random()*(H*.4-S);
+        k.push({transform:`translate(${Math.round(x)}px,${Math.round(Math.max(0,y))}px) rotate(${Math.round(rot)}deg)`,offset:s/5.4})}
+      k.push({transform:`translate(${endX}px,${fy}px) rotate(${Math.round(rot/360)*360}deg)`,offset:1});return k};
+    const ease={duration:dur,easing:'cubic-bezier(.3,.6,.35,1)'};
+    r1.animate(path(true,fx1),ease);r2.animate(path(false,fx2),ease);
+    const t0=performance.now();await new Promise(res=>{const f=()=>{if(performance.now()-t0>=dur-110){drawDie(r1,a);drawDie(r2,b);return res()}drawDie(r1,1+(Math.random()*6|0));drawDie(r2,1+(Math.random()*6|0));setTimeout(f,80)};f()})}
+  else if(r1.animate){const k=[{transform:`translate(${fx1}px,${fy}px) scale(.4)`,opacity:0},{transform:`translate(${fx1}px,${fy}px) scale(1)`,opacity:1}];
+    r1.animate(k,{duration:260});r2.animate(k.map(f=>({...f,transform:f.transform.replace(`${fx1}px`,`${fx2}px`)})),{duration:260});await sleepRaw(260)}
+  if(a===b){r1.classList.add('dbl');r2.classList.add('dbl')}
+  sum.innerHTML=`${a} + ${b} = <b>${a+b}</b>${a===b?' <em>더블!</em>':''}`;sum.style.top=(fy+S+Math.round(S*.12))+'px';sum.classList.add('on');
+  await sleepRaw(Math.round(950*speed));
+  fx.classList.add('out');fx._t=setTimeout(()=>{fx.className='';fx.innerHTML=''},380)};
 
 /* ---------- 알림·소리 ---------- */
 UI.toast=(msg,ms)=>{const t=$('#toast');if(!t)return;t.textContent=msg;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),ms||2300)};
@@ -189,3 +212,48 @@ UI.renderDash=function(){const g=VG(),d=$('#dash');if(!g||!d)return;const me=g.p
   const dp=$('[data-tile-pos]',d);if(dp)dp.onclick=()=>onTileClick(+dp.dataset.tilePos);
   const lim=g.cfg.rounds||MAX_ROUNDS,tp=g.players[g.turn];
   $('.dtop .room',d).textContent=`📱 방 ${Net.code||''} · 라운드 ${Math.min(g.round,lim)}/${lim} · ${g.over?'게임 끝':tp.name+'의 차례'}`};
+
+/* ---------- 잠시 멈춤: 모든 기기에 알리고, 진행자 기기에는 다시 시작 버튼 ---------- */
+UI.pauseOv=function(){const g=VG();let o=$('#pauseov');
+  if(!(g&&g.paused&&!g.over)){if(o)o.remove();return}
+  const judge=Net.role==='host'||Net.kind==='remote';
+  if(!o){o=document.createElement('div');o.id='pauseov';document.body.appendChild(o)}
+  o.innerHTML=`<div class="pbox"><div class="bigpic">⏸️</div><h3>잠시 멈췄어요</h3><p>${judge?'다시 시작하면 멈춘 곳부터 이어서 해요.':'진행자가 다시 시작하면 이어서 해요.'}</p>${judge?'<button class="btn main big" data-resume>▶️ 다시 시작</button>':''}</div>`;
+  const r=$('[data-resume]',o);if(r)r.onclick=()=>{if(Net.kind==='remote')Net.cmd({c:'pause',on:false});else setPause(false)}};
+
+/* ---------- 진행자 리모컨: 게임판 대신 진행에 필요한 것만 크게 ----------
+   지금 상황과 정답·해설을 미리 보고, 판정·계속하기는 큰 창으로, 플레이어 관리·달란트 조정·되돌리기·잠시 멈춤을 한 화면에서 합니다 */
+UI.buildRemote=function(){$('#dash')?.remove();let d=$('#rmt');if(!d){d=document.createElement('div');d.id='rmt';$('#game').appendChild(d)}
+  d.innerHTML=`<div class="rtop"><span class="room">🎛️ 진행자 리모컨 · 방 ${esc(Net.code||'')}</span><span class="sp"></span><button class="gb" id="gSet" aria-label="설정">⚙️</button></div>
+    <div class="rinfo" id="rinfo"></div><section class="rnow" id="rnow"></section>
+    <div class="rtools"><button class="btn" data-r="undo">↩️ 되돌리기</button><button class="btn" data-r="pause">⏸️ 잠시 멈춤</button></div>
+    <section class="rpl" id="rpl"></section><div hidden><div id="cMsg"></div><div id="cAct"></div><div id="d1"></div><div id="d2"></div></div>`;
+  d.appendChild($('#toast'));UI.bindGameBtns(d);
+  $('[data-r="undo"]',d).onclick=()=>{const L=openLayer('edit',`<div class="bigpic">↩️</div><h3>이전 게임 상태로 되돌릴까요?</h3><div class="mbody"><p>바로 전 사람의 선택 하나를 취소해요. 주사위 값과 문제는 그대로예요.</p></div><div class="mbtns row"><button class="btn wide" data-c>취소</button><button class="btn main wide" data-u>↩️ 되돌리기</button></div>`,{close:true,tone:'var(--accent)'});
+    $('[data-c]',L.box).onclick=L.close;$('[data-u]',L.box).onclick=()=>{L.close();Net.cmd({c:'undo'})}};
+  $('[data-r="pause"]',d).onclick=()=>{const g=VG();Net.cmd({c:'pause',on:!(g&&g.paused)})};
+  UI.renderRemote()};
+UI.renderRemote=function(){const g=VG(),d=$('#rmt');if(!g||!d)return;const lim=g.cfg.rounds||MAX_ROUNDS,tp=g.players[g.turn];
+  $('#rinfo',d).innerHTML=`<span>${esc(g.board.name)} 판 · 라운드 ${Math.min(g.round,lim)}/${lim}</span><span class="chip" style="--pc:${tp.col}"><span class="tok">${esc(tp.tok)}</span>${esc(tp.name)}의 차례</span>`;
+  $('[data-r="pause"]',d).textContent=g.paused?'▶️ 다시 시작':'⏸️ 잠시 멈춤';
+  /* 지금 상황 + 정답 미리 보기 */
+  const sp=Net.curPrompt,sec=Net.curSecret,Q=sp&&sp.quiz;let h='';
+  if(Q){const q=Q.q,who=g.players.find(x=>x.id===(['qa','qv','qj','qo'].includes(sp.kind)?sp.pid:Q.pid)),mc=q.t==='mc';
+    const st={qa:'답하는 중',qv:'컴퓨터가 생각하는 중',qj:'판정을 기다려요',qs:'다른 팀 기회를 고르는 중',qo:'도전할지 고르는 중',qr:'결과'}[sp.kind]||'';
+    const ans=sec?(mc&&sec.ans!=null?`${sec.ans+1}번 · ${esc(q.choices[sec.ans])}`:esc(sec.a||'')):mc&&q.ans!=null?`${q.ans+1}번 · ${esc(q.choices[q.ans])}`:esc(q.a||'');
+    const last=(Q.tries||[])[Q.tries.length-1]||{};
+    h=`<div class="rq"><div class="kick">${Q.kick} · ${LV_KO[q.lv]} · ${mc?'객관식':'주관식'}</div><div class="rwho">${who?`${esc(who.tok)} ${esc(who.name)}`:''} <b>${st}</b></div>
+      <p class="rqt">${esc(q.q)}</p>${mc?`<ol class="rch">${q.choices.map((c,k)=>`<li class="${sec&&sec.ans===k?'ok':''}">${esc(c)}</li>`).join('')}</ol>`:''}
+      ${last.text?`<div class="rtyped">✍️ 입력한 답: <b>${esc(last.text)}</b></div>`:''}
+      <div class="rans"><span>정답</span><b>${ans||'—'}</b>${sec&&sec.alt&&sec.alt.length?`<small>함께 인정: ${esc(sec.alt.join(', '))}</small>`:''}${(sec&&sec.ex)||q.ex?`<small>${esc((sec&&sec.ex)||q.ex)}</small>`:''}${(sec&&sec.ref)||q.ref?`<small>${refHTML((sec&&sec.ref)||q.ref)}</small>`:''}</div></div>`}
+  else h=`<div class="rmsg">${UI.lastMsg||'진행 중이에요'}</div>${sp&&!canAct(sp)?`<div class="watch">${esc(waitWho(sp))}의 차례를 기다려요</div>`:''}`;
+  if(sp&&canAct(sp))h+=`<button class="btn main big wide" data-open>👉 진행하기 (판정·계속하기)</button>`;
+  $('#rnow',d).innerHTML=h;const op=$('[data-open]',d);if(op)op.onclick=()=>UI.showPrompt(sp,true);
+  /* 플레이어 관리 */
+  $('#rpl',d).innerHTML=g.players.map(p=>{const on=p.net?Net.isOnline(p.net):null;
+    const st=p.out?'파산':p.ai?`🤖 컴퓨터(${LV_KO[p.aiLv]||'보통'})`:p.op?'🎤 진행자 조작':p.net?(on?'🟢 접속 중':'⚪ 연결 끊김'):'';
+    return `<div class="rp" style="--pc:${p.col}"><span class="tok" style="--pc:${p.col}">${esc(p.tok)}</span><div class="nm"><b>${esc(p.name)}</b><small>${st}</small></div><span class="mo">${p.out?'-':fmt(p.money)}</span>
+      ${p.out?'':`<div class="btnrow"><button class="btn sm" data-money="${p.id}">💰 조정</button>${p.ai?`<button class="btn sm" data-lv="${p.id}">난이도</button><button class="btn sm" data-op="${p.id}">🎤</button>`:`<button class="btn sm" data-toai="${p.id}">🤖 대체</button>`}</div>`}</div>`}).join('');
+  $$('[data-money]',d).forEach(b=>b.onclick=()=>openMoney(g.players.find(x=>x.id===+b.dataset.money),(v,why)=>Net.cmd({c:'money',id:+b.dataset.money,v,why})));
+  $$('[data-toai],[data-lv]',d).forEach(b=>b.onclick=()=>{const id=+(b.dataset.toai||b.dataset.lv),p=g.players.find(x=>x.id===id);pickAiLevel(p.aiLv||'normal',lv=>{if(lv)Net.cmd({c:'toai',id,lv})})});
+  $$('[data-op]',d).forEach(b=>b.onclick=()=>Net.cmd({c:'op',id:+b.dataset.op}))};

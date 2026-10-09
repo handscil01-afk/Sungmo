@@ -538,3 +538,125 @@ body.np .ln{font-size:.82rem}
 .mi-sub{min-height:2.4rem;border-radius:.9rem;background:var(--paper);color:var(--ink-2);font-family:var(--f-cute);font-size:.95rem;box-shadow:inset 0 0 0 2px var(--line)}
 .mi-sub:hover{color:var(--bad);box-shadow:inset 0 0 0 2px #ffb3c0}
 @media (max-width:640px) and (orientation:portrait){.mi-split{grid-column:1/-1}}
+/* ---------- 주사위: 화면 전체 ---------- */
+#center .tray,.dact .tray{display:none}
+#rollfx{position:fixed;inset:0;z-index:85;pointer-events:none;display:none}
+#rollfx.on{display:block;background:rgba(61,52,88,.18);animation:rfin .18s ease-out}
+#rollfx.out{animation:rfout .38s ease-in forwards}
+@keyframes rfin{from{background:rgba(61,52,88,0)}}
+@keyframes rfout{to{opacity:0}}
+#rollfx .rdie{position:absolute;left:0;top:0;width:var(--ds);height:var(--ds);border-radius:22%;background:#fff;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:calc(var(--ds)*.14);box-shadow:inset 0 0 0 calc(var(--ds)*.025) #ece4f5,0 calc(var(--ds)*.06) 0 #d9cfe9,0 calc(var(--ds)*.12) calc(var(--ds)*.2) rgba(61,52,88,.3)}
+#rollfx .rdie i{border-radius:50%;margin:13%}
+#rollfx .rdie i.on{background:var(--ink)}
+#rollfx .rdie.d1 i.on{background:var(--bad)}
+#rollfx .rdie.dbl{box-shadow:inset 0 0 0 calc(var(--ds)*.04) var(--accent),0 calc(var(--ds)*.06) 0 var(--accent-2),0 calc(var(--ds)*.12) calc(var(--ds)*.2) rgba(61,52,88,.3)}
+#rollfx .rsum{position:absolute;left:50%;transform:translate(-50%,8px);opacity:0;padding:.2em .9em;border-radius:99px;background:var(--paper);box-shadow:var(--shadow);font-family:var(--f-cute);font-size:calc(var(--ds)*.28);white-space:nowrap;color:var(--ink);transition:opacity .2s,transform .2s}
+#rollfx .rsum.on{opacity:1;transform:translate(-50%,0)}
+#rollfx .rsum b{font-weight:400;color:var(--accent-2);font-size:1.3em}
+#rollfx .rsum em{font-style:normal;color:var(--accent)}
+/* 주사위 굴리기 창: 화면을 덮고 큰 버튼만 */
+.mbox.rollbox{max-width:min(94vw,34rem);text-align:center;display:flex;flex-direction:column;align-items:center;gap:.7rem;padding:1.4rem 1.4rem 1.6rem}
+.mbox.rollbox .mtop{width:100%;margin:0}
+.rhead{display:flex;align-items:center;gap:.6rem;font-family:var(--f-cute);font-size:1.9rem}
+.rhead .tok{width:3.2rem;height:3.2rem;font-size:1.9rem}
+.rhead b{font-weight:400;color:var(--tc,var(--accent-2))}
+.rlabel{font-family:var(--f-cute);font-size:1.25rem;color:var(--ink-2)}
+.rbig{font-size:clamp(4rem,14vmin,8rem);line-height:1;animation:wob 1.4s ease-in-out infinite}
+@keyframes wob{50%{transform:rotate(-8deg) scale(1.06)}}
+.btn.rollgo{min-height:clamp(4.5rem,13vmin,7rem);font-size:clamp(1.8rem,5.5vmin,3rem);border-radius:1.6rem}
+.dpad.big{--u:5px;padding:.8rem 1rem;gap:.6rem}
+.dpad.big .dbtn{width:clamp(2.6rem,9vmin,4.2rem);height:clamp(2.6rem,9vmin,4.2rem)}
+.dpad.big .pl{font-size:1.05rem}
+.dpad.big .drow em{font-size:.95rem}
+.autobar{height:.5rem;border-radius:99px;background:var(--cream);overflow:hidden;margin-top:.8rem;box-shadow:inset 0 0 0 1.5px var(--line)}
+.autobar i{display:block;height:100%;background:var(--tc,var(--accent));transform-origin:left;animation:autobar linear forwards}
+@keyframes autobar{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+/* ---------- 잠시 멈춤 ---------- */
+#pauseov{position:fixed;inset:0;z-index:90;display:grid;place-items:center;background:rgba(61,52,88,.55);padding:1rem}
+#pauseov .pbox{background:var(--paper);border-radius:1.6rem;padding:1.6rem 2rem;text-align:center;display:flex;flex-direction:column;gap:.6rem;align-items:center;box-shadow:var(--shadow)}
+#pauseov h3{font-family:var(--f-cute);font-weight:400;font-size:2rem}
+.mgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:.4rem}
+.mgrid .btn{min-height:2.8rem;font-size:1.15rem}
+/* ---------- 진행자 리모컨 화면 ---------- */
+body.remote #pl,body.remote #pr,body.remote #board{display:none}
+body.remote #game{display:block;height:100dvh;padding:max(.4rem,env(safe-area-inset-top)) .6rem .6rem;overflow-y:auto}
+#rmt{display:flex;flex-direction:column;gap:.6rem;max-width:44rem;margin:0 auto}
+#rmt .rtop{display:flex;align-items:center;gap:.5rem;font-family:var(--f-cute);font-size:1.05rem;color:var(--ink-2)}
+#rmt .rtop .sp{flex:1}
+#rmt .gb{width:2.6rem;height:2.6rem;font-size:1.3rem}
+#rmt .rinfo{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;justify-content:space-between;font-family:var(--f-cute);color:var(--ink-2)}
+#rmt .rinfo .chip{font-size:1.05rem}
+.rnow{background:var(--paper);border-radius:1.3rem;padding:.9rem 1rem;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:.6rem}
+.rnow .rmsg{font-family:var(--f-cute);font-size:1.3rem}
+.rq .rwho{font-family:var(--f-cute);font-size:1.1rem;color:var(--ink-2)}
+.rq .rwho b{font-weight:400;color:var(--accent-2);margin-left:.3rem}
+.rq .rqt{font-family:var(--f-cute);font-size:1.45rem;line-height:1.35;margin:.3rem 0}
+.rq .rch{margin:0;padding-left:1.6rem;font-size:1.1rem}
+.rq .rch li.ok{color:var(--good);font-weight:700}
+.rtyped{font-size:1.1rem}
+.rans{display:flex;flex-direction:column;gap:.15rem;margin-top:.4rem;padding:.7rem .9rem;border-radius:1rem;background:#fff7e6;box-shadow:inset 0 0 0 2px #ffd28a}
+.rans span{font-family:var(--f-cute);color:#9a5200;font-size:.95rem}
+.rans b{font-family:var(--f-cute);font-weight:400;font-size:1.6rem}
+.rans small{color:var(--ink-2);font-size:.98rem}
+.rtools{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+.rtools .btn{min-height:3.4rem;font-size:1.2rem}
+.rpl{display:flex;flex-direction:column;gap:.45rem}
+.rp{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.3rem .6rem;padding:.55rem .7rem;border-radius:1rem;background:var(--paper);box-shadow:var(--shadow);border-left:.4rem solid var(--pc)}
+.rp .tok{width:2.4rem;height:2.4rem;font-size:1.35rem}
+.rp .nm b{display:block;font-family:var(--f-cute);font-weight:400;font-size:1.15rem}
+.rp .nm small{color:var(--ink-2)}
+.rp .mo{font-family:var(--f-cute);font-size:1.25rem}
+.rp .btnrow{grid-column:1/-1;justify-content:flex-end}
+/* ---------- 방 목록 ---------- */
+.tbar{display:flex;flex-wrap:wrap;gap:.5rem;margin:.4rem 0 .6rem}
+.rooms{display:grid;gap:.6rem;grid-template-columns:repeat(auto-fill,minmax(min(100%,19rem),1fr));max-height:55vh;overflow-y:auto;padding:.2rem}
+.rooms .room{display:flex;flex-direction:column;align-items:flex-start;gap:.25rem;text-align:left;padding:.8rem 1rem;border-radius:1.1rem;background:var(--cream);box-shadow:inset 0 0 0 2px var(--line),0 3px 0 var(--line)}
+.rooms .room:hover{box-shadow:inset 0 0 0 3px var(--mint),0 3px 0 var(--line)}
+.rooms .room.busy{opacity:.8}
+.rooms .rt{font-family:var(--f-cute);font-size:1.3rem}
+.rooms .rh{color:var(--ink-2);font-size:.95rem}
+.rooms .rb{display:flex;flex-wrap:wrap;gap:.25rem .35rem;align-items:center}
+.rooms .rb b{font-family:var(--f-cute);font-weight:400;font-size:1.05rem;margin-right:.2rem}
+.rooms .rb i{font-style:normal;font-size:.85rem;padding:.05rem .5rem;border-radius:99px;background:var(--paper);box-shadow:inset 0 0 0 1.5px var(--line)}
+.rooms .rb i.wait{background:#dcf6e9;box-shadow:inset 0 0 0 1.5px #8fd9b5}
+.rooms .rb i.on{background:#fff1dc;box-shadow:inset 0 0 0 1.5px #ffcf8a}
+
+/* 땅 주인 장식: 건물 단계마다 칸 바깥쪽 가장자리에 주인 색 장막·집·성벽 무늬를 둘러요 (배경은 주인 색 그대로) */
+.tile .orn{position:absolute;z-index:1;pointer-events:none;background:var(--oc);display:none}
+.tile.owned.lv1 .orn,.tile.owned.lv2 .orn,.tile.owned.lv3 .orn{display:block}
+.tile.sb .orn{left:0;right:0;bottom:0;height:var(--ot)} .tile.st .orn{left:0;right:0;top:0;height:var(--ot)}
+.tile.sl .orn{top:0;bottom:0;left:0;width:var(--ot)} .tile.sr .orn{top:0;bottom:0;right:0;width:var(--ot)}
+#board{--ot:max(6px,calc(var(--u)*1.9))}
+.tile.owned.lv1.sb,.tile.owned.lv2.sb,.tile.owned.lv3.sb{padding-bottom:calc(var(--ot) + 1px)}
+.tile.owned.lv1.st,.tile.owned.lv2.st,.tile.owned.lv3.st{padding-top:calc(var(--ot) + 1px)}
+.tile.owned.lv1.sl,.tile.owned.lv2.sl,.tile.owned.lv3.sl{padding-left:calc(var(--ot) + 1px)}
+.tile.owned.lv1.sr,.tile.owned.lv2.sr,.tile.owned.lv3.sr{padding-right:calc(var(--ot) + 1px)}
+.tile.owned.lv1{box-shadow:inset 0 0 0 max(3px,calc(var(--u)*.85)) var(--oc),0 2px 0 rgba(61,52,88,.12)}
+.tile.owned.lv2{box-shadow:inset 0 0 0 max(3px,calc(var(--u)*1)) var(--oc),0 2px 0 rgba(61,52,88,.12)}
+.tile.owned.lv3{box-shadow:inset 0 0 0 max(3px,calc(var(--u)*.8)) var(--oc),inset 0 0 0 max(4px,calc(var(--u)*1.15)) #fff,inset 0 0 0 max(5px,calc(var(--u)*1.5)) var(--oc),0 2px 0 rgba(61,52,88,.12)}
+.tile.owned.lv1.sb .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 10 L10 0 L20 10Z'/%3E%3C/svg%3E") center/auto 100% repeat-x;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 10 L10 0 L20 10Z'/%3E%3C/svg%3E") center/auto 100% repeat-x}
+.tile.owned.lv1.st .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 0 L10 10 L20 0Z'/%3E%3C/svg%3E") center/auto 100% repeat-x;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 0 L10 10 L20 0Z'/%3E%3C/svg%3E") center/auto 100% repeat-x}
+.tile.owned.lv1.sl .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 20'%3E%3Cpath d='M0 0 L10 10 L0 20Z'/%3E%3C/svg%3E") center/100% auto repeat-y;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 20'%3E%3Cpath d='M0 0 L10 10 L0 20Z'/%3E%3C/svg%3E") center/100% auto repeat-y}
+.tile.owned.lv1.sr .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 20'%3E%3Cpath d='M10 0 L0 10 L10 20Z'/%3E%3C/svg%3E") center/100% auto repeat-y;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 20'%3E%3Cpath d='M10 0 L0 10 L10 20Z'/%3E%3C/svg%3E") center/100% auto repeat-y}
+.tile.owned.lv2.sb .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 14'%3E%3Cpath d='M2 14 L2 7 L12 1 L22 7 L22 14Z M16 5 L16 1.6 L18.6 1.6 L18.6 6.6Z'/%3E%3C/svg%3E") center/auto 100% repeat-x;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 14'%3E%3Cpath d='M2 14 L2 7 L12 1 L22 7 L22 14Z M16 5 L16 1.6 L18.6 1.6 L18.6 6.6Z'/%3E%3C/svg%3E") center/auto 100% repeat-x}
+.tile.owned.lv2.st .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 14'%3E%3Cpath d='M2 0 L2 7 L12 13 L22 7 L22 0Z M16 9 L16 12.4 L18.6 12.4 L18.6 7.4Z'/%3E%3C/svg%3E") center/auto 100% repeat-x;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 14'%3E%3Cpath d='M2 0 L2 7 L12 13 L22 7 L22 0Z M16 9 L16 12.4 L18.6 12.4 L18.6 7.4Z'/%3E%3C/svg%3E") center/auto 100% repeat-x}
+.tile.owned.lv2.sl .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 24'%3E%3Cpath d='M0 2 L7 2 L13 12 L7 22 L0 22Z M9 16 L12.4 16 L12.4 18.6 L7.4 18.6Z'/%3E%3C/svg%3E") center/100% auto repeat-y;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 24'%3E%3Cpath d='M0 2 L7 2 L13 12 L7 22 L0 22Z M9 16 L12.4 16 L12.4 18.6 L7.4 18.6Z'/%3E%3C/svg%3E") center/100% auto repeat-y}
+.tile.owned.lv2.sr .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 24'%3E%3Cpath d='M14 2 L7 2 L1 12 L7 22 L14 22Z M5 16 L1.6 16 L1.6 18.6 L6.6 18.6Z'/%3E%3C/svg%3E") center/100% auto repeat-y;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 24'%3E%3Cpath d='M14 2 L7 2 L1 12 L7 22 L14 22Z M5 16 L1.6 16 L1.6 18.6 L6.6 18.6Z'/%3E%3C/svg%3E") center/100% auto repeat-y}
+.tile.owned.lv3.sb .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M0 10 L0 0 L5 0 L5 4 L10 4 L10 10Z'/%3E%3C/svg%3E") center/auto 100% repeat-x;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M0 10 L0 0 L5 0 L5 4 L10 4 L10 10Z'/%3E%3C/svg%3E") center/auto 100% repeat-x}
+.tile.owned.lv3.st .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M0 0 L0 10 L5 10 L5 6 L10 6 L10 0Z'/%3E%3C/svg%3E") center/auto 100% repeat-x;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M0 0 L0 10 L5 10 L5 6 L10 6 L10 0Z'/%3E%3C/svg%3E") center/auto 100% repeat-x}
+.tile.owned.lv3.sl .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M0 0 L10 0 L10 5 L6 5 L6 10 L0 10Z'/%3E%3C/svg%3E") center/100% auto repeat-y;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M0 0 L10 0 L10 5 L6 5 L6 10 L0 10Z'/%3E%3C/svg%3E") center/100% auto repeat-y}
+.tile.owned.lv3.sr .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M10 0 L0 0 L0 5 L4 5 L4 10 L10 10Z'/%3E%3C/svg%3E") center/100% auto repeat-y;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M10 0 L0 0 L0 5 L4 5 L4 10 L10 10Z'/%3E%3C/svg%3E") center/100% auto repeat-y}
+/* 장식을 더 또렷하게, 옆줄 칸은 글씨 자리를 넉넉하게 */
+#board{--ot:max(7px,calc(var(--u)*2.5))}
+.tile.sl,.tile.sr{--ot:max(6px,calc(var(--u)*1.9))}
+.tile.owned.sl{padding-right:calc(var(--u)*4.6)} .tile.owned.sr{padding-left:calc(var(--u)*4.6)}
+.tile.owned.lv1.sl,.tile.owned.lv2.sl,.tile.owned.lv3.sl{padding-left:calc(var(--ot) + 1px)}
+.tile.owned.lv1.sr,.tile.owned.lv2.sr,.tile.owned.lv3.sr{padding-right:calc(var(--ot) + 1px)}
+.tile.owned.sl .nm,.tile.owned.sr .nm,#board.lg .tile.owned.sl:not(.corner) .nm,#board.lg .tile.owned.sr:not(.corner) .nm{font-size:max(8px,calc(var(--u)*2.2))}
+.tile.sl .flag{right:calc(var(--u)*.3)} .tile.sr .flag{left:calc(var(--u)*.3)}
+.tile .orn{opacity:.95;filter:drop-shadow(0 0 1px rgba(255,255,255,.9))}
+#board{--ot:max(7px,calc(var(--u)*2.2))}
+.tile.owned.sb{padding-top:calc(var(--u)*3.9)} .tile.owned.st{padding-bottom:calc(var(--u)*3.9)}
+.tile.owned.sl .pr,.tile.owned.sr .pr{white-space:normal;line-height:1.05;text-align:center}
+/* 네 글자 이상 이름은 위·아래 줄 칸에서 한 줄에 들어가도록 조금 작게 */
+.tile.long.sb .nm,.tile.long.st .nm,#board.lg .tile.long.sb:not(.corner) .nm,#board.lg .tile.long.st:not(.corner) .nm{font-size:max(8px,calc(var(--u)*2.05));letter-spacing:-.02em}

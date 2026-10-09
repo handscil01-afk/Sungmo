@@ -143,8 +143,9 @@ const Setup={tab:'people',L:null,
       ${this.inGame?'<div class="srow full"><div class="tx"><small>보드 판과 카드를 고치면 다음 게임부터 반영돼요. 퀴즈는 바로 반영돼요.</small></div></div>':''}</div>`},
   /* 멀티플레이: 방 코드 · 참가자 · 자리 바꾸기 · 중계 화면 */
   netHTML(){const host=Net.role==='host',code=Net.code||'',g=this.inGame?VG():null;
-    const link=`${location.origin}${location.pathname}#room=${code}`;
-    let h=`<div class="sgrid"><div class="srow full"><div class="tx"><b>방 코드 <span class="roomcode">${esc(code)}</span></b><small>${MODE_KO[Net.mode]||''} · 누군가 나갔다가 다시 들어올 때 이 코드를 넣으면 원래 자리로 돌아와요.</small></div>
+    const link=roomLink();
+    const rm=host?Net.room:null;
+    let h=`<div class="sgrid"><div class="srow full"><div class="tx"><b>방 코드 <span class="roomcode">${esc(code)}</span></b><small>${rm&&rm.title?esc(rm.title)+' · ':''}${MODE_KO[Net.mode]||''}${rm?(rm.pw?` · 🔒 비공개 (비밀번호 <b>${esc(rm.pw)}</b>)`:' · 🔓 공개'):''} · 누군가 나갔다가 다시 들어올 때 이 코드를 넣으면 원래 자리로 돌아와요.</small></div>
       <div class="btnrow"><button class="btn sm main" data-share>📤 방 공유하기</button><button class="btn sm" data-copy="${esc(code)}">📋 코드 복사</button><button class="btn sm" data-copy="${esc(link)}">🔗 링크 복사</button></div></div>
       <div class="srow full"><div class="tx"><b>연결 상태</b><small>${connInfo()}</small></div></div>`;
     if(!host){const me=g?g.players.find(p=>p.id===Net.mySeat):null;
@@ -153,11 +154,13 @@ const Setup={tab:'people',L:null,
       <div class="srow"><div class="tx"><b>🎛️ 진행자 리모컨 PIN <span class="roomcode">${esc(Net.pin)}</span></b><small>진행자 휴대폰에서 방 참가하기 → 진행자 리모컨을 고르고 PIN을 넣으면 정답 확인과 판정을 휴대폰으로 할 수 있어요. 쓰지 않아도 돼요.</small></div></div>
       <div class="srow full"><div class="tx"><small>연결된 화면: 📺 ${Net.displays().length}개 · 🎛️ 리모컨 ${[...Net.members.values()].filter(m=>m.kind==='remote'&&m.online).length}개 ${Net.hostSeesAnswers()?'· 이 기기에 정답이 보여요(진행자 창)':'· 이 기기에는 정답이 보이지 않아요'}</small></div></div>`;
     const P=g?g.players:null;
+    if(P&&Net.mode==='relay')h+=`<div class="srow full"><div class="tx"><b>🎤 진행자 도구</b><small>잠시 멈추면 모든 기기에 알리고 컴퓨터도 기다려요. 달란트 조정은 아래 참가자 줄의 💰 버튼으로 해요.</small></div><div class="btnrow"><button class="btn sm main" data-pause>${g.paused?'▶️ 다시 시작':'⏸️ 잠시 멈춤'}</button></div></div>`;
     if(P){h+=`<div class="srow full"><div class="tx"><b>참가자 · 자리 바꾸기</b><small>사람이 나가면 컴퓨터로 대체하고, 새 사람이 들어오면 컴퓨터 자리를 넘겨줄 수 있어요. 위치·달란트·땅·건물·카드는 그대로 이어져요.</small></div></div>
       ${P.map(p=>{const on=p.net?Net.isOnline(p.net):null;
         const st=p.out?'파산':p.ai?`🤖 컴퓨터 (${LV_KO[p.aiLv]||'보통'})`:p.host?'👑 방장 (이 기기)':p.op?'🎤 진행자가 조작':p.net?(on?'🟢 접속 중':'⚪ 연결 끊김'):'';
-        const acts=p.out?'':p.ai?`<button class="btn sm" data-lv="${p.id}">난이도</button>${Net.mode==='relay'?`<button class="btn sm" data-op="${p.id}">🎤 진행자 조작으로</button>`:''}`
-          :p.op?`<button class="btn sm" data-toai="${p.id}">🤖 컴퓨터로</button>`:p.net?`<button class="btn sm" data-toai="${p.id}">🤖 컴퓨터로 대체</button>`:'';
+        const money=Net.mode==='relay'&&!p.out?`<button class="btn sm" data-money="${p.id}">💰</button>`:'';
+        const acts=money+(p.out?'':p.ai?`<button class="btn sm" data-lv="${p.id}">난이도</button>${Net.mode==='relay'?`<button class="btn sm" data-op="${p.id}">🎤 진행자 조작으로</button>`:''}`
+          :p.op?`<button class="btn sm" data-toai="${p.id}">🤖 컴퓨터로</button>`:p.net?`<button class="btn sm" data-toai="${p.id}">🤖 컴퓨터로 대체</button>`:'');
         return `<div class="srow mem" style="--pc:${p.col}"><div class="tx"><b><span class="tok" style="--pc:${p.col}">${esc(p.tok)}</span> ${esc(p.name)}</b><small>${st}</small></div><div class="btnrow">${acts}</div></div>`}).join('')}`}
     else h+=`<div class="srow full"><div class="tx"><small>참가자 자리는 플레이어 탭에서 정해요. 참가자가 들어오면 컴퓨터 자리에 자동으로 앉아요.</small></div></div>`;
     h+=`</div>`;return h},
@@ -209,6 +212,8 @@ const Setup={tab:'people',L:null,
     const dp=$('[data-disp]',p);if(dp)dp.onclick=()=>NetUI.openDisplay();
     $$('[data-toai]',p).forEach(b=>b.onclick=()=>{const q=byId(+b.dataset.toai);pickAiLevel(q.aiLv||G.cfg.ai,lv=>{if(!lv)return;if(q.op){q.op=false;q.ai=true;q.aiLv=lv;UI.render();persist();redispatch()}else Net.toAI(q,lv);this.pane()})});
     $$('[data-lv]',p).forEach(b=>b.onclick=()=>{const q=byId(+b.dataset.lv);pickAiLevel(q.aiLv||G.cfg.ai,lv=>{if(!lv)return;q.aiLv=lv;UI.render();persist();this.pane()})});
+    const pz=$('[data-pause]',p);if(pz)pz.onclick=()=>{setPause(!G.paused);this.pane()};
+    $$('[data-money]',p).forEach(b=>b.onclick=()=>openMoney(byId(+b.dataset.money),(v,why)=>{adjustMoney(+b.dataset.money,v,why);this.pane()}));
     $$('[data-op]',p).forEach(b=>b.onclick=()=>{const q=byId(+b.dataset.op);q.ai=false;q.op=true;log(`${q.name} 자리를 진행자가 조작해요`,q);UI.render();persist();redispatch();this.pane()})},
   /* 보드 판 */
   boardHTML(){const cur=SETUP.cfg.board;
@@ -227,7 +232,8 @@ const Setup={tab:'people',L:null,
     startGame({players:P.map(p=>({...p})),cfg:{...SETUP.cfg},room:mode==='local'?null:{code:Net.code,mode}})}
 };
 /* 방 공유: 휴대폰은 공유 창(카카오톡·문자 등), PC는 링크 복사 */
-function roomLink(){return `${location.origin}${location.pathname}#room=${Net.code}`}
+/* 비공개 방 링크에는 비밀번호를 넣어서, 링크로 오면 이름만 적고 바로 들어오게 합니다 */
+function roomLink(){const pw=Net.role==='host'?Net.room&&Net.room.pw:Net.pw;return `${location.origin}${location.pathname}#room=${Net.code}${pw?'&pw='+encodeURIComponent(pw):''}`}
 function shareRoom(){if(!Net.code)return;const url=roomLink(),text=`성경 부루마블 방에 초대해요! 링크를 누르고 이름만 적으면 바로 들어와요. (방 코드 ${Net.code})`;
   if(navigator.share)navigator.share({title:'성경 부루마블',text,url}).catch(e=>{if(e&&e.name!=='AbortError')copyText(url)});else copyText(url)}
 function connInfo(){const via=FB.configured()?'Firebase 중계 서버':window.__NET==='bc'?'같은 기기 안':'PeerJS 직접 연결';
@@ -240,6 +246,19 @@ function dropSave(){const save=hasSave();if(!save)return;
     <div class="mbtns row"><button class="btn wide" data-c>취소</button><button class="btn bad wide" data-ok>지우기</button></div>`,{close:true,tone:'#ff9d9d'});
   $('[data-c]',L.box).onclick=L.close;
   $('[data-ok]',L.box).onclick=()=>{L.close();store.del('save');const ss=store.get('net.session',null);if(ss&&ss.role==='host'){store.del('net.session');store.del('net.keys')}UI.toast('저장된 게임을 지웠어요');Home.show()}}
+/* 진행자 달란트 조정 창 (방장 기기·진행자 리모컨 공용) */
+function openMoney(p,send){if(!p)return;let v=0;
+  const html=()=>`<div class="kick">🎤 진행자 조정</div><h3><span class="tok" style="--pc:${p.col};display:inline-grid;width:2.2rem;height:2.2rem;vertical-align:middle">${esc(p.tok)}</span> ${esc(p.name)} · ${fmt(p.money)} 달란트</h3>
+    <div class="mbody"><div class="mgrid">${[-200,-100,-50,50,100,200].map(x=>`<button class="btn ${x>0?'good':'bad'}" data-add="${x}">${x>0?'+':''}${x}</button>`).join('')}</div>
+    <label class="cute">직접 입력 (빼려면 -)<input class="inp" id="mv" inputmode="numeric" value="${v||''}" placeholder="예: 150 또는 -80"></label>
+    <label class="cute">이유 (기록에 남아요)<input class="inp" id="mw" maxlength="30" placeholder="예: 암송 보너스, 질서 벌점"></label>
+    <p class="ref" id="mprev"></p></div>
+    <div class="mbtns row"><button class="btn wide" data-c>취소</button><button class="btn main wide" data-ok>적용하기</button></div>`;
+  const L=openLayer('edit',html(),{close:true,tone:p.col});
+  const prev=()=>{const n=parseInt($('#mv',L.box).value,10);$('#mprev',L.box).textContent=Number.isInteger(n)&&n?`적용하면 ${fmt(Math.max(0,p.money+n))} 달란트가 돼요 (${n>0?'+':''}${n})`:''};
+  $$('[data-add]',L.box).forEach(b=>b.onclick=()=>{const cur=parseInt($('#mv',L.box).value,10)||0;$('#mv',L.box).value=cur+ +b.dataset.add;prev()});
+  $('#mv',L.box).oninput=prev;$('[data-c]',L.box).onclick=L.close;
+  $('[data-ok]',L.box).onclick=()=>{const n=parseInt($('#mv',L.box).value,10);if(!Number.isInteger(n)||!n)return UI.toast('더하거나 뺄 달란트를 적어 주세요');L.close();send(n,$('#mw',L.box).value.trim())}}
 function copyText(t){const done=()=>UI.toast('📋 복사했어요: '+t);
   try{navigator.clipboard.writeText(t).then(done,()=>fallback())}catch(e){fallback()}
   function fallback(){const i=document.createElement('textarea');i.value=t;document.body.appendChild(i);i.select();try{document.execCommand('copy');done()}catch(e){UI.toast(t)}i.remove()}}
