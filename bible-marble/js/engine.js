@@ -21,7 +21,7 @@ const PALETTE_KO=['빨강','파랑','초록','보라','주황','분홍','청록'
 const SEAT=PALETTE.slice(0,4);
 const TOKENS=['🐑','🕊️','🐟','🦁','🐪','🐴','😃','😎','🐯','🐻','🐼','🐰','🦊','🐸','🐵','🐶','🐱','🐧','🦄','🐢','🐳','🦋','🌟','🍎','🍇','🌻','🌈','⚽','🎈','👑','🎵','🚀','😊','🥰','🤩','🙏','🔥','💎','🌳','🍀','🐝','🦉','🐙','🐬'];
 const DEF_NAMES=['베드로','요한','야고보','안드레'];
-const DEF_CFG={diff:'easy',qmc:true,qsa:true,quizTime:0,tollQuiz:true,quizTile:true,jailQuiz:true,steal:false,aiQuiz:'manual',
+const DEF_CFG={diff:'easy',qmc:true,qsa:true,quizTime:0,quizTimeMc:0,quizTimeSa:0,tollQuiz:true,quizTile:true,jailQuiz:true,steal:false,aiQuiz:'manual',
   rounds:20,money:2000,salary:200,monopoly:true,doubleAgain:true,cards:true,jailTurns:3,ai:'normal',board:'both'};
 
 function waitFor(setup){const id=RUN;return new Promise((res,rej)=>{const e={rej};WAITS.add(e);setup(v=>{if(!WAITS.has(e))return;WAITS.delete(e);id===RUN?res(v):rej(ABORT)})})}
@@ -344,6 +344,8 @@ function drawQuestion(forAI){
 /* 화면에 보여 줄 퀴즈 정보: 정답은 판정·결과 단계에서만 담습니다 (참가자 기기에서 미리 볼 수 없게) */
 function pubQuiz(QS){const q={...QS.q},open=QS.stage==='result';delete q.reset;if(!open){delete q.ans;delete q.a;delete q.alt;delete q.ex;delete q.ref}
   return {purpose:QS.purpose,kick:QS.kick,sub:QS.sub,pid:QS.pid,stage:QS.stage,stealer:QS.stealer,by:QS.by,q,tries:QS.tries.map(t=>{const o={...t};if(!open)delete o.match;return o})}}
+/* 제한 시간: 객관식·주관식을 따로 정합니다 (예전 설정의 하나짜리 시간은 둘 다에 씁니다) */
+function quizTimeFor(cfg,t){const v=t==='mc'?cfg.quizTimeMc:cfg.quizTimeSa;return (v!=null?v:cfg.quizTime)||0}
 function secretQuiz(QS,tr){return {ans:QS.q.ans,a:QS.q.a,alt:QS.q.alt,ex:QS.q.ex,ref:QS.q.ref,match:tr?!!tr.match:undefined}}
 async function quizFlow(p,purpose,o){
   const Q=rnd('q',()=>drawQuestion(p.ai));
@@ -374,7 +376,7 @@ async function answerStep(QS,a){
     tr.choice=ok?Q.ans:rnd('aiw',()=>{const w=Q.choices.map((_,i)=>i).filter(i=>i!==Q.ans&&!QS.tries.some(t=>t.choice===i));return w.length?w[Math.random()*w.length|0]:-1});
     tr.ok=ok;sfx(ok?'good':'bad');log(`${a.name}: 퀴즈 ${ok?'정답':'오답'}`,a);return ok}
   QS.stage='answer';
-  const v=await ask({kind:'qa',who:'player',pid:a.id,quiz:pubQuiz(QS),time:G.cfg.quizTime||0,undo:1,type:MODE()==='player'&&Q.t==='sa'?'text':'',secret:secretQuiz(QS)});
+  const v=await ask({kind:'qa',who:'player',pid:a.id,quiz:pubQuiz(QS),time:quizTimeFor(G.cfg,Q.t),undo:1,type:MODE()==='player'&&Q.t==='sa'?'text':'',secret:secretQuiz(QS)});
   if(Q.t==='mc'){tr.choice=v;tr.ok=v===Q.ans;if(v<0)tr.timeout=1;sfx(tr.ok?'good':'bad');log(`${a.name}: 퀴즈 ${tr.ok?'정답':v<0?'시간 초과':'오답'}`,a);return tr.ok}
   if(v===-1)tr.timeout=1;if(v&&typeof v==='object'){tr.text=v.text.trim().slice(0,80);tr.match=saMatch(tr.text,Q.a,Q.alt)}
   /* 플레이어 모드: 진행자가 없으므로 입력한 답을 게임이 비교해서 판정합니다 */

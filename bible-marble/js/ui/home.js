@@ -3,7 +3,10 @@
 const DEF_PLAYERS=()=>[{pid:uid('p'),name:DEF_NAMES[0],ai:false,emoji:TOKENS[0],color:PALETTE[0],dice:'screen'},{pid:uid('p'),name:DEF_NAMES[1],ai:true,emoji:TOKENS[1],color:PALETTE[1],dice:'screen'}];
 function loadSetup(){const s=store.get('setup',{})||{};
   const players=Array.isArray(s.players)&&s.players.length>=2?s.players.slice(0,4).map((p,k)=>({pid:p.pid||uid('p'),name:p.name||DEF_NAMES[k],ai:!!p.ai,aiLv:p.aiLv||null,host:!!p.host,op:!!p.op,emoji:p.emoji||TOKENS[p.tok]||TOKENS[k],color:p.color||PALETTE[k],dice:p.dice==='real'?'real':'screen',net:null})):DEF_PLAYERS();
-  return {players,cfg:Object.assign({},DEF_CFG,s.cfg||s.set||{})}}
+  const cfg=Object.assign({},DEF_CFG,s.cfg||s.set||{}),old=(s.cfg||s.set||{});
+  /* 예전 설정(제한 시간 하나)은 객관식·주관식 둘 다에 옮겨 둡니다 */
+  if(old.quizTime&&old.quizTimeMc==null){cfg.quizTimeMc=old.quizTime;cfg.quizTimeSa=old.quizTime}
+  return {players,cfg}}
 let SETUP=loadSetup();
 const saveSetup=()=>store.set('setup',{players:SETUP.players.map(p=>({...p,net:null})),cfg:SETUP.cfg});
 
@@ -20,14 +23,15 @@ const SET_ITEMS={
   quiz:[
     {k:'diff',t:'퀴즈 난이도',seg:[['easy','쉬움'],['normal','보통'],['hard','어려움'],['mix','섞어서']],full:1},
     {k:'qmc',t:'객관식 문제',sw:1},{k:'qsa',t:'주관식 문제',d:'진행자가 정답·오답을 눌러요. 컴퓨터는 객관식만 풀어요.',sw:1},
-    {k:'quizTime',t:'퀴즈 제한 시간',d:'시간이 지나면 틀린 것으로 처리해요. 컴퓨터는 제한이 없어요.',seg:[[0,'없음'],[10,'10초'],[15,'15초'],[20,'20초'],[30,'30초'],[60,'60초']],full:1},
-    {k:'aiQuiz',t:'컴퓨터 차례 퀴즈',d:'직접 넘기면 계속하기를 눌러야 답이 나와요.',seg:[['manual','직접 넘기기'],['auto','자동으로']],full:1}],
+    {k:'quizTimeMc',t:'객관식 제한 시간',d:'시간이 지나면 틀린 것으로 처리해요. 컴퓨터는 제한이 없어요.',seg:[[0,'없음'],[10,'10초'],[20,'20초'],[30,'30초'],[60,'60초']]},
+    {k:'quizTimeSa',t:'주관식 제한 시간',d:'답을 떠올리고 말하거나 입력할 시간이에요.',seg:[[0,'없음'],[30,'30초'],[45,'45초'],[60,'60초'],[90,'90초']]}],
   qrule:[
     {k:'tollQuiz',t:'통행료 말씀 찬스',d:'남의 땅에서 퀴즈를 맞히면 통행료가 반값이에요.',sw:1},
     {k:'quizTile',t:'말씀 퀴즈 칸',d:'끄면 퀴즈 없이 100 달란트를 받아요.',sw:1},
     {k:'jailQuiz',t:'광야 탈출 퀴즈',d:'맞히면 광야에서 바로 나와요.',sw:1},
     {k:'steal',t:'다른 팀에게 기회',d:'퀴즈 칸·보너스 퀴즈를 틀리면 다른 팀이 도전해서 상금의 절반을 받아요. 통행료 감면·광야 탈출은 넘기지 않아요.',sw:1}],
   play:[
+    {k:'aiQuiz',t:'컴퓨터 차례 퀴즈',d:'직접 넘기면 계속하기를 눌러야 컴퓨터의 답이 나와요. 플레이어 모드에서는 잠시 보여 준 뒤 자동으로 넘어가요.',seg:[['manual','직접 넘기기'],['auto','자동으로']],full:1},
     {k:'ai',t:'기본 컴퓨터 실력',d:'새로 넣는 컴퓨터 자리의 실력이에요. 자리마다 따로 바꿀 수 있어요.',seg:[['easy','쉬움'],['normal','보통'],['hard','어려움']]}],
   screen:[
     {k:'textScale',t:'글자·화면 크기',d:'TV나 큰 화면에서 멀리 볼 때는 크게 하세요.',seg:[[.9,'작게'],[1,'보통'],[1.15,'크게'],[1.3,'아주 크게']],pref:1,full:1},
@@ -112,7 +116,7 @@ const Setup={tab:'people',L:null,
       const scr=T==='screen'?`<div class="srow"><div class="tx"><b>전체화면</b><small>${FS.can()?'지금 화면을 전체화면으로 바꾸거나 되돌려요.':'이 화면에서는 전체화면이 막혀 있어요. 홈 화면에 설치하면 넓게 쓸 수 있어요.'}</small></div><button class="btn sm" data-fs>${FS.is()?'↙️ 창 모드로':'⛶ 전체화면'}</button></div>
         <div class="srow"><div class="tx"><b>홈 화면에 설치</b><small>설치하면 아이콘으로 바로 열리고 주소창 없이 넓게 보여요.</small></div><button class="btn sm" data-inst>📲 설치 방법</button></div>`:'';
       const rel=T==='qrule'&&this.mode()==='player'?'<div class="srow full"><div class="tx"><b>플레이어 모드 안내</b><small>진행자가 없으므로 주관식은 각자 답을 입력하면 게임이 채점해요. 다른 팀 기회는 차례 순서대로 다음 사람에게 넘어가요.</small></div></div>':'';
-      const items=(SET_ITEMS[T]||[]).filter(it=>!(T==='quiz'&&it.k==='aiQuiz'&&this.mode()==='player'));
+      const items=(SET_ITEMS[T]||[]).filter(it=>!(it.k==='aiQuiz'&&this.mode()==='player'));
       p.innerHTML=`<div class="sgrid">${extra}${itemsHTML(items,cfg,this.inGame)}${quizInfo}${rel}${scr}</div>`;
       bindItems(p,items,cfg,k=>{this.changed(k)});
       const da=$('#diceAll',p);if(da)da.onclick=e=>{const b=e.target.closest('button');if(!b)return;SETUP.players.forEach(x=>{if(!x.ai)x.dice=b.dataset.v});saveSetup();UI.toast(b.dataset.v==='real'?'모든 사람 플레이어가 실물 주사위를 써요':'모든 사람 플레이어가 화면 주사위를 써요')};
