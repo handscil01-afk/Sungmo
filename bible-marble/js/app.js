@@ -18,7 +18,7 @@ const App={
     const r=save.G.room,restore=save.net&&save.net.code===r.code?save.net:null;
     try{UI.toast(`방 ${r.code}을 다시 여는 중… (최대 30초)`,4000);await Net.host(r.mode,r.code,restore);resumeGame(save);UI.toast(`📶 방 ${r.code}을 다시 열었어요. 참가자 기기가 자동으로 들어와요`,4000)}
     catch(e){netError(e)}},
-  prefChanged(){UI.fit();drawSoundBtn();if(VG()){UI.render();UI.renderTokens&&UI.renderTokens()}}
+  prefChanged(){UI.fit();drawSoundBtn();BGM.sync();if(VG()){UI.render();UI.renderTokens&&UI.renderTokens()}}
 };
 UI.enterGame=function(){
   closeLayer('info');document.body.classList.add('ingame');$('#home').hidden=true;$('#game').hidden=false;
@@ -40,7 +40,7 @@ function displayStart(){if($('#dispGo')||FS.is())return;const d=document.createE
 /* ---------- 머리줄 버튼 (처음 화면) ---------- */
 function drawSoundBtn(){const b=$('#bSound');b.innerHTML=(PREF.sound?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>':'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l5 6M22 9l-5 6"/></svg>')+`<span class="lb">${PREF.sound?'소리 켬':'소리 끔'}</span>`;b.setAttribute('aria-label',PREF.sound?'효과음 끄기':'효과음 켜기')}
 $('#bRules').onclick=showRules;
-$('#bSound').onclick=()=>{PREF.sound=!PREF.sound;savePref();drawSoundBtn();if(PREF.sound){SND.init();SND.play('coin')}};
+$('#bSound').onclick=()=>{PREF.sound=!PREF.sound;savePref();drawSoundBtn();if(PREF.sound){SND.init();SND.play('coin')}BGM.sync()};
 $('#bFS').onclick=()=>FS.toggle();
 /* 게임 중 키보드: Esc로 열린 창이 없으면 설정을 엽니다 */
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.body.classList.contains('ingame')&&!topLayer()&&Net.kind!=='display'){e.preventDefault();Net.role==='client'?Setup.openClient():Setup.openInGame()}});

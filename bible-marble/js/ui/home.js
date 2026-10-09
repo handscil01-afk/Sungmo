@@ -13,7 +13,7 @@ const saveSetup=()=>store.set('setup',{players:SETUP.players.map(p=>({...p,net:n
 /* ---------- 설정 항목 정의 (게임 중 설정에서도 같이 씁니다) ---------- */
 const SET_ITEMS={
   rules:[
-    {k:'rounds',t:'게임 길이',d:'"파산까지"는 한 명만 남거나 50라운드가 지나면 끝나요.',seg:[[10,'10라운드'],[20,'20라운드'],[30,'30라운드'],[0,'파산까지']]},
+    {k:'rounds',t:'게임 길이',d:'"파산까지"는 라운드 제한 없이 한 명만 남을 때까지 해요. 원하는 라운드 수를 직접 넣을 수도 있어요.',seg:[[10,'10라운드'],[20,'20라운드'],[30,'30라운드'],[0,'파산까지']],custom:{min:1,max:300,unit:'라운드'},full:1},
     {k:'money',t:'시작 달란트',d:'게임을 시작할 때만 정할 수 있어요.',seg:[[1500,'1,500'],[2000,'2,000'],[3000,'3,000']],setupOnly:1},
     {k:'salary',t:'출발 축복금',d:'출발 칸을 지나거나 도착하면 받는 달란트예요.',seg:[[100,'100'],[200,'200'],[300,'300']]},
     {k:'jailTurns',t:'광야에 머무는 차례',seg:[[1,'1번'],[2,'2번'],[3,'3번']]},
@@ -29,7 +29,8 @@ const SET_ITEMS={
     {k:'tollQuiz',t:'통행료 말씀 찬스',d:'남의 땅에서 퀴즈를 맞히면 통행료가 반값이에요.',sw:1},
     {k:'quizTile',t:'말씀 퀴즈 칸',d:'끄면 퀴즈 없이 100 달란트를 받아요.',sw:1},
     {k:'jailQuiz',t:'광야 탈출 퀴즈',d:'맞히면 광야에서 바로 나와요.',sw:1},
-    {k:'steal',t:'다른 팀에게 기회',d:'퀴즈 칸·보너스 퀴즈를 틀리면 다른 팀이 도전해서 상금의 절반을 받아요. 통행료 감면·광야 탈출은 넘기지 않아요.',sw:1}],
+    {k:'mcAll',t:'객관식은 모두 도전',d:'퀴즈 칸·보너스 퀴즈의 객관식을 틀리면 나머지 모두(컴퓨터 포함)가 동시에 답하고, 맞힌 사람끼리 상금 전부를 나눠 가져요.',sw:1},
+    {k:'steal',t:'다른 팀에게 기회',d:'퀴즈 칸·보너스 퀴즈를 틀리면 다른 팀 한 곳이 도전해서 상금의 절반을 받아요. "객관식은 모두 도전"이 켜져 있으면 주관식에만 써요. 통행료 감면·광야 탈출은 넘기지 않아요.',sw:1}],
   play:[
     {k:'aiQuiz',t:'컴퓨터 차례 퀴즈',d:'직접 넘기면 계속하기를 눌러야 컴퓨터의 답이 나와요. 플레이어 모드에서는 잠시 보여 준 뒤 자동으로 넘어가요.',seg:[['manual','직접 넘기기'],['auto','자동으로']],full:1},
     {k:'ai',t:'기본 컴퓨터 실력',d:'새로 넣는 컴퓨터 자리의 실력이에요. 자리마다 따로 바꿀 수 있어요.',seg:[['easy','쉬움'],['normal','보통'],['hard','어려움']]}],
@@ -40,16 +41,24 @@ const SET_ITEMS={
     {k:'autoFS',t:'자동 전체화면',d:'화면을 처음 누르면 전체화면으로 바뀌어요.',sw:1,pref:1}],
   sound:[
     {k:'sound',t:'효과음',d:'주사위, 동전, 정답 소리를 들려줘요.',sw:1,pref:1},
-    {k:'volume',t:'효과음 크기',seg:[[.35,'작게'],[.7,'보통'],[1,'크게']],pref:1}],
+    {k:'volume',t:'효과음 크기',seg:[[.35,'작게'],[.7,'보통'],[1,'크게']],pref:1},
+    {k:'bgm',t:'배경 음악',d:'잔잔한 1분짜리 음악을 끊김 없이 반복해요. 위쪽 소리 버튼을 끄면 함께 꺼져요. 참가자 휴대폰에서는 처음에 꺼져 있어요.',sw:1,pref:1,get:()=>BGM.want()},
+    {k:'bgmVol',t:'배경 음악 크기',seg:[[.15,'작게'],[.3,'보통'],[.5,'크게']],pref:1}],
 };
-function itemsHTML(list,cfg,inGame){return list.map(it=>{const src=it.pref?PREF:cfg,v=src[it.k],off=inGame&&it.setupOnly;
+function itemsHTML(list,cfg,inGame){return list.map(it=>{const src=it.pref?PREF:cfg,v=it.get?it.get():src[it.k],off=inGame&&it.setupOnly;
   const ctl=it.sw?`<button type="button" class="sw" role="switch" aria-checked="${!!v}" aria-label="${esc(it.t)}" data-k="${it.k}"></button>`
-    :`<div class="seg" data-k="${it.k}">${it.seg.map(([val,l])=>`<button type="button" data-v="${val}" class="${String(v)===String(val)?'on':''}">${l}</button>`).join('')}</div>`;
+    :`<div class="seg" data-k="${it.k}">${it.seg.map(([val,l])=>`<button type="button" data-v="${val}" class="${String(v)===String(val)?'on':''}">${l}</button>`).join('')}</div>`+
+      (it.custom?`<label class="custom${it.seg.some(([val])=>String(val)===String(v))?'':' on'}">직접 <input class="inp" type="number" inputmode="numeric" data-kc="${it.k}" min="${it.custom.min}" max="${it.custom.max}" value="${it.seg.some(([val])=>String(val)===String(v))?'':esc(v)}" placeholder="숫자"> ${it.custom.unit}</label>`:'');
   return `<div class="srow${off?' off':''}${it.full?' full':''}"><div class="tx"><b>${esc(it.t)}</b>${it.d?`<small>${esc(it.d)}</small>`:''}</div>${ctl}</div>`}).join('')}
 function bindItems(root,list,cfg,onChange){const find=k=>list.find(i=>i.k===k);
-  $$('.sw[data-k]',root).forEach(b=>{const it=find(b.dataset.k);if(!it)return;b.onclick=()=>{const src=it.pref?PREF:cfg;src[it.k]=!src[it.k];b.setAttribute('aria-checked',!!src[it.k]);if(it.pref){savePref();App.prefChanged()}onChange&&onChange(it.k)}});
+  /* 직접 입력 칸: 범위 안의 정수만 받습니다 */
+  $$('[data-kc]',root).forEach(inp=>{const it=find(inp.dataset.kc);if(!it)return;inp.onchange=()=>{const n=parseInt(inp.value,10);
+    if(!(n>=it.custom.min&&n<=it.custom.max)){UI.toast(`${it.custom.min}~${it.custom.max} 사이의 숫자를 넣어 주세요`);return}
+    const src=it.pref?PREF:cfg;src[it.k]=n;const seg=$(`.seg[data-k="${it.k}"]`,root);if(seg)$$('button',seg).forEach(x=>x.classList.toggle('on',x.dataset.v===String(n)));inp.closest('.custom').classList.add('on');onChange&&onChange(it.k)}});
+  $$('.sw[data-k]',root).forEach(b=>{const it=find(b.dataset.k);if(!it)return;b.onclick=()=>{const src=it.pref?PREF:cfg;src[it.k]=!(it.get?it.get():src[it.k]);b.setAttribute('aria-checked',!!src[it.k]);if(it.pref){savePref();App.prefChanged()}onChange&&onChange(it.k)}});
   $$('.seg[data-k]',root).forEach(seg=>{const it=find(seg.dataset.k);if(!it)return;seg.onclick=e=>{const b=e.target.closest('button');if(!b)return;const src=it.pref?PREF:cfg;
-    src[it.k]=typeof it.seg[0][0]==='number'?+b.dataset.v:b.dataset.v;$$('button',seg).forEach(x=>x.classList.toggle('on',x===b));if(it.pref){savePref();App.prefChanged()}onChange&&onChange(it.k)}})}
+    src[it.k]=typeof it.seg[0][0]==='number'?+b.dataset.v:b.dataset.v;$$('button',seg).forEach(x=>x.classList.toggle('on',x===b));
+    const ci=$(`[data-kc="${it.k}"]`,root);if(ci){ci.value='';ci.closest('.custom').classList.remove('on')}if(it.pref){savePref();App.prefChanged()}onChange&&onChange(it.k)}})}
 
 /* ---------- 메인 화면 ---------- */
 const Home={
@@ -130,7 +139,7 @@ const Setup={tab:'people',L:null,
     if(this.who==='prefs'||this.who==='client'){el.textContent=this.who==='client'?`${Net.kind==='remote'?'🎛️ 진행자 리모컨':Net.kind==='display'?'📺 게임 화면':'📱 참가자'} · ${MODE_KO[Net.mode]||''}`:'';return}
     const cfg=this.cfg(),b=this.inGame&&G?G.board:Content.board(cfg.board),n=this.inGame&&G?G.players.length:SETUP.players.length;
     const qn=Content.quizAll().filter(q=>q.on&&eraFits(q.era,b.era)&&(cfg.diff==='mix'||q.lv===cfg.diff)&&(q.t==='mc'?cfg.qmc!==false:cfg.qsa!==false)).length;
-    el.textContent=`${n}명 · ${b.name} 판 · ${LV_KO[cfg.diff]||'섞어서'} 퀴즈 ${qn}문제 · ${cfg.rounds?cfg.rounds+'라운드':'파산까지'}${Net.code?` · 방 ${Net.code}`:''}`;
+    el.textContent=`${n}명 · ${b.name} 판 · ${LV_KO[cfg.diff]||'섞어서'} 퀴즈 ${qn}문제 · ${cfg.rounds>0?cfg.rounds+'라운드':'파산까지'}${Net.code?` · 방 ${Net.code}`:''}`;
     const qc=$('#qcount',this.L.box);if(qc)qc.textContent=`지금 설정(${b.name} 판, ${LV_KO[cfg.diff]||'섞어서'})으로 ${qn}문제가 나올 수 있어요. 퀴즈 관리에서 문제를 고르거나 새로 만들 수 있어요.`},
   /* 게임 메뉴 (게임 중) */
   gameHTML(){const g=VG(),cl=this.who==='client';
@@ -153,7 +162,7 @@ const Setup={tab:'people',L:null,
       <div class="btnrow"><button class="btn sm main" data-share>📤 방 공유하기</button><button class="btn sm" data-copy="${esc(code)}">📋 코드 복사</button><button class="btn sm" data-copy="${esc(link)}">🔗 링크 복사</button></div></div>
       <div class="srow full"><div class="tx"><b>연결 상태</b><small>${connInfo()}</small></div></div>`;
     if(!host){const me=g?g.players.find(p=>p.id===Net.mySeat):null;
-      h+=`<div class="srow full"><div class="tx"><b>${Net.kind==='remote'?'🎛️ 진행자 리모컨':Net.kind==='display'?'📺 게임 화면':me?`내 자리: ${esc(me.tok)} ${esc(me.name)}`:'구경하는 중'}</b><small>${Net.kind==='remote'?'주관식 정답이 이 기기에만 보여요. 판정과 계속하기를 여기서 할 수 있어요.':me?'내 차례의 행동은 이 기기에서만 할 수 있어요.':'자리가 생기면 방장이 넘겨줄 수 있어요.'}</small></div></div></div>`;return h}
+      h+=`<div class="srow full"><div class="tx"><b>${Net.kind==='remote'?'🎛️ 진행자 리모컨':Net.kind==='display'?'📺 게임 화면':me?`내 자리: ${tokIn(me.tok)} ${esc(me.name)}`:'구경하는 중'}</b><small>${Net.kind==='remote'?'주관식 정답이 이 기기에만 보여요. 판정과 계속하기를 여기서 할 수 있어요.':me?'내 차례의 행동은 이 기기에서만 할 수 있어요.':'참가 요청을 보내면 진행자가 비어 있는 자리를 넘겨줄 수 있어요.'}</small></div>${!me&&g&&Net.kind==='player'?'<button class="btn sm main" data-reqseat>🙋 참가 요청</button>':''}</div></div>`;return h}
     if(Net.mode==='relay')h+=`<div class="srow"><div class="tx"><b>📺 게임 화면 창 (PC)</b><small>TV·프로젝터(확장 모니터)에 띄울 게임 화면을 새 창으로 열어요. 이 창은 진행자 화면이 되고, 정답은 여기에만 보여요.</small></div><button class="btn sm main" data-disp>📺 게임 화면 창 열기</button></div>
       <div class="srow"><div class="tx"><b>🎛️ 진행자 리모컨 PIN <span class="roomcode">${esc(Net.pin)}</span></b><small>진행자 휴대폰에서 방 참가하기 → 진행자 리모컨을 고르고 PIN을 넣으면 정답 확인과 판정을 휴대폰으로 할 수 있어요. 쓰지 않아도 돼요.</small></div></div>
       <div class="srow full"><div class="tx"><small>연결된 화면: 📺 ${Net.displays().length}개 · 🎛️ 리모컨 ${[...Net.members.values()].filter(m=>m.kind==='remote'&&m.online).length}개 ${Net.hostSeesAnswers()?'· 이 기기에 정답이 보여요(진행자 창)':'· 이 기기에는 정답이 보이지 않아요'}</small></div></div>`;
@@ -165,7 +174,7 @@ const Setup={tab:'people',L:null,
         const money=Net.mode==='relay'&&!p.out?`<button class="btn sm" data-money="${p.id}">💰</button>`:'';
         const acts=money+(p.out?'':p.ai?`<button class="btn sm" data-lv="${p.id}">난이도</button>${Net.mode==='relay'?`<button class="btn sm" data-op="${p.id}">🎤 진행자 조작으로</button>`:''}`
           :p.op?`<button class="btn sm" data-toai="${p.id}">🤖 컴퓨터로</button>`:p.net?`<button class="btn sm" data-toai="${p.id}">🤖 컴퓨터로 대체</button>`:'');
-        return `<div class="srow mem" style="--pc:${p.col}"><div class="tx"><b><span class="tok" style="--pc:${p.col}">${esc(p.tok)}</span> ${esc(p.name)}</b><small>${st}</small></div><div class="btnrow">${acts}</div></div>`}).join('')}`}
+        return `<div class="srow mem" style="--pc:${p.col}"><div class="tx"><b><span class="tok" style="--pc:${p.col}">${tokIn(p.tok)}</span> ${esc(p.name)}</b><small>${st}</small></div><div class="btnrow">${acts}</div></div>`}).join('')}`}
     else h+=`<div class="srow full"><div class="tx"><small>참가자 자리는 플레이어 탭에서 정해요. 참가자가 들어오면 컴퓨터 자리에 자동으로 앉아요.</small></div></div>`;
     h+=`</div>`;return h},
   /* 인원·캐릭터 (게임 시작 전) */
@@ -184,7 +193,7 @@ const Setup={tab:'people',L:null,
       <div class="seg" id="pcount">${[2,3,4].map(n=>`<button type="button" data-v="${n}" class="${P.length===n?'on':''}">${n}명</button>`).join('')}</div></div>
       ${host?`<div class="srow full"><div class="tx"><b>방 코드 <span class="roomcode">${esc(Net.code)}</span></b><small>방 공유하기로 링크를 보내면 받은 사람은 이름만 적고 바로 들어와요. 정한 인원까지 컴퓨터로 채워 두고, 사람이 들어오면 컴퓨터 자리를 넘겨받아요.</small></div><div class="btnrow"><button class="btn sm main" data-share>📤 방 공유하기</button><button class="btn sm" data-copy="${esc(Net.code)}">📋 코드 복사</button></div></div>`:''}</div>
       <div class="plist">${P.map((p,k)=>`<div class="pedit" style="--pc:${p.color}">
-        <button type="button" class="tok" style="--pc:${p.color}" data-pick="${k}" aria-label="${k+1}번 캐릭터 바꾸기">${esc(p.emoji)}</button>
+        <button type="button" class="tok" style="--pc:${p.color}" data-pick="${k}" aria-label="${k+1}번 캐릭터 바꾸기">${tokIn(p.emoji)}</button>
         <input class="inp" id="pname${k}" maxlength="10" value="${esc(p.name)}" aria-label="${k+1}번 이름" ${p.net?'readonly':''}>
         ${P.length>2&&!p.net&&!p.host?`<button type="button" class="del" data-del="${k}" aria-label="${k+1}번 빼기">×</button>`:'<span></span>'}
         <div class="opts">${kindSeg(p,k)}<button type="button" class="btn sm" data-pick="${k}">🎨 ${PALETTE_KO[PALETTE.indexOf(p.color)]||'색'} · 바꾸기</button></div></div>`).join('')}</div>`},
@@ -213,6 +222,7 @@ const Setup={tab:'people',L:null,
     $$('[data-cm]',p).forEach(b=>b.onclick=()=>Manage.open(b.dataset.cm,()=>this.render()));
     $$('[data-copy]',p).forEach(b=>b.onclick=()=>copyText(b.dataset.copy));
     $$('[data-share]',p).forEach(b=>b.onclick=()=>shareRoom());
+    const rq=$('[data-reqseat]',p);if(rq)rq.onclick=()=>{Net.reqSeat();this.L.close()};
     const dp=$('[data-disp]',p);if(dp)dp.onclick=()=>NetUI.openDisplay();
     $$('[data-toai]',p).forEach(b=>b.onclick=()=>{const q=byId(+b.dataset.toai);pickAiLevel(q.aiLv||G.cfg.ai,lv=>{if(!lv)return;if(q.op){q.op=false;q.ai=true;q.aiLv=lv;UI.render();persist();redispatch()}else Net.toAI(q,lv);this.pane()})});
     $$('[data-lv]',p).forEach(b=>b.onclick=()=>{const q=byId(+b.dataset.lv);pickAiLevel(q.aiLv||G.cfg.ai,lv=>{if(!lv)return;q.aiLv=lv;UI.render();persist();this.pane()})});
@@ -252,7 +262,7 @@ function dropSave(){const save=hasSave();if(!save)return;
   $('[data-ok]',L.box).onclick=()=>{L.close();store.del('save');const ss=store.get('net.session',null);if(ss&&ss.role==='host'){store.del('net.session');store.del('net.keys')}UI.toast('저장된 게임을 지웠어요');Home.show()}}
 /* 진행자 달란트 조정 창 (방장 기기·진행자 리모컨 공용) */
 function openMoney(p,send){if(!p)return;let v=0;
-  const html=()=>`<div class="kick">🎤 진행자 조정</div><h3><span class="tok" style="--pc:${p.col};display:inline-grid;width:2.2rem;height:2.2rem;vertical-align:middle">${esc(p.tok)}</span> ${esc(p.name)} · ${fmt(p.money)} 달란트</h3>
+  const html=()=>`<div class="kick">🎤 진행자 조정</div><h3><span class="tok" style="--pc:${p.col};display:inline-grid;width:2.2rem;height:2.2rem;vertical-align:middle">${tokIn(p.tok)}</span> ${esc(p.name)} · ${fmt(p.money)} 달란트</h3>
     <div class="mbody"><div class="mgrid">${[-200,-100,-50,50,100,200].map(x=>`<button class="btn ${x>0?'good':'bad'}" data-add="${x}">${x>0?'+':''}${x}</button>`).join('')}</div>
     <label class="cute">직접 입력 (빼려면 -)<input class="inp" id="mv" inputmode="numeric" value="${v||''}" placeholder="예: 150 또는 -80"></label>
     <label class="cute">이유 (기록에 남아요)<input class="inp" id="mw" maxlength="30" placeholder="예: 암송 보너스, 질서 벌점"></label>
@@ -270,13 +280,15 @@ function copyText(t){const done=()=>UI.toast('📋 복사했어요: '+t);
 function pickLook(p,others,done){
   const usedC=others.map(o=>o.color);
   const html=()=>`<div class="kick">🎨 캐릭터 꾸미기</div><h3>${esc(p.name||'플레이어')}</h3><div class="picker">
-    <div class="pedit" style="--pc:${p.color};grid-template-columns:auto 1fr"><span class="tok" style="--pc:${p.color}">${esc(p.emoji)}</span><span class="cute" style="font-size:1.3rem">게임판의 말과 깃발에 이렇게 보여요</span></div>
+    <div class="pedit" style="--pc:${p.color};grid-template-columns:auto 1fr"><span class="tok" style="--pc:${p.color}">${tokIn(p.emoji)}</span><span class="cute" style="font-size:1.3rem">게임판의 말과 깃발에 이렇게 보여요</span></div>
     <b class="cute">색깔</b><div class="colors">${PALETTE.map((c,i)=>`<button type="button" style="--c:${c}" data-c="${c}" class="${p.color===c?'on':''}" ${usedC.includes(c)?'disabled':''} aria-label="${PALETTE_KO[i]}" title="${PALETTE_KO[i]}"></button>`).join('')}</div>
     <b class="cute">이모티콘</b><div class="emojis">${TOKENS.map(e=>`<button type="button" data-e="${e}" class="${p.emoji===e?'on':''}">${e}</button>`).join('')}</div>
-    <label class="cute" style="display:flex;gap:.5rem;align-items:center">직접 입력 <input class="inp" id="emo" maxlength="4" style="max-width:8rem" placeholder="😀"></label></div>
+    <label class="cute" style="display:flex;gap:.5rem;align-items:center">직접 입력 <input class="inp" id="emo" maxlength="4" style="max-width:8rem" placeholder="😀"></label>
+    <b class="cute">내 사진</b><div class="phrow">${isPhoto(p.emoji)?`<span class="tok" style="--pc:${p.color}">${tokIn(p.emoji)}</span>`:''}<button type="button" class="btn sm" data-photo>📷 ${isPhoto(p.emoji)?'다른 사진으로 바꾸기':'기기에 있는 사진 넣기'}</button></div></div>
     <div class="mbtns"><button class="btn main wide" data-close>다 골랐어요</button></div>`;
   const L=openLayer('info',html(),{close:true,tone:p.color,wide:true,onClose:done});
   const bind=()=>{$$('[data-c]',L.box).forEach(b=>b.onclick=()=>{p.color=b.dataset.c;refresh()});$$('[data-e]',L.box).forEach(b=>b.onclick=()=>{p.emoji=b.dataset.e;refresh()});
+    $('[data-photo]',L.box).onclick=()=>PhotoCrop.pick(t=>{p.emoji=t;refresh()});
     const inp=$('#emo',L.box);inp.onchange=()=>{const v=[...inp.value.trim()].slice(0,2).join('');if(v){p.emoji=v;refresh()}};$('[data-close]',L.box).onclick=L.close};
   const refresh=()=>{$('.mbox',L.ov).style.setProperty('--tc',p.color);const x=$('.mbox',L.ov);x.innerHTML='<button class="xclose" data-x aria-label="닫기">×</button>'+html();$('[data-x]',x).onclick=L.close;bind()};
   bind()}

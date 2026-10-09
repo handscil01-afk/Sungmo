@@ -14,6 +14,8 @@ const AI={
       case 'qs':await sleep(900);return spec.cands.length?spec.cands[0]:-1;
       case 'qv':case 'qr':await sleep(2200);return true;
       case 'qo':await sleep(400);return false;
+      /* 돈이 모자랄 때: 가장 싼 땅부터 팝니다 */
+      case 'sell':await sleep(700);return spec.lands[0].i;
       /* 사람 자리를 컴퓨터가 이어받았을 때 이미 나온 문제에 답합니다 */
       case 'qa':{await sleep(1500);const q=spec.quiz.q,h=spec.secret||{},acc=(AIACC[p.aiLv||G.cfg.ai]||AIACC.normal)[q.lv]||.7,ok=Math.random()<acc;
         if(q.t!=='mc')return ok&&h.a?{text:h.a}:-1;
