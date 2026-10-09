@@ -21,6 +21,19 @@ const store={
   get(k,d){try{const v=localStorage.getItem(SP()+k);return v==null?d:JSON.parse(v)}catch(e){return d}},
   set(k,v){try{localStorage.setItem(SP()+k,JSON.stringify(v));return true}catch(e){return false}},
   del(k){try{localStorage.removeItem(SP()+k)}catch(e){}}};
+/* 사진 말: 말(토큰) 값이 '@'+사진 번호(6글자)이면 이 기기에 저장한 사진을 동그랗게 보여 줍니다.
+   사진은 고를 때 작게(128px) 줄여서 기기 안(localStorage)에만 두고, 함께하기에서는 방장이 같은 방 기기들에게만 나눠 줍니다. */
+const PHOTOS=store.get('photos',{})||{};
+const isPhoto=t=>typeof t==='string'&&/^@[a-z0-9]{6}$/.test(t);
+const photoSrc=t=>isPhoto(t)&&PHOTOS[t.slice(1)]?PHOTOS[t.slice(1)].d:null;
+function tokIn(t){if(!isPhoto(t))return esc(t);const s=photoSrc(t);return s?`<img class="ph" src="${s}" alt="" draggable="false">`:'📷'}
+const tokTxt=t=>isPhoto(t)?'📷':t;
+const okPhotoData=d=>typeof d==='string'&&d.length<60000&&/^data:image\/(jpeg|webp|png);base64,[A-Za-z0-9+/=]+$/.test(d);
+function savePhoto(id,d){if(!/^[a-z0-9]{6}$/.test(id)||!okPhotoData(d))return false;
+  PHOTOS[id]={d,t:Date.now()};for(const x of Object.keys(PHOTOS).sort((a,b)=>PHOTOS[b].t-PHOTOS[a].t).slice(24))delete PHOTOS[x];
+  /* 저장 공간이 모자라면 오래된 사진부터 지웁니다 */
+  while(!store.set('photos',PHOTOS)){const old=Object.keys(PHOTOS).sort((a,b)=>PHOTOS[a].t-PHOTOS[b].t);if(old.length<=1)break;delete PHOTOS[old[0]]}
+  return true}
 /* IndexedDB: 성경 본문처럼 큰 자료를 저장합니다 */
 const IDB={db:null,
   open(){if(this.db)return Promise.resolve(this.db);return new Promise((res,rej)=>{let q;try{q=indexedDB.open('biblemarble',1)}catch(e){return rej(e)}

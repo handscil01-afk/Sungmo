@@ -54,9 +54,9 @@ const Net={
     this.lastSecret=spec&&spec.secret?clone(spec.secret):null;
     for(const m of this.members.values())if(m.online&&m.conn)m.conn.send(this.promptMsg(m))},
   promptMsg(m){return {t:'p',p:this.lastPrompt||null,secret:m.kind==='remote'?this.lastSecret:null}},
-  pubSpec(spec){const o={};for(const [k,v] of Object.entries(spec))if(!['resolve','secret','aiSeq','by'].includes(k)&&typeof v!=='function')o[k]=v;return clone(o)},
+  pubSpec(spec){const o={};for(const [k,v] of Object.entries(spec))if(!['resolve','secret','aiSeq','by','picks'].includes(k)&&typeof v!=='function')o[k]=v;return clone(o)},
   /* 상태 보내기: 바뀌지 않는 보드·카드는 처음 한 번만(st), 매번은 바뀌는 부분만(s) 보냅니다 */
-  pushState(){if(this.role!=='host'||!G)return;this.publishLobby();clearTimeout(this.pushT);this.pushT=setTimeout(()=>{if(!G)return;
+  pushState(){if(this.role!=='host'||!G)return;this.publishLobby();clearTimeout(this.pushT);this.pushT=setTimeout(()=>{if(!G)return;this.sendPhotos();
     if(this.sentSid!==G.started){this.sentSid=G.started;this.broadcast({t:'st',S:this.staticPart()})}
     this.broadcast({t:'s',G:this.slim(),online:this.onlineMap()})},60)},
   staticPart(){return {sid:G.started,board:G.board,cards:G.cards}},
@@ -99,11 +99,14 @@ const Net={
       if(msg.t==='hello'){member=this.hello(c,msg,local);return}
       if(!member||member.conn!==c)return;member.last=Date.now();
       if(msg.t==='profile')this.profile(member,msg);
+      else if(msg.t==='photo')this.onPhoto(member,msg);
       else if(msg.t==='in')this.onInput(member,msg);
       else if(msg.t==='cmd')this.onCmd(member,msg);
+      else if(msg.t==='reqseat'&&G&&member.kind==='player'&&!G.players.some(p=>p.net===member.cid))this.request(member);
       else if(msg.t==='ping')c.send({t:'pong',at:msg.at})};
     c._c=()=>{if(member&&member.conn===c){member.online=false;member.conn=null;member.offSince=Date.now();member.asked=0;
-      this.reqs=this.reqs.filter(r=>r.cid!==member.cid);if(this.reqUI&&this.reqUI.cid===member.cid)this.closeReq();
+      this.reqs=this.reqs.filter(r=>r.cid!==member.cid);if(this.reqUI&&this.reqUI.cid===member.cid){this.closeReq();this.nextReq()}
+      if(member.kind==='remote')setTimeout(()=>this.remoteGone(),300);
       if(member.kind==='player')UI.toast(`📴 ${member.name}님 연결이 끊겼어요`);if(!G&&member.kind==='player')this.lobbyLeft(member.cid);this.lobbyChanged();if(G)UI.render()}}},
   hello(c,msg,local){let cid=String(c.vid||msg.cid||'').slice(0,40);if(!cid)return null;const kind=['display','remote'].includes(msg.kind)?msg.kind:'player';
     if(kind==='remote'&&(this.mode!=='relay'||String(msg.pin||'')!==this.pin)){c.send({t:'deny',why:this.mode!=='relay'?'mode':'pin'});return null}
@@ -114,18 +117,20 @@ const Net={
     if(!c.vid&&kind==='player'&&this.keys[cid]&&this.keys[cid]!==msg.key)cid=cid+'-'+uid('x').slice(-4);
     let m=this.members.get(cid);if(!m){m={cid};this.members.set(cid,m)}
     if(m.conn&&m.conn!==c)m.conn.close();
-    Object.assign(m,{conn:c,online:true,local:!!local,kind,last:Date.now(),offSince:0,asked:0,name:String(msg.name||'참가자').slice(0,10),emoji:String(msg.emoji||'😀').slice(0,4),color:PALETTE.includes(msg.color)?msg.color:PALETTE[0]});
+    Object.assign(m,{conn:c,online:true,local:!!local,kind,last:Date.now(),offSince:0,asked:0,name:String(msg.name||'참가자').slice(0,10),emoji:String(msg.emoji||'😀').slice(0,7),color:PALETTE.includes(msg.color)?msg.color:PALETTE[0],ph:new Set()});
     if(kind==='player'&&!this.keys[cid]){this.keys[cid]=uid('k');this.saveKeys()}
     const welcome=seat=>c.send({t:'welcome',cid,key:this.keys[cid]||null,code:this.code,mode:this.mode,kind,seat});
     if(kind!=='player'){welcome(null);if(G)this.sendGame(m);else this.lobbyChanged();
-      UI.toast(kind==='display'?'📺 게임 화면이 연결됐어요':'🎛️ 진행자 리모컨이 연결됐어요');if(G)UI.render();return m}
+      UI.toast(kind==='display'?'📺 게임 화면이 연결됐어요':'🎛️ 진행자 리모컨이 연결됐어요');
+      if(kind==='remote'&&this.mode==='relay')for(const x of Object.values(this.decs)){if(x.d.on==='host')closeLayer('edit');x.d.on='remote';c.send({t:'ask',d:x.d})}
+      if(G)UI.render();return m}
     if(G){const p=G.players.find(x=>x.net===cid);welcome(p?p.id:null);this.sendGame(m);
       if(p){UI.toast(`📶 ${m.name}님이 다시 들어왔어요`);redispatch()}
       else this.request(m);
       UI.render()}
     else{this.seat(m);UI.toast(`📶 ${m.name}님이 들어왔어요`);this.lobbyChanged()}
     return m},
-  sendGame(m){m.conn.send({t:'st',S:this.staticPart()});m.conn.send({t:'s',G:this.slim(),online:this.onlineMap()});m.conn.send(this.promptMsg(m))},
+  sendGame(m){this.sendPhotos();m.conn.send({t:'st',S:this.staticPart()});m.conn.send({t:'s',G:this.slim(),online:this.onlineMap()});m.conn.send(this.promptMsg(m))},
   /* 로비 자리 규칙: 정한 인원까지 컴퓨터로 채워 두고, 사람이 들어오면 컴퓨터 한 자리를 넘겨받습니다(최대 4명).
      다른 브라우저로 다시 들어온 사람은 이름이 같은 끊긴 자리로 돌려보내서 이름이 두 번 생기지 않게 합니다 */
   seat(m){const P=SETUP.players;let k=P.findIndex(p=>p.net===m.cid);
@@ -144,14 +149,21 @@ const Net={
     Object.assign(p,{net:null,ai:true,name:DEF_NAMES.concat(['바울','디모데','룻','에스더']).find(n=>!usedN.includes(n))||'컴퓨터',emoji:usedE.includes(p.emoji)?TOKENS.find(t=>!usedE.includes(t)):p.emoji});
     this.members.delete(cid);saveSetup();this.lobbyChanged()},LOBBY_GRACE_MS())},
   unseat(cid){const m=this.members.get(cid);if(m&&m.conn)m.conn.send({t:'welcome',cid,key:this.keys[cid],code:this.code,mode:this.mode,kind:'player',seat:null})},
-  profile(m,msg){if(G||m.kind!=='player')return;m.name=String(msg.name||m.name).slice(0,10);m.emoji=String(msg.emoji||m.emoji).slice(0,4);
+  profile(m,msg){if(G||m.kind!=='player')return;m.name=String(msg.name||m.name).slice(0,10);m.emoji=String(msg.emoji||m.emoji).slice(0,7);
     const P=SETUP.players,k=P.findIndex(p=>p.net===m.cid);if(k<0)return;const usedC=P.filter((x,i)=>i!==k).map(x=>x.color);
     P[k].name=m.name;P[k].emoji=m.emoji;if(PALETTE.includes(msg.color)&&!usedC.includes(msg.color))P[k].color=msg.color;saveSetup();this.lobbyChanged()},
-  lobbyChanged(){if(this.role!=='host')return;
+  /* 사진 말: 참가자가 보낸 사진을 받아 두고(같은 번호가 이미 있으면 바꾸지 않음), 쓰이는 사진을 아직 못 받은 기기에만 보냅니다 */
+  onPhoto(m,msg){const id=String(msg.id||'');if(m.kind!=='player'||PHOTOS[id]||!savePhoto(id,msg.d))return;this.sendPhotos();if(G)UI.render();else this.lobbyChanged()},
+  usedPhotos(){const ids=new Set();for(const p of SETUP.players)if(isPhoto(p.emoji))ids.add(p.emoji.slice(1));if(G)for(const p of G.players)if(isPhoto(p.tok))ids.add(p.tok.slice(1));return [...ids].filter(id=>PHOTOS[id])},
+  sendPhotos(){if(this.role!=='host')return;const used=this.usedPhotos();if(!used.length)return;
+    for(const m of this.members.values()){if(!m.online||!m.conn)continue;m.ph=m.ph||new Set();const P={};let n=0;for(const id of used)if(!m.ph.has(id)){P[id]=PHOTOS[id].d;m.ph.add(id);n++}if(n)m.conn.send({t:'ph',P})}},
+  sendMyPhoto(){const e=this.profileData&&this.profileData.emoji;if(this.role==='client'&&this.kind==='player'&&this.conn&&photoSrc(e))this.conn.send({t:'photo',id:e.slice(1),d:photoSrc(e)})},
+  lobbyChanged(){if(this.role!=='host')return;this.sendPhotos();
     const lobby={t:'lobby',code:this.code,mode:this.mode,title:(this.room&&this.room.title)||'',seats:SETUP.players.map(p=>({name:p.name,emoji:p.emoji,color:p.color,ai:p.ai,host:!!p.host,op:!!p.op,net:p.net||null,online:p.net?this.isOnline(p.net):true})),board:Content.board(SETUP.cfg.board).name};
     this.broadcast(lobby);this.publishLobby();if(Setup.L&&$('#tabpane')&&Setup.tab==='people'&&!Setup.inGame)Setup.pane();if(Setup.L&&Setup.tab==='net')Setup.pane()},
   /* 참가자의 선택: 지금 요청서의 답할 사람이 이 기기일 때만 받아들입니다 */
   onInput(m,msg){const spec=PROMPT;if(!spec||spec.id!==msg.id||!spec.actor)return;const a=spec.actor;
+    if(spec.kind==='qall')return allPart(spec,msg.v,m);
     if(msg.v==='skip'&&a.t==='ai'&&m.kind==='remote'&&['notice','card'].includes(spec.kind))return spec.resolve&&spec.resolve(true,'skip');
     const ok=(a.t==='net'&&m.kind==='player'&&a.cid===m.cid)||(a.t==='judge'&&m.kind==='remote');
     if(ok&&spec.resolve)spec.resolve(msg.v,'net')},
@@ -163,7 +175,8 @@ const Net={
       case 'op':if(p&&p.ai&&!p.out){p.ai=false;p.op=true;log(`${p.name} 자리를 진행자가 조작해요`,p);UI.render();persist();redispatch()}break;
       case 'money':{const v=+msg.v;if(p&&Number.isInteger(v)&&Math.abs(v)<=100000)adjustMoney(p.id,v,String(msg.why||'').slice(0,30));break}
       case 'undo':if(canUndo())undo();break;
-      case 'pause':setPause(!!msg.on);break}},
+      case 'pause':setPause(!!msg.on);break
+      case 'ans':if(typeof msg.id==='string'&&this.decs[msg.id])this.finishDecision(msg.id,String(msg.v||''));break}},
   cmd(o){if(this.role==='client'&&this.kind==='remote')this.conn?this.conn.send({t:'cmd',...o}):UI.toast('방장과 연결이 끊겨서 보내지 못했어요')},
 
   /* ---------- 게임 중 자리 바꾸기 ---------- */
@@ -176,17 +189,29 @@ const Net={
     const seats=this.freeSeats(m.cid);if(!seats.length){this.reqs.shift();m.conn.send({t:'note',m:'빈 자리가 없어서 구경하는 사람으로 들어왔어요'});return this.nextReq()}
     const same=p=>p.prev===m.cid||(p.name===m.name&&(p.ai?!!p.prev:!!p.net&&!this.isOnline(p.net)));
     const back=seats.some(same);
-    const lab=p=>same(p)?`↩️ 원래 자리(<b>${esc(p.name)}</b>)를 돌려주기`:p.ai?`🤖 컴퓨터 <b>${esc(p.name)}</b> 자리를 이 사람에게 넘기기`:`📴 연결이 끊긴 <b>${esc(p.name)}</b> 자리를 이 사람에게 넘기기`;
+    const lab=p=>same(p)?`↩️ 원래 자리(${p.name})를 돌려주기`:p.ai?`🤖 컴퓨터 ${p.name} 자리를 이 사람에게 넘기기`:`📴 연결이 끊긴 ${p.name} 자리를 이 사람에게 넘기기`;
     seats.sort((a,b)=>same(b)-same(a));
-    const L=openLayer('edit',`<div class="kick">📶 참가 요청 · 방 ${esc(this.code)}</div><h3>${back?`"${esc(m.name)}"님이 다시 들어왔어요`:'새로운 플레이어가 참가하려고 합니다'}</h3>
-      <div class="mbody"><div class="pedit" style="--pc:${m.color};grid-template-columns:auto 1fr"><span class="tok" style="--pc:${m.color}">${esc(m.emoji)}</span><b class="cute" style="font-size:1.4rem">${esc(m.name)}</b></div>
-      <p>${back?'컴퓨터가 이어서 하던 원래 자리를 돌려줄까요? ':seats.some(p=>p.ai)?'지금 컴퓨터 플레이어를 이 플레이어로 교체할까요? ':''}자리를 넘겨도 위치·달란트·땅·건물·카드는 그대로 이어져요.</p></div>
-      <div class="mbtns">${seats.map(p=>`<button class="btn wide ${same(p)?'main':''}" style="box-shadow:inset 0 0 0 3px ${p.col},0 3px 0 var(--line)" data-seat="${p.id}">${lab(p)}</button>`).join('')}
-      <button class="btn wide" data-no>취소 (구경만 하게 하기)</button></div>`,{tone:'var(--mint)'});
-    this.reqUI={cid:m.cid,L};
-    $$('[data-seat]',L.box).forEach(b=>b.onclick=()=>{this.closeReq();this.takeSeat(m,+b.dataset.seat);this.nextReq()});
-    $('[data-no]',L.box).onclick=()=>{this.closeReq();m.conn&&m.conn.send({t:'note',m:'방장이 구경하는 사람으로 들어오게 했어요'});this.nextReq()}},
-  closeReq(){if(!this.reqUI)return;const cid=this.reqUI.cid;this.reqUI.L.close();this.reqUI=null;this.reqs=this.reqs.filter(r=>r.cid!==cid)},
+    this.reqUI={cid:m.cid};
+    this.decide({kick:`📶 참가 요청 · 방 ${this.code}`,title:back?`"${m.name}"님이 다시 들어왔어요`:'새로운 플레이어가 참가하려고 합니다',tone:'var(--mint)',
+      who:{name:m.name,emoji:m.emoji,color:m.color},
+      text:`${back?'컴퓨터가 이어서 하던 원래 자리를 돌려줄까요? ':seats.some(p=>p.ai)?'지금 컴퓨터 플레이어를 이 플레이어로 교체할까요? ':''}자리를 넘겨도 위치·달란트·땅·건물·카드는 그대로 이어져요.`,
+      opts:[...seats.map(p=>({v:'seat:'+p.id,label:lab(p),main:same(p),col:p.col})),{v:'no',label:'취소 (구경만 하게 하기)'}]},
+      v=>{this.reqUI=null;this.reqs=this.reqs.filter(x=>x.cid!==m.cid);
+        if(v&&v.startsWith('seat:'))this.takeSeat(m,+v.slice(5));else m.conn&&m.conn.send({t:'note',m:'진행자가 구경하는 사람으로 들어오게 했어요',spect:1});this.nextReq()},
+      ()=>!this.members.get(m.cid)||!this.members.get(m.cid).online)},
+  /* ---------- 진행자 결정 창: 중계 모드에서 리모컨이 연결되어 있으면 리모컨에, 아니면 이 기기에 띄웁니다 ---------- */
+  decs:{},decSeq:0,
+  remotes(){return [...this.members.values()].filter(m=>m.kind==='remote'&&m.online&&m.conn)},
+  decide(d,cb,stale){const id='d'+(++this.decSeq);d.id=id;this.decs[id]={d,cb,stale};
+    const rs=this.mode==='relay'?this.remotes():[];
+    if(rs.length){d.on='remote';rs.forEach(r=>r.conn.send({t:'ask',d}))}else this.showDecision(d)},
+  finishDecision(id,v){const x=this.decs[id];if(!x)return;delete this.decs[id];closeLayer('edit');
+    this.remotes().forEach(r=>r.conn.send({t:'askdone',id}));if(x.stale&&x.stale())return x.cb(null);x.cb(v)},
+  showDecision(d){d.on='host';const L=openLayer('edit',decisionHTML(d),{tone:d.tone});
+    $$('[data-dv]',L.box).forEach(b=>b.onclick=()=>this.finishDecision(d.id,b.dataset.dv))},
+  /* 리모컨이 끊기면 리모컨에 띄웠던 결정 창을 이 기기에 다시 띄웁니다 */
+  remoteGone(){if(this.remotes().length)return;for(const x of Object.values(this.decs))if(x.d.on==='remote')this.showDecision(x.d)},
+  closeReq(){if(!this.reqUI)return;const cid=this.reqUI.cid;for(const [id,x] of Object.entries(this.decs))if(x.d.who&&x.d.title&&x.d.kick.startsWith('📶')){delete this.decs[id];closeLayer('edit');this.remotes().forEach(r=>r.conn.send({t:'askdone',id}))}this.reqUI=null;this.reqs=this.reqs.filter(r=>r.cid!==cid)},
   takeSeat(m,id){const p=byId(id);if(!p||!m.online)return;
     const usedC=G.players.filter(x=>x!==p).map(x=>x.col);
     Object.assign(p,{net:m.cid,ai:false,host:false,op:false,prev:null,name:m.name,tok:m.emoji,col:usedC.includes(m.color)?p.col:m.color});
@@ -199,14 +224,16 @@ const Net={
       if(m.online)continue;if(!m.offSince)m.offSince=now;if(m.asked===-1||(m.asked&&now<m.asked))continue;
       if(now-m.offSince<OFFLINE_ASK_MS())continue;
       return this.askReplace(p,m)}},
-  askReplace(p,m){const L=openLayer('edit',`<div class="kick">📴 연결 끊김</div><h3>플레이어 "${esc(p.name)}"가 게임에서 나갔습니다</h3>
-      <div class="mbody"><p>계속 진행하려면 컴퓨터 플레이어로 대체할까요? 위치·달란트·땅·건물·카드는 그대로 이어지고, 나중에 다시 들어오면 자리를 돌려줄 수 있어요.</p></div>
-      <div class="mbtns"><button class="btn main wide" data-r>🤖 컴퓨터로 대체</button><button class="btn wide" data-w>기다리기 (1분 뒤 다시 묻기)</button><button class="btn wide" data-c>취소 (다시 묻지 않기)</button></div>`,{tone:'#ff9d9d'});
-    const mm=m;
-    $('[data-w]',L.box).onclick=()=>{mm.asked=Date.now()+60000;L.close()};
-    $('[data-c]',L.box).onclick=()=>{mm.asked=-1;L.close()};
-    $('[data-r]',L.box).onclick=()=>{L.close();pickAiLevel(p.aiLv||G.cfg.ai,lv=>{if(lv)this.toAI(p,lv);else mm.asked=Date.now()+60000})}},
-  toAI(p,lv){if(!p||p.ai)return;p.prev=p.net;p.net=null;p.ai=true;p.aiLv=lv;
+  askReplace(p,m){m.asked=Date.now()+600000;
+    this.decide({kick:'📴 연결 끊김',title:`플레이어 "${p.name}"가 게임에서 나갔습니다`,tone:'#ff9d9d',
+      text:'계속 진행하려면 컴퓨터 플레이어로 대체할까요? 위치·달란트·땅·건물·카드는 그대로 이어지고, 나중에 다시 들어오면 자리를 돌려줄 수 있어요.',
+      opts:[{v:'easy',label:'🤖 컴퓨터(쉬움)로 대체'},{v:'normal',label:'🤖 컴퓨터(보통)로 대체',main:true},{v:'hard',label:'🤖 컴퓨터(어려움)로 대체'},{v:'wait',label:'기다리기 (1분 뒤 다시 묻기)'},{v:'never',label:'취소 (다시 묻지 않기)'}]},
+      v=>{if(!v)return;if(v==='wait')m.asked=Date.now()+60000;else if(v==='never')m.asked=-1;else if(['easy','normal','hard'].includes(v))this.toAI(p,v)},
+      ()=>!G||!p.net||this.isOnline(p.net))},
+  toAI(p,lv){if(!p||p.ai)return;const m=this.members.get(p.net);
+    /* 접속 중인 사람을 진행자가 바꾼 경우 그 사람 기기에 알려 줍니다 */
+    if(m&&m.online&&m.conn){m.conn.send({t:'welcome',cid:m.cid,key:this.keys[m.cid],code:this.code,mode:this.mode,kind:'player',seat:null});m.conn.send({t:'kicked',name:p.name})}
+    p.prev=p.net;p.net=null;p.ai=true;p.aiLv=lv;
     log(`${p.name} 자리를 컴퓨터(${LV_KO[lv]})가 이어서 해요`,p);UI.toast(`🤖 ${p.name} 자리를 컴퓨터가 이어서 해요`);UI.render();persist();redispatch()},
 
   /* ---------- 참가자 ---------- */
@@ -233,10 +260,14 @@ const Net={
     clearTimeout(this.retryT);this.retryT=setTimeout(()=>this.connect(false).catch(()=>this.lost(msg)),3000)},
   onMsg(msg){if(!msg||typeof msg!=='object')return;
     switch(msg.t){
-      case 'welcome':this.pauseMsg=null;this.mySeat=msg.seat;this.mode=msg.mode||this.mode;if(msg.cid)this.cid=msg.cid;if(msg.key)this.key=msg.key;this.saveSession();
+      case 'ph':{let n=0;for(const [id,d] of Object.entries(msg.P||{}))if(savePhoto(id,d))n++;if(n){if(this.G)UI.render();else if(this.lastLobby)NetUI.lobby()}break}
+      case 'welcome':this.sendMyPhoto();this.pauseMsg=null;this.mySeat=msg.seat;this.mode=msg.mode||this.mode;if(msg.cid)this.cid=msg.cid;if(msg.key)this.key=msg.key;this.saveSession();
         $('#waitNote')?.remove();if(this.G){UI.enterGame()}break;
       case 'deny':{const why=msg.why,code=this.code;this.leave();App.home();UI.toast(why==='pin'?'진행자 PIN이 맞지 않아요':why==='pw'?'비밀번호가 맞지 않아요':'이 방은 중계 모드가 아니라서 리모컨으로 들어갈 수 없어요',4000);if(why==='pw')NetUI.quick(code,'',{pub:false});break}
-      case 'note':UI.toast(msg.m,3500);if(msg.wait)this.waitNote(msg.m);else $('#waitNote')?.remove();break;
+      case 'note':UI.toast(msg.m,3500);if(msg.wait)this.waitNote(msg.m);else $('#waitNote')?.remove();if(msg.spect)this.spectNote();break;
+      case 'kicked':this.kickedNote(msg.name);break;
+      case 'ask':if(this.kind==='remote')this.showAsk(msg.d);break;
+      case 'askdone':if(this.askId===msg.id){closeLayer('edit');this.askId=null}break;
       case 'lobby':this.lastLobby=msg;this.mode=msg.mode||this.mode;if(!this.G)NetUI.lobby();break;
       case 'st':this.GS=msg.S;break;
       case 's':{if(!this.GS||this.GS.sid!==msg.G.started)break;const first=!this.G||!document.body.classList.contains('ingame');this.G=Object.assign({},this.GS,msg.G);this.online=msg.online||{};this.mode=(msg.G.room&&msg.G.room.mode)||this.mode;
@@ -246,13 +277,23 @@ const Net={
       case 'pong':if(msg.at)this.rtt=Date.now()-msg.at;this.lastPong=Date.now();break;
       case 'bye':if(msg.pause){this.lost('⏸️ 방장이 잠시 나갔어요 · 방이 다시 열리면 자동으로 들어가요');break}
         this.leave();App.home();UI.toast('방장이 방을 닫았어요');break}},
+  /* 진행자가 내 자리를 컴퓨터로 바꿨을 때 */
+  kickedNote(name){const L=openLayer('edit',`<div class="bigpic">🤖</div><h3>진행자가 내 자리(${esc(name)})를 컴퓨터로 바꿨어요</h3>
+      <div class="mbody"><p>지금은 구경하는 사람으로 게임을 볼 수 있어요. 다시 하고 싶으면 참가 요청을 보내 주세요. 진행자가 확인하면 원래 자리로 돌아가요.</p></div>
+      <div class="mbtns"><button class="btn main wide" data-rq>🙋 다시 참가 요청</button><button class="btn wide" data-c>구경하기</button></div>`,{tone:'#ffcf8a'});
+    $('[data-rq]',L.box).onclick=()=>{L.close();this.reqSeat()};$('[data-c]',L.box).onclick=L.close;if(this.G)UI.enterGame()},
+  spectNote(){},
+  reqSeat(){if(this.conn){this.conn.send({t:'reqseat'});UI.toast('🙋 참가 요청을 보냈어요. 진행자가 확인하면 자리에 앉아요',3500)}},
+  /* 리모컨: 진행자 결정 창 */
+  showAsk(d){this.askId=d.id;const L=openLayer('edit',decisionHTML(d),{tone:d.tone});
+    $$('[data-dv]',L.box).forEach(b=>b.onclick=()=>{$$('[data-dv]',L.box).forEach(x=>x.disabled=true);this.cmd({c:'ans',id:d.id,v:b.dataset.dv})})},
   waitNote(m){if($('#waitNote'))return;const d=document.createElement('div');d.id='waitNote';d.className='netbar wait';d.textContent='⏳ '+m;document.body.appendChild(d)},
   onEvent(e){switch(e.t){
     case 'toast':UI.toast(e.m);break;case 'sfx':UI.sfx(e.k);break;case 'float':UI.float(e.id,e.d);break;case 'burst':UI.burst(e.i,e.label,e.color);break;
-    case 'msg':UI.setMsg(e.h);break;case 'dice':UI.rollDice(e.a,e.b,e.anim);break;case 'qres':UI.showQuizResult(e.quiz);break;
+    case 'msg':UI.setMsg(e.h);break;case 'pay':UI.payFx(e.a,e.b,e.v);break;case 'dice':UI.rollDice(e.a,e.b,e.anim);break;case 'qres':UI.showQuizResult(e.quiz);break;
     case 'pos':if(this.G){const p=this.G.players.find(x=>x.id===e.id);if(p){p.pos=e.pos;UI.moveToken(e.id)}}break}},
   input(id,v){if(this.conn)this.conn.send({t:'in',id,v});else UI.toast('방장과 연결이 끊겨서 보내지 못했어요')},
-  sendProfile(p){this.profileData=p;store.set('net.profile',p);this.conn&&this.conn.send({t:'profile',...p})},
+  sendProfile(p){this.profileData=p;store.set('net.profile',p);this.sendMyPhoto();this.conn&&this.conn.send({t:'profile',...p})},
 
   /* ---------- 공통 ---------- */
   /* pause: 게임 중인 방장이 잠시 나갈 때. 방 정보와 자리 주인을 그대로 두고, 이어하기로 같은 방 코드를 다시 엽니다 */
@@ -274,6 +315,10 @@ const Net={
       try{UI.toast('방을 다시 여는 중… (최대 30초)');await this.host(s.mode||(restore&&restore.mode)||'player',s.code,restore);if(save&&save.G.room)resumeGame(save);else Setup.open('people')}
       catch(e){UI.toast('방을 다시 열지 못했어요. 잠시 뒤 이어하기를 다시 눌러 주세요',4500);Home.show()}}}
 };
+/* 진행자 결정 창 모양 (방장 기기·리모컨 공용) */
+function decisionHTML(d){return `<div class="kick">${esc(d.kick||'')}</div><h3>${esc(d.title||'')}</h3><div class="mbody">
+    ${d.who?`<div class="pedit" style="--pc:${d.who.color};grid-template-columns:auto 1fr"><span class="tok" style="--pc:${d.who.color}">${tokIn(d.who.emoji)}</span><b class="cute" style="font-size:1.4rem">${esc(d.who.name)}</b></div>`:''}
+    <p>${esc(d.text||'')}</p></div><div class="mbtns">${d.opts.map(o=>`<button class="btn wide ${o.main?'main':''}" ${o.col?`style="box-shadow:inset 0 0 0 3px ${o.col},0 3px 0 var(--line)"`:''} data-dv="${esc(o.v)}">${esc(o.label)}</button>`).join('')}</div>`}
 /* 컴퓨터 난이도 고르기 */
 function pickAiLevel(cur,done){const L=openLayer('edit',`<div class="kick">🤖 컴퓨터로 대체</div><h3>컴퓨터 난이도를 골라 주세요</h3>
     <div class="mbody"><p>난이도에 따라 퀴즈 정답률이 달라져요.</p></div>
@@ -342,7 +387,7 @@ const NetUI={
     if(!me.host&&prof){me.name=prof.name||me.name;if(prof.emoji)me.emoji=prof.emoji;if(prof.color&&!P.some(x=>x!==me&&x.color===prof.color))me.color=prof.color}
     const L=openLayer('info',`<div class="kick">🙂 플레이어 모드 · 방장</div><h3>내 캐릭터를 정해 주세요</h3><div class="mbody">
       <label class="cute">내 이름<input class="inp" id="hname" maxlength="10" value="${esc(me.name||'')}" placeholder="예: 베드로"></label>
-      <div class="pedit" style="--pc:${me.color};grid-template-columns:auto 1fr"><span class="tok" style="--pc:${me.color}">${esc(me.emoji)}</span><button class="btn sm" data-look>🎨 동물·색깔 고르기</button></div></div>
+      <div class="pedit" style="--pc:${me.color};grid-template-columns:auto 1fr"><span class="tok" style="--pc:${me.color}">${tokIn(me.emoji)}</span><button class="btn sm" data-look>🎨 동물·사진·색깔 고르기</button></div></div>
       <div class="mbtns"><button class="btn main wide" data-go>방 만들기</button></div>`,{close:true,tone:me.color});
     $('[data-look]',L.box).onclick=()=>{me.name=$('#hname',L.box).value;pickLook(me,P.filter(x=>x!==me),()=>this.hostAsPlayer(room))};
     $('[data-go]',L.box).onclick=()=>{const n=$('#hname',L.box).value.trim();if(!n)return UI.toast('이름을 적어 주세요');me.name=n;
@@ -373,7 +418,7 @@ const NetUI={
       <div class="seg" id="jkind"><button type="button" data-v="player" class="${kind==='player'?'on':''}">🙂 플레이어</button><button type="button" data-v="display" class="${kind==='display'?'on':''}">📺 게임 화면</button><button type="button" data-v="remote" class="${kind==='remote'?'on':''}">🎛️ 진행자 리모컨</button></div>
       <label class="cute">방 코드 (6자리)<input class="inp" id="jcode" maxlength="8" style="font-size:2rem;letter-spacing:.2em;text-transform:uppercase;text-align:center" value="${esc(prefill||'')}" placeholder="ABC123" autocomplete="off"></label>
       ${kind==='player'?`<label class="cute">내 이름<input class="inp" id="jname" maxlength="10" value="${esc(prof.name)}" placeholder="예: 민수"></label>
-      <div class="pedit" style="--pc:${prof.color};grid-template-columns:auto 1fr"><span class="tok" style="--pc:${prof.color}">${esc(prof.emoji)}</span><button class="btn sm" data-look>🎨 동물·색깔 고르기</button></div>`:''}
+      <div class="pedit" style="--pc:${prof.color};grid-template-columns:auto 1fr"><span class="tok" style="--pc:${prof.color}">${tokIn(prof.emoji)}</span><button class="btn sm" data-look>🎨 동물·사진·색깔 고르기</button></div>`:''}
       ${kind!=='remote'?'<label class="cute">🔒 비밀번호 (비공개 방만)<input class="inp" id="jpw" maxlength="12" autocomplete="off"></label>':''}
       ${kind==='display'?'<p class="ref">TV·프로젝터에 연결한 기기에서 고르세요. 모두가 보는 게임판과 문제만 나오고, 정답은 결과가 나올 때까지 나오지 않아요.</p>':''}
       ${kind==='remote'?`<label class="cute">진행자 PIN (4자리)<input class="inp" id="jpin" inputmode="numeric" maxlength="4" style="font-size:1.8rem;letter-spacing:.3em;text-align:center" placeholder="0000"></label><p class="ref">중계 모드의 진행자 기기 설정 → 멀티플레이에 PIN이 있어요. 리모컨에서는 주관식 정답을 보고 판정할 수 있어요. 리모컨은 꼭 쓰지 않아도 돼요.</p>`:''}</div>
@@ -399,7 +444,7 @@ const NetUI={
     const seats=lb?lb.seats:[];const mine=seats.find(s=>s.net===me);
     const html=`<div class="kick">📱 방 ${esc(Net.code)} · ${lb?`${MODE_KO[lb.mode]||''} · ${esc(lb.board)} 판`:''}</div><h3>${lb&&lb.title?esc(lb.title)+' · ':''}방장이 게임을 시작하기를 기다려요</h3>
       <div class="code">${esc(Net.code)}</div>
-      <div class="members">${seats.map(s=>`<div class="m" style="box-shadow:inset .35rem 0 0 ${s.color}"><span class="tok" style="--pc:${s.color}">${esc(s.emoji)}</span>${esc(s.name)}${s.net===me?' (나)':''}<span class="st">${s.ai?'🤖 컴퓨터':s.host?'👑 방장':s.op?'🎤 진행자가 조작':s.net?(s.online?'🟢 접속':'⚪ 끊김'):''}</span></div>`).join('')||'<div class="m">참가자 목록을 받는 중…</div>'}</div>
+      <div class="members">${seats.map(s=>`<div class="m" style="box-shadow:inset .35rem 0 0 ${s.color}"><span class="tok" style="--pc:${s.color}">${tokIn(s.emoji)}</span>${esc(s.name)}${s.net===me?' (나)':''}<span class="st">${s.ai?'🤖 컴퓨터':s.host?'👑 방장':s.op?'🎤 진행자가 조작':s.net?(s.online?'🟢 접속':'⚪ 끊김'):''}</span></div>`).join('')||'<div class="m">참가자 목록을 받는 중…</div>'}</div>
       ${mine?'':'<p class="ref">빈 자리가 없어서 구경하는 사람으로 들어왔어요.</p>'}
       <div class="mbtns row"><button class="btn" data-look>🎨 내 캐릭터 바꾸기</button><button class="btn" data-share>📤 방 공유하기</button><button class="btn" data-leave>방 나가기</button></div>`;
     const L=openLayer('info',html,{tone:'var(--mint)'});$('[data-share]',L.box).onclick=()=>shareRoom();

@@ -503,21 +503,6 @@ body.dash #game{display:block;height:100dvh;padding:max(.4rem,env(safe-area-inse
 @media (orientation:landscape){#dash{grid-template-columns:minmax(9rem,22%) minmax(0,1.2fr) }.dmain{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);align-items:start}}
 .dlist{padding-top:.45rem}
 #dcard .pc .lands .none{grid-column:1/-1}
-/* 땅 주인 표시(깃발·건물): 칸 안쪽 가장자리에 따로 띠를 두고 글씨는 그 띠를 피해서 놓습니다 */
-.tile .flag{width:calc(var(--u)*3.4);height:calc(var(--u)*3.4);min-width:13px;min-height:13px;border-radius:50%;font-size:max(7px,calc(var(--u)*2.1));box-shadow:0 0 0 max(1px,calc(var(--u)*.3)) #fff,0 1px 0 rgba(0,0,0,.25)}
-.tile .bld .bi{font-size:max(10px,calc(var(--u)*3))}
-.tile.owned.sb{padding-top:calc(var(--u)*4.4)} .tile.owned.st{padding-bottom:calc(var(--u)*4.4)}
-.tile.owned.sl{padding-right:calc(var(--u)*4.6)} .tile.owned.sr{padding-left:calc(var(--u)*4.6)}
-.tile.sb .flag{top:calc(var(--u)*.5);left:auto;right:calc(50% + var(--u)*.1);bottom:auto;transform:none}
-.tile.sb .bld{top:calc(var(--u)*.4);left:calc(50% + var(--u)*.4);bottom:auto;right:auto}
-.tile.st .flag{bottom:calc(var(--u)*.5);top:auto;left:auto;right:calc(50% + var(--u)*.1);transform:none}
-.tile.st .bld{bottom:calc(var(--u)*.4);left:calc(50% + var(--u)*.4);top:auto;right:auto}
-.tile.sl .flag{right:calc(var(--u)*.6);left:auto;top:auto;bottom:calc(50% + var(--u)*.1);transform:none}
-.tile.sl .bld{right:calc(var(--u)*.4);left:auto;top:calc(50% + var(--u)*.3);bottom:auto}
-.tile.sr .flag{left:calc(var(--u)*.6);right:auto;top:auto;bottom:calc(50% + var(--u)*.1);transform:none}
-.tile.sr .bld{left:calc(var(--u)*.4);right:auto;top:calc(50% + var(--u)*.3);bottom:auto}
-.tile.sl .bld .lvp,.tile.sr .bld .lvp{display:none}
-.tile.sl .bld,.tile.sr .bld{flex-direction:column}
 /* 좁은 상황판(게임판을 크게 쓰는 가로 화면): 이름·달란트가 잘리지 않게 줄입니다 */
 body.np .pc{padding:.5rem .55rem;gap:.2rem}
 body.np .pc-top{gap:.4rem}
@@ -621,42 +606,129 @@ body.remote #game{display:block;height:100dvh;padding:max(.4rem,env(safe-area-in
 .rooms .rb i.wait{background:#dcf6e9;box-shadow:inset 0 0 0 1.5px #8fd9b5}
 .rooms .rb i.on{background:#fff1dc;box-shadow:inset 0 0 0 1.5px #ffcf8a}
 
-/* 땅 주인 장식: 건물 단계마다 칸 바깥쪽 가장자리에 주인 색 장막·집·성벽 무늬를 둘러요 (배경은 주인 색 그대로) */
-.tile .orn{position:absolute;z-index:1;pointer-events:none;background:var(--oc);display:none}
-.tile.owned.lv1 .orn,.tile.owned.lv2 .orn,.tile.owned.lv3 .orn{display:block}
-.tile.sb .orn{left:0;right:0;bottom:0;height:var(--ot)} .tile.st .orn{left:0;right:0;top:0;height:var(--ot)}
-.tile.sl .orn{top:0;bottom:0;left:0;width:var(--ot)} .tile.sr .orn{top:0;bottom:0;right:0;width:var(--ot)}
-#board{--ot:max(6px,calc(var(--u)*1.9))}
-.tile.owned.lv1.sb,.tile.owned.lv2.sb,.tile.owned.lv3.sb{padding-bottom:calc(var(--ot) + 1px)}
-.tile.owned.lv1.st,.tile.owned.lv2.st,.tile.owned.lv3.st{padding-top:calc(var(--ot) + 1px)}
-.tile.owned.lv1.sl,.tile.owned.lv2.sl,.tile.owned.lv3.sl{padding-left:calc(var(--ot) + 1px)}
-.tile.owned.lv1.sr,.tile.owned.lv2.sr,.tile.owned.lv3.sr{padding-right:calc(var(--ot) + 1px)}
-.tile.owned.lv1{box-shadow:inset 0 0 0 max(3px,calc(var(--u)*.85)) var(--oc),0 2px 0 rgba(61,52,88,.12)}
-.tile.owned.lv2{box-shadow:inset 0 0 0 max(3px,calc(var(--u)*1)) var(--oc),0 2px 0 rgba(61,52,88,.12)}
-.tile.owned.lv3{box-shadow:inset 0 0 0 max(3px,calc(var(--u)*.8)) var(--oc),inset 0 0 0 max(4px,calc(var(--u)*1.15)) #fff,inset 0 0 0 max(5px,calc(var(--u)*1.5)) var(--oc),0 2px 0 rgba(61,52,88,.12)}
-.tile.owned.lv1.sb .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 10 L10 0 L20 10Z'/%3E%3C/svg%3E") center/auto 100% repeat-x;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 10 L10 0 L20 10Z'/%3E%3C/svg%3E") center/auto 100% repeat-x}
-.tile.owned.lv1.st .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 0 L10 10 L20 0Z'/%3E%3C/svg%3E") center/auto 100% repeat-x;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 10'%3E%3Cpath d='M0 0 L10 10 L20 0Z'/%3E%3C/svg%3E") center/auto 100% repeat-x}
-.tile.owned.lv1.sl .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 20'%3E%3Cpath d='M0 0 L10 10 L0 20Z'/%3E%3C/svg%3E") center/100% auto repeat-y;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 20'%3E%3Cpath d='M0 0 L10 10 L0 20Z'/%3E%3C/svg%3E") center/100% auto repeat-y}
-.tile.owned.lv1.sr .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 20'%3E%3Cpath d='M10 0 L0 10 L10 20Z'/%3E%3C/svg%3E") center/100% auto repeat-y;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 20'%3E%3Cpath d='M10 0 L0 10 L10 20Z'/%3E%3C/svg%3E") center/100% auto repeat-y}
-.tile.owned.lv2.sb .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 14'%3E%3Cpath d='M2 14 L2 7 L12 1 L22 7 L22 14Z M16 5 L16 1.6 L18.6 1.6 L18.6 6.6Z'/%3E%3C/svg%3E") center/auto 100% repeat-x;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 14'%3E%3Cpath d='M2 14 L2 7 L12 1 L22 7 L22 14Z M16 5 L16 1.6 L18.6 1.6 L18.6 6.6Z'/%3E%3C/svg%3E") center/auto 100% repeat-x}
-.tile.owned.lv2.st .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 14'%3E%3Cpath d='M2 0 L2 7 L12 13 L22 7 L22 0Z M16 9 L16 12.4 L18.6 12.4 L18.6 7.4Z'/%3E%3C/svg%3E") center/auto 100% repeat-x;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 14'%3E%3Cpath d='M2 0 L2 7 L12 13 L22 7 L22 0Z M16 9 L16 12.4 L18.6 12.4 L18.6 7.4Z'/%3E%3C/svg%3E") center/auto 100% repeat-x}
-.tile.owned.lv2.sl .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 24'%3E%3Cpath d='M0 2 L7 2 L13 12 L7 22 L0 22Z M9 16 L12.4 16 L12.4 18.6 L7.4 18.6Z'/%3E%3C/svg%3E") center/100% auto repeat-y;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 24'%3E%3Cpath d='M0 2 L7 2 L13 12 L7 22 L0 22Z M9 16 L12.4 16 L12.4 18.6 L7.4 18.6Z'/%3E%3C/svg%3E") center/100% auto repeat-y}
-.tile.owned.lv2.sr .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 24'%3E%3Cpath d='M14 2 L7 2 L1 12 L7 22 L14 22Z M5 16 L1.6 16 L1.6 18.6 L6.6 18.6Z'/%3E%3C/svg%3E") center/100% auto repeat-y;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 24'%3E%3Cpath d='M14 2 L7 2 L1 12 L7 22 L14 22Z M5 16 L1.6 16 L1.6 18.6 L6.6 18.6Z'/%3E%3C/svg%3E") center/100% auto repeat-y}
-.tile.owned.lv3.sb .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M0 10 L0 0 L5 0 L5 4 L10 4 L10 10Z'/%3E%3C/svg%3E") center/auto 100% repeat-x;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M0 10 L0 0 L5 0 L5 4 L10 4 L10 10Z'/%3E%3C/svg%3E") center/auto 100% repeat-x}
-.tile.owned.lv3.st .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M0 0 L0 10 L5 10 L5 6 L10 6 L10 0Z'/%3E%3C/svg%3E") center/auto 100% repeat-x;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M0 0 L0 10 L5 10 L5 6 L10 6 L10 0Z'/%3E%3C/svg%3E") center/auto 100% repeat-x}
-.tile.owned.lv3.sl .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M0 0 L10 0 L10 5 L6 5 L6 10 L0 10Z'/%3E%3C/svg%3E") center/100% auto repeat-y;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M0 0 L10 0 L10 5 L6 5 L6 10 L0 10Z'/%3E%3C/svg%3E") center/100% auto repeat-y}
-.tile.owned.lv3.sr .orn{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M10 0 L0 0 L0 5 L4 5 L4 10 L10 10Z'/%3E%3C/svg%3E") center/100% auto repeat-y;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M10 0 L0 0 L0 5 L4 5 L4 10 L10 10Z'/%3E%3C/svg%3E") center/100% auto repeat-y}
-/* 장식을 더 또렷하게, 옆줄 칸은 글씨 자리를 넉넉하게 */
-#board{--ot:max(7px,calc(var(--u)*2.5))}
-.tile.sl,.tile.sr{--ot:max(6px,calc(var(--u)*1.9))}
-.tile.owned.sl{padding-right:calc(var(--u)*4.6)} .tile.owned.sr{padding-left:calc(var(--u)*4.6)}
-.tile.owned.lv1.sl,.tile.owned.lv2.sl,.tile.owned.lv3.sl{padding-left:calc(var(--ot) + 1px)}
-.tile.owned.lv1.sr,.tile.owned.lv2.sr,.tile.owned.lv3.sr{padding-right:calc(var(--ot) + 1px)}
-.tile.owned.sl .nm,.tile.owned.sr .nm,#board.lg .tile.owned.sl:not(.corner) .nm,#board.lg .tile.owned.sr:not(.corner) .nm{font-size:max(8px,calc(var(--u)*2.2))}
-.tile.sl .flag{right:calc(var(--u)*.3)} .tile.sr .flag{left:calc(var(--u)*.3)}
-.tile .orn{opacity:.95;filter:drop-shadow(0 0 1px rgba(255,255,255,.9))}
-#board{--ot:max(7px,calc(var(--u)*2.2))}
-.tile.owned.sb{padding-top:calc(var(--u)*3.9)} .tile.owned.st{padding-bottom:calc(var(--u)*3.9)}
-.tile.owned.sl .pr,.tile.owned.sr .pr{white-space:normal;line-height:1.05;text-align:center}
 /* 네 글자 이상 이름은 위·아래 줄 칸에서 한 줄에 들어가도록 조금 작게 */
 .tile.long.sb .nm,.tile.long.st .nm,#board.lg .tile.long.sb:not(.corner) .nm,#board.lg .tile.long.st:not(.corner) .nm{font-size:max(8px,calc(var(--u)*2.05));letter-spacing:-.02em}
+/* 리모컨: 차례 순서 줄과 고정 자리 */
+#rmt .rturn{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .3rem;padding:.45rem .6rem;border-radius:1rem;background:var(--paper);box-shadow:var(--shadow);min-height:3.2rem}
+#rmt .rturn i{font-style:normal;color:var(--ink-3)}
+#rmt .rturn .rt{display:inline-flex;align-items:center;gap:.3rem;padding:.15rem .55rem .15rem .2rem;border-radius:99px;font-family:var(--f-cute);font-size:1rem;opacity:.55}
+#rmt .rturn .rt .tok{width:1.7rem;height:1.7rem;font-size:1rem}
+#rmt .rturn .rt b{font-weight:400}
+#rmt .rturn .rt.on{opacity:1;background:color-mix(in srgb,var(--pc) 22%,#fff);box-shadow:inset 0 0 0 2px var(--pc);font-size:1.1rem}
+#rmt .rturn .rt.out{text-decoration:line-through}
+.rnow{min-height:13rem}
+.rwait{font-family:var(--f-cute);font-size:1.1rem;color:var(--ink-2);min-height:1.6rem}
+.srow label.custom{display:inline-flex;align-items:center;gap:.35rem;font-family:var(--f-cute);color:var(--ink-2);white-space:nowrap}
+.srow label.custom .inp{width:5.2rem;min-height:2.5rem;text-align:center;font-size:1.1rem}
+.srow label.custom.on .inp{box-shadow:inset 0 0 0 2.5px var(--accent);color:var(--accent-2)}
+/* 작은 게임판 (칸 고르기) */
+.mbox.minibox{max-width:min(96vw,40rem)}
+.miniboard{display:grid;grid-template-columns:1.25fr repeat(7,1fr) 1.25fr;grid-template-rows:1.25fr repeat(7,1fr) 1.25fr;gap:2px;width:min(100%,82vh);aspect-ratio:1;margin:.4rem auto 0;padding:3px;border-radius:12px;background:var(--sand)}
+.miniboard .mt{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;overflow:hidden;border-radius:6px;background:var(--paper);font-size:clamp(7px,2.1vmin,12px);line-height:1.05;padding:1px;box-shadow:inset 0 3px 0 var(--gc,transparent)}
+.miniboard .mt span{font-size:1.6em;line-height:1}
+.miniboard .mt b{font-family:var(--f-cute);font-weight:400;word-break:break-all}
+.miniboard .mt i{position:absolute;top:1px;right:1px;font-style:normal;font-size:.9em}
+.miniboard .mt[style*="--oc"]{background:color-mix(in srgb,var(--oc) 28%,#fff)}
+.miniboard .mt.no{opacity:.35}
+.miniboard .mt.here{box-shadow:inset 0 0 0 2px var(--bad)}
+.miniboard .mt:not(.no):hover,.miniboard .mt.pick{box-shadow:inset 0 0 0 3px var(--accent);transform:scale(1.06);z-index:2}
+.miniboard .mcen{grid-area:2/2/9/9;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.3rem;align-content:center;background:#fffef8;border-radius:10px;padding:.4rem;text-align:center}
+.miniboard .mcen .tok{width:2rem;height:2rem;font-size:1.1rem}
+.miniboard .mcen small{width:100%;color:var(--ink-3);font-size:.8rem}
+
+/* ---------- 땅 주인 장식: 글씨처럼 똑바로, 칸 위쪽에 크게 ----------
+   땅만: 주인 색 삼각 깃발 줄 · 장막: 위쪽 주름 장식과 양옆으로 드리운 커튼 · 집: 큰 지붕과 굴뚝 · 성: 성벽과 뾰족한 탑 지붕.
+   주인 표시는 장식 가운데 위에 올리고, 글씨는 장식 아래로 내려서 가리지 않게 합니다 */
+#board{--dh:max(12px,calc(var(--u)*4.2))}
+.tile.sl,.tile.sr{--dh:max(10px,calc(var(--u)*3.3))}
+.tile .deco,.tile .drL,.tile .drR{position:absolute;pointer-events:none;background:var(--oc);display:none;z-index:1}
+.tile .deco{left:0;right:0;top:0;height:var(--dh)}
+.tile .drL,.tile .drR{top:0;bottom:0;width:max(5px,calc(var(--u)*2));opacity:.9}
+.tile .drL{left:0} .tile .drR{right:0}
+.tile.owned .deco{display:block}
+.tile.owned.lv1 .drL,.tile.owned.lv1 .drR{display:block}
+.tile.owned.lv0 .deco{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 40' preserveAspectRatio='none'%3E%3Cpath d='M0 0H100V5H0Z M4 4L10 18L16 4Z M20 4L26 18L32 4Z M36 4L42 18L48 4Z M52 4L58 18L64 4Z M68 4L74 18L80 4Z M84 4L90 18L96 4Z'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 40' preserveAspectRatio='none'%3E%3Cpath d='M0 0H100V5H0Z M4 4L10 18L16 4Z M20 4L26 18L32 4Z M36 4L42 18L48 4Z M52 4L58 18L64 4Z M68 4L74 18L80 4Z M84 4L90 18L96 4Z'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat;height:calc(var(--dh)*.8)}
+.tile.owned.lv1 .deco{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 40' preserveAspectRatio='none'%3E%3Cpath d='M0 0H100V12Q90 34 80 12Q70 34 60 12Q50 34 40 12Q30 34 20 12Q10 34 0 12Z'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 40' preserveAspectRatio='none'%3E%3Cpath d='M0 0H100V12Q90 34 80 12Q70 34 60 12Q50 34 40 12Q30 34 20 12Q10 34 0 12Z'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat}
+.tile.owned.lv1 .drL{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 100' preserveAspectRatio='none'%3E%3Cpath d='M0 0H22C8 30 6 70 20 100H0Z'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 100' preserveAspectRatio='none'%3E%3Cpath d='M0 0H22C8 30 6 70 20 100H0Z'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat}
+.tile.owned.lv1 .drR{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='78 0 22 100' preserveAspectRatio='none'%3E%3Cpath d='M100 0H78C92 30 94 70 80 100H100Z'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='78 0 22 100' preserveAspectRatio='none'%3E%3Cpath d='M100 0H78C92 30 94 70 80 100H100Z'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat}
+.tile.owned.lv2 .deco{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 40' preserveAspectRatio='none'%3E%3Cpath d='M-2 40L50 1L102 40Z M70 20V5H80V28Z'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 40' preserveAspectRatio='none'%3E%3Cpath d='M-2 40L50 1L102 40Z M70 20V5H80V28Z'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat;height:calc(var(--dh)*1.1)}
+.tile.owned.lv3 .deco{-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 40' preserveAspectRatio='none'%3E%3Cpath d='M0 40V20H7V13H14V20H21V13H28V20H35V13H42V20H49V13H56V20H63V13H70V20H77V13H84V20H91V13H100V40Z M0 22L11 0L22 22Z M78 22L89 0L100 22Z'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 40' preserveAspectRatio='none'%3E%3Cpath d='M0 40V20H7V13H14V20H21V13H28V20H35V13H42V20H49V13H56V20H63V13H70V20H77V13H84V20H91V13H100V40Z M0 22L11 0L22 22Z M78 22L89 0L100 22Z'/%3E%3C/svg%3E") 0 0/100% 100% no-repeat;height:calc(var(--dh)*1.15)}
+.tile.owned{padding-top:calc(var(--dh) + 1px)}
+.tile.owned.lv2,.tile.owned.lv3{padding-top:calc(var(--dh)*1.12 + 1px)}
+.tile.owned.lv1{padding-left:max(5px,calc(var(--u)*1.9));padding-right:max(5px,calc(var(--u)*1.9))}
+.tile.owned.sb{padding-top:calc(var(--dh) + 1px)}
+.tile .flag{top:calc(var(--dh)*.08);left:50%;right:auto;bottom:auto;transform:translateX(-50%);width:calc(var(--u)*3.3);height:calc(var(--u)*3.3);min-width:13px;min-height:13px;border-radius:50%;font-size:max(7px,calc(var(--u)*2));box-shadow:0 0 0 max(1.5px,calc(var(--u)*.35)) #fff,0 1px 2px rgba(0,0,0,.3);z-index:3}
+.tile.owned.lv2 .flag,.tile.owned.lv3 .flag{top:calc(var(--dh)*.32)}
+.tile .bld{display:none}
+.tile.owned .nm,.tile.owned .pr{text-shadow:0 0 4px #fff,0 0 2px #fff}
+.tile .drL,.tile .drR{width:max(4px,calc(var(--u)*1.15));bottom:auto;height:72%}
+.tile.owned.lv1{padding-left:2px;padding-right:2px}
+.tile.sl.owned.lv1,.tile.st.owned.lv1,.tile.sb.owned.lv1,.tile.sr.owned.lv1{padding-left:max(2px,calc(var(--u)*.9));padding-right:max(2px,calc(var(--u)*.9))}
+.tile.sl .flag,.tile.sr .flag{width:calc(var(--u)*2.8);height:calc(var(--u)*2.8);font-size:max(7px,calc(var(--u)*1.7))}
+.tile.owned.lv2 .flag,.tile.owned.lv3 .flag{top:calc(var(--dh)*.12)}
+.tile.sl.owned.lv1,.tile.sr.owned.lv1{padding-left:max(2px,calc(var(--u)*1.2))}
+.tile.sl.owned.lv1{padding-right:calc(var(--u)*1.9)} .tile.sr.owned.lv1{padding-left:calc(var(--u)*1.9);padding-right:max(2px,calc(var(--u)*1.2))}
+.tile.sl .flag,.tile.sr .flag,.tile.st .flag,.tile.sb .flag{left:50%;right:auto}
+.tile.long.sl .nm,.tile.long.sr .nm,#board.lg .tile.long.sl:not(.corner) .nm,#board.lg .tile.long.sr:not(.corner) .nm{font-size:max(8px,calc(var(--u)*2.05));letter-spacing:-.02em}
+/* ---------- 가진 땅: 포커 패처럼 ---------- */
+.hand{position:relative;flex:1 1 auto;min-height:5.2rem;margin-top:.2rem}
+.hand .none{font-size:.88rem;color:var(--ink-3)}
+.hand .hc{position:absolute;top:calc(.4rem + var(--lift,0px));left:0;width:4.3rem;height:5.6rem;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:.05rem;padding:.55rem .2rem .25rem;border-radius:.55rem;background:#fff;
+  box-shadow:inset 0 .45rem 0 var(--gc),0 0 0 1.5px rgba(61,52,88,.18),0 3px 6px rgba(61,52,88,.18);transform:rotate(var(--rot,0deg));transform-origin:50% 120%;transition:transform .18s,top .18s,box-shadow .18s;font-family:var(--f-cute);cursor:pointer}
+.hand .hc:hover,.hand .hc:focus-visible{top:-.3rem;transform:rotate(0deg) scale(1.08);z-index:50!important;box-shadow:inset 0 .45rem 0 var(--gc),0 0 0 2px var(--accent),0 8px 14px rgba(61,52,88,.28)}
+.hand .hc .hpic{font-size:1.5rem;line-height:1.1}
+.hand .hc b{font-weight:400;font-size:.82rem;line-height:1.05;text-align:center;word-break:keep-all}
+.hand .hc .hlv{font-size:.68rem;color:var(--ink-2);white-space:nowrap}
+.hand .hc .htoll{margin-top:auto;font-size:.75rem;color:var(--accent-2)}
+body.tab .pc.wide .hand .hc,#dcard .hand .hc{width:5.4rem;height:7rem}
+body.tab .pc.wide .hand .hc .hpic,#dcard .hand .hc .hpic{font-size:2rem}
+body.tab .pc.wide .hand .hc b,#dcard .hand .hc b{font-size:.98rem}
+body.tab .pc.wide .hand,#dcard .hand{min-height:7.4rem}
+/* 땅 카드 크게 */
+.mbox.cardpop{max-width:min(92vw,24rem);animation:cardout .32s cubic-bezier(.2,.9,.3,1.3)}
+@keyframes cardout{from{transform:translateY(40%) rotate(-12deg) scale(.4);opacity:0}}
+.pcard{display:flex;flex-direction:column;align-items:center;gap:.4rem;text-align:center;border-radius:1.2rem;padding:0 0 .6rem;box-shadow:inset 0 0 0 3px var(--gc);overflow:hidden;background:#fff}
+.pcard .pch{width:100%;background:var(--gc);padding:.6rem .8rem;color:#2c2440}
+.pcard .pch span{display:block;font-size:.95rem;opacity:.85}
+.pcard .pch b{font-family:var(--f-cute);font-weight:400;font-size:1.9rem}
+.pcard .pcpic{font-size:4.2rem;line-height:1.1}
+.pcard .pcown{font-family:var(--f-cute);font-size:1.15rem;display:flex;align-items:center;gap:.3rem}
+.pcard .pcown .tok{width:1.9rem;height:1.9rem;font-size:1.1rem}
+.pcard .pctoll{font-size:1.1rem}
+.pcard .pctoll b{font-family:var(--f-cute);font-weight:400;font-size:1.4rem;color:var(--accent-2)}
+.pcard .ttab{width:92%}
+.pcard .pcnote{padding:0 .9rem;color:var(--ink-2)}
+/* ---------- 돈 이동 ---------- */
+.coinfx{position:fixed;left:0;top:0;z-index:86;font-size:2.2rem;pointer-events:none;margin:-1.1rem 0 0 -1.1rem;filter:drop-shadow(0 2px 2px rgba(0,0,0,.25))}
+.bigamt{position:fixed;z-index:87;transform:translate(-50%,-50%);font-family:var(--f-cute);font-size:clamp(2rem,6vmin,3.6rem);pointer-events:none;text-shadow:0 3px 0 #fff,0 0 8px #fff;animation:bigamt 1.6s ease-out forwards;white-space:nowrap}
+.bigamt.neg{color:var(--bad)} .bigamt.pos{color:var(--good)}
+@keyframes bigamt{0%{opacity:0;transform:translate(-50%,-30%) scale(.6)}15%{opacity:1;transform:translate(-50%,-50%) scale(1.15)}70%{opacity:1;transform:translate(-50%,-70%) scale(1)}100%{opacity:0;transform:translate(-50%,-110%)}}
+/* 객관식 모두 도전 */
+.achips{display:flex;flex-wrap:wrap;gap:.3rem;margin:.4rem 0 .1rem}
+.ach{display:inline-flex;align-items:center;gap:.2rem;padding:.15rem .55rem;border-radius:99px;font-size:.9rem;font-weight:700;background:#fff;box-shadow:inset 0 0 0 2px var(--pc,#ccc);opacity:.7}
+.ach.on{opacity:1;background:color-mix(in srgb,var(--pc) 16%,#fff)}
+.ach.ok{opacity:1;background:#e3f7ea;color:#16794a}.ach.no{opacity:1;background:#fdeaea;color:#b23b3b}
+.allrows{display:flex;flex-direction:column;gap:.4rem}
+.arow{display:flex;align-items:center;gap:.5rem;padding:.35rem .5rem;border-radius:.9rem;background:var(--card,#fff);box-shadow:0 0 0 2px var(--line,#e5e0f0)}
+.arow b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.abtns{display:flex;gap:.3rem}.abtns .btn{min-width:2.6rem;min-height:2.6rem;padding:0 .5rem;font-size:1.15rem}
+/* 팔 땅 고르기 */
+.sellgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(7.2rem,1fr));gap:.5rem;margin-top:.6rem;max-height:46vh;overflow:auto;padding:.2rem}
+.sellc{position:relative;display:flex;flex-direction:column;align-items:center;gap:.1rem;padding:.9rem .4rem .5rem;border:0;border-radius:.9rem;background:#fff;box-shadow:inset 0 0 0 2px var(--gc),0 3px 0 var(--line);font:inherit;cursor:pointer;overflow:hidden}
+.sellc .sb{position:absolute;left:0;right:0;top:0;height:.55rem;background:var(--gc)}
+.sellc .spic{font-size:1.7rem;line-height:1.1}.sellc b{font-size:1.05rem;color:var(--ink,#2a2540)}
+.sellc .slv{font-size:.8rem;color:var(--sub,#6b6585)}.sellc .sv{font-size:1.15rem;font-weight:800;color:#16794a}
+.sellc .sok{font-size:.72rem;font-weight:700;color:#fff;background:#2fae5b;border-radius:99px;padding:.05rem .45rem}
+.sellc.enough{box-shadow:inset 0 0 0 3px #2fae5b,0 3px 0 var(--line)}
+.sellc:active{transform:translateY(2px)}.sellc:disabled{opacity:.5}
+/* 사진 말 */
+img.ph{display:inline-block;width:1.25em;height:1.25em;border-radius:50%;object-fit:cover;vertical-align:-.25em;pointer-events:none;user-select:none;-webkit-user-drag:none}
+.tok>img.ph:only-child{width:100%;height:100%;vertical-align:0}
+.phrow{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.crop{position:relative;width:min(78vw,52vh,26rem);aspect-ratio:1;margin:.4rem auto;overflow:hidden;border-radius:1.2rem;background:#2b2638;touch-action:none;cursor:grab;user-select:none}
+.crop img{position:absolute;left:50%;top:50%;max-width:none!important;max-height:none!important;transform-origin:center;pointer-events:none}
+.crop .cb{filter:blur(7px) brightness(.55) saturate(.8)}
+.crop .csw{position:absolute;inset:0;clip-path:circle(40% at 50% 50%);pointer-events:none}
+.crop .ring{position:absolute;left:10%;top:10%;width:80%;height:80%;border-radius:50%;border:3px dashed #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35),inset 0 0 0 1px rgba(0,0,0,.35);pointer-events:none}
+.cropnote{text-align:center;margin:.2rem 0}
+.croptools{display:flex;justify-content:center;gap:.4rem;flex-wrap:wrap;margin:.3rem 0 .6rem}.croptools .btn{min-width:3rem}
