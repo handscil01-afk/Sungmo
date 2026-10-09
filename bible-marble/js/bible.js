@@ -49,7 +49,8 @@ const Bible={data:null,meta:null,loading:null,
   /* 여러 형식을 읽습니다: "창1:1 본문", "창세기 1:1 본문", "창세기 1장 1절 본문", 책 이름 줄 + "1:1 본문",
      CSV/TSV(책,장,절,본문), JSON([{book,chapter,verse,text}] 또는 {책:{장:{절:본문}}}) */
   parse(text,opt={}){
-    const books={},add=(b,c,v,t)=>{t=String(t==null?'':t).trim();if(opt.stripHead!==false)t=t.replace(/^(<[^>]{1,40}>\s*)+/,'').trim();if(b==null||!c||!v||!t)return;(books[b]=books[b]||{});(books[b][c]=books[b][c]||{})[v]=t};
+    let last=null;const strip=t=>{t=String(t==null?'':t).trim();if(opt.stripHead!==false)t=t.replace(/^(<[^>]{1,40}>\s*)+/,'').trim();return t};
+    const books={},add=(b,c,v,t)=>{t=strip(t);if(b==null||!c||!v||!t)return;(books[b]=books[b]||{});(books[b][c]=books[b][c]||{})[v]=t;last={b,c,v}};
     let bad=0,lines=0;const t=text.trim();
     if(/^[\[{]/.test(t)){try{const j=JSON.parse(t);
       if(Array.isArray(j))for(const r of j){const b=bookOf(r.book??r.책??r.b);add(b,+(r.chapter??r.장??r.c),+(r.verse??r.절??r.v),r.text??r.본문??r.t)}
@@ -61,6 +62,12 @@ const Bible={data:null,meta:null,loading:null,
       if(cells.length>=4&&bookOf(cells[0])!=null&&/^\d+$/.test(cells[1])&&/^\d+$/.test(cells[2])){add(bookOf(cells[0]),+cells[1],+cells[2],cells.slice(3).join(', '));continue}
       if((m=line.match(/^<?\s*([가-힣]+|[1-3]?[a-z]{2,3})\s*\.?\s*(\d+)\s*(?::|장)\s*(\d+)\s*절?\s*>?\s*(.*)$/i))&&bookOf(m[1])!=null){curB=bookOf(m[1]);add(curB,+m[2],+m[3],m[4]);continue}
       if((m=line.match(/^(\d+)\s*:\s*(\d+)\s+(.*)$/))&&curB!=null){add(curB,+m[1],+m[2],m[3]);continue}
+      /* 절 번호가 빠진 줄(예: "창35:야곱의 아들은 열둘이라")은 한 절이 둘로 나뉜 뒷부분이라 같은 장의 바로 앞 절에 이어 붙입니다 */
+      if((m=line.match(/^<?\s*([가-힣]+)\s*(\d+)\s*:\s*(\D.*)$/))&&bookOf(m[1])!=null&&last&&last.b===bookOf(m[1])&&last.c===+m[2]){
+        const t=strip(m[3]).replace(/<[^>]{1,40}>\s*/g,'').trim();if(t){books[last.b][last.c][last.v]+=' '+t;continue}}
+      /* 새 장의 첫 줄인데 절 번호가 없으면 1절로 넣습니다 (시편의 "제이권" 같은 권 제목은 본문이 아니라 건너뜀) */
+      if((m=line.match(/^<?\s*([가-힣]+)\s*(\d+)\s*:\s*(\D.*)$/))&&bookOf(m[1])!=null){const b=bookOf(m[1]),c=+m[2],t=strip(m[3]).replace(/<[^>]{1,40}>\s*/g,'').trim();
+        if(/^제[일이삼사오육칠팔구십]+권$/.test(t))continue;if(t&&!(books[b]&&books[b][c]&&books[b][c][1])){add(b,c,1,t);continue}}
       if(bookOf(line.replace(/\s*\d*장?$/,''))!=null&&line.length<12){curB=bookOf(line.replace(/\s*\d*장?$/,''));continue}
       bad++}
     return {books,bad,lines}}
