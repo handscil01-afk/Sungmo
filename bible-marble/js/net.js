@@ -100,6 +100,7 @@ const Net={
       if(!member||member.conn!==c)return;member.last=Date.now();
       if(msg.t==='profile')this.profile(member,msg);
       else if(msg.t==='photo')this.onPhoto(member,msg);
+      else if(msg.t==='team')this.moveTeam(member,+msg.seat);
       else if(msg.t==='in')this.onInput(member,msg);
       else if(msg.t==='cmd')this.onCmd(member,msg);
       else if(msg.t==='reqseat'&&G&&member.kind==='player'&&!G.players.some(p=>p.net===member.cid))this.request(member);
@@ -124,7 +125,7 @@ const Net={
       UI.toast(kind==='display'?'📺 게임 화면이 연결됐어요':'🎛️ 진행자 리모컨이 연결됐어요');
       if(kind==='remote'&&this.mode==='relay')for(const x of Object.values(this.decs)){if(x.d.on==='host')closeLayer('edit');x.d.on='remote';c.send({t:'ask',d:x.d})}
       if(G)UI.render();return m}
-    if(G){const p=G.players.find(x=>x.net===cid);welcome(p?p.id:null);this.sendGame(m);
+    if(G){const p=G.players.find(x=>x.net===cid||(x.mates||[]).some(y=>y.cid===cid));welcome(p?p.id:null);this.sendGame(m);
       if(p){UI.toast(`📶 ${m.name}님이 다시 들어왔어요`);redispatch()}
       else this.request(m);
       UI.render()}
@@ -134,20 +135,44 @@ const Net={
   /* 로비 자리 규칙: 정한 인원까지 컴퓨터로 채워 두고, 사람이 들어오면 컴퓨터 한 자리를 넘겨받습니다(최대 4명).
      다른 브라우저로 다시 들어온 사람은 이름이 같은 끊긴 자리로 돌려보내서 이름이 두 번 생기지 않게 합니다 */
   seat(m){const P=SETUP.players;let k=P.findIndex(p=>p.net===m.cid);
+    /* 팀전: 이미 팀원으로 들어와 있던 기기는 그 팀으로 돌려보냅니다 */
+    const mk=P.findIndex(p=>(p.mates||[]).some(x=>x.cid===m.cid));if(k<0&&mk>=0){const x=P[mk].mates.find(x=>x.cid===m.cid);x.name=m.name;
+      m.conn&&m.conn.send({t:'welcome',cid:m.cid,key:this.keys[m.cid],code:this.code,mode:this.mode,kind:'player',seat:mk});saveSetup();return}
     if(k<0){k=P.findIndex(p=>p.net&&!this.isOnline(p.net)&&p.name===m.name);if(k>=0){clearTimeout(this.relT[P[k].net]);this.members.delete(P[k].net)}}
     if(k<0)k=P.findIndex(p=>!p.net&&p.ai&&!p.host);
-    if(k<0&&P.length<4){P.push({pid:uid('p'),name:'',ai:false,emoji:'',color:'',dice:'screen'});k=P.length-1}
+    if(k<0&&P.length<4&&!SETUP.cfg.teams){P.push({pid:uid('p'),name:'',ai:false,emoji:'',color:'',dice:'screen'});k=P.length-1}
+    /* 팀전: 빈 자리가 없으면 팀원이 가장 적은 팀에 팀원으로 넣습니다 */
+    if(k<0&&SETUP.cfg.teams){const t=this.teamSeats();if(t.length){const q=t.sort((a,b)=>(a.mates||[]).length-(b.mates||[]).length)[0];this.addMate(q,m);
+      m.conn&&m.conn.send({t:'welcome',cid:m.cid,key:this.keys[m.cid],code:this.code,mode:this.mode,kind:'player',seat:P.indexOf(q)});saveSetup();return}}
     if(k<0){m.conn&&m.conn.send({t:'welcome',cid:m.cid,key:this.keys[m.cid],code:this.code,mode:this.mode,kind:'player',seat:null});m.conn&&m.conn.send({t:'note',m:'방이 가득 차서(최대 4명) 구경하는 사람으로 들어왔어요'});return}
     const p=P[k],usedC=P.filter((x,i)=>i!==k).map(x=>x.color),usedE=P.filter((x,i)=>i!==k).map(x=>x.emoji);
-    Object.assign(p,{net:m.cid,ai:false,host:false,op:false,name:m.name,emoji:usedE.includes(m.emoji)?TOKENS.find(t=>!usedE.includes(t)):m.emoji,color:usedC.includes(m.color)?PALETTE.find(c=>!usedC.includes(c)):m.color});
+    /* 팀전에서 방장이 이름을 붙여 둔 자리(예: 사랑반)는 팀 이름을 그대로 둡니다 */
+    const keepName=SETUP.cfg.teams&&p.ai&&p.name&&!AI_NAMES.includes(p.name);
+    Object.assign(p,{net:m.cid,ai:false,host:false,op:false,name:keepName?p.name:m.name,emoji:usedE.includes(m.emoji)?TOKENS.find(t=>!usedE.includes(t)):m.emoji,color:usedC.includes(m.color)?PALETTE.find(c=>!usedC.includes(c)):m.color});
     m.conn&&m.conn.send({t:'welcome',cid:m.cid,key:this.keys[m.cid],code:this.code,mode:this.mode,kind:'player',seat:k});saveSetup()},
+  /* ---------- 팀전: 한 자리에 여러 기기 ---------- */
+  teamSeats(){return SETUP.players.filter(p=>p.net&&!p.host)},
+  addMate(p,m){p.mates=(p.mates||[]).filter(x=>x.cid!==m.cid);p.mates.push({cid:m.cid,name:m.name})},
+  /* 자리에서 빼기: 팀원이면 팀원 목록에서, 자리 주인이면 첫 팀원이 주인이 되고, 팀원이 없으면 컴퓨터 자리로 */
+  leaveSeat(cid){const P=SETUP.players;for(const p of P){if(p.mates&&p.mates.some(x=>x.cid===cid)){p.mates=p.mates.filter(x=>x.cid!==cid);return}}
+    const p=P.find(x=>x.net===cid);if(!p)return;
+    if(p.mates&&p.mates.length){const n=p.mates.shift();p.net=n.cid;return}
+    const usedN=P.map(x=>x.name),usedE=P.filter(x=>x!==p).map(x=>x.emoji);
+    Object.assign(p,{net:null,ai:true,name:AI_NAMES.find(n=>!usedN.includes(n))||'컴퓨터',emoji:usedE.includes(p.emoji)?TOKENS.find(t=>!usedE.includes(t)):p.emoji})},
+  moveTeam(m,k){if(G||m.kind!=='player'||!SETUP.cfg.teams)return;const P=SETUP.players,t=P[k];if(!t||t.host||t.op||t.net===m.cid||(t.mates||[]).some(x=>x.cid===m.cid))return;
+    if(!t.net&&!t.ai)return;
+    this.leaveSeat(m.cid);
+    if(t.ai&&!t.net){const usedC=P.filter(x=>x!==t).map(x=>x.color),usedE=P.filter(x=>x!==t).map(x=>x.emoji),keepName=t.name&&!AI_NAMES.includes(t.name);
+      Object.assign(t,{net:m.cid,ai:false,op:false,name:keepName?t.name:m.name,emoji:usedE.includes(m.emoji)?TOKENS.find(e=>!usedE.includes(e)):m.emoji,color:usedC.includes(m.color)?PALETTE.find(c=>!usedC.includes(c)):m.color})}
+    else this.addMate(t,m);
+    m.conn&&m.conn.send({t:'welcome',cid:m.cid,key:this.keys[m.cid],code:this.code,mode:this.mode,kind:'player',seat:k});saveSetup();this.lobbyChanged()},
   /* 로비에서 연결이 끊긴 채 잠시 돌아오지 않으면 그 자리를 컴퓨터로 채웁니다 */
   relT:{},
   lobbyLeft(cid){clearTimeout(this.relT[cid]);this.relT[cid]=setTimeout(()=>{if(this.role!=='host'||G||this.isOnline(cid))return;
-    const P=SETUP.players,p=P.find(x=>x.net===cid);if(!p)return;const usedN=P.map(x=>x.name),usedE=P.filter(x=>x!==p).map(x=>x.emoji);
-    UI.toast(`📴 ${p.name}님이 돌아오지 않아 컴퓨터로 채웠어요`);
-    Object.assign(p,{net:null,ai:true,name:DEF_NAMES.concat(['바울','디모데','룻','에스더']).find(n=>!usedN.includes(n))||'컴퓨터',emoji:usedE.includes(p.emoji)?TOKENS.find(t=>!usedE.includes(t)):p.emoji});
-    this.members.delete(cid);saveSetup();this.lobbyChanged()},LOBBY_GRACE_MS())},
+    const P=SETUP.players,p=P.find(x=>x.net===cid||(x.mates||[]).some(y=>y.cid===cid));if(!p)return;
+    const mate=p.net!==cid,solo=!mate&&!(p.mates&&p.mates.length);
+    UI.toast(solo?`📴 ${p.name}님이 돌아오지 않아 컴퓨터로 채웠어요`:'📴 팀원 한 명이 돌아오지 않아 팀에서 뺐어요');
+    this.leaveSeat(cid);this.members.delete(cid);saveSetup();this.lobbyChanged()},LOBBY_GRACE_MS())},
   unseat(cid){const m=this.members.get(cid);if(m&&m.conn)m.conn.send({t:'welcome',cid,key:this.keys[cid],code:this.code,mode:this.mode,kind:'player',seat:null})},
   profile(m,msg){if(G||m.kind!=='player')return;m.name=String(msg.name||m.name).slice(0,10);m.emoji=String(msg.emoji||m.emoji).slice(0,7);
     const P=SETUP.players,k=P.findIndex(p=>p.net===m.cid);if(k<0)return;const usedC=P.filter((x,i)=>i!==k).map(x=>x.color);
@@ -159,13 +184,13 @@ const Net={
     for(const m of this.members.values()){if(!m.online||!m.conn)continue;m.ph=m.ph||new Set();const P={};let n=0;for(const id of used)if(!m.ph.has(id)){P[id]=PHOTOS[id].d;m.ph.add(id);n++}if(n)m.conn.send({t:'ph',P})}},
   sendMyPhoto(){const e=this.profileData&&this.profileData.emoji;if(this.role==='client'&&this.kind==='player'&&this.conn&&photoSrc(e))this.conn.send({t:'photo',id:e.slice(1),d:photoSrc(e)})},
   lobbyChanged(){if(this.role!=='host')return;this.sendPhotos();
-    const lobby={t:'lobby',code:this.code,mode:this.mode,title:(this.room&&this.room.title)||'',seats:SETUP.players.map(p=>({name:p.name,emoji:p.emoji,color:p.color,ai:p.ai,host:!!p.host,op:!!p.op,net:p.net||null,online:p.net?this.isOnline(p.net):true})),board:Content.board(SETUP.cfg.board).name};
+    const lobby={t:'lobby',code:this.code,mode:this.mode,title:(this.room&&this.room.title)||'',teams:!!SETUP.cfg.teams,seats:SETUP.players.map(p=>({name:p.name,emoji:p.emoji,color:p.color,ai:p.ai,host:!!p.host,op:!!p.op,net:p.net||null,online:p.net?this.isOnline(p.net):true,mates:(p.mates||[]).map(x=>({cid:x.cid,name:x.name}))})),board:Content.board(SETUP.cfg.board).name};
     this.broadcast(lobby);this.publishLobby();if(Setup.L&&$('#tabpane')&&Setup.tab==='people'&&!Setup.inGame)Setup.pane();if(Setup.L&&Setup.tab==='net')Setup.pane()},
   /* 참가자의 선택: 지금 요청서의 답할 사람이 이 기기일 때만 받아들입니다 */
   onInput(m,msg){const spec=PROMPT;if(!spec||spec.id!==msg.id||!spec.actor)return;const a=spec.actor;
     if(spec.kind==='qall')return allPart(spec,msg.v,m);
     if(msg.v==='skip'&&a.t==='ai'&&m.kind==='remote'&&['notice','card'].includes(spec.kind))return spec.resolve&&spec.resolve(true,'skip');
-    const ok=(a.t==='net'&&m.kind==='player'&&a.cid===m.cid)||(a.t==='judge'&&m.kind==='remote');
+    const ok=(a.t==='net'&&m.kind==='player'&&(a.cid===m.cid||(a.cids||[]).includes(m.cid)))||(a.t==='judge'&&m.kind==='remote');
     if(ok&&spec.resolve)spec.resolve(msg.v,'net')},
 
   /* 진행자 리모컨의 명령: 리모컨 기기에서 온 것만 받고 값도 검사합니다 */
@@ -175,18 +200,20 @@ const Net={
       case 'op':if(p&&p.ai&&!p.out){p.ai=false;p.op=true;log(`${p.name} 자리를 진행자가 조작해요`,p);UI.render();persist();redispatch()}break;
       case 'money':{const v=+msg.v;if(p&&Number.isInteger(v)&&Math.abs(v)<=100000)adjustMoney(p.id,v,String(msg.why||'').slice(0,30));break}
       case 'undo':if(canUndo())undo();break;
-      case 'pause':setPause(!!msg.on);break
+      case 'pause':setPause(!!msg.on);break;
+      case 'hq':queueHQ(msg.q);break
       case 'ans':if(typeof msg.id==='string'&&this.decs[msg.id])this.finishDecision(msg.id,String(msg.v||''));break}},
   cmd(o){if(this.role==='client'&&this.kind==='remote')this.conn?this.conn.send({t:'cmd',...o}):UI.toast('방장과 연결이 끊겨서 보내지 못했어요')},
 
   /* ---------- 게임 중 자리 바꾸기 ---------- */
   freeSeats(cid){if(!G)return [];return G.players.filter(p=>!p.out&&!p.host&&(p.ai||(p.net&&p.net!==cid&&!this.isOnline(p.net))||(p.prev===cid)))},
+  mateSeats(){return G&&G.cfg.teams?G.players.filter(p=>!p.out&&p.net&&!p.ai&&!p.host):[]},
   request(m){const seats=this.freeSeats(m.cid);
-    if(!seats.length){m.conn.send({t:'note',m:'빈 자리가 없어서 구경하는 사람으로 들어왔어요'});return}
+    if(!seats.length&&!this.mateSeats().length){m.conn.send({t:'note',m:'빈 자리가 없어서 구경하는 사람으로 들어왔어요'});return}
     this.reqs=this.reqs.filter(r=>r.cid!==m.cid);this.reqs.push({cid:m.cid});m.conn.send({t:'note',m:'방장이 자리를 확인하고 있어요. 잠시만 기다려 주세요',wait:1});this.nextReq()},
   nextReq(){if(this.reqUI||!this.reqs.length)return;const r=this.reqs[0],m=this.members.get(r.cid);
     if(!m||!m.online){this.reqs.shift();return this.nextReq()}
-    const seats=this.freeSeats(m.cid);if(!seats.length){this.reqs.shift();m.conn.send({t:'note',m:'빈 자리가 없어서 구경하는 사람으로 들어왔어요'});return this.nextReq()}
+    const seats=this.freeSeats(m.cid),mates=this.mateSeats();if(!seats.length&&!mates.length){this.reqs.shift();m.conn.send({t:'note',m:'빈 자리가 없어서 구경하는 사람으로 들어왔어요'});return this.nextReq()}
     const same=p=>p.prev===m.cid||(p.name===m.name&&(p.ai?!!p.prev:!!p.net&&!this.isOnline(p.net)));
     const back=seats.some(same);
     const lab=p=>same(p)?`↩️ 원래 자리(${p.name})를 돌려주기`:p.ai?`🤖 컴퓨터 ${p.name} 자리를 이 사람에게 넘기기`:`📴 연결이 끊긴 ${p.name} 자리를 이 사람에게 넘기기`;
@@ -195,9 +222,9 @@ const Net={
     this.decide({kick:`📶 참가 요청 · 방 ${this.code}`,title:back?`"${m.name}"님이 다시 들어왔어요`:'새로운 플레이어가 참가하려고 합니다',tone:'var(--mint)',
       who:{name:m.name,emoji:m.emoji,color:m.color},
       text:`${back?'컴퓨터가 이어서 하던 원래 자리를 돌려줄까요? ':seats.some(p=>p.ai)?'지금 컴퓨터 플레이어를 이 플레이어로 교체할까요? ':''}자리를 넘겨도 위치·달란트·땅·건물·카드는 그대로 이어져요.`,
-      opts:[...seats.map(p=>({v:'seat:'+p.id,label:lab(p),main:same(p),col:p.col})),{v:'no',label:'취소 (구경만 하게 하기)'}]},
+      opts:[...seats.map(p=>({v:'seat:'+p.id,label:lab(p),main:same(p),col:p.col})),...mates.map(p=>({v:'mate:'+p.id,label:`👥 ${p.name} 팀의 팀원으로 넣기`,col:p.col})),{v:'no',label:'취소 (구경만 하게 하기)'}]},
       v=>{this.reqUI=null;this.reqs=this.reqs.filter(x=>x.cid!==m.cid);
-        if(v&&v.startsWith('seat:'))this.takeSeat(m,+v.slice(5));else m.conn&&m.conn.send({t:'note',m:'진행자가 구경하는 사람으로 들어오게 했어요',spect:1});this.nextReq()},
+        if(v&&v.startsWith('seat:'))this.takeSeat(m,+v.slice(5));else if(v&&v.startsWith('mate:'))this.takeMate(m,+v.slice(5));else m.conn&&m.conn.send({t:'note',m:'진행자가 구경하는 사람으로 들어오게 했어요',spect:1});this.nextReq()},
       ()=>!this.members.get(m.cid)||!this.members.get(m.cid).online)},
   /* ---------- 진행자 결정 창: 중계 모드에서 리모컨이 연결되어 있으면 리모컨에, 아니면 이 기기에 띄웁니다 ---------- */
   decs:{},decSeq:0,
@@ -217,11 +244,14 @@ const Net={
     Object.assign(p,{net:m.cid,ai:false,host:false,op:false,prev:null,name:m.name,tok:m.emoji,col:usedC.includes(m.color)?p.col:m.color});
     log(`${p.name}님이 ${p.id+1}번 자리를 이어받았어요`,p);m.conn.send({t:'welcome',cid:m.cid,key:this.keys[m.cid],code:this.code,mode:this.mode,kind:'player',seat:p.id});
     UI.toast(`🙂 ${p.name}님이 자리를 이어받았어요`);UI.render();persist();redispatch()},
+  takeMate(m,id){const p=byId(id);if(!p||!m.online||p.ai||!p.net)return;p.mates=(p.mates||[]).filter(x=>x.cid!==m.cid);p.mates.push({cid:m.cid,name:m.name});
+    log(`👥 ${m.name}님이 ${p.name} 팀의 팀원이 됐어요`,p);m.conn.send({t:'welcome',cid:m.cid,key:this.keys[m.cid],code:this.code,mode:this.mode,kind:'player',seat:p.id});
+    UI.toast(`👥 ${m.name}님이 ${p.name} 팀에 들어왔어요`);UI.render();persist();redispatch()},
   /* 플레이어가 나간 채로 오래 돌아오지 않으면 방장에게 컴퓨터로 대체할지 묻습니다 */
   watch(){if(this.role!=='host'||!G||G.over||$('#eov'))return;const now=Date.now();
     for(const p of G.players){if(!p.net||p.out||p.ai)continue;const m=this.members.get(p.net);
       if(!m){this.members.set(p.net,{cid:p.net,kind:'player',name:p.name,online:false,offSince:now,asked:0});continue}
-      if(m.online)continue;if(!m.offSince)m.offSince=now;if(m.asked===-1||(m.asked&&now<m.asked))continue;
+      if(m.online||(p.mates||[]).some(x=>this.isOnline(x.cid)))continue;if(!m.offSince)m.offSince=now;if(m.asked===-1||(m.asked&&now<m.asked))continue;
       if(now-m.offSince<OFFLINE_ASK_MS())continue;
       return this.askReplace(p,m)}},
   askReplace(p,m){m.asked=Date.now()+600000;
@@ -233,7 +263,8 @@ const Net={
   toAI(p,lv){if(!p||p.ai)return;const m=this.members.get(p.net);
     /* 접속 중인 사람을 진행자가 바꾼 경우 그 사람 기기에 알려 줍니다 */
     if(m&&m.online&&m.conn){m.conn.send({t:'welcome',cid:m.cid,key:this.keys[m.cid],code:this.code,mode:this.mode,kind:'player',seat:null});m.conn.send({t:'kicked',name:p.name})}
-    p.prev=p.net;p.net=null;p.ai=true;p.aiLv=lv;
+    for(const x of p.mates||[]){const mm=this.members.get(x.cid);if(mm&&mm.online&&mm.conn){mm.conn.send({t:'welcome',cid:mm.cid,key:this.keys[mm.cid],code:this.code,mode:this.mode,kind:'player',seat:null});mm.conn.send({t:'kicked',name:p.name})}}
+    p.mates=[];p.prev=p.net;p.net=null;p.ai=true;p.aiLv=lv;
     log(`${p.name} 자리를 컴퓨터(${LV_KO[lv]})가 이어서 해요`,p);UI.toast(`🤖 ${p.name} 자리를 컴퓨터가 이어서 해요`);UI.render();persist();redispatch()},
 
   /* ---------- 참가자 ---------- */
@@ -444,11 +475,14 @@ const NetUI={
     const seats=lb?lb.seats:[];const mine=seats.find(s=>s.net===me);
     const html=`<div class="kick">📱 방 ${esc(Net.code)} · ${lb?`${MODE_KO[lb.mode]||''} · ${esc(lb.board)} 판`:''}</div><h3>${lb&&lb.title?esc(lb.title)+' · ':''}방장이 게임을 시작하기를 기다려요</h3>
       <div class="code">${esc(Net.code)}</div>
-      <div class="members">${seats.map(s=>`<div class="m" style="box-shadow:inset .35rem 0 0 ${s.color}"><span class="tok" style="--pc:${s.color}">${tokIn(s.emoji)}</span>${esc(s.name)}${s.net===me?' (나)':''}<span class="st">${s.ai?'🤖 컴퓨터':s.host?'👑 방장':s.op?'🎤 진행자가 조작':s.net?(s.online?'🟢 접속':'⚪ 끊김'):''}</span></div>`).join('')||'<div class="m">참가자 목록을 받는 중…</div>'}</div>
-      ${mine?'':'<p class="ref">빈 자리가 없어서 구경하는 사람으로 들어왔어요.</p>'}
+      <div class="members">${seats.map((s,k)=>{const inT=s.net===me||(s.mates||[]).some(x=>x.cid===me),canJoin=lb.teams&&!inT&&!s.host&&!s.op&&(s.ai||s.net);
+        return `<div class="m" style="box-shadow:inset .35rem 0 0 ${s.color}"><span class="tok" style="--pc:${s.color}">${tokIn(s.emoji)}</span>${esc(s.name)}${inT?' (나)':''}${(s.mates||[]).length?`<small class="mates">👥 ${s.mates.map(x=>esc(x.name)).join('·')}</small>`:''}<span class="st">${s.ai?'🤖 컴퓨터':s.host?'👑 방장':s.op?'🎤 진행자가 조작':s.net?(s.online?'🟢 접속':'⚪ 끊김'):''}</span>${canJoin?`<button class="btn sm" data-team="${k}">${s.ai?'이 자리에 앉기':'이 팀으로'}</button>`:''}</div>`}).join('')||'<div class="m">참가자 목록을 받는 중…</div>'}</div>
+      ${lb&&lb.teams?'<p class="ref">👥 팀전: 한 팀에 여러 명이 들어갈 수 있어요. 팀원 휴대폰 어느 것으로든 그 팀 차례를 조작해요.</p>':''}
+      ${mine||seats.some(s=>(s.mates||[]).some(x=>x.cid===me))?'':'<p class="ref">빈 자리가 없어서 구경하는 사람으로 들어왔어요.</p>'}
       <div class="mbtns row"><button class="btn" data-look>🎨 내 캐릭터 바꾸기</button><button class="btn" data-share>📤 방 공유하기</button><button class="btn" data-leave>방 나가기</button></div>`;
     const L=openLayer('info',html,{tone:'var(--mint)'});$('[data-share]',L.box).onclick=()=>shareRoom();
     $('[data-leave]',L.box).onclick=()=>{L.close();Net.leave();App.home()};
+    $$('[data-team]',L.box).forEach(b=>b.onclick=()=>{b.disabled=true;Net.conn&&Net.conn.send({t:'team',seat:+b.dataset.team})});
     $('[data-look]',L.box).onclick=()=>{const prof={...Net.profileData};pickLook(prof,seats.filter(s=>s.net!==me).map(s=>({color:s.color})),()=>{Net.sendProfile(prof);setTimeout(()=>this.lobby(),200)})}},
   clientMenu(){Setup.openClient()},
   /* PC 중계: 게임 화면 창을 따로 띄웁니다. 크롬·엣지에서 화면 배치 권한을 허용하면 확장 모니터(TV)에 바로 띄웁니다 */

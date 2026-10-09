@@ -9,11 +9,17 @@ const AI={
       case 'buy':{await sleep(500);const t=T(spec.tile);return p.money-t.price>=aiReserve()}
       case 'upgrade':{await sleep(500);return p.money-upCost(spec.tile)>=aiReserve()-50}
       case 'ark':await sleep(450);return spec.amt>=100;
-      case 'wild':{await sleep(650);const o=spec.opts;return o.includes('song')?'song':o.includes('quiz')?'quiz':(o.includes('pay')&&p.money-100>=aiReserve())?'pay':'dice'}
+      case 'wild':{await sleep(650);const o=spec.opts;return o.includes('moses')?'moses':o.includes('song')?'song':o.includes('quiz')?'quiz':(o.includes('pay')&&p.money-100>=aiReserve())?'pay':'dice'}
       case 'fly':{await sleep(800);return aiFly(p)}
       case 'qs':await sleep(900);return spec.cands.length?spec.cands[0]:-1;
       case 'qv':case 'qr':await sleep(2200);return true;
       case 'qo':await sleep(400);return false;
+      case 'charuse':await sleep(500);return spec.amt>=150;
+      case 'trade':await sleep(300);return null;
+      case 'qmark':await sleep(300);return [];
+      /* 거래 제안: 받는 땅·달란트가 내주는 것보다 넉넉히 많으면 받아들입니다 */
+      case 'tradeok':{await sleep(900);const get=spec.give.reduce((s,i)=>s+landWorth(i),0)+(spec.pay>0?spec.pay:0),give=spec.get.reduce((s,i)=>s+landWorth(i),0)+(spec.pay<0?-spec.pay:0);
+        return get>=give*1.2+20&&p.money-(spec.pay<0?-spec.pay:0)>=aiReserve()/2}
       /* 돈이 모자랄 때: 가장 싼 땅부터 팝니다 */
       case 'sell':await sleep(700);return spec.lands[0].i;
       /* 사람 자리를 컴퓨터가 이어받았을 때 이미 나온 문제에 답합니다 */

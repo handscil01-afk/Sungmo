@@ -44,6 +44,15 @@ const SET_ITEMS={
     {k:'volume',t:'효과음 크기',seg:[[.35,'작게'],[.7,'보통'],[1,'크게']],pref:1},
     {k:'bgm',t:'배경 음악',d:'잔잔한 1분짜리 음악을 끊김 없이 반복해요. 위쪽 소리 버튼을 끄면 함께 꺼져요. 참가자 휴대폰에서는 처음에 꺼져 있어요.',sw:1,pref:1,get:()=>BGM.want()},
     {k:'bgmVol',t:'배경 음악 크기',seg:[[.15,'작게'],[.3,'보통'],[.5,'크게']],pref:1}],
+  extra:[
+    {k:'chars',t:'🃏 성경 인물 카드 수집',d:'퀴즈·암송 미션을 맞히거나 헌금함 칸에 가면 다윗·에스더 같은 인물 카드를 받아요. 인물마다 한 번 쓰는 능력이 있고, 여섯 명을 모두 모으면 500 달란트를 받아요.',sw:1},
+    {k:'trade',t:'🤝 플레이어끼리 땅 거래',d:'내 차례에 주사위를 굴리기 전에 다른 사람에게 땅과 달란트를 바꾸자고 제안해요. 상대가 받아들이면 바로 바뀌어요.',sw:1},
+    {k:'memo',t:'📜 말씀 암송 미션 칸',d:'퀴즈 칸 하나가 암송 미션 칸이 돼요. 구절의 빈칸을 채우면 150 달란트와 인물 카드를 받아요. 불러온 성경 본문이나 직접 넣은 구절로 문제를 만들어요.',sw:1,setupOnly:1},
+    {k:'timeLimit',t:'⏱ 시간 제한',d:'정한 시간이 지나면 그 라운드까지만 하고 끝내요. 진행자가 멈춘 동안은 시간이 가지 않아요.',seg:[[0,'없음'],[20,'20분'],[30,'30분'],[45,'45분'],[60,'60분']],custom:{min:5,max:240,unit:'분'},full:1},
+    {k:'teams',t:'👥 팀전 (한 자리를 여러 명이)',d:'함께하기에서 한 자리에 팀원이 여러 명 들어와, 팀원 휴대폰 어느 것으로든 그 팀 차례를 조작해요. 교회 반별 대항전에 좋아요.',sw:1},
+    {k:'hostQ',t:'🎤 진행자 즉석 문제',d:'진행자가 문제를 바로 입력해서 다음 차례 사람이나 모두에게 내요. 중계 모드의 리모컨·진행자 화면, 한 기기 게임의 설정에서 써요.',sw:1},
+    {k:'records',t:'🏆 게임 기록·명예의 전당',d:'끝난 게임의 순위와 기록을 이 기기에 모아요. 처음 화면의 명예의 전당에서 봐요.',sw:1,pref:1},
+    {k:'celebrate',t:'🎉 승리 연출·결과 이미지',d:'게임이 끝나면 폭죽과 시상대를 보여 주고, 결과를 이미지 한 장으로 저장하거나 보낼 수 있어요.',sw:1,pref:1}],
 };
 function itemsHTML(list,cfg,inGame){return list.map(it=>{const src=it.pref?PREF:cfg,v=it.get?it.get():src[it.k],off=inGame&&it.setupOnly;
   const ctl=it.sw?`<button type="button" class="sw" role="switch" aria-checked="${!!v}" aria-label="${esc(it.t)}" data-k="${it.k}"></button>`
@@ -73,18 +82,19 @@ const Home={
         <button class="mi" data-m="net"><span class="e">👥</span><b>함께하기</b><small>방을 만들거나 방 코드로 참가해요</small></button>
         <button class="mi" data-m="manage"><span class="e">📚</span><b>콘텐츠 관리</b><small>퀴즈 · 보드 · 카드 · 성경 본문</small></button>
         <button class="mi" data-m="rules"><span class="e">📖</span><b>게임 방법</b><small>규칙을 읽어 봐요</small></button>
+        ${PREF.records!==false?'<button class="mi" data-m="hall"><span class="e">🏆</span><b>명예의 전당</b><small>끝난 게임의 기록과 순위</small></button>':''}
         <button class="mi" data-m="settings"><span class="e">⚙️</span><b>화면·소리</b><small>글자 크기, 효과음, 전체화면</small></button>
       </div>`;
     $$('[data-m]',h).forEach(b=>b.onclick=()=>{const m=b.dataset.m;
       if(m==='resume')App.resume(hasSave());else if(m==='drop')dropSave();else if(m==='rejoin')Net.rejoin();else if(m==='start')Setup.open();else if(m==='net')NetUI.open();
-      else if(m==='manage')Manage.open();else if(m==='rules')showRules();else if(m==='settings')Setup.openPrefs()});
+      else if(m==='manage')Manage.open();else if(m==='rules')showRules();else if(m==='hall')Hall.open();else if(m==='settings')Setup.openPrefs()});
     bindInstall(h)}
 };
 
 /* ---------- 게임 설정 창 ---------- */
 /* 설정 창 탭: 게임 · 화면 · 소리 · 플레이어 · 콘텐츠 · 멀티플레이 */
 const TABS={game:['🎲','게임'],net:['📶','멀티플레이'],people:['👥','플레이어'],board:['🗺️','보드 판'],rules:['🎯','게임 규칙'],quiz:['❓','퀴즈'],qrule:['🏅','퀴즈 규칙'],
-  play:['🤖','컴퓨터'],screen:['📺','화면'],sound:['🔊','소리'],content:['📚','콘텐츠']};
+  play:['🤖','컴퓨터'],extra:['✨','추가 기능'],screen:['📺','화면'],sound:['🔊','소리'],content:['📚','콘텐츠']};
 const Setup={tab:'people',L:null,
   open(tab){this.tab=tab||'people';this.inGame=false;this.who='setup';this.render()},
   openPrefs(){this.inGame=false;this.who='prefs';this.tab='screen';this.render()},
@@ -95,8 +105,8 @@ const Setup={tab:'people',L:null,
   tabs(){const w=this.who,on=!!Net.role;
     if(w==='prefs')return ['screen','sound'];
     if(w==='client')return [...(this.inGame?['game']:[]),'net','screen','sound'];
-    if(w==='host')return ['game',...(on?['net']:[]),'rules','quiz','qrule','play','screen','sound','content'];
-    return ['people',...(on?['net']:[]),'board','rules','quiz','qrule','play','screen','sound','content']},
+    if(w==='host')return ['game',...(on?['net']:[]),'rules','quiz','qrule','play','extra','screen','sound','content'];
+    return ['people',...(on?['net']:[]),'board','rules','quiz','qrule','play','extra','screen','sound','content']},
   render(){
     const tabs=this.tabs();if(!tabs.includes(this.tab))this.tab=tabs[0];
     const host=Net.role==='host'&&this.who==='setup';
@@ -125,8 +135,10 @@ const Setup={tab:'people',L:null,
       const scr=T==='screen'?`<div class="srow"><div class="tx"><b>전체화면</b><small>${FS.can()?'지금 화면을 전체화면으로 바꾸거나 되돌려요.':'이 화면에서는 전체화면이 막혀 있어요. 홈 화면에 설치하면 넓게 쓸 수 있어요.'}</small></div><button class="btn sm" data-fs>${FS.is()?'↙️ 창 모드로':'⛶ 전체화면'}</button></div>
         <div class="srow"><div class="tx"><b>홈 화면에 설치</b><small>설치하면 아이콘으로 바로 열리고 주소창 없이 넓게 보여요.</small></div><button class="btn sm" data-inst>📲 설치 방법</button></div>`:'';
       const rel=T==='qrule'&&this.mode()==='player'?'<div class="srow full"><div class="tx"><b>플레이어 모드 안내</b><small>진행자가 없으므로 주관식은 각자 답을 입력하면 게임이 채점해요. 다른 팀 기회는 차례 순서대로 다음 사람에게 넘어가요.</small></div></div>':'';
+      const ext=T==='extra'?`<div class="srow full"><div class="tx"><b>더 보기</b><small>암송 구절을 직접 넣거나, 기록을 보거나, 즉석 문제를 낼 수 있어요.</small></div><div class="btnrow"><button class="btn sm" data-xo="memo">📜 암송 구절 넣기</button><button class="btn sm" data-xo="hall">🏆 명예의 전당</button>${this.inGame&&hqCan()?'<button class="btn sm" data-xo="hq">🎤 즉석 문제 내기</button>':''}</div></div>`:'';
       const items=(SET_ITEMS[T]||[]).filter(it=>!(it.k==='aiQuiz'&&this.mode()==='player'));
-      p.innerHTML=`<div class="sgrid">${extra}${itemsHTML(items,cfg,this.inGame)}${quizInfo}${rel}${scr}</div>`;
+      p.innerHTML=`<div class="sgrid">${extra}${itemsHTML(items,cfg,this.inGame)}${quizInfo}${rel}${scr}${ext}</div>`;
+      $$('[data-xo]',p).forEach(b=>b.onclick=()=>{const v=b.dataset.xo;if(v==='memo')MemoEdit.open();else if(v==='hall')Hall.open();else HostQ.open()});
       bindItems(p,items,cfg,k=>{this.changed(k)});
       const da=$('#diceAll',p);if(da)da.onclick=e=>{const b=e.target.closest('button');if(!b)return;SETUP.players.forEach(x=>{if(!x.ai)x.dice=b.dataset.v});saveSetup();UI.toast(b.dataset.v==='real'?'모든 사람 플레이어가 실물 주사위를 써요':'모든 사람 플레이어가 화면 주사위를 써요')};
       const m=$('[data-mgr]',p);if(m)m.onclick=()=>{Manage.open('quiz',()=>this.render())};
@@ -146,6 +158,7 @@ const Setup={tab:'people',L:null,
     return `<div class="sgrid">
       <div class="srow"><div class="tx"><b>📒 진행 기록</b><small>지금까지 있었던 일을 차례대로 봐요.</small></div><button class="btn sm" data-g="log">기록 보기</button></div>
       <div class="srow"><div class="tx"><b>📖 게임 방법</b><small>규칙과 칸 설명을 읽어 봐요.</small></div><button class="btn sm" data-g="rules">규칙 보기</button></div>
+      ${hqCan()?'<div class="srow"><div class="tx"><b>🎤 즉석 문제</b><small>문제를 바로 입력해서 다음 차례 사람이나 모두에게 내요.</small></div><button class="btn sm" data-g="hq">문제 내기</button></div>':''}
       ${!cl&&canUndo()?'<div class="srow"><div class="tx"><b>↩️ 되돌리기</b><small>바로 전 선택 하나를 취소해요. 누르면 한 번 더 확인해요.</small></div><button class="btn sm" data-g="undo">되돌리기</button></div>':''}
       ${!cl&&MODE()==='player'?'<div class="srow"><div class="tx"><b>↩️ 되돌리기</b><small>여럿이 하는 플레이어 모드에서는 공평하게 하려고 되돌리기를 쓰지 않아요.</small></div></div>':''}
       <div class="srow full"><div class="tx"><b>${cl?'🚪 방 나가기':'🏠 처음 화면으로'}</b><small>${cl?'방에서 나가요. 같은 방 코드로 다시 들어오면 내 자리로 돌아가요.':Net.role==='host'?'방을 잠시 닫고 처음 화면으로 가요. 게임은 저장되고, "이어하기"를 누르면 같은 방 코드로 다시 열려요.':'게임은 저장되고, 처음 화면의 "이어하기"로 다시 할 수 있어요.'}</small></div><button class="btn sm" data-g="home">${cl?'나가기':'처음 화면으로'}</button></div>
@@ -179,7 +192,7 @@ const Setup={tab:'people',L:null,
     h+=`</div>`;return h},
   /* 인원·캐릭터 (게임 시작 전) */
   peopleHTML(){const P=SETUP.players,host=Net.role==='host',mode=host?Net.mode:'local';
-    const kindSeg=(p,k)=>{if(p.net)return `<span class="net">📱 참가자 ${Net.isOnline(p.net)?'· 접속 중':'· 연결 끊김'}</span><button class="btn sm" data-kick="${k}">자리 비우기</button>`;
+    const kindSeg=(p,k)=>{if(p.net)return `<span class="net">📱 참가자 ${Net.isOnline(p.net)?'· 접속 중':'· 연결 끊김'}${(p.mates||[]).length?` · 👥 팀원 ${p.mates.map(x=>esc(x.name)).join('·')}`:''}</span><button class="btn sm" data-kick="${k}">자리 비우기</button>`;
       if(p.host)return `<span class="net">👑 방장 (이 기기에서 조작)</span>`;
       const opts=mode==='local'?[['human','🙂 사람'],['ai','🤖 컴퓨터']]:mode==='relay'?[['ai','🤖 컴퓨터'],['op','🎤 진행자 조작']]:[['ai','🤖 컴퓨터']];
       const cur=p.ai?'ai':p.op?'op':'human';
@@ -210,14 +223,14 @@ const Setup={tab:'people',L:null,
     $$('[data-lvs]',p).forEach(seg=>seg.onclick=e=>{const b=e.target.closest('button');if(!b)return;P[+seg.dataset.lvs].aiLv=b.dataset.v;saveSetup();this.pane()});
     $$('[data-dice]',p).forEach(seg=>seg.onclick=e=>{const b=e.target.closest('button');if(!b)return;P[+seg.dataset.dice].dice=b.dataset.v;saveSetup();this.pane()});
     $$('[data-del]',p).forEach(b=>b.onclick=()=>{P.splice(+b.dataset.del,1);saveSetup();Net.lobbyChanged();this.pane()});
-    $$('[data-kick]',p).forEach(b=>b.onclick=()=>{const k=+b.dataset.kick;Net.unseat(P[k].net);P[k].net=null;P[k].ai=true;saveSetup();Net.lobbyChanged();this.pane()});
+    $$('[data-kick]',p).forEach(b=>b.onclick=()=>{const k=+b.dataset.kick;Net.unseat(P[k].net);for(const x of P[k].mates||[])Net.unseat(x.cid);P[k].mates=[];P[k].net=null;P[k].ai=true;saveSetup();Net.lobbyChanged();this.pane()});
     $$('[data-pick]',p).forEach(b=>b.onclick=()=>{const k=+b.dataset.pick;if(P[k].net)return UI.toast('참가자 자리는 참가자 기기에서 바꿀 수 있어요');
       pickLook(P[k],P.filter((_,i)=>i!==k),()=>{saveSetup();Net.lobbyChanged();this.pane()})});
     $$('[data-board]',p).forEach(b=>b.onclick=()=>{SETUP.cfg.board=b.dataset.board;saveSetup();Net.lobbyChanged();this.pane()});
     const bm=$('[data-bmgr]',p);if(bm)bm.onclick=()=>Manage.open('board',()=>this.render());
     /* 게임 메뉴 · 콘텐츠 · 멀티플레이 */
     $$('[data-g]',p).forEach(b=>b.onclick=()=>{const v=b.dataset.g;
-      if(v==='log')openLog();else if(v==='rules')showRules();else if(v==='undo'){this.L.close();confirmUndo()}
+      if(v==='hq')HostQ.open();else if(v==='log')openLog();else if(v==='rules')showRules();else if(v==='undo'){this.L.close();confirmUndo()}
       else if(v==='home'){this.L.close();App.leaveGame()}});
     $$('[data-cm]',p).forEach(b=>b.onclick=()=>Manage.open(b.dataset.cm,()=>this.render()));
     $$('[data-copy]',p).forEach(b=>b.onclick=()=>copyText(b.dataset.copy));
