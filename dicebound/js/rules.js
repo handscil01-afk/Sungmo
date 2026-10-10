@@ -38,7 +38,7 @@
     return { id, name: NAMES[id], rank: RANK[id], atk, block, heal, apply, used: used.sort((a, b) => a - b) };
   }
 
-  /* ctx = { dice:[{kind,value}], relics:[id], gold, hp, maxHp, rerollsLeft, enemyType, status:{str,freeze} }
+  /* ctx = { dice:[{kind,value}], relics:[id], gold, hp, maxHp, rerollsLeft, enemyType, status:{str,freeze}, hero }
    * 반환값은 미리보기와 실제 공격에서 똑같이 쓴다. */
   function computeAttack(ctx) {
     const vals = ctx.dice.map(d => d.value);
@@ -76,6 +76,12 @@
     if (has('cursed')) add(4, '저주받은 상자');
     if (has('heart') && ctx.hp * 2 <= ctx.maxHp) add(5, '깨진 심장');
     if (has('life') && (h.id === 'fullhouse' || h.id === 'five')) { heal += 5; notes.push('생명의 서 회복 +5'); }
+    if (ctx.hero === 'druid') {
+      if (h.rank >= RANK.pair) { apply.bleed += 1; notes.push('드루이드 출혈 +1'); }
+      if (heal > 0) { heal += 2; notes.push('드루이드 회복 +2'); }
+    }
+    if (ctx.hero === 'archer' && apply.bleed > 0) { apply.bleed += 2; notes.push('궁수 출혈 +2'); }
+    if (ctx.hero === 'warrior' && ctx.hp * 2 <= ctx.maxHp) add(5, '전사의 분노');
     if (st.str) add(st.str, '힘');
 
     if (has('crown') && h.rank >= RANK.triple) { const before = atk; atk = Math.floor(atk * 1.25); notes.push(`왕의 왕관 ×1.25 (+${atk - before})`); }
@@ -107,11 +113,11 @@
   // 층에 맞춰 적 능력치를 정한다. 보스는 고정.
   function scaleEnemy(key, def, floor, rng) {
     const m = def.type === 'boss' ? 1 : 1 + 0.12 * (floor - 1);
-    const am = def.type === 'boss' ? 1 : 1 + 0.06 * (floor - 1);
+    const am = def.type === 'boss' ? 1 : 1 + 0.09 * (floor - 1);
     const jitter = def.type === 'boss' ? 1 : 0.95 + rng.next() * 0.1;
     const hp = Math.round(def.hp * m * jitter);
     return {
-      key, name: def.name, img: def.img, type: def.type, hp, maxHp: hp,
+      key, name: def.name, img: def.img, sprite: !!def.sprite, type: def.type, hp, maxHp: hp,
       moves: def.moves.map(mv => Object.assign({}, mv, mv.atk ? { atk: Math.round(mv.atk * am) } : {}, mv.block ? { block: Math.round(mv.block * am) } : {})),
       status: { block: 0, bleed: 0, burn: 0, freeze: 0, str: 0 },
       moveIdx: -1, intent: null
@@ -129,19 +135,23 @@
     return enemy.intent;
   }
 
-  /* 분기형 맵 생성. 여러 경로를 아래층부터 위층으로 그리고, 경로가 서로 엇갈리지 않게 한다.
-   * 모든 노드는 어떤 경로 위에 있으므로 항상 시작층에서 도달할 수 있고 보스까지 이어진다. */
+  /* 분기형 맵 생성. 모든 경로는 출발 지점(0층, 가운데) 하나에서 시작해 위층으로 갈라지고,
+   * 경로가 서로 엇갈리지 않게 한다. 모든 노드는 어떤 경로 위에 있으므로 출발 지점에서 도달할 수 있고 보스까지 이어진다. */
   function genMap(rng, opts) {
     const F = (opts && opts.floors) || 10, L = (opts && opts.lanes) || 5, P = (opts && opts.paths) || 5;
     const nodes = {};
     const edges = [];
     const key = (f, c) => `${f}-${c}`;
-    const mark = (f, c) => { const k = key(f, c); if (!nodes[k]) nodes[k] = { id: k, f, c, type: null, next: [], prev: [] }; return nodes[k]; };
-    const starts = rng.shuffle([...Array(L).keys()]);
+    const S = Math.floor((L - 1) / 2);
+    const mark = (f, c) => {
+      const k = f === 0 ? 'start' : key(f, c);
+      if (!nodes[k]) nodes[k] = { id: k, f, c, type: f === 0 ? 'start' : null, next: [], prev: [] };
+      return nodes[k];
+    };
     for (let p = 0; p < P; p++) {
-      let c = p < 2 ? starts[p] : rng.int(L);
-      mark(1, c);
-      for (let f = 1; f < F; f++) {
+      let c = S;
+      mark(0, c);
+      for (let f = 0; f < F; f++) {
         const cand = rng.shuffle([c - 1, c, c + 1].filter(x => x >= 0 && x < L));
         const crosses = nc => edges.some(e => e.f === f && ((e.a < c && e.b > nc) || (e.a > c && e.b < nc)));
         let nc = cand.find(x => !crosses(x));
@@ -162,7 +172,7 @@
     const late = [['battle', 38], ['elite', 16], ['event', 18], ['shop', 10], ['rest', 10], ['mystery', 8]];
     const fixedFloor = { 1: 'battle', 6: 'treasure' };
     fixedFloor[F] = 'rest';
-    const list = Object.values(nodes).filter(n => n.id !== 'boss').sort((a, b) => a.f - b.f || a.c - b.c);
+    const list = Object.values(nodes).filter(n => n.id !== 'boss' && n.id !== 'start').sort((a, b) => a.f - b.f || a.c - b.c);
     list.forEach(n => {
       if (fixedFloor[n.f]) { n.type = fixedFloor[n.f]; return; }
       const table = (n.f <= 3 ? early : late).filter(t => !(t[0] === 'rest' && n.f === F - 1));
@@ -179,7 +189,7 @@
     }
     // 화면 배치용 좌표 (퍼센트)
     Object.values(nodes).forEach(n => {
-      n.x = n.id === 'boss' ? 50 : ((n.c + 0.5) / L) * 100 + (rng.next() * 8 - 4);
+      n.x = n.id === 'boss' || n.id === 'start' ? 50 : ((n.c + 0.5) / L) * 100 + (rng.next() * 8 - 4);
     });
     return { floors: F, lanes: L, nodes };
   }
@@ -195,8 +205,12 @@
       memo[id] = n.next.length > 0 && n.next.every(reach);
       return memo[id];
     };
-    const starts = Object.values(map.nodes).filter(n => n.f === 1);
-    return starts.length > 0 && Object.values(map.nodes).every(n => n.id === 'boss' || reach(n.id)) && starts.every(n => reach(n.id));
+    const start = map.nodes.start;
+    // 출발 지점 하나, 모든 노드가 출발 지점에서 이어지고 보스로 이어진다
+    const fromStart = {}; const walk = id => { if (fromStart[id]) return; fromStart[id] = true; map.nodes[id].next.forEach(walk); };
+    if (start) walk('start');
+    return !!start && Object.values(map.nodes).filter(n => n.f === 0).length === 1 &&
+      Object.values(map.nodes).every(n => n.id === 'boss' || reach(n.id)) && Object.keys(map.nodes).every(id => fromStart[id]);
   }
 
   const api = { RANK, evalHand, computeAttack, enemyHit, applyDamage, scaleEnemy, nextIntent, genMap, validateMap };

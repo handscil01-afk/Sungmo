@@ -67,7 +67,13 @@ async function act(page, a) {
     await page.addScriptTag({ path: path.join(__dirname, 'bot.js') });
     await page.evaluate(() => DB.RNG.seed(7));
     await page.click('[data-act="newRun"]');
+    await page.click('[data-hero="archer"]');
+    await page.screenshot({ path: path.join(OUT, `${v.name}-1b-select.png`) });
+    await page.click('[data-act="pickHero"]');
     await page.screenshot({ path: path.join(OUT, `${v.name}-2-map.png`) });
+    await page.click('.hud .round[data-act="sheet"]');
+    await page.screenshot({ path: path.join(OUT, `${v.name}-2b-sheet.png`) });
+    await page.click('.modal-actions .btn');
     // 전투까지 진행하고, 재굴림할 주사위를 골라 둔 상태를 캡처
     const first = await page.evaluate(() => DB.game.available()[0]);
     await page.click(`[data-node="${first}"]`);
@@ -77,6 +83,14 @@ async function act(page, a) {
     await page.click('[data-die="0"]'); await page.click('[data-die="2"]');
     await page.waitForTimeout(900);
     await page.screenshot({ path: path.join(OUT, `${v.name}-4-battle.png`) });
+    await page.evaluate(() => { DB.game.settings.reduceMotion = false; });
+    await page.click('[data-act="attack"]');
+    await page.waitForTimeout(420);
+    await page.screenshot({ path: path.join(OUT, `${v.name}-4b-attack.png`) });
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: path.join(OUT, `${v.name}-4c-enemy.png`) });
+    await page.waitForFunction(() => !DB.ui.busy, null, { timeout: 15000 });
+    await page.evaluate(() => { DB.game.settings.reduceMotion = true; });
     // 각 화면을 강제로 열어 캡처 (게임 함수로 상태를 만든다)
     await page.evaluate(() => { const G = DB.game; G.run.battle = null; G.run.gold = 140; G.run.floor = 4; G.run.screen = 'map'; });
     for (const [name, type] of [['5-shop', 'shop'], ['6-treasure', 'treasure'], ['7-rest', 'rest'], ['8-event', 'event'], ['9-elite', 'elite'], ['10-boss', 'boss']]) {
@@ -113,6 +127,8 @@ async function act(page, a) {
     await page.addScriptTag({ path: path.join(__dirname, 'bot.js') });
     await page.evaluate(s => { DB.game.settings.reduceMotion = true; DB.game.settings.autoFS = false; DB.RNG.seed(s); }, 100 + k);
     await page.click('[data-act="newRun"]');
+    await page.click(`[data-hero="${['druid', 'archer', 'knight', 'warrior'][k % 4]}"]`);
+    await page.click('[data-act="pickHero"]');
     let steps = 0, shotEnd = false, reloaded = false;
     while (steps < 1500) {
       await idle(page);

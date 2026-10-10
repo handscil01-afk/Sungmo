@@ -7,18 +7,46 @@
   DB.IMG = {
     dice: v => `${A}dice/d${v}.webp`,
     logo: A + 'ui/logo.webp',
-    player: A + 'chars/player.jpg',
     bg: {
-      menu: A + 'bg/menu.jpg', menuWide: A + 'bg/menu-wide.jpg', battle: A + 'bg/battle.jpg', shop: A + 'bg/shop.jpg',
-      event: A + 'bg/event.jpg', forest: A + 'bg/forest.jpg', city: A + 'bg/city.jpg', snow: A + 'bg/snow.jpg',
-      cave: A + 'bg/cave.jpg', hell: A + 'bg/hell.jpg'
+      menu: A + 'bg/menu.jpg', menuWide: A + 'bg/menu-wide.jpg', battle: A + 'bg/battle.jpg'
     },
+    // 지역·실내 배경 (bg2): forest, mushroom, coast, snow, ice-castle, jungle, swamp, crystal-cave, hell,
+    // shop-in, tavern, village, alley, spring, throne
+    bg2: n => `${A}bg2/${n}.jpg`,
+    fx2: n => `${A}fx2/${n}.webp`,
     node: t => `${A}nodes/${t}.webp`,
     icon: n => `${A}icons/${n}.webp`,
     fx: n => `${A}fx/${n}.jpg`,
     emblem: c => `${A}emblems/${c}.webp`,
     ui: n => `${A}ui/${n}`,
     treasure: A + 'ui/treasure-glow.jpg'
+  };
+
+  // 주인공: 고르거나 정보를 볼 때는 앞모습(front), 전투에서는 뒷모습(back)
+  // perk 는 game.js·rules.js 에서 id 로 처리한다. hurt 가 있으면 체력이 40% 이하일 때 그 모습으로 바뀐다.
+  const H = n => ({ front: `${A}heroes/${n}-front.webp`, back: `${A}heroes/${n}-back.webp`, face: `${A}heroes/${n}-face.jpg` });
+  DB.HEROES = {
+    druid: Object.assign(H('druid'), {
+      name: '드루이드', title: '숲의 수호자', hp: 50, die: 'life', fx: 'spore', color: '#59d17f',
+      desc: '숲의 정령과 교감하는 치유사. 버섯 지팡이로 상대를 독과 덩굴로 묶는다.',
+      perk: '회복 효과 +2, 원 페어 이상으로 공격하면 적에게 출혈 1'
+    }),
+    archer: Object.assign(H('archer'), {
+      name: '궁수', title: '바람의 사냥꾼', hp: 46, die: 'blood', fx: 'arrow', color: '#9fd36a',
+      desc: '숲을 누비는 엘프 사냥꾼. 빠른 손놀림으로 주사위를 여러 번 다시 굴린다.',
+      perk: '매 턴 재굴림 +1, 적에게 출혈을 줄 때 +2'
+    }),
+    knight: Object.assign(H('knight'), {
+      name: '기사', title: '검은 숲의 검', hp: 56, die: 'steel', fx: 'slash', color: '#9fb0c4',
+      desc: '장검과 단검을 쓰는 숲의 기사. 단단한 갑옷으로 전투를 시작한다.',
+      perk: '전투 시작 시 방어 8'
+    }),
+    warrior: Object.assign(H('warrior'), {
+      name: '전사', title: '방패의 투사', hp: 60, die: 'flame', fx: 'punch', color: '#e5b94e',
+      hurtFront: `${A}heroes/warrior-front-hurt.webp`, hurtBack: `${A}heroes/warrior-back-hurt.webp`,
+      desc: '수많은 전장을 버텨 낸 투사. 상처를 입을수록 더 거세게 싸운다.',
+      perk: '체력이 절반 이하이면 공격 피해 +5'
+    })
   };
 
   // 상태 효과: 플레이어와 적이 같은 규칙을 쓴다
@@ -117,11 +145,11 @@
       moves: [{ name: '바위 껍질', block: 14 }, { name: '내려찍기', atk: 15 }, { name: '돌 던지기', atk: 9 }]
     },
     necromancer: {
-      name: '네크로맨서', img: A + 'bosses/necromancer.jpg', marker: A + 'bossicons/skull.webp', type: 'boss', hp: 175, desc: '죽은 자들을 지배하는 마법사.',
+      name: '네크로맨서', img: A + 'bosses/necromancer.jpg', marker: A + 'bossicons/skull.webp', type: 'boss', hp: 200, desc: '죽은 자들을 지배하는 마법사.',
       moves: [{ name: '뼈의 장벽', block: 14, atk: 6 }, { name: '생명 흡수', atk: 11, heal: 10 }, { name: '죽음의 저주', atk: 6, apply: { freeze: 2, bleed: 2 } }, { name: '죽음의 파동', atk: 17 }]
     },
     hellLord: {
-      name: '지옥의 군주', img: A + 'bosses/hell-lord.jpg', marker: A + 'bossicons/demon.webp', type: 'boss', hp: 145, desc: '모든 것을 불태우는 존재.',
+      name: '지옥의 군주', img: A + 'bosses/hell-lord.jpg', marker: A + 'bossicons/demon.webp', type: 'boss', hp: 185, desc: '모든 것을 불태우는 존재.',
       moves: [{ name: '지옥불', atk: 8, apply: { burn: 3 } }, { name: '분노', buff: 2, block: 10 }, { name: '파멸의 일격', atk: 20 }, { name: '화염 폭풍', atk: 5, hits: 3 }]
     },
     fallenKnight: {
@@ -129,9 +157,80 @@
       moves: [{ name: '타락한 맹세', block: 15, heal: 10 }, { name: '심판의 연격', atk: 6, hits: 3 }, { name: '붉은 성검', atk: 14, apply: { bleed: 3 } }, { name: '신성 모독', atk: 9, apply: { freeze: 2 } }]
     },
     abyssDragon: {
-      name: '심연의 드래곤', img: A + 'bosses/abyss-dragon.jpg', marker: A + 'bossicons/dragon.webp', type: 'boss', hp: 145, desc: '끝없는 욕망의 화신.',
+      name: '심연의 드래곤', img: A + 'bosses/abyss-dragon.jpg', marker: A + 'bossicons/dragon.webp', type: 'boss', hp: 165, desc: '끝없는 욕망의 화신.',
       moves: [{ name: '날개 치기', atk: 10 }, { name: '심연 응축', block: 16, charge: true }, { name: '심연의 숨결', atk: 25, apply: { burn: 2 } }, { name: '꼬리 휩쓸기', atk: 7, apply: { bleed: 2 } }]
     }
+  };
+
+  // 전신 스프라이트 몬스터: 행동 묶음(MOVESET)을 정해 두고 몬스터마다 골라 쓴다
+  const MOVESET = {
+    blade: [{ name: '베기', atk: 7 }, { name: '연속 베기', atk: 4, hits: 2 }, { name: '급소 찌르기', atk: 5, apply: { bleed: 2 } }],
+    archer: [{ name: '화살 세례', atk: 3, hits: 3 }, { name: '조준 사격', atk: 10 }, { name: '독화살', atk: 4, apply: { bleed: 2 } }],
+    frost: [{ name: '서리 화살', atk: 5, apply: { freeze: 2 } }, { name: '얼음 창', atk: 9 }, { name: '얼음 갑주', block: 8, atk: 3 }],
+    fire: [{ name: '불꽃 화살', atk: 4, apply: { burn: 2 } }, { name: '화염 베기', atk: 9 }, { name: '불길 두르기', block: 6, buff: 1 }],
+    storm: [{ name: '번개 채찍', atk: 3, hits: 3 }, { name: '낙뢰', atk: 11 }, { name: '폭풍의 눈', block: 7, apply: { freeze: 1 } }],
+    tide: [{ name: '물의 창', atk: 8 }, { name: '소용돌이', atk: 4, apply: { freeze: 1, bleed: 1 } }, { name: '파도 장벽', block: 9, heal: 4 }],
+    nature: [{ name: '가시 덩굴', atk: 4, apply: { bleed: 2 } }, { name: '포자 구름', atk: 3, apply: { freeze: 1, bleed: 1 } }, { name: '생명의 수액', heal: 8, block: 4 }],
+    void: [{ name: '공허의 손길', atk: 5, apply: { freeze: 2 } }, { name: '영혼 흡수', atk: 8, heal: 6 }, { name: '어둠의 파동', atk: 11 }],
+    brute: [{ name: '내려찍기', atk: 13 }, { name: '포효', buff: 2, block: 6 }, { name: '휘두르기', atk: 6, hits: 2 }],
+    beast: [{ name: '할퀴기', atk: 4, hits: 2 }, { name: '물어뜯기', atk: 7, apply: { bleed: 2 } }, { name: '날개 치기', atk: 9 }],
+    holy: [{ name: '심판의 검', atk: 10 }, { name: '빛의 방패', block: 10, heal: 5 }, { name: '천상의 연격', atk: 5, hits: 2 }]
+  };
+  const M = (name, file, type, hp, set, desc) => ({ name, img: `${A}mobs/${file}.webp`, sprite: true, type, hp, moves: MOVESET[set], desc });
+  Object.assign(DB.ENEMIES, {
+    elfArcher: M('엘프 저격수', 'elf-archer', 'normal', 22, 'archer', '나무 위에서 화살을 퍼붓는 숲의 저격수.'),
+    dryadWitch: M('드라이어드 마녀', 'dryad-witch', 'normal', 24, 'nature', '두 개의 지팡이로 숲의 힘을 끌어 쓴다.'),
+    shaman: M('늪지 주술사', 'shaman', 'normal', 23, 'nature', '버섯 지팡이로 저주를 퍼뜨린다.'),
+    barbarian: M('야만 전사', 'barbarian', 'elite', 52, 'brute', '가시 곤봉과 방패를 든 거대한 전사.'),
+    jungleBlade: M('밀림의 검객', 'jungle-blade', 'normal', 27, 'blade', '톱날 검으로 빠르게 베어 든다.'),
+    thunderHuntress: M('천둥 사냥꾼', 'thunder-huntress', 'normal', 26, 'storm', '번개 채찍을 휘두르는 사냥꾼.'),
+    sporeMystic: M('포자 무녀', 'spore-mystic', 'normal', 25, 'nature', '독버섯 포자를 흩뿌리는 무녀.'),
+    cursedDryad: M('저주받은 드라이어드', 'cursed-dryad', 'normal', 28, 'void', '어둠에 물든 나무의 정령.'),
+    leopardSeraph: M('표범 날개 수호자', 'leopard-seraph', 'elite', 58, 'holy', '밀림 사원을 지키는 날개 달린 수호자.'),
+    mossReaper: M('이끼 낫잡이', 'moss-reaper', 'elite', 55, 'beast', '네 개의 낫을 쓰는 밀림의 사냥꾼.'),
+    orcBrute: M('오크 도끼전사', 'orc-brute', 'elite', 62, 'brute', '거대한 도끼를 휘두르는 오크.'),
+    sharkRaider: M('상어 약탈자', 'shark-raider', 'normal', 30, 'blade', '해안을 습격하는 상어 전사.'),
+    shellWitch: M('조개 마녀', 'shell-witch', 'normal', 27, 'tide', '조개 지팡이로 파도를 부른다.'),
+    tideCaller: M('파도 술사', 'tide-caller', 'normal', 28, 'storm', '번개 사슬로 바다를 다스린다.'),
+    pearlMystic: M('진주 무희', 'pearl-mystic', 'normal', 26, 'tide', '보석을 띄워 마력을 모은다.'),
+    siren: M('세이렌 예언자', 'siren', 'normal', 29, 'tide', '노랫소리로 선원을 홀린다.'),
+    seaWitch: M('심해 마녀', 'sea-witch', 'normal', 31, 'tide', '삼지창을 든 심해의 마녀.'),
+    anchorBrute: M('닻 거인', 'anchor-brute', 'elite', 68, 'brute', '거대한 닻을 끌고 다니는 해적 거인.'),
+    coralReaper: M('산호 사신', 'coral-reaper', 'elite', 60, 'beast', '산호 갑각을 두른 네 팔의 사냥꾼.'),
+    gorgon: M('고르곤 파수꾼', 'gorgon', 'elite', 64, 'blade', '뱀 머리칼을 지닌 방패 전사.'),
+    frostKnight: M('서리 기사', 'frost-knight', 'normal', 34, 'frost', '얼음 창과 방패를 든 기사.'),
+    stormCaller: M('폭풍 소환사', 'storm-caller', 'normal', 32, 'storm', '번개 사슬을 두른 폭풍의 소환사.'),
+    harpyQueen: M('하피 여왕', 'harpy-queen', 'normal', 33, 'beast', '설산 하늘을 지배하는 하피.'),
+    valkyrie: M('죽음의 발키리', 'valkyrie', 'normal', 35, 'holy', '전사자의 영혼을 거두는 발키리.'),
+    gildedValkyrie: M('황금 발키리', 'gilded-valkyrie', 'elite', 72, 'holy', '불타는 성검을 든 천상의 전사.'),
+    seraph: M('세라프', 'seraph', 'elite', 70, 'holy', '심판을 내리는 천사.'),
+    voidSorceress: M('공허의 마녀', 'void-sorceress', 'normal', 36, 'void', '블랙홀 지팡이를 든 마녀.'),
+    crystalMystic: M('수정 예언자', 'crystal-mystic', 'normal', 34, 'void', '수정에 운명을 비추어 본다.'),
+    shadowAssassin: M('그림자 암살자', 'shadow-assassin', 'normal', 33, 'blade', '어둠 속에서 급소를 노린다.'),
+    basiliskTamer: M('바실리스크 조련사', 'basilisk-tamer', 'normal', 38, 'beast', '바실리스크를 부리는 뱀 인간.'),
+    scorpionBlade: M('전갈 검사', 'scorpion-blade', 'normal', 37, 'beast', '네 개의 낫과 꼬리를 쓰는 전갈 전사.'),
+    demonWarrior: M('악마 전사', 'demon-warrior', 'normal', 39, 'fire', '용암 갑옷을 두른 악마.'),
+    ashRevenant: M('잿빛 망령', 'ash-revenant', 'normal', 38, 'fire', '불타는 검을 든 망령.'),
+    boneKnight: M('해골 기사', 'bone-knight', 'elite', 74, 'blade', '뼈 갑옷을 입은 망자의 기사.'),
+    steamGolem: M('증기 골렘', 'steam-golem', 'elite', 82, 'brute', '증기를 뿜는 강철 거인.'),
+    driderQueen: M('드라이더 여왕', 'drider-queen', 'elite', 76, 'void', '거미 몸을 가진 동굴의 여왕.'),
+    voidHerald: Object.assign(M('공허의 전령', 'void-herald', 'boss', 185, 'void', '여섯 팔로 공허를 부르는 존재.'), {
+      marker: A + 'bossicons/beast.webp',
+      moves: [{ name: '공허의 문', block: 16, heal: 8 }, { name: '여섯 팔의 연격', atk: 5, hits: 4 }, { name: '시간 정지', atk: 8, apply: { freeze: 3 } }, { name: '공허 폭발', atk: 22 }]
+    }),
+    succubus: Object.assign(M('서큐버스 여왕', 'succubus', 'boss', 175, 'fire', '지옥 성의 주인인 서큐버스.'), {
+      marker: A + 'bossicons/wolf.webp',
+      moves: [{ name: '유혹의 속삭임', atk: 6, apply: { freeze: 2 } }, { name: '흡혈', atk: 12, heal: 10 }, { name: '지옥 날개', atk: 6, hits: 3 }, { name: '피의 계약', buff: 3, block: 12 }]
+    })
+  });
+
+  // 지역별 몬스터 목록 (층 → 지역 → 일반·정예)
+  DB.POOLS = {
+    forest: { normal: ['goblin', 'skeleton', 'elfArcher', 'dryadWitch', 'shaman'], elite: ['werewolf', 'barbarian'] },
+    mushroom: { normal: ['mage', 'jungleBlade', 'thunderHuntress', 'sporeMystic', 'cursedDryad'], elite: ['golem', 'leopardSeraph', 'mossReaper', 'orcBrute'] },
+    coast: { normal: ['sharkRaider', 'shellWitch', 'tideCaller', 'pearlMystic', 'siren', 'seaWitch'], elite: ['anchorBrute', 'coralReaper', 'gorgon'] },
+    snow: { normal: ['frostKnight', 'stormCaller', 'harpyQueen', 'valkyrie'], elite: ['gildedValkyrie', 'seraph'] },
+    cave: { normal: ['voidSorceress', 'crystalMystic', 'shadowAssassin', 'basiliskTamer', 'scorpionBlade', 'demonWarrior', 'ashRevenant'], elite: ['boneKnight', 'steamGolem', 'driderQueen'] }
   };
 
   DB.NPC = {
@@ -153,16 +252,18 @@
     rest: { name: '휴식', desc: '야영지에서 회복하거나 주사위를 단련한다.' },
     event: { name: '이벤트', desc: '누군가를 만난다. 선택에 따라 결과가 달라진다.' },
     mystery: { name: '미지의 노드', desc: '들어가 보기 전에는 무엇이 있는지 알 수 없다.' },
-    boss: { name: '보스', desc: '이 땅을 지배하는 최종 보스.' }
+    boss: { name: '보스', desc: '이 땅을 지배하는 최종 보스.' },
+    start: { name: '출발 지점', desc: '여정이 시작되는 곳.' }
   };
 
   // 층별 지역 (맵·전투 배경)
   DB.REGIONS = [
-    { from: 1, to: 3, name: '어둠의 숲', bg: 'forest' },
-    { from: 4, to: 6, name: '몰락한 도시', bg: 'city' },
-    { from: 7, to: 8, name: '얼어붙은 설산', bg: 'snow' },
-    { from: 9, to: 10, name: '심연의 동굴', bg: 'cave' },
-    { from: 11, to: 11, name: '지옥의 문', bg: 'hell' }
+    { from: 0, to: 2, key: 'forest', name: '어둠의 숲', bg: ['forest', 'jungle'] },
+    { from: 3, to: 4, key: 'mushroom', name: '버섯 숲', bg: ['mushroom', 'swamp'] },
+    { from: 5, to: 6, key: 'coast', name: '폭풍 해안', bg: ['coast'] },
+    { from: 7, to: 8, key: 'snow', name: '얼어붙은 설산', bg: ['snow', 'ice-castle'] },
+    { from: 9, to: 10, key: 'cave', name: '수정 동굴', bg: ['crystal-cave'] },
+    { from: 11, to: 11, key: 'hell', name: '지옥의 성', bg: ['hell'] }
   ];
 
   DB.ACHIEVEMENTS = {
@@ -176,7 +277,7 @@
     diceMaster: { name: '주사위 장인', desc: '다섯 주사위를 모두 특수 주사위로 채운다.', emblem: 'gold' },
     flawless: { name: '무결점', desc: '피해를 받지 않고 정예 몬스터를 처치한다.', emblem: 'red' },
     clear: { name: '운명의 정복자', desc: '최종 보스를 처치한다.', emblem: 'red' },
-    allBosses: { name: '네 개의 왕관', desc: '네 보스를 모두 처치한다.', emblem: 'red' },
+    allBosses: { name: '왕관 수집가', desc: '모든 보스를 처치한다.', emblem: 'red' },
     runs10: { name: '끈질긴 여행자', desc: '여정을 10번 시작한다.', emblem: 'blue' }
   };
 
@@ -186,7 +287,6 @@
     diceCount: 5,
     rerolls: 2,
     potionSlots: 3,
-    startHp: 50,
     startGold: 20
   };
 })(typeof window !== 'undefined' ? window : globalThis);

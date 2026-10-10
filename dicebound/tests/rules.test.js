@@ -50,6 +50,13 @@ const before = JSON.stringify(ctx);
 R.computeAttack(ctx); R.computeAttack(ctx);
 eq('미리보기 계산은 상태를 바꾸지 않는다', JSON.stringify(ctx), before);
 
+// 주인공 능력
+eq('드루이드: 회복 +2, 출혈 +1', (x => [x.heal, x.apply.bleed])(R.computeAttack(Object.assign({}, base, { hero: 'druid', dice: dice([3, 3, 3, 6, 6]) }))), [8, 1]);
+eq('드루이드: 하이 카드는 출혈 없음', R.computeAttack(Object.assign({}, base, { hero: 'druid', dice: dice([1, 3, 4, 5, 6]) })).apply.bleed, 0);
+eq('궁수: 출혈 +2', R.computeAttack(Object.assign({}, base, { hero: 'archer', dice: dice([4, 4, 4, 1, 6]) })).apply.bleed, 4);
+eq('전사: 체력 절반 이하면 피해 +5', R.computeAttack(Object.assign({}, base, { hero: 'warrior', hp: 25, dice: dice([2, 2, 4, 5, 6]) })).atk, 13);
+eq('전사: 체력이 많으면 보너스 없음', R.computeAttack(Object.assign({}, base, { hero: 'warrior', hp: 26, dice: dice([2, 2, 4, 5, 6]) })).atk, 8);
+
 // 방어 처리
 const t = { hp: 20, status: { block: 5 } };
 eq('방어 먼저 차감', R.applyDamage(t, 8), { absorbed: 5, lost: 3 });
@@ -66,11 +73,12 @@ for (let s = 1; s <= 300; s++) {
   const ns = Object.values(m.nodes);
   if (!ns.some(n => n.type === 'shop')) noShop++;
   if (ns.some(n => n.f === 1 && n.type !== 'battle')) bad++;
+  if (ns.filter(n => n.f === 0).length !== 1 || !m.nodes.start || m.nodes.start.next.length < 1) bad++;
   if (ns.some(n => n.type === 'elite' && n.f < 4)) bad++;
   if (ns.some(n => n.id !== 'boss' && !n.type)) bad++;
   for (let f = 1; f <= 10; f++) if (!ns.some(n => n.f === f)) bad++;
 }
-eq('맵 300개 모두 유효', bad, 0);
+eq('맵 300개 모두 유효 (출발 지점 1개)', bad, 0);
 eq('맵 300개 모두 상점 포함', noShop, 0);
 DB.RNG.seed(null);
 

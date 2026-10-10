@@ -18,7 +18,7 @@
 
   /* ---------- 저장 ---------- */
   function defaultMeta() {
-    return { runs: 0, wins: 0, bestFloor: 0, codex: { enemies: {}, relics: {}, dice: {}, potions: {} }, ach: {}, bosses: {}, eliteKills: 0 };
+    return { runs: 0, wins: 0, bestFloor: 0, codex: { enemies: {}, relics: {}, dice: {}, potions: {} }, ach: {}, bosses: {}, eliteKills: 0, heroes: {} };
   }
   G.load = function () {
     const m = DB.store.get(KEY_META, null);
@@ -26,7 +26,8 @@
     G.meta.codex = Object.assign(defaultMeta().codex, G.meta.codex || {});
     G.settings = Object.assign({ autoFS: true, wakeLock: true, reduceMotion: false, installDismissed: false }, DB.store.get(KEY_SET, {}) || {});
     const r = DB.store.get(KEY_RUN, null);
-    G.savedRun = r && r.v === 1 && r.screen !== 'end' ? r : null;
+    // v2: 주인공 선택과 출발 지점이 생겼으므로 이전 형식의 저장은 이어하지 않는다
+    G.savedRun = r && r.v === 2 && r.screen !== 'end' && DB.HEROES[r.hero] ? r : null;
   };
   G.saveMeta = () => DB.store.set(KEY_META, G.meta);
   G.saveSettings = () => DB.store.set(KEY_SET, G.settings);
@@ -58,20 +59,27 @@
   }
 
   /* ---------- 여정 시작·이어하기 ---------- */
-  G.newRun = function (seed) {
+  G.newRun = function (heroId, seed) {
     if (seed != null) RNG.seed(seed);
+    const hero = DB.HEROES[heroId] ? heroId : 'knight';
+    const H = DB.HEROES[hero];
     const bossKeys = Object.keys(DB.ENEMIES).filter(k => DB.ENEMIES[k].type === 'boss');
     G.run = {
-      v: 1, hp: C.startHp, maxHp: C.startHp, gold: C.startGold, floor: 0, pos: null, visited: [],
+      v: 2, hero, hp: H.hp, maxHp: H.hp, gold: C.startGold, floor: 0, pos: 'start', visited: ['start'],
       map: R.genMap(RNG, { floors: C.floors, lanes: C.lanes, paths: 5 }),
       bossKey: RNG.pick(bossKeys),
-      dice: Array.from({ length: C.diceCount }, () => ({ kind: null })),
+      // 주인공마다 특수 주사위 하나를 들고 시작한다
+      dice: Array.from({ length: C.diceCount }, (_, i) => ({ kind: i === 0 ? H.die : null })),
       relics: [], potions: [], seenEvents: [],
       screen: 'map', node: null, battle: null, reward: null, shop: null, rest: null, event: null, pendingDice: null,
       stats: { kills: 0, elites: 0, turns: 0, dealt: 0, taken: 0, gold: 0, maxHit: 0, start: Date.now() },
       result: null
     };
     G.meta.runs++;
+    G.meta.heroes = G.meta.heroes || {};
+    G.meta.heroes[hero] = G.meta.heroes[hero] || { runs: 0, wins: 0 };
+    G.meta.heroes[hero].runs++;
+    seen('dice', H.die);
     if (G.meta.runs >= 10) G.unlock('runs10');
     G.events = [];
     commit();
@@ -86,8 +94,23 @@
   G.abandonRun = function () { DB.store.del(KEY_RUN); G.savedRun = null; G.run = null; };
 
   G.region = function (floor) {
-    const f = Math.max(1, floor || 1);
+    const f = Math.max(0, floor || 0);
     return DB.REGIONS.find(r => f >= r.from && f <= r.to) || DB.REGIONS[0];
+  };
+  // 지역 배경 중 하나를 노드마다 고정해서 고른다
+  G.regionBg = function (floor, nodeId) {
+    const list = G.region(floor).bg;
+    let h = 0; String(nodeId || floor).split('').forEach(ch => { h = (h * 31 + ch.charCodeAt(0)) >>> 0; });
+    return DB.IMG.bg2(list[h % list.length]);
+  };
+  G.hero = () => G.run && DB.HEROES[G.run.hero];
+  // 전사는 체력이 40% 이하이면 부상 모습으로 바뀐다
+  G.heroImg = function (side) {
+    const r = G.run, H = G.hero();
+    if (!H) return '';
+    const hurt = r.hp > 0 && r.hp <= r.maxHp * 0.4;
+    if (side === 'back') return hurt && H.hurtBack ? H.hurtBack : H.back;
+    return hurt && H.hurtFront ? H.hurtFront : H.front;
   };
 
   /* ---------- 맵 ---------- */
@@ -142,10 +165,12 @@
   };
 
   /* ---------- 전투 ---------- */
-  const NORMALS_EARLY = ['goblin', 'skeleton'], NORMALS = ['goblin', 'skeleton', 'mage'], ELITES = ['werewolf', 'golem'];
+  // 지역별 몬스터 목록에서 고른다 (data.js 의 DB.POOLS)
   function startBattle(kind, opts) {
     const r = G.run;
-    const key = kind === 'boss' ? r.bossKey : kind === 'elite' ? RNG.pick(ELITES) : RNG.pick(r.floor <= 1 ? NORMALS_EARLY : NORMALS);
+    const pool = DB.POOLS[G.region(r.floor).key] || DB.POOLS.forest;
+    const normals = r.floor <= 1 ? ['goblin', 'skeleton', 'elfArcher'] : pool.normal;
+    const key = kind === 'boss' ? r.bossKey : kind === 'elite' ? RNG.pick(pool.elite) : RNG.pick(normals);
     const e = R.scaleEnemy(key, DB.ENEMIES[key], Math.max(1, r.floor), RNG);
     R.nextIntent(e, RNG);
     seen('enemies', key);
@@ -158,6 +183,8 @@
     r.screen = 'battle';
     const b = r.battle;
     if (r.relics.indexOf('guard') >= 0) b.status.block += 6;
+    if (r.hero === 'knight') b.status.block += 8;
+    b.bg = kind === 'boss' ? DB.IMG.bg2('hell') : G.regionBg(r.floor, r.pos);
     if (r.relics.indexOf('lucky') >= 0) r.hp = Math.min(r.maxHp, r.hp + 4);
     log(`${e.name}이(가) 나타났다!`);
     G.events = [{ type: 'battleStart', snap: snap() }];
@@ -191,7 +218,7 @@
     if (r.relics.indexOf('amulet') >= 0) b.status.block += 2;
     tickStatus('player');
     if (r.hp <= 0) { lose(); return; }
-    b.rerollsMax = C.rerolls + (r.relics.indexOf('scepter') >= 0 ? 1 : 0);
+    b.rerollsMax = C.rerolls + (r.relics.indexOf('scepter') >= 0 ? 1 : 0) + (r.hero === 'archer' ? 1 : 0);
     b.rerollsLeft = b.rerollsMax;
     b.selected = [];
     b.values = r.dice.map(() => RNG.die());
@@ -210,7 +237,7 @@
     return R.computeAttack({
       dice: r.dice.map((d, i) => ({ kind: d.kind, value: b.values[i] })),
       relics: r.relics, gold: r.gold, hp: r.hp, maxHp: r.maxHp,
-      rerollsLeft: b.rerollsLeft, enemyType: b.enemy.type, status: b.status
+      rerollsLeft: b.rerollsLeft, enemyType: b.enemy.type, status: b.status, hero: r.hero
     });
   };
   function canAct() { const b = G.run && G.run.battle; return !!(b && G.run.screen === 'battle' && b.phase === 'player' && !G.run.pendingDice); }
@@ -354,7 +381,7 @@
     const r = G.run;
     const b = r.battle;
     r.result = { won, floor: r.floor, enemy: b ? b.enemy.key : null, time: Date.now() - r.stats.start };
-    if (won) G.meta.wins++;
+    if (won) { G.meta.wins++; if (G.meta.heroes && G.meta.heroes[r.hero]) G.meta.heroes[r.hero].wins++; }
     r.screen = 'end';
   }
 

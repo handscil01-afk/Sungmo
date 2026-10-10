@@ -14,7 +14,7 @@ const { chromium } = require('playwright');
   await p.goBack(); await p.waitForTimeout(300);
   ok('뒤로 가기로 정보창 닫힘', await p.$('.modal') === null && p.url().includes('/dicebound/'));
   // 창 안에서 다른 창으로 이어지는 흐름 (닫기 직후 새 창)
-  await p.click('[data-act="newRun"]');
+  await p.click('[data-act="newRun"]'); await p.click('[data-act="pickHero"]');
   await p.click('.hud .round[data-act="sheet"]'); await p.click('.tab[data-tab="settings"]');
   await p.click('#sAbandon'); await p.waitForTimeout(200);
   ok('포기 확인 창이 바로 닫히지 않음', (await p.$$('.modal')).length === 1);
@@ -31,10 +31,14 @@ const { chromium } = require('playwright');
   await p.click('#fpDice [data-i="3"]'); await p.click('#fpVals [data-v="2"]'); await p.waitForTimeout(200);
   ok('변환의 두루마리 적용', await p.evaluate(() => DB.game.run.battle.values[3] === 2 && DB.game.run.potions.length === 1));
   // 미리보기 피해 = 실제 피해
-  const pv = await p.evaluate(() => { const b = DB.game.run.battle; return { atk: DB.game.preview().atk, hp: b.enemy.hp, blk: b.enemy.status.block }; });
+  // 적의 차례가 시작될 때 출혈(중첩만큼)·화상(3) 피해가 더 들어가므로 그것까지 계산한다. 적이 회복하는 행동이면 비교를 건너뛴다.
+  const pv = await p.evaluate(() => { const b = DB.game.run.battle, pr = DB.game.preview(), e = b.enemy;
+    return { atk: pr.atk, hp: e.hp, blk: e.status.block, bleed: e.status.bleed + pr.apply.bleed, burn: e.status.burn + pr.apply.burn, heals: !!e.intent.heal }; });
   await p.click('[data-act="attack"]'); await p.waitForFunction(() => !DB.ui.busy);
   const after = await p.evaluate(() => DB.game.run.battle ? DB.game.run.battle.enemy.hp : 0);
-  ok(`미리보기 피해(${pv.atk})와 실제 피해 일치`, after === Math.max(0, pv.hp - Math.max(0, pv.atk - pv.blk)));
+  const hit = Math.max(0, pv.hp - Math.max(0, pv.atk - pv.blk));
+  const expect = hit === 0 ? 0 : Math.max(0, hit - pv.bleed - (pv.burn > 0 ? 3 : 0));
+  ok(`미리보기 피해(${pv.atk})와 실제 피해 일치`, pv.heals || after === expect);
   // 상점: 골드 부족, 주사위 구매 취소
   await p.evaluate(() => { const G = DB.game, r = G.run; r.battle = null; r.screen = 'map'; r.gold = 35; const id = Object.keys(r.map.nodes)[0]; r.map.nodes[id].type = 'shop'; G.available = () => [id]; G.chooseNode(id); delete G.available; });
   const idx = await p.evaluate(() => DB.game.run.shop.items.findIndex(i => i.cat === 'relic'));
