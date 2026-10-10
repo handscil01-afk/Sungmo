@@ -105,16 +105,17 @@
     const show = UI.view === 'game' && r && r.screen !== 'end';
     hud.classList.toggle('hidden', !show);
     if (!show) return;
-    const reg = G.region(r.floor || 1);
+    const reg = G.region(r.floor);
+    const H = G.hero();
     hud.innerHTML = `
       <div class="hud-row">
-        <button class="hud-ava" data-act="sheet" data-tab="status" aria-label="캐릭터 상태">${img(I.player, '', '여행자')}</button>
+        <button class="hud-ava" data-act="sheet" data-tab="status" aria-label="캐릭터 상태">${img(H.face, '', H.name)}</button>
         <div class="hud-hp">${img(I.icon('heal'), 'hud-ico', '체력')}${bar(r.hp, r.maxHp, 'hp')}</div>
         ${coin(r.gold)}
         <button class="round fs-btn" data-act="fs" aria-label="전체화면">${fsIcon()}</button>
         <button class="round" data-act="sheet" data-tab="status" aria-label="메뉴">${img(I.ui('round-menu.webp'), '', '메뉴')}</button>
       </div>
-      <div class="hud-sub"><div class="hud-pots">${[0, 1, 2].map(i => r.potions[i] ? `<button class="pot" data-pot="${i}" aria-label="${esc(DB.POTIONS[r.potions[i]].name)}">${img(DB.POTIONS[r.potions[i]].icon, '', DB.POTIONS[r.potions[i]].name)}</button>` : '<span class="pot empty"></span>').join('')}</div><span class="hud-floor">${r.floor ? `${r.floor > DB.CONST.floors ? '최종' : r.floor + '층'} · ${reg.name}` : '여정의 시작'}</span><span class="hud-relics">${r.relics.map(relicChip).join('')}</span></div>`;
+      <div class="hud-sub"><div class="hud-pots">${[0, 1, 2].map(i => r.potions[i] ? `<button class="pot" data-pot="${i}" aria-label="${esc(DB.POTIONS[r.potions[i]].name)}">${img(DB.POTIONS[r.potions[i]].icon, '', DB.POTIONS[r.potions[i]].name)}</button>` : '<span class="pot empty"></span>').join('')}</div><span class="hud-floor">${r.floor ? `${r.floor > DB.CONST.floors ? '최종' : r.floor + '층'} · ${reg.name}` : `${esc(H.name)} · 출발 지점`}</span><span class="hud-relics">${r.relics.map(relicChip).join('')}</span></div>`;
     $$('[data-pot]', hud).forEach(b => { b.onclick = () => potionModal(+b.dataset.pot); });
     $$('[data-relic]', hud).forEach(b => { b.onclick = () => relicModal(b.dataset.relic); });
     bindActs(hud);
@@ -160,7 +161,8 @@
     document.body.dataset.view = UI.view;
     renderHud();
     const s = $('#screen');
-    if (UI.view !== 'game' || !r) { renderMenu(s); }
+    if (UI.view === 'select') { document.body.dataset.screen = 'select'; renderSelect(s); }
+    else if (UI.view !== 'game' || !r) { document.body.dataset.screen = 'menu'; renderMenu(s); }
     else {
       document.body.dataset.screen = r.screen;
       ({ map: renderMap, battle: renderBattle, reward: renderReward, shop: renderShop, rest: renderRest, event: renderEvent, end: renderEnd })[r.screen](s);
@@ -184,9 +186,10 @@
   const ACTS = {
     newRun() {
       if (G.savedRun) {
-        UI.modal({ title: '새 여정', html: '<p>진행 중인 여정이 있습니다. 새로 시작하면 지금 여정은 사라집니다.</p>', buttons: [{ label: '취소', cls: 'dark' }, { label: '새로 시작', cls: 'teal', action: startNew }] });
-      } else startNew();
+        UI.modal({ title: '새 여정', html: '<p>진행 중인 여정이 있습니다. 새로 시작하면 지금 여정은 사라집니다.</p>', buttons: [{ label: '취소', cls: 'dark' }, { label: '새로 시작', cls: 'teal', action: openSelect }] });
+      } else openSelect();
     },
+    pickHero() { if (UI.heroSel) startNew(UI.heroSel); },
     cont() { if (G.continueRun()) { UI.view = 'game'; UI.mapSel = null; UI.render(); } },
     sheet(b) { openSheet(b.dataset.tab || 'status'); },
     how() { howModal(); },
@@ -194,7 +197,7 @@
     install() { DB.pwa.install(); },
     installLater() { G.settings.installDismissed = true; G.saveSettings(); UI.render(); },
     menu() { UI.view = 'menu'; UI.closeAll(); UI.render(); },
-    retry() { startNew(); },
+    retry() { openSelect(); },
     toMenu() { G.run = null; UI.view = 'menu'; UI.render(); },
     leave() { G.leave(); },
     go() { if (UI.mapSel) G.chooseNode(UI.mapSel); },
@@ -207,7 +210,8 @@
     restHeal() { G.restHeal(); },
     restMeditate() { G.restMeditate(); }
   };
-  function startNew() { UI.closeAll(); G.newRun(); UI.view = 'game'; UI.mapSel = null; UI.render(); }
+  function openSelect() { UI.closeAll(); G.run = null; UI.view = 'select'; UI.heroSel = UI.heroSel || 'druid'; UI.render(); }
+  function startNew(heroId) { UI.closeAll(); G.newRun(heroId); UI.view = 'game'; UI.mapSel = null; UI.render(); }
 
   function howModal() {
     UI.modal({
@@ -251,15 +255,42 @@
     </section>`;
   }
 
+  /* ---------- 주인공 선택 ---------- */
+  function renderSelect(s) {
+    setBg(I.bg2('forest'), 'dim');
+    const id = UI.heroSel, H = DB.HEROES[id], rec = (G.meta.heroes || {})[id];
+    const die = DB.DICE[H.die];
+    s.innerHTML = `<section class="page select">
+      <div class="page-head"><small class="eyebrow">CHOOSE YOUR HERO</small><h2>주인공 선택</h2></div>
+      <div class="hero-pick">${Object.keys(DB.HEROES).map(k => { const x = DB.HEROES[k]; return `<button class="hero-card ${k === id ? 'on' : ''}" data-hero="${k}" style="--hc:${x.color}">${img(x.front, 'hc-img', x.name)}<b>${esc(x.name)}</b></button>`; }).join('')}</div>
+      <div class="hero-detail panel" style="--hc:${H.color}">
+        <div class="hd-art">${img(H.front, 'hd-img', H.name)}</div>
+        <div class="hd-text">
+          <small class="eyebrow">${esc(H.title)}</small>
+          <h2>${esc(H.name)}</h2>
+          <p>${esc(H.desc)}</p>
+          <div class="hd-stats"><span>${img(I.icon('heal'), '', '체력')}체력 <b>${H.hp}</b></span><span>${dieFace(6, H.die)}<b>${esc(die.name)}</b></span></div>
+          <p class="perk"><b>고유 능력</b> ${esc(H.perk)}</p>
+          <p class="muted small">시작 주사위: ${esc(die.desc)}</p>
+          ${rec ? `<p class="muted small">기록: 여정 ${rec.runs}회 · 정복 ${rec.wins}회</p>` : ''}
+        </div>
+      </div>
+      <div class="page-foot two"><button class="btn dark" data-act="toMenu">메인 메뉴</button><button class="btn teal" data-act="pickHero">${esc(H.name)}(으)로 출발</button></div>
+    </section>`;
+    $$('[data-hero]', s).forEach(b => { b.onclick = () => { UI.heroSel = b.dataset.hero; UI.render(); }; });
+  }
+
   /* ---------- 맵 ---------- */
-  const ROW = 86, TOP = 92, BOTTOM = 60;
+  const ROW = 86, TOP = 168, BOTTOM = 24;
   function renderMap(s) {
     const r = G.run, map = r.map, F = map.floors;
     const reg = G.region(r.floor + 1 > F ? F + 1 : r.floor + 1);
-    setBg(I.bg[reg.bg], 'map');
+    setBg(I.bg2(reg.bg[0]), 'map');
     const av = G.available();
-    const H = TOP + F * ROW + BOTTOM;
-    const y = f => (f === F + 1 ? 48 : TOP + (F - f) * ROW + ROW / 2);
+    const hero = G.hero();
+    const H = TOP + (F + 1) * ROW + BOTTOM;
+    // 보스는 맨 위 여백 안에, 출발 지점(0층)은 맨 아래에 둔다
+    const y = f => (f === F + 1 ? 70 : TOP + (F - f) * ROW + ROW / 2);
     const nodes = Object.values(map.nodes);
     const px = x => 10 + x * 0.82; // 노드가 화면 밖으로 잘리지 않게 좌우 여백을 둔다
     const visitedEdge = (a, b) => { const i = r.visited.indexOf(a); return i >= 0 && r.visited[i + 1] === b; };
@@ -273,8 +304,10 @@
     const btns = nodes.map(n => {
       const isAv = av.indexOf(n.id) >= 0, vis = r.visited.indexOf(n.id) >= 0, cur = r.pos === n.id;
       const cls = ['node', 'nt-' + n.type, isAv ? 'avail' : '', vis ? 'visited' : '', cur ? 'current' : '', UI.mapSel === n.id ? 'sel' : ''].join(' ');
-      const inner = n.type === 'boss' ? `${img(I.node('boss'), 'node-img', '보스')}${img(boss.marker, 'boss-mark', boss.name)}<span class="boss-name">${esc(boss.name)}</span>` : img(I.node(n.type), 'node-img', DB.NODE_TYPES[n.type].name);
-      return `<button class="${cls}" data-node="${n.id}" style="left:${px(n.x)}%;top:${y(n.f)}px" aria-label="${n.f}층 ${DB.NODE_TYPES[n.type].name}${isAv ? ' (이동 가능)' : ''}">${inner}${cur ? `<span class="you">${img(I.player, '', '현재 위치')}</span>` : ''}</button>`;
+      const inner = n.type === 'boss' ? `${img(boss.marker, 'boss-mark', boss.name)}<span class="boss-name">${esc(boss.name)}</span>`
+        : n.type === 'start' ? `<span class="start-ring">${img(hero.face, '', '출발 지점')}</span>`
+        : img(I.node(n.type), 'node-img', DB.NODE_TYPES[n.type].name);
+      return `<button class="${cls}" data-node="${n.id}" style="left:${px(n.x)}%;top:${y(n.f)}px" aria-label="${n.f ? n.f + '층 ' : ''}${DB.NODE_TYPES[n.type].name}${isAv ? ' (이동 가능)' : ''}">${inner}${cur && n.type !== 'start' ? `<span class="you">${img(hero.face, '', '현재 위치')}</span>` : ''}</button>`;
     }).join('');
     const floorsLbl = Array.from({ length: F }, (_, i) => `<span class="flabel" style="top:${y(i + 1)}px">${i + 1}</span>`).join('');
     const sel = UI.mapSel && map.nodes[UI.mapSel];
@@ -284,7 +317,7 @@
       <div class="map-scroll" id="mapScroll"><div class="map" style="height:${H}px">
         <svg class="edges" viewBox="0 0 100 ${H}" preserveAspectRatio="none">${lines}</svg>${floorsLbl}${btns}
       </div></div>
-      <div class="map-info panel">${sel ? `${img(I.node(sel.type === 'boss' ? 'boss' : sel.type), 'mi-ico')}<div class="mi-text"><b>${sel.type === 'boss' ? esc(boss.name) : DB.NODE_TYPES[sel.type].name}</b><span>${sel.type === 'boss' ? esc(boss.desc) : DB.NODE_TYPES[sel.type].desc}</span></div><button class="btn ${selAv ? 'teal' : 'gray'}" data-act="go" ${selAv ? '' : 'disabled'}>${selAv ? '이동하기' : (r.visited.indexOf(sel.id) >= 0 ? '지나온 곳' : '갈 수 없음')}</button>` : `<div class="mi-text"><b>${r.pos ? '다음 경로를 고르세요' : '여정을 시작합니다'}</b><span>빛나는 노드를 눌러 정보를 보고 이동하세요. 연결된 다음 노드로만 갈 수 있습니다.</span></div>`}</div>
+      <div class="map-info panel">${sel ? `${img(sel.type === 'boss' ? boss.marker : sel.type === 'start' ? hero.face : I.node(sel.type), 'mi-ico' + (sel.type === 'start' ? ' round-ico' : ''))}<div class="mi-text"><b>${sel.type === 'boss' ? esc(boss.name) : DB.NODE_TYPES[sel.type].name}</b><span>${sel.type === 'boss' ? esc(boss.desc) : DB.NODE_TYPES[sel.type].desc}</span></div><button class="btn ${selAv ? 'teal' : 'gray'}" data-act="go" ${selAv ? '' : 'disabled'}>${selAv ? '이동하기' : (r.visited.indexOf(sel.id) >= 0 ? '지나온 곳' : '갈 수 없음')}</button>` : `<div class="mi-text"><b>${r.pos !== 'start' ? '다음 경로를 고르세요' : '여정을 시작합니다'}</b><span>빛나는 노드를 눌러 정보를 보고 이동하세요. 연결된 다음 노드로만 갈 수 있습니다.</span></div>`}</div>
     </section>`;
     $$('[data-node]', s).forEach(b => {
       b.onclick = () => {
@@ -295,7 +328,7 @@
     });
     // 현재 위치가 보이도록 스크롤
     const sc = $('#mapScroll', s);
-    const target = sel ? y(sel.f) : r.pos ? y(map.nodes[r.pos].f) : y(1);
+    const target = sel ? y(sel.f) : r.pos && map.nodes[r.pos] ? y(map.nodes[r.pos].f) : y(0);
     requestAnimationFrame(() => { sc.scrollTop = Math.max(0, target - sc.clientHeight * 0.55); });
   }
 
@@ -323,32 +356,31 @@
     return `<div class="preview"><button class="hand-name" data-act="hands" aria-label="족보표 보기"><small>현재 족보</small><b>${p.hand.name}</b></button><div class="chips">${chips.join('')}</div></div>`;
   }
   function renderBattle(s) {
-    const r = G.run, b = r.battle, e = b.enemy;
+    const r = G.run, b = r.battle, e = b.enemy, H = G.hero();
     const boss = e.type === 'boss', elite = e.type === 'elite';
-    setBg(boss ? I.bg.hell : I.bg.battle, 'battle');
+    setBg(b.bg || I.bg.battle, 'battle');
     const p = G.preview();
     const can = b.phase === 'player' && !UI.busy;
     const typeName = boss ? '보스' : elite ? '정예' : '일반';
     const rolled = (UI.lastRoll && UI.lastRoll.id === b.rollId && UI.lastRoll.key === r.stats.turns) ? null : (G.events.find(ev => ev.type === 'roll') || null);
     UI.lastRoll = { id: b.rollId, key: r.stats.turns };
+    // 포켓몬 배틀 배치: 적은 오른쪽 위(정면), 주인공은 왼쪽 아래(뒷모습), 정보 상자는 서로 반대쪽
     s.innerHTML = `<section class="battle ${boss ? 'is-boss' : ''} ${elite ? 'is-elite' : ''}">
-      <div class="arena">
-        <div class="foe">
+      <div class="stage" id="stage" style="background-image:url('${b.bg || I.bg.battle}')">
+        <div class="infobox foe-box">
+          <div class="ib-name"><span class="tag ${e.type}">${typeName}</span><b>${esc(e.name)}</b></div>
+          <div class="hpline">${bar(e.hp, e.maxHp, 'enemy')}${e.status.block ? `<span class="blk" data-st="block">${img(DB.STATUS.block.icon, '', '방어')}<b>${e.status.block}</b></span>` : ''}</div>
+          <div class="sts" id="eSts">${statusRow(e.status, true)}</div>
           ${intentHTML(e)}
-          <div class="foe-card" id="foeCard">${img(e.img, 'foe-img', e.name)}<div class="fx-anchor" id="fxFoe"></div></div>
-          <div class="foe-info">
-            <div class="foe-name"><span class="tag ${e.type}">${typeName}</span><b>${esc(e.name)}</b></div>
-            <div class="hpline">${bar(e.hp, e.maxHp, 'enemy')}${e.status.block ? `<span class="blk" data-st="block">${img(DB.STATUS.block.icon, '', '방어')}<b>${e.status.block}</b></span>` : ''}</div>
-            <div class="sts" id="eSts">${statusRow(e.status, true)}</div>
-          </div>
         </div>
-        <div class="me">
-          <div class="me-ava" id="meCard">${img(I.player, '', '여행자')}<div class="fx-anchor" id="fxMe"></div></div>
-          <div class="me-info">
-            <div class="hpline">${bar(r.hp, r.maxHp, 'hp')}${b.status.block ? `<span class="blk">${img(DB.STATUS.block.icon, '', '방어')}<b>${b.status.block}</b></span>` : ''}</div>
-            <div class="sts" id="pSts">${statusRow(b.status, true)}</div>
-          </div>
+        <div class="spot foe-spot ${e.sprite ? 'sprite' : 'portrait'}"><div class="platform"></div><div class="mon" id="foeCard">${img(e.img, 'foe-img', e.name)}<div class="fx-anchor" id="fxFoe"></div></div></div>
+        <div class="spot me-spot"><div class="platform"></div><div class="mon" id="meCard">${img(G.heroImg('back'), 'me-img', H.name)}<div class="fx-anchor" id="fxMe"></div></div></div>
+        <div class="infobox me-box">
+          <div class="ib-name"><b>${esc(H.name)}</b><small>${esc(H.title)}</small></div>
+          <div class="hpline">${bar(r.hp, r.maxHp, 'hp')}${b.status.block ? `<span class="blk">${img(DB.STATUS.block.icon, '', '방어')}<b>${b.status.block}</b></span>` : ''}</div>
+          <div class="sts" id="pSts">${statusRow(b.status, true)}</div>
         </div>
+        <div class="flash" id="flash"></div>
       </div>
       <div class="control panel">
         ${previewHTML(p)}
@@ -378,15 +410,20 @@
     });
   }
 
-  /* ---------- 전투 연출 재생 ---------- */
-  const wait = ms => new Promise(res => setTimeout(res, G.settings.reduceMotion ? Math.min(ms, 120) : ms));
+  /* ---------- 전투 연출 재생 ----------
+   * 공격: 공격자가 앞으로 돌진 → (궁수·드루이드는 투사체가 날아감) → 맞은 쪽에 타격 이펙트, 흔들림, 번쩍임, 피해 숫자
+   * 이펙트 이미지는 assets/fx2 (투명 배경), 방어막만 기존 fx(rune, 화면 합성)를 쓴다. */
+  const slow = () => G.settings.reduceMotion;
+  const wait = ms => new Promise(res => setTimeout(res, slow() ? Math.min(ms, 120) : ms));
   function fx(anchorId, name, cls) {
     const a = document.getElementById(anchorId);
-    if (!a || G.settings.reduceMotion) return;
+    if (!a || slow()) return;
     const el = document.createElement('img');
-    el.src = I.fx(name); el.className = 'fx ' + (cls || ''); el.alt = '';
+    el.src = name === 'rune' ? I.fx('rune') : I.fx2(name);
+    el.className = 'fx ' + (name === 'rune' ? 'screen ' : '') + (cls || '');
+    el.alt = '';
     a.appendChild(el);
-    setTimeout(() => el.remove(), 800);
+    setTimeout(() => el.remove(), 900);
   }
   function floatText(anchorId, text, cls) {
     const a = document.getElementById(anchorId);
@@ -395,62 +432,128 @@
     el.className = 'float ' + (cls || '');
     el.textContent = text;
     a.appendChild(el);
-    setTimeout(() => el.remove(), 1100);
+    setTimeout(() => el.remove(), 1200);
   }
-  function shake(id) { const el = document.getElementById(id); if (!el || G.settings.reduceMotion) return; el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); }
+  function anim(id, cls, ms) {
+    const el = document.getElementById(id);
+    if (!el || slow()) return;
+    el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+    setTimeout(() => el.classList.remove(cls), ms || 600);
+  }
+  function flash(color) {
+    const el = $('#flash');
+    if (!el || slow()) return;
+    el.style.setProperty('--fc', color);
+    el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+  }
+  // 투사체: 공격자 위치에서 맞는 쪽으로 날아간다
+  function projectile(fromId, toId, name, ms) {
+    const st = $('#stage'), a = document.getElementById(fromId), b = document.getElementById(toId);
+    if (!st || !a || !b || slow() || !st.animate) return Promise.resolve();
+    const S = st.getBoundingClientRect(), A = a.getBoundingClientRect(), B = b.getBoundingClientRect();
+    const x0 = A.left + A.width * 0.6 - S.left, y0 = A.top + A.height * 0.35 - S.top;
+    const x1 = B.left + B.width / 2 - S.left, y1 = B.top + B.height * 0.45 - S.top;
+    const ang = Math.atan2(y1 - y0, x1 - x0) * 180 / Math.PI + 45; // 화살 이미지는 오른쪽 위(45°)를 향한다
+    const el = document.createElement('img');
+    el.src = I.fx2(name); el.className = 'proj'; el.alt = '';
+    st.appendChild(el);
+    const an = el.animate([
+      { transform: `translate(${x0}px, ${y0}px) translate(-50%, -50%) rotate(${ang}deg) scale(.7)`, opacity: .2 },
+      { transform: `translate(${x1}px, ${y1}px) translate(-50%, -50%) rotate(${ang}deg) scale(1)`, opacity: 1 }
+    ], { duration: ms || 320, easing: 'ease-in' });
+    return new Promise(res => { an.onfinish = () => { el.remove(); res(); }; });
+  }
+  const HERO_HIT = { druid: ['px-missile', 'poison'], archer: ['px-arrow', 'px-impact'], knight: ['px-slash', 'slash-green'], warrior: ['punch', 'px-impact'] };
+  function moveFx(mv) {
+    if (mv.apply && mv.apply.burn) return 'combustion';
+    if (mv.apply && mv.apply.freeze) return 'frostbite';
+    if (mv.apply && mv.apply.bleed) return 'blood';
+    if (mv.hits > 1) return 'px-slash';
+    return mv.atk >= 15 ? 'shock' : 'px-impact';
+  }
   function applySnap(sn) {
     if (!sn) return;
-    const eb = $('.foe .bar'), pb = $('.me .bar');
+    const eb = $('.foe-box .bar'), pb = $('.me-box .bar');
     if (eb) { eb.querySelector('i').style.width = `${Math.max(0, sn.eHp / sn.eMax * 100)}%`; eb.querySelector('span').textContent = `${sn.eHp} / ${sn.eMax}`; }
     if (pb) { pb.querySelector('i').style.width = `${Math.max(0, sn.pHp / sn.pMax * 100)}%`; pb.querySelector('span').textContent = `${sn.pHp} / ${sn.pMax}`; }
     const es = $('#eSts'), ps = $('#pSts');
     if (es) es.innerHTML = statusRow(sn.eSt);
     if (ps) ps.innerHTML = statusRow(sn.pSt);
+    // 전사는 체력이 낮아지면 그 자리에서 부상 모습으로 바뀐다
+    const me = $('#meCard .me-img'), H = G.hero();
+    if (me && H && H.hurtBack) {
+      const want = sn.pHp > 0 && sn.pHp <= sn.pMax * 0.4 ? H.hurtBack : H.back;
+      if (me.getAttribute('src') !== want) me.setAttribute('src', want);
+    }
   }
   const ANIM = ['playerAttack', 'tick', 'enemyMove', 'victory', 'defeat', 'potion'];
   async function play(events) {
     UI.busy = true;
     document.body.classList.add('busy');
     $$('.control button, .hud button.pot').forEach(b => { b.disabled = true; });
+    const hero = G.run.hero;
     for (const ev of events) {
       if (ev.type === 'playerAttack') {
-        fx('fxFoe', ev.hand.rank >= 4 ? 'slash-fire' : 'slash-ice');
-        shake('foeCard');
-        floatText('fxFoe', ev.absorbed && !(ev.atk - ev.absorbed) ? '막힘' : `-${ev.atk - ev.absorbed}`, 'dmg');
+        const [p, hit] = HERO_HIT[hero] || HERO_HIT.knight;
+        anim('meCard', 'lunge-me', 500);
+        await wait(160);
+        if (hero === 'archer' || hero === 'druid') await projectile('meCard', 'foeCard', p, 300);
+        else fx('fxFoe', p, 'big');
+        fx('fxFoe', ev.hand.rank >= 6 ? 'shock' : ev.hand.rank >= 4 ? 'combustion' : hit, ev.hand.rank >= 4 ? 'big' : '');
+        anim('foeCard', 'hurt', 500);
+        if (ev.hand.rank >= 4) anim('stage', 'quake', 450);
+        flash(ev.hand.rank >= 4 ? 'rgba(255,190,90,.4)' : 'rgba(255,255,255,.28)');
+        const dealt = ev.atk - ev.absorbed;
+        floatText('fxFoe', ev.absorbed && !dealt ? '막힘' : `-${dealt}`, 'dmg' + (ev.hand.rank >= 4 ? ' crit' : ''));
+        if (ev.apply.bleed) fx('fxFoe', 'px-bleed', 'small');
+        if (ev.apply.freeze) fx('fxFoe', 'px-freeze', 'small');
+        if (ev.apply.burn) fx('fxFoe', 'px-burn', 'small');
         if (ev.block) { fx('fxMe', 'rune'); floatText('fxMe', `방어 +${ev.block}`, 'blk'); }
-        if (ev.heal) { fx('fxMe', 'heal'); floatText('fxMe', `+${ev.heal}`, 'heal'); }
-        if (ev.apply.bleed) fx('fxFoe', 'burst-pink', 'small');
-        if (ev.apply.freeze) fx('fxFoe', 'shards', 'small');
-        if (ev.apply.burn) fx('fxFoe', 'burst-fire', 'small');
+        if (ev.heal) { fx('fxMe', 'px-heal'); floatText('fxMe', `+${ev.heal}`, 'heal'); }
         applySnap(ev.snap);
-        await wait(650);
+        await wait(700);
       } else if (ev.type === 'tick') {
         const anchor = ev.who === 'player' ? 'fxMe' : 'fxFoe';
-        fx(anchor, ev.status === 'bleed' ? 'burst-pink' : 'burst-fire', 'small');
+        fx(anchor, ev.status === 'bleed' ? 'px-bleed' : 'px-burn', 'small');
+        anim(ev.who === 'player' ? 'meCard' : 'foeCard', 'hurt', 400);
         floatText(anchor, `-${ev.amount}`, 'dmg');
         applySnap(ev.snap);
-        await wait(450);
+        await wait(500);
       } else if (ev.type === 'enemyMove') {
         const mv = ev.move;
-        if (mv.atk) { fx('fxMe', G.run.battle && G.run.battle.enemy.type === 'boss' ? 'void' : 'bolt'); shake('meCard'); floatText('fxMe', ev.dealt ? `-${ev.dealt}` : '막음', 'dmg'); }
-        if (mv.block) fx('fxFoe', 'rune', 'small');
-        if (mv.heal) { fx('fxFoe', 'heal', 'small'); floatText('fxFoe', `+${mv.heal}`, 'heal'); }
-        if (mv.buff) fx('fxFoe', 'burst-fire', 'small');
         const it = $('.intent'); if (it) it.classList.add('acting');
+        if (mv.atk) {
+          anim('foeCard', 'lunge-foe', 500);
+          await wait(180);
+          const n = Math.min(mv.hits || 1, 4);
+          for (let k = 0; k < n; k++) {
+            fx('fxMe', moveFx(mv), k ? 'small' : 'big');
+            anim('meCard', 'hurt', 400);
+            if (k < n - 1) await wait(150);
+          }
+          anim('stage', 'quake', 450);
+          flash(G.run.battle && G.run.battle.enemy.type === 'boss' ? 'rgba(150,40,200,.38)' : 'rgba(224,40,60,.34)');
+          floatText('fxMe', ev.dealt ? `-${ev.dealt}` : '막음', 'dmg');
+        }
+        if (mv.block) fx('fxFoe', 'rune', 'small');
+        if (mv.heal) { fx('fxFoe', 'heal-burst', 'small'); floatText('fxFoe', `+${mv.heal}`, 'heal'); }
+        if (mv.buff) fx('fxFoe', 'px-burn', 'small');
         applySnap(ev.snap);
         await wait(700);
       } else if (ev.type === 'potion') {
-        fx(ev.id === 'bomb' || ev.id === 'frost' ? 'fxFoe' : 'fxMe', { bomb: 'burst-fire', frost: 'shards', heal: 'heal', cure: 'heal', ward: 'rune', might: 'burst-fire', reroll: 'rune', fate: 'vortex' }[ev.id] || 'rune');
+        const toFoe = ev.id === 'bomb' || ev.id === 'frost';
+        fx(toFoe ? 'fxFoe' : 'fxMe', { bomb: 'combustion', frost: 'frostbite', heal: 'heal-burst', cure: 'px-heal', ward: 'rune', might: 'px-burn', reroll: 'rune-orb', fate: 'px-missile' }[ev.id] || 'rune');
+        if (toFoe) { anim('foeCard', 'hurt', 400); flash('rgba(255,190,90,.3)'); }
         applySnap(ev.snap);
-        await wait(400);
+        await wait(450);
       } else if (ev.type === 'victory') {
         const c = $('#foeCard'); if (c) c.classList.add('dying');
         applySnap(ev.snap);
-        await wait(800);
+        await wait(850);
       } else if (ev.type === 'defeat') {
         const c = $('#meCard'); if (c) c.classList.add('dying');
         applySnap(ev.snap);
-        await wait(900);
+        await wait(950);
       }
     }
     UI.busy = false;
@@ -489,7 +592,7 @@
   function renderReward(s) {
     const r = G.run, rw = r.reward;
     const tre = rw.kind === 'treasure';
-    setBg(tre ? I.bg.event : I.bg.battle, 'dim');
+    setBg(tre ? I.bg2('jungle') : (G.run.node ? G.regionBg(G.run.floor, G.run.pos) : I.bg.battle), 'dim');
     let body = '';
     if (tre) {
       body += `<div class="chest ${rw.opened ? 'open' : ''}">${img(I.treasure, 'chest-art', '보물 상자')}${rw.opened ? `<p class="gain">${coin('+' + rw.gold)} 골드를 발견했다!</p>` : '<button class="btn teal" data-act="openChest">상자 열기</button>'}</div>`;
@@ -521,7 +624,7 @@
   /* ---------- 상점 ---------- */
   function renderShop(s) {
     const r = G.run, sh = r.shop, npc = DB.NPC[sh.npc];
-    setBg(I.bg.shop, 'dim');
+    setBg(I.bg2('shop-in'), 'dim');
     const item = (it, i) => {
       let icon, name, desc, tag = '';
       if (it.cat === 'dice') { const d = DB.DICE[it.id]; icon = dieFace(6, it.id, 'card-die'); name = d.name; desc = d.desc; tag = d.rarity === 'rare' ? '희귀' : '일반'; }
@@ -534,7 +637,7 @@
     };
     const sec = (cat, title) => { const list = sh.items.map((it, i) => [it, i]).filter(x => x[0].cat === cat); return list.length ? `<h3 class="sub">${title}</h3><div class="shop-list">${list.map(x => item(x[0], x[1])).join('')}</div>` : ''; };
     s.innerHTML = `<section class="page shop">
-      <div class="npc-banner">${img(npc.img, 'npc-img', npc.name)}<div class="npc-talk frame"><small>${esc(npc.name)}</small><p>"어서 오게, 여행자. 골드만 있다면 무엇이든 내주지."</p></div></div>
+      <div class="npc-banner" style="background-image:url('${I.bg2('shop-in')}')">${img(npc.img, 'npc-img', npc.name)}<div class="npc-talk frame"><small>${esc(npc.name)}</small><p>"어서 오게, 여행자. 골드만 있다면 무엇이든 내주지."</p></div></div>
       <div class="panel page-body">${sec('dice', '특수 주사위')}${sec('relic', '유물')}${sec('potion', '소모품')}${sec('service', '서비스')}</div>
       <div class="page-foot"><button class="btn teal wide" data-act="leave">상점 떠나기</button></div>
     </section>`;
@@ -544,10 +647,10 @@
   /* ---------- 휴식 ---------- */
   function renderRest(s) {
     const r = G.run, st = r.rest, npc = DB.NPC.healer;
-    setBg(I.bg.event, 'dim');
+    setBg(I.bg2('spring'), 'dim');
     const amt = Math.round(r.maxHp * 0.3) + (r.relics.indexOf('lantern') >= 0 ? 10 : 0);
     s.innerHTML = `<section class="page rest">
-      <div class="npc-banner">${img(npc.img, 'npc-img', npc.name)}<div class="npc-talk frame"><small>${npc.name}</small><p>"모닥불 곁에서 잠시 쉬어 가세요. 하나만 고를 수 있어요."</p></div></div>
+      <div class="npc-banner" style="background-image:url('${I.bg2('spring')}')">${img(npc.img, 'npc-img', npc.name)}<div class="npc-talk frame"><small>${npc.name}</small><p>"모닥불 곁에서 잠시 쉬어 가세요. 하나만 고를 수 있어요."</p></div></div>
       <div class="panel page-body">
         ${st.done ? `<div class="result">${img(I.node('rest'), 'res-ico')}<p>${esc(st.result)}</p></div>` : `
         <div class="cards">
@@ -563,9 +666,12 @@
   }
 
   /* ---------- 이벤트 ---------- */
+  const EVENT_BG = { altar: 'crystal-cave', gamble: 'alley', library: 'throne', inn: 'tavern', villager: 'village', bounty: 'tavern' };
+
   function renderEvent(s) {
     const r = G.run, ev = r.event, def = G.EVENTS[ev.id], npc = def.npc && DB.NPC[def.npc];
-    setBg(I.bg.event, 'dim');
+    const evBg = I.bg2(EVENT_BG[ev.id] || 'village');
+    setBg(evBg, 'dim');
     let body;
     if (ev.done && ev.result) {
       const x = ev.result;
@@ -576,7 +682,7 @@
       body = `<div class="choices">${def.choices.map((c, i) => { const ok = G.eventCan(i); return `<button class="choice" data-ev="${i}" ${ok === true ? '' : 'disabled'}><b>${esc(c.label)}</b><small>${esc(ok === true ? c.desc : ok || c.desc)}</small></button>`; }).join('')}</div>`;
     }
     s.innerHTML = `<section class="page event">
-      <div class="event-art">${img(I.bg.event, 'ev-bg', '')}${npc ? img(npc.img, 'npc-img', npc.name) : ''}</div>
+      <div class="event-art">${img(evBg, 'ev-bg', '')}${npc ? img(npc.img, 'npc-img', npc.name) : ''}</div>
       <div class="frame ev-text"><small class="eyebrow">${npc ? esc(npc.name) : 'EVENT'}</small><h2>${esc(def.title)}</h2><p>${esc(def.text)}</p></div>
       <div class="panel page-body">${body}</div>
       <div class="page-foot"><button class="btn ${ev.done ? 'teal' : 'dark'} wide" data-act="leave">${ev.done ? '맵으로 돌아가기' : '그냥 떠나기'}</button></div>
@@ -589,11 +695,12 @@
   function renderEnd(s) {
     const r = G.run, res = r.result, st = r.stats;
     const boss = DB.ENEMIES[r.bossKey];
-    setBg(res.won ? I.bg.hell : I.bg.battle, 'dim');
+    const H = G.hero();
+    setBg(I.bg2(res.won ? 'throne' : 'hell'), 'dim');
     const killer = res.enemy && DB.ENEMIES[res.enemy];
     const mins = Math.max(1, Math.round(res.time / 60000));
     s.innerHTML = `<section class="page end ${res.won ? 'won' : 'lost'}">
-      <div class="end-art">${res.won ? `${img(boss.img, 'end-foe', boss.name)}${img(I.emblem('gold'), 'end-emblem', '')}` : `${img(I.player, 'end-me', '여행자')}${killer ? img(killer.img, 'end-foe small', killer.name) : ''}`}</div>
+      <div class="end-art">${img(res.won ? H.front : (H.hurtFront || H.front), 'end-hero', H.name)}${res.won ? img(I.emblem('gold'), 'end-emblem', '') : ''}${killer ? img(killer.img, 'end-foe ' + (killer.sprite ? 'sprite' : 'portrait'), killer.name) : ''}</div>
       <div class="frame end-text"><small class="eyebrow">${res.won ? 'VICTORY' : 'GAME OVER'}</small><h1>${res.won ? '운명을 정복했다' : '여정이 끝났다'}</h1>
         <p>${res.won ? `${esc(boss.name)}을(를) 쓰러뜨리고 주사위의 운명을 손에 넣었습니다.` : `${res.floor}층에서 ${killer ? esc(killer.name) + '에게 ' : ''}쓰러졌습니다. 다른 길과 조합으로 다시 도전하세요.`}</p></div>
       <div class="panel stats">
@@ -646,7 +753,8 @@
   function sheetTab(tab, codexTab) {
     const r = G.run, m = G.meta;
     if (tab === 'status') {
-      return `<div class="status-top">${img(I.player, 'st-ava', '여행자')}<div><b>여행자</b>${bar(r.hp, r.maxHp, 'hp')}<div class="st-line">${coin(r.gold)}<span>${r.floor ? r.floor + '층' : '출발 전'} · ${esc(G.region(r.floor || 1).name)}</span></div></div></div>
+      const H = G.hero();
+      return `<div class="status-top"><div class="st-art">${img(G.heroImg('front'), 'st-full', H.name)}</div><div><small class="eyebrow">${esc(H.title)}</small><b>${esc(H.name)}</b>${bar(r.hp, r.maxHp, 'hp')}<div class="st-line">${coin(r.gold)}<span>${r.floor ? r.floor + '층' : '출발 지점'} · ${esc(G.region(r.floor).name)}</span></div><p class="perk small"><b>고유 능력</b> ${esc(H.perk)}</p></div></div>
         <h3 class="sub">주사위</h3><div class="dice-list">${r.dice.map((d, i) => `<div class="dl">${dieFace(6, d.kind)}<div><b>${i + 1}. ${d.kind ? esc(DB.DICE[d.kind].name) : '기본 주사위'}</b><small>${d.kind ? esc(DB.DICE[d.kind].desc) : '특별한 효과가 없다.'}</small></div></div>`).join('')}</div>
         <h3 class="sub">이번 여정</h3><div class="mini-stats"><span>처치 ${r.stats.kills}</span><span>정예 ${r.stats.elites}</span><span>준 피해 ${r.stats.dealt}</span><span>받은 피해 ${r.stats.taken}</span><span>최대 일격 ${r.stats.maxHit}</span></div>
         <button class="btn dark sm wide" id="sMenu">메인 메뉴로 (자동 저장)</button>`;
@@ -657,14 +765,16 @@
     }
     if (tab === 'hands') return handsTable();
     if (tab === 'codex') {
-      const cats = [['enemies', '몬스터'], ['relics', '유물'], ['dice', '주사위'], ['potions', '소모품']];
+      const cats = [['heroes', '주인공'], ['enemies', '몬스터'], ['relics', '유물'], ['dice', '주사위'], ['potions', '소모품']];
       let list = '';
-      if (codexTab === 'enemies') list = Object.keys(DB.ENEMIES).map(k => { const e = DB.ENEMIES[k], c = m.codex.enemies[k]; return c ? `<div class="cx ${e.type}">${img(e.img, 'cx-img', e.name)}<b>${esc(e.name)}</b><small>${esc(e.desc)}</small><small class="muted">만남 ${c.seen} · 처치 ${c.kills}</small></div>` : '<div class="cx locked"><div class="cx-img q">?</div><b>???</b><small>아직 만나지 못했다.</small></div>'; }).join('');
+      const hm = m.heroes || {};
+      if (codexTab === 'heroes') list = Object.keys(DB.HEROES).map(k => { const x = DB.HEROES[k], c = hm[k]; return `<div class="cx hero">${img(x.front, 'cx-img sprite', x.name)}<b>${esc(x.name)}</b><small>${esc(x.perk)}</small><small class="muted">여정 ${c ? c.runs : 0} · 정복 ${c ? c.wins : 0}</small></div>`; }).join('');
+      if (codexTab === 'enemies') list = Object.keys(DB.ENEMIES).map(k => { const e = DB.ENEMIES[k], c = m.codex.enemies[k]; return c ? `<div class="cx ${e.type}">${img(e.img, 'cx-img' + (e.sprite ? ' sprite' : ''), e.name)}<b>${esc(e.name)}</b><small>${esc(e.desc)}</small><small class="muted">만남 ${c.seen} · 처치 ${c.kills}</small></div>` : '<div class="cx locked"><div class="cx-img q">?</div><b>???</b><small>아직 만나지 못했다.</small></div>'; }).join('');
       if (codexTab === 'relics') list = Object.keys(DB.RELICS).map(k => m.codex.relics[k] ? `<button class="cx small" data-relic="${k}">${img(DB.RELICS[k].icon, 'cx-ico', '')}<b>${esc(DB.RELICS[k].name)}</b></button>` : '<div class="cx small locked"><div class="cx-ico q">?</div><b>???</b></div>').join('');
       if (codexTab === 'dice') list = Object.keys(DB.DICE).map(k => m.codex.dice[k] ? `<div class="cx small">${dieFace(6, k)}<b>${esc(DB.DICE[k].name)}</b><small>${esc(DB.DICE[k].desc)}</small></div>` : '<div class="cx small locked"><div class="cx-ico q">?</div><b>???</b></div>').join('');
       if (codexTab === 'potions') list = Object.keys(DB.POTIONS).map(k => m.codex.potions[k] ? `<div class="cx small">${img(DB.POTIONS[k].icon, 'cx-ico', '')}<b>${esc(DB.POTIONS[k].name)}</b><small>${esc(DB.POTIONS[k].desc)}</small></div>` : '<div class="cx small locked"><div class="cx-ico q">?</div><b>???</b></div>').join('');
-      const total = { enemies: Object.keys(DB.ENEMIES).length, relics: Object.keys(DB.RELICS).length, dice: Object.keys(DB.DICE).length, potions: Object.keys(DB.POTIONS).length };
-      return `<div class="subtabs">${cats.map(c => `<button class="${c[0] === codexTab ? 'on' : ''}" data-ctab="${c[0]}">${c[1]} <small>${Object.keys(m.codex[c[0]]).length}/${total[c[0]]}</small></button>`).join('')}</div><div class="codex ${codexTab}">${list}</div>`;
+      const total = { heroes: Object.keys(DB.HEROES).length, enemies: Object.keys(DB.ENEMIES).length, relics: Object.keys(DB.RELICS).length, dice: Object.keys(DB.DICE).length, potions: Object.keys(DB.POTIONS).length };
+      return `<div class="subtabs">${cats.map(c => `<button class="${c[0] === codexTab ? 'on' : ''}" data-ctab="${c[0]}">${c[1]} <small>${Object.keys(c[0] === 'heroes' ? hm : m.codex[c[0]]).length}/${total[c[0]]}</small></button>`).join('')}</div><div class="codex ${codexTab}">${list}</div>`;
     }
     if (tab === 'ach') {
       const ids = Object.keys(DB.ACHIEVEMENTS);
