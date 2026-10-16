@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#f4f5f7">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="다과비 계산기">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>다과비 계산기</title>
+<style>
+:root{
+  --bg:#f4f5f7; --card:#ffffff; --field:#f1f3f6; --text:#16181d; --sub:#6b7280; --line:#e6e8ec;
+  --accent:#2f6fed; --accent-soft:#e8efff; --good:#12a150; --warn:#e5484d; --warn-soft:#fdecec;
+  --shadow:0 1px 2px rgba(16,24,40,.05),0 4px 14px rgba(16,24,40,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#101215; --card:#1a1d22; --field:#23272e; --text:#f1f2f4; --sub:#9aa1ad; --line:#2b3038;
+    --accent:#5b8cff; --accent-soft:#1e2a44; --good:#3ccf7e; --warn:#ff6b6f; --warn-soft:#3a1f22;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25);
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);height:100%;overflow:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
+  -webkit-tap-highlight-color:transparent;font-variant-numeric:tabular-nums;-webkit-text-size-adjust:100%;word-break:keep-all}
+button,input{font:inherit;color:inherit}
+button{border:0;background:none;cursor:pointer;touch-action:manipulation}
+input{border:0;outline:none;background:none;min-width:0}
+
+.app{max-width:520px;margin:0 auto;height:var(--appH,100dvh);display:flex;flex-direction:column}
+
+/* 요약 */
+.top{padding:12px 16px 8px;flex:none}
+.summary{background:var(--card);border-radius:20px;padding:14px 18px 16px;box-shadow:var(--shadow)}
+.budget-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.budget{display:flex;align-items:center;gap:6px;background:var(--field);border-radius:10px;padding:6px 10px}
+.budget span{font-size:13px;color:var(--sub)}
+.budget input{width:92px;font-size:15px;font-weight:700;text-align:right}
+.budget em{font-style:normal;font-size:14px;font-weight:600}
+.reset{font-size:13px;color:var(--sub);padding:8px 10px;border-radius:10px}
+.reset.armed{color:#fff;background:var(--warn)}
+.remain-label{margin-top:12px;font-size:13px;color:var(--sub)}
+.remain{font-size:38px;font-weight:800;letter-spacing:-.02em;line-height:1.15;color:var(--good)}
+.remain small{font-size:20px;font-weight:700;margin-left:2px}
+.over .remain{color:var(--warn)}
+.bar{margin-top:10px;height:8px;border-radius:99px;background:var(--field);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:99px;transition:width .25s}
+.over .bar i{background:var(--warn)}
+.meta{display:flex;justify-content:space-between;margin-top:8px;font-size:13px;color:var(--sub)}
+.meta b{color:var(--text);font-weight:700}
+/* 입력 중에는 요약을 작게 */
+.typing .summary{padding:10px 16px}
+.typing .remain-label{margin-top:8px;display:inline-block}
+.typing .remain{font-size:26px;display:inline-block;margin-left:6px}
+.typing .remain small{font-size:15px}
+.typing .bar,.typing .meta{display:none}
+
+/* 목록 */
+.list{flex:1;overflow-y:auto;padding:4px 16px 12px;-webkit-overflow-scrolling:touch}
+.empty{text-align:center;color:var(--sub);font-size:14px;padding:36px 0;line-height:1.6}
+.item{background:var(--card);border-radius:14px;padding:10px 12px 10px 14px;margin-bottom:8px;box-shadow:var(--shadow);
+  display:grid;grid-template-columns:1fr auto;align-items:center;gap:2px 10px;border:2px solid transparent}
+.item.editing{border-color:var(--accent);background:var(--accent-soft)}
+.item .main{min-width:0;text-align:left;padding:2px 0}
+.item .name{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .name.noname{color:var(--sub);font-weight:500}
+.item .unit{font-size:13px;color:var(--sub);margin-top:2px}
+.item .sub{font-size:17px;font-weight:700;text-align:right;white-space:nowrap}
+.item .ctrl{grid-column:1/3;display:flex;align-items:center;justify-content:space-between;margin-top:6px}
+.mini{display:flex;align-items:center;background:var(--field);border-radius:10px}
+.mini button{width:36px;height:32px;font-size:18px;font-weight:600}
+.mini button:disabled{opacity:.3}
+.mini b{min-width:28px;text-align:center;font-size:15px}
+.del{height:32px;padding:0 10px;font-size:13px;color:var(--sub);border-radius:10px}
+.del:active{color:var(--warn);background:var(--warn-soft)}
+
+/* 입력 패널 */
+.panel{flex:none;background:var(--card);border-radius:20px 20px 0 0;box-shadow:0 -4px 18px rgba(16,24,40,.08);
+  padding:10px 16px calc(12px + env(safe-area-inset-bottom))}
+.preview{font-size:13px;color:var(--sub);min-height:18px;margin:0 2px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.preview b{color:var(--text)}
+.preview .bad{color:var(--warn)}
+.row{display:flex;gap:8px}
+.row+.row{margin-top:8px}
+.price{flex:1;position:relative;background:var(--field);border-radius:12px;display:flex;align-items:center}
+.price input{width:100%;height:54px;padding:0 34px 0 14px;font-size:24px;font-weight:700}
+.price input::placeholder{color:var(--sub);font-weight:500;font-size:18px}
+.price span{position:absolute;right:14px;font-size:16px;color:var(--sub)}
+.price.shake{animation:shake .3s}
+@keyframes shake{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.qty{flex:none;display:flex;align-items:center;background:var(--field);border-radius:12px}
+.qty button{width:40px;height:54px;font-size:22px;font-weight:600}
+.qty input{width:38px;text-align:center;font-size:20px;font-weight:700}
+.nameIn{flex:1;height:48px;background:var(--field);border-radius:12px;padding:0 14px;font-size:15px}
+.nameIn::placeholder{color:var(--sub)}
+.add{flex:none;min-width:92px;height:48px;border-radius:12px;background:var(--accent);color:#fff;font-size:16px;font-weight:700}
+.add:active{filter:brightness(.92)}
+.cancel{flex:none;height:48px;padding:0 12px;border-radius:12px;color:var(--sub);background:var(--field);font-size:14px;display:none}
+.editmode .cancel{display:block}
+
+/* 알림 */
+.toast{position:fixed;left:50%;top:14px;transform:translate(-50%,-80px);transition:transform .25s,opacity .25s;opacity:0;pointer-events:none;z-index:20;
+  background:#22252b;color:#fff;border-radius:12px;padding:10px 10px 10px 16px;font-size:14px;display:flex;align-items:center;gap:12px;
+  box-shadow:0 6px 20px rgba(0,0,0,.2);max-width:calc(100% - 32px)}
+.toast.show{transform:translate(-50%,0);opacity:1;pointer-events:auto}
+.toast button{color:#8fb3ff;font-weight:700;padding:4px 8px}
+
+/* 도구 버튼 · 품목 머리줄 */
+.hidden{display:none!important}
+.tools{display:flex;gap:2px}
+.icon-btn{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;color:var(--sub)}
+.icon-btn:active{background:var(--field)}
+.icon-btn svg{width:20px;height:20px}
+.listhead{flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 12px 2px 20px;font-size:13px;color:var(--sub)}
+.typing .listhead{display:none}
+
+/* 홈 화면 설치 안내 */
+.banner{background:var(--accent-soft);border-radius:16px;padding:12px 14px;margin-bottom:10px;display:flex;gap:12px;align-items:flex-start}
+.banner img{width:40px;height:40px;border-radius:10px;flex:none}
+.banner b{display:block;font-size:14px}
+.banner p{font-size:12px;color:var(--sub);margin-top:2px;line-height:1.45}
+.banner .btns{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.typing .banner{display:none}
+.chip{height:32px;padding:0 12px;border-radius:9px;font-size:13px;font-weight:600;background:var(--card);color:var(--text)}
+.chip.primary{background:var(--accent);color:#fff}
+.chip.ghost{background:none;color:var(--sub)}
+.empty .chip{margin-top:16px;box-shadow:var(--shadow)}
+
+/* 아래에서 올라오는 창 */
+.dim{position:fixed;inset:0;background:rgba(0,0,0,.38);z-index:30;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--card);width:100%;max-width:520px;border-radius:20px 20px 0 0;padding:20px 20px calc(20px + env(safe-area-inset-bottom));max-height:85%;overflow-y:auto}
+.sheet h3{font-size:18px;margin-bottom:10px}
+.sheet p{font-size:14px;color:var(--sub);line-height:1.55}
+.sheet p+p{margin-top:8px}
+.sheet ol{margin:12px 0 0 20px;font-size:15px;line-height:1.9}
+.kbd{display:inline-block;padding:0 6px;border-radius:6px;background:var(--field);font-weight:700}
+.srow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0 14px;border-bottom:1px solid var(--line)}
+.srow small{display:block;font-size:12px;color:var(--sub);margin-top:2px}
+.sbtn{width:100%;height:48px;border-radius:12px;background:var(--field);font-size:15px;font-weight:600;margin-top:10px}
+.sbtn.primary{background:var(--accent);color:#fff}
+.switch{position:relative;width:48px;height:28px;flex:none}
+.switch input{position:absolute;opacity:0;width:0;height:0}
+.switch span{position:absolute;inset:0;border-radius:99px;background:var(--line);transition:.2s}
+.switch span:after{content:"";position:absolute;left:3px;top:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.switch input:checked+span{background:var(--accent)}
+.switch input:checked+span:after{transform:translateX(20px)}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <div class="top">
+    <div class="banner hidden" id="banner">
+      <img src="icon-192.png" alt="">
+      <div>
+        <b>홈 화면에 설치해 두세요</b>
+        <p>아이콘으로 바로 열리고, 인터넷이 잘 안 되는 마트 안에서도 열려요.</p>
+        <div class="btns">
+          <button class="chip primary" id="bInst">설치하기</button>
+          <button class="chip" id="bFs">전체화면</button>
+          <button class="chip ghost" id="bLater">다음에</button>
+        </div>
+      </div>
+    </div>
+    <section class="summary" id="summary">
+      <div class="budget-row">
+        <label class="budget">
+          <span>예산</span>
+          <input id="budget" inputmode="numeric" enterkeyhint="done" autocomplete="off">
+          <em>원</em>
+        </label>
+        <div class="tools">
+          <button class="icon-btn" id="hFS" aria-label="전체화면"></button>
+          <button class="icon-btn" id="hSet" aria-label="설정"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+        </div>
+      </div>
+      <div class="remain-label" id="remainLabel">남은 금액</div>
+      <div class="remain" id="remain">0<small>원</small></div>
+      <div class="bar"><i id="bar"></i></div>
+      <div class="meta">
+        <span>사용 <b id="used">0</b>원</span>
+        <span id="pct">예산의 0%</span>
+      </div>
+    </section>
+  </div>
+
+  <div class="listhead">
+    <span id="count">담은 품목 0개</span>
+    <button class="reset" id="reset">새로 시작</button>
+  </div>
+
+  <main class="list" id="list"></main>
+
+  <section class="panel" id="panel">
+    <div class="preview" id="preview">가격과 개수를 넣고 추가하세요</div>
+    <div class="row">
+      <label class="price" id="priceBox">
+        <input id="price" inputmode="numeric" enterkeyhint="done" placeholder="가격" autocomplete="off">
+        <span>원</span>
+      </label>
+      <div class="qty">
+        <button id="qMinus" aria-label="개수 줄이기">−</button>
+        <input id="qty" inputmode="numeric" value="1" aria-label="개수" autocomplete="off">
+        <button id="qPlus" aria-label="개수 늘리기">+</button>
+      </div>
+    </div>
+    <div class="row">
+      <input class="nameIn" id="name" placeholder="품목 이름 (선택)" enterkeyhint="done" autocomplete="off">
+      <button class="cancel" id="cancel">취소</button>
+      <button class="add" id="add">추가</button>
+    </div>
+  </section>
+</div>
+
+<div id="sheetRoot"></div>
+<div class="toast" id="toast"><span id="toastMsg"></span><button id="undo">되돌리기</button></div>
+
+<script>
+(function(){
+  // 다른 곳에 게시되어 head 태그가 body로 들어간 경우 head로 옮김
+  Array.prototype.forEach.call(document.querySelectorAll('body meta, body link[rel]'), function(n){ document.head.appendChild(n); });
+  function isStandalone(){
+    return matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || navigator.standalone === true;
+  }
+
+  var KEY = 'snack-budget-calc-v1';
+  var $ = function(id){ return document.getElementById(id); };
+  var won = function(n){ return Number(n).toLocaleString('ko-KR'); };
+  var digits = function(s){ var v = parseInt(String(s).replace(/[^\d]/g,''),10); return isNaN(v) ? 0 : v; };
+  var esc = function(s){ return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); };
+
+  var state = { budget:120000, items:[], seq:0 };
+  try{
+    var saved = JSON.parse(localStorage.getItem(KEY));
+    if(saved && Array.isArray(saved.items)) state = saved;
+  }catch(e){}
+  function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+
+  var typingInputs;
+  var editId = null, undoData = null, toastTimer = null, resetTimer = null;
+
+  var el = {
+    app:$('app'), summary:$('summary'), budget:$('budget'), reset:$('reset'), remainLabel:$('remainLabel'),
+    remain:$('remain'), bar:$('bar'), used:$('used'), count:$('count'), list:$('list'), panel:$('panel'),
+    preview:$('preview'), priceBox:$('priceBox'), price:$('price'), qty:$('qty'), qMinus:$('qMinus'),
+    qPlus:$('qPlus'), name:$('name'), add:$('add'), cancel:$('cancel'), toast:$('toast'), toastMsg:$('toastMsg'), undo:$('undo')
+  };
+
+  function total(exceptId){
+    var t = 0;
+    state.items.forEach(function(it){ if(it.id !== exceptId) t += it.price * it.qty; });
+    return t;
+  }
+
+  function render(){
+    var used = total(null), remain = state.budget - used;
+    var over = remain < 0;
+    el.summary.classList.toggle('over', over);
+    el.remainLabel.textContent = over ? '예산 초과' : '남은 금액';
+    el.remain.innerHTML = won(Math.abs(remain)) + '<small>원</small>';
+    el.used.textContent = won(used);
+    var pct = state.budget > 0 ? Math.min(100, used / state.budget * 100) : (used > 0 ? 100 : 0);
+    el.bar.style.width = pct + '%';
+    var qsum = state.items.reduce(function(a,it){ return a + it.qty; }, 0);
+    el.count.textContent = '담은 품목 ' + state.items.length + '개 · 총 ' + qsum + '개';
+    $('pct').textContent = '예산의 ' + (state.budget > 0 ? Math.round(used / state.budget * 100) : 0) + '%';
+    if(document.activeElement !== el.budget) el.budget.value = won(state.budget);
+
+    if(!state.items.length){
+      el.list.innerHTML = '<div class="empty">아래에 가격과 개수를 넣고<br><b>추가</b>를 누르면 여기에 쌓입니다' +
+        (isStandalone() ? '' : '<br><button class="chip" data-install>홈 화면에 설치하기</button>') + '</div>';
+    }else{
+      // 최근에 넣은 품목이 맨 위
+      el.list.innerHTML = state.items.slice().reverse().map(function(it){
+        var nm = it.name ? esc(it.name) : '품목 ' + it.no;
+        return '<div class="item' + (it.id === editId ? ' editing' : '') + '" data-id="' + it.id + '">' +
+          '<button class="main" data-act="edit"><div class="name' + (it.name ? '' : ' noname') + '">' + nm + '</div>' +
+          '<div class="unit">' + won(it.price) + '원 × ' + it.qty + '</div></button>' +
+          '<div class="sub">' + won(it.price * it.qty) + '원</div>' +
+          '<div class="ctrl"><div class="mini">' +
+            '<button data-act="minus"' + (it.qty <= 1 ? ' disabled' : '') + ' aria-label="개수 줄이기">−</button>' +
+            '<b>' + it.qty + '</b>' +
+            '<button data-act="plus" aria-label="개수 늘리기">+</button></div>' +
+          '<button class="del" data-act="del">삭제</button></div></div>';
+      }).join('');
+    }
+    updatePreview();
+  }
+
+  function formQty(){ return Math.max(1, digits(el.qty.value) || 1); }
+
+  function updatePreview(){
+    var price = digits(el.price.value), q = formQty();
+    var base = state.budget - total(editId);   // 지금 입력 중인 품목을 빼고 남는 돈
+    if(!price){
+      el.preview.innerHTML = editId ? '수정할 가격과 개수를 넣으세요' :
+        (base >= 0 ? '남은 <b>' + won(base) + '원</b> 안에서 고르세요' : '<span class="bad">이미 예산을 넘었어요</span>');
+      return;
+    }
+    var sub = price * q, after = base - sub, maxQ = Math.floor(base / price);
+    var html = '<b>' + won(sub) + '원</b> → ';
+    html += after >= 0 ? '잔액 <b>' + won(after) + '원</b>' : '<span class="bad">' + won(-after) + '원 초과</span>';
+    html += ' · 최대 <b>' + Math.max(0, maxQ) + '개</b>';
+    el.preview.innerHTML = html;
+  }
+
+  function resetForm(){
+    editId = null;
+    el.price.value = ''; el.qty.value = '1'; el.name.value = '';
+    el.add.textContent = '추가';
+    el.panel.classList.remove('editmode');
+  }
+
+  function submit(){
+    var price = digits(el.price.value);
+    if(!price){
+      el.priceBox.classList.remove('shake'); void el.priceBox.offsetWidth; el.priceBox.classList.add('shake');
+      el.price.focus(); return;
+    }
+    var q = formQty(), nm = el.name.value.trim();
+    if(editId){
+      var it = state.items.find(function(x){ return x.id === editId; });
+      if(it){ it.price = price; it.qty = q; it.name = nm; }
+    }else{
+      state.seq = (state.seq || 0) + 1;
+      state.items.push({ id: 'i' + Date.now() + Math.random().toString(36).slice(2,6), no: state.seq, name: nm, price: price, qty: q });
+    }
+    resetForm(); save(); render();
+    el.list.scrollTop = 0;
+    el.price.focus();
+  }
+
+  function startEdit(id){
+    var it = state.items.find(function(x){ return x.id === id; });
+    if(!it) return;
+    editId = id;
+    el.price.value = won(it.price); el.qty.value = it.qty; el.name.value = it.name || '';
+    el.add.textContent = '수정';
+    el.panel.classList.add('editmode');
+    render();
+    el.price.focus();
+  }
+
+  function showToast(msg, data){
+    undoData = data || null;
+    el.undo.style.display = data ? '' : 'none';
+    el.toastMsg.textContent = msg;
+    el.toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ el.toast.classList.remove('show'); undoData = null; }, 4500);
+  }
+
+  typingInputs = [el.price, el.qty, el.name];
+
+  // 목록 버튼
+  el.list.addEventListener('click', function(e){
+    if(e.target.closest('[data-install]')){ installSheet(); return; }
+    var btn = e.target.closest('[data-act]'); if(!btn) return;
+    var card = btn.closest('.item'); var id = card.getAttribute('data-id');
+    var idx = state.items.findIndex(function(x){ return x.id === id; });
+    var it = state.items[idx]; if(!it) return;
+    var act = btn.getAttribute('data-act');
+    if(act === 'edit'){ editId === id ? (resetForm(), render()) : startEdit(id); return; }
+    if(act === 'plus'){ it.qty++; }
+    if(act === 'minus' && it.qty > 1){ it.qty--; }
+    if(act === 'del'){
+      state.items.splice(idx, 1);
+      if(editId === id) resetForm();
+      showToast('“' + (it.name || '품목 ' + it.no) + '” 삭제', { type:'one', item: it, idx: idx });
+    }
+    if(editId === id && act !== 'del'){ el.qty.value = it.qty; }
+    save(); render();
+  });
+
+  el.undo.addEventListener('click', function(){
+    if(!undoData) return;
+    if(undoData.type === 'one') state.items.splice(undoData.idx, 0, undoData.item);
+    if(undoData.type === 'all') state.items = undoData.items;
+    undoData = null; el.toast.classList.remove('show');
+    save(); render();
+  });
+
+  // 전체 삭제: 두 번 눌러야 지워짐
+  el.reset.addEventListener('click', function(){
+    if(!state.items.length) return;
+    if(!el.reset.classList.contains('armed')){
+      el.reset.classList.add('armed'); el.reset.textContent = '한 번 더 누르면 전체 삭제';
+      clearTimeout(resetTimer);
+      resetTimer = setTimeout(function(){ el.reset.classList.remove('armed'); el.reset.textContent = '새로 시작'; }, 3000);
+      return;
+    }
+    clearTimeout(resetTimer);
+    el.reset.classList.remove('armed'); el.reset.textContent = '새로 시작';
+    showToast('목록을 모두 지웠어요', { type:'all', items: state.items });
+    state.items = []; state.seq = 0; resetForm(); save(); render();
+  });
+
+  // 입력 칸
+  function moneyInput(input){
+    input.addEventListener('input', function(){
+      var v = digits(input.value); if(v > 999999999) v = 999999999;
+      input.value = v ? won(v) : '';
+    });
+  }
+  moneyInput(el.price); moneyInput(el.budget);
+  el.price.addEventListener('input', updatePreview);
+  el.budget.addEventListener('input', function(){ state.budget = digits(el.budget.value); save(); render(); });
+  el.budget.addEventListener('focus', function(){ el.budget.select(); });
+  el.budget.addEventListener('blur', function(){ el.budget.value = won(state.budget); });
+  el.budget.addEventListener('keydown', function(e){ if(e.key === 'Enter') el.budget.blur(); });
+
+  el.qty.addEventListener('input', function(){ var v = digits(el.qty.value); el.qty.value = v ? Math.min(v, 999) : ''; updatePreview(); });
+  el.qty.addEventListener('blur', function(){ el.qty.value = formQty(); updatePreview(); });
+  el.qty.addEventListener('focus', function(){ el.qty.select(); });
+  function stepQty(d){ el.qty.value = Math.min(999, Math.max(1, formQty() + d)); updatePreview(); }
+  el.qMinus.addEventListener('click', function(){ stepQty(-1); });
+  el.qPlus.addEventListener('click', function(){ stepQty(1); });
+
+  [el.price, el.qty, el.name].forEach(function(inp){
+    inp.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); submit(); } });
+  });
+  el.add.addEventListener('click', submit);
+  el.cancel.addEventListener('click', function(){ resetForm(); render(); });
+
+  // 패널 버튼을 눌러도 키보드가 내려가지 않게
+  [el.add, el.qMinus, el.qPlus, el.cancel].forEach(function(b){
+    b.addEventListener('mousedown', function(e){ if(document.activeElement && document.activeElement !== document.body) e.preventDefault(); });
+  });
+
+  // 입력 중에 목록 버튼을 눌러도 키보드와 화면 배치가 흔들리지 않게
+  el.list.addEventListener('mousedown', function(e){
+    if(e.target.closest('[data-act]') && typingInputs.indexOf(document.activeElement) >= 0) e.preventDefault();
+  });
+
+  // 입력 중에는 요약을 작게 접어서 목록이 보이게
+  function setTyping(){
+    var on = typingInputs.indexOf(document.activeElement) >= 0;
+    document.body.classList.toggle('typing', on);
+  }
+  document.addEventListener('focusin', setTyping);
+  document.addEventListener('focusout', function(){ setTimeout(setTyping, 50); });
+
+  // 키보드가 올라와도 입력 패널이 키보드 위에 있도록 화면 높이 맞춤
+  var vv = window.visualViewport;
+  function fit(){
+    var h = vv ? vv.height : window.innerHeight;
+    document.documentElement.style.setProperty('--appH', h + 'px');
+    window.scrollTo(0, 0);
+  }
+  if(vv){ vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit); }
+  window.addEventListener('resize', fit);
+  fit();
+
+  // ===== 홈 화면 설치 · 전체화면 =====
+  var UIKEY = 'snack-calc-ui-v1', ui = { autoFS: true, installDismissed: false };
+  try{ var u = JSON.parse(localStorage.getItem(UIKEY)); if(u) for(var k in u) ui[k] = u[k]; }catch(e){}
+  function saveUI(){ try{ localStorage.setItem(UIKEY, JSON.stringify(ui)); }catch(e){} }
+
+  var SVG = function(d){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="' + d + '"/></svg>'; };
+  var ICON = { fsOn: SVG('M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5'), fsOff: SVG('M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5') };
+  var inFrame = false; try{ inFrame = window.self !== window.top; }catch(e){ inFrame = true; }
+
+  var FS = {
+    userExit: false,
+    supported: function(){ var d = document.documentElement; return !!(d.requestFullscreen || d.webkitRequestFullscreen) && !isStandalone() && !inFrame; },
+    on: function(){ return !!(document.fullscreenElement || document.webkitFullscreenElement); },
+    enter: function(){
+      var d = document.documentElement;
+      try{ var r = d.requestFullscreen ? d.requestFullscreen({ navigationUI: 'hide' }) : (d.webkitRequestFullscreen && d.webkitRequestFullscreen()); if(r && r.catch) r.catch(function(){}); }catch(e){}
+    },
+    exit: function(){
+      try{ var r = document.exitFullscreen ? document.exitFullscreen() : (document.webkitExitFullscreen && document.webkitExitFullscreen()); if(r && r.catch) r.catch(function(){}); }catch(e){}
+    },
+    toggle: function(){
+      if(!FS.supported()){ installSheet(); return; }   // 아이폰처럼 전체화면이 막힌 곳은 설치 방법 안내
+      if(FS.on()){ FS.userExit = true; FS.exit(); } else { FS.userExit = false; FS.enter(); }
+    }
+  };
+
+  var installEvt = null;
+  window.addEventListener('beforeinstallprompt', function(e){ e.preventDefault(); installEvt = e; paintInstall(); });
+  window.addEventListener('appinstalled', function(){ installEvt = null; ui.installDismissed = true; saveUI(); paintInstall(); showToast('홈 화면에 설치했어요'); });
+
+  function paintInstall(){
+    var sa = isStandalone();
+    $('banner').classList.toggle('hidden', sa || inFrame || ui.installDismissed);
+    $('bFs').classList.toggle('hidden', !FS.supported());
+    var h = $('hFS');
+    h.classList.toggle('hidden', sa);
+    h.innerHTML = FS.on() ? ICON.fsOff : ICON.fsOn;
+    h.setAttribute('aria-label', FS.on() ? '전체화면 끝내기' : '전체화면');
+  }
+
+  function openSheet(html){
+    var dim = document.createElement('div');
+    dim.className = 'dim';
+    dim.innerHTML = '<div class="sheet" role="dialog">' + html + '</div>';
+    dim.addEventListener('click', function(e){ if(e.target === dim || e.target.closest('[data-close]')) dim.remove(); });
+    $('sheetRoot').appendChild(dim);
+    return dim.firstChild;
+  }
+
+  function doInstall(){
+    var ev = installEvt; installEvt = null;
+    try{
+      ev.prompt();
+      ev.userChoice.then(function(r){ if(r && r.outcome === 'accepted'){ ui.installDismissed = true; saveUI(); } paintInstall(); }).catch(function(){});
+    }catch(e){ installSheet(); }
+  }
+
+  function installSheet(){
+    if(isStandalone()){ showToast('이미 홈 화면 앱으로 실행 중이에요'); return; }
+    if(installEvt){ doInstall(); return; }   // 바로 설치 창 띄우기
+    var ua = navigator.userAgent;
+    var ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var samsung = /SamsungBrowser/i.test(ua), inapp = /KAKAOTALK|NAVER\(inapp|Instagram|FBAN|FBAV|Line\//i.test(ua);
+    var mobile = /Android|Mobi/i.test(ua) || ios;
+    var kbd = function(t){ return '<span class="kbd">' + t + '</span>'; };
+    var how;
+    if(location.protocol === 'file:') how = '<p>지금은 파일로 열려 있어서 설치할 수 없어요. 휴대폰 크롬이나 사파리에서 아래 주소로 열어 주세요.</p><p><b>handscil01-afk.github.io/Sungmo/snack-calc/</b></p>';
+    else if(inapp) how = '<ol><li>오른쪽 아래(또는 위) ' + kbd('⋮') + ' 메뉴를 누르세요</li><li><b>다른 브라우저로 열기</b>(크롬·사파리)를 누르세요</li><li>열린 화면에서 다시 <b>설치하기</b>를 누르세요</li></ol>';
+    else if(ios) how = '<ol><li>사파리 아래(또는 위) ' + kbd('공유 ⬆') + ' 단추를 누르세요</li><li>메뉴를 올려 <b>홈 화면에 추가</b>를 누르세요</li><li>오른쪽 위 <b>추가</b>를 누르세요</li></ol>';
+    else if(samsung) how = '<ol><li>아래 ' + kbd('≡') + ' 메뉴를 누르세요</li><li><b>현재 페이지 추가</b> → <b>홈 화면</b>을 누르세요</li></ol>';
+    else if(mobile) how = '<ol><li>오른쪽 위 ' + kbd('⋮') + ' 메뉴를 누르세요</li><li><b>앱 설치</b> 또는 <b>홈 화면에 추가</b>를 누르세요</li><li>뜨는 창에서 <b>설치</b>를 누르세요</li></ol>';
+    else how = '<ol><li>크롬·엣지 주소창 오른쪽의 ' + kbd('설치 ⊕') + ' 아이콘을 누르세요</li><li>없으면 ' + kbd('⋮') + ' 메뉴 → <b>앱 설치</b>(또는 <b>앱</b> → <b>이 사이트를 앱으로 설치</b>)를 누르세요</li></ol>';
+    openSheet('<h3>홈 화면에 설치하기</h3><p>설치하면 아이콘으로 바로 열리고, 주소창 없이 화면을 넓게 쓸 수 있어요. 인터넷이 잘 안 되는 곳에서도 열려요.</p>' + how +
+      '<button class="sbtn primary" data-close>알겠어요</button>');
+  }
+
+  function settingsSheet(){
+    var h = '<h3>설정</h3>';
+    if(FS.supported()){
+      h += '<div class="srow"><span>자동 전체화면<small>화면을 처음 누르면 주소창 없이 전체화면으로 바꿔요</small></span>' +
+        '<label class="switch"><input type="checkbox" id="stFs"' + (ui.autoFS ? ' checked' : '') + '><span></span></label></div>';
+      h += '<button class="sbtn" data-a="fs">' + (FS.on() ? '전체화면 끝내기' : '전체화면 켜기') + '</button>';
+    }
+    if(!isStandalone()) h += '<button class="sbtn" data-a="inst">홈 화면에 설치하기</button>';
+    h += '<button class="sbtn primary" data-close>닫기</button>';
+    var sh = openSheet(h);
+    var sw = sh.querySelector('#stFs');
+    if(sw) sw.addEventListener('change', function(){ ui.autoFS = sw.checked; saveUI(); });
+    sh.addEventListener('click', function(e){
+      var b = e.target.closest('[data-a]'); if(!b) return;
+      sh.parentNode.remove();
+      if(b.getAttribute('data-a') === 'fs') FS.toggle();
+      else installSheet();
+    });
+  }
+
+  $('hFS').addEventListener('click', FS.toggle);
+  $('hSet').addEventListener('click', settingsSheet);
+  $('bInst').addEventListener('click', installSheet);
+  $('bFs').addEventListener('click', FS.toggle);
+  $('bLater').addEventListener('click', function(){
+    ui.installDismissed = true; saveUI(); paintInstall();
+    showToast('설정(톱니바퀴)에서 언제든 설치할 수 있어요');
+  });
+
+  // 자동 전체화면: 화면을 처음 누를 때 (버튼으로 직접 끈 뒤에는 다시 켜지 않음)
+  document.addEventListener('click', function(e){
+    if(!ui.autoFS || FS.userExit || FS.on() || !FS.supported()) return;
+    if(e.target.closest && e.target.closest('#hFS, #hSet, #banner, .dim')) return;
+    FS.enter();
+  }, true);
+  document.addEventListener('fullscreenchange', function(){ paintInstall(); fit(); });
+  document.addEventListener('webkitfullscreenchange', function(){ paintInstall(); fit(); });
+
+  if('serviceWorker' in navigator && location.protocol === 'https:'){
+    window.addEventListener('load', function(){ navigator.serviceWorker.register('sw.js').catch(function(){}); });
+  }
+
+  paintInstall();
+  render();
+})();
+</script>
+</body>
+</html>
