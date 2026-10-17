@@ -1,7 +1,7 @@
 # Sungmo 저장소 작업 규칙
 
-이 저장소에는 빌드 없이 브라우저에서 바로 동작하는 웹 앱(게임, 연습 도구 등)을 앱마다 폴더 하나씩 만든다. 예: `bible-marble/`, `piano/`
-- 작은 앱은 HTML 파일 하나로 만들어도 된다. 커지면 `bible-marble/`처럼 `index.html` + `css/` + `js/`(일반 `<script>`, 빌드 없음)로 나눈다.
+이 저장소에는 빌드 없이 브라우저에서 바로 동작하는 웹 앱(게임, 연습 도구 등)을 앱마다 폴더 하나씩 만든다. 예: `snack-calc/`, `dicebound/`. 코드를 지운 앱의 개발 노트(`bible-marble/README.md`, `piano/README.md`)는 새 앱을 만들 때 참고한다.
+- 작은 앱은 HTML 파일 하나로 만들어도 된다. 커지면 `index.html` + `css/` + `js/`(일반 `<script>`, 빌드 없음)로 나눈다.
 - GitHub Pages(`main` 브랜치)로 배포한다. 주소: https://handscil01-afk.github.io/Sungmo/<앱 폴더>/
 - 채팅에서 새 HTML 앱을 만들 때도 따로 말하지 않아도 이 저장소에 새 앱 폴더로 만들어 `main`에 올리고, 앱 목록(`index.html`)과 `README.md`에 추가한다(사용자 요청).
 - 파일을 추가·변경하면 앱의 `sw.js` 캐시 목록과 캐시 이름(버전)도 함께 고친다.
