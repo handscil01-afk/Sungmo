@@ -1,0 +1,17 @@
+{
+ "name": "명찰 만들기",
+ "short_name": "명찰 만들기",
+ "description": "명단으로 행사용 양면 명찰과 직원용 접는 비상연락망을 만들어 인쇄하는 도구",
+ "scope": "./",
+ "display": "fullscreen",
+ "display_override": ["fullscreen", "standalone"],
+ "orientation": "any",
+ "background_color": "#f4f5f7",
+ "theme_color": "#2f6fed",
+ "lang": "ko",
+ "icons": [
+  { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+  { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+  { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+ ]
+}

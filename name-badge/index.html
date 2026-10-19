@@ -1,0 +1,1796 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2f6fed">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="명찰 만들기">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>명찰 만들기</title>
+<style>
+:root{
+  --bg:#f4f5f7; --card:#ffffff; --field:#f1f3f6; --text:#16181d; --sub:#6b7280; --line:#dfe3e8;
+  --accent:#2f6fed; --accent-soft:#e8efff; --good:#12a150; --warn:#e5484d; --warn-soft:#fdecec; --amber:#b7791f; --amber-soft:#fff6e0;
+  --stage:#d9dde3; --lw:clamp(560px,46vw,660px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#101215; --card:#1a1d22; --field:#23272e; --text:#f1f2f4; --sub:#9aa1ad; --line:#2f343c;
+    --accent:#5b8cff; --accent-soft:#1e2a44; --good:#3ccf7e; --warn:#ff6b6f; --warn-soft:#3a1f22; --amber:#e6b450; --amber-soft:#3a3118; --stage:#2a2e35;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--text)}
+body{display:flex;flex-direction:column;height:100dvh;font:14px/1.4 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR","Noto Sans CJK KR",sans-serif;word-break:keep-all}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+.hidden{display:none!important}
+.sub{color:var(--sub);font-size:12px}
+.top{flex:none;height:44px;display:flex;align-items:center;gap:8px;padding:0 12px;background:var(--card);border-bottom:1px solid var(--line)}
+.top img{width:26px;height:26px;border-radius:6px}
+.top h1{font-size:16px;margin:0;flex:1;font-weight:700}
+.ib{width:34px;height:34px;border:1px solid var(--line);background:var(--card);border-radius:8px;display:grid;place-items:center}
+.ib svg{width:18px;height:18px}
+.ib:hover{background:var(--field)}
+.seg.viewsw{display:none}
+#banner{flex:none;display:flex;align-items:center;gap:10px;padding:6px 12px;background:var(--accent-soft);border-bottom:1px solid var(--line);flex-wrap:wrap}
+#banner img{width:28px;height:28px;border-radius:7px}
+#banner b{font-size:13px}
+#banner span.t{flex:1;min-width:180px;font-size:12px;color:var(--sub)}
+.btn{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:6px 11px;font-size:13px;white-space:nowrap}
+.btn:hover{background:var(--field)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.pri:hover{filter:brightness(1.08)}
+.btn.sm{padding:3px 8px;font-size:12px}
+.btn.danger{color:var(--warn)}
+.btn.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+.btn:disabled{opacity:.45;cursor:default}
+#app{flex:1;min-height:0;display:grid;grid-template-columns:var(--lw) 1fr}
+#left{display:flex;flex-direction:column;min-height:0;min-width:0;border-right:1px solid var(--line);background:var(--card)}
+.tabs{flex:none;display:flex;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;border:0;background:transparent;padding:10px 4px;font-weight:600;color:var(--sub);border-bottom:3px solid transparent;white-space:nowrap}
+.tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
+#tabBody{flex:1;min-height:0;overflow:auto;padding:10px 12px}
+#tabBody.flexcol{display:flex;flex-direction:column;overflow:hidden}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px}
+.cols>div{min-width:0}
+h4{margin:10px 0 4px;font-size:13px}
+h4:first-child{margin-top:0}
+.f{display:flex;align-items:center;gap:6px;margin:5px 0}
+.f>label{flex:none;min-width:70px;color:var(--sub);font-size:13px}
+.f input[type=text],.f select,.f input[type=number]{flex:1;min-width:0;border:1px solid var(--line);background:var(--field);border-radius:6px;padding:4px 7px}
+.f input[type=number]{max-width:84px;text-align:right}
+.f input[type=color]{width:36px;height:26px;padding:0;border:1px solid var(--line);border-radius:5px;background:none}
+textarea.ta{width:100%;border:1px solid var(--line);background:var(--field);border-radius:6px;padding:5px 7px;resize:vertical;font-size:13px;line-height:1.35}
+.ck{display:flex;align-items:center;gap:6px;margin:5px 0;font-size:13px;cursor:pointer}
+.ck input{width:16px;height:16px;flex:none}
+.rn{margin:6px 0}
+.rn .h{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:13px}
+.rn .h label{color:var(--sub)}
+.rn .h input[type=number]{width:72px;text-align:right;border:1px solid var(--line);background:var(--field);border-radius:6px;padding:2px 6px}
+.rn input[type=range]{width:100%;margin:2px 0 0}
+.btns{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.note{font-size:12px;color:var(--sub);margin:4px 0}
+.warnbox{font-size:12px;color:var(--warn);background:var(--warn-soft);border-radius:6px;padding:4px 8px;margin:4px 0}
+.infobox{font-size:12px;color:var(--text);background:var(--accent-soft);border-radius:6px;padding:5px 8px;margin:6px 0}
+.pills{display:flex;flex-wrap:wrap;gap:5px;margin:2px 0 8px}
+.pill{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:3px 10px;font-size:12px}
+.pill.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.pill i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:baseline}
+/* 명단 표 */
+.twrap{flex:1;min-height:0;overflow:auto;border:1px solid var(--line);border-radius:8px}
+table.rt{width:100%;border-collapse:collapse;font-size:13px;min-width:530px;table-layout:fixed}
+.rt th{position:sticky;top:0;background:var(--field);z-index:1;text-align:left;font-weight:600;padding:5px 4px;font-size:12px;color:var(--sub);border-bottom:1px solid var(--line)}
+.rt td{padding:1px 2px;border-bottom:1px solid var(--line);vertical-align:middle}
+.rt tr.sel td{background:var(--accent-soft)}
+.rt input[type=text],.rt select{width:100%;min-width:0;border:1px solid transparent;background:transparent;padding:3px 3px;border-radius:4px;font-size:13px}
+.rt input[type=text]:hover,.rt select:hover,.rt input[type=text]:focus,.rt select:focus{border-color:var(--line);background:var(--card)}
+.rt select{padding:3px 0}
+.rt .pcw{display:flex;flex-wrap:wrap;gap:1px 3px;align-items:center}.rt .pcw select{flex:1;min-width:64px;width:auto}
+.rt td.c{text-align:center}.rt td{overflow:hidden}
+.mini{border:1px solid var(--line);background:var(--card);border-radius:5px;font-size:11px;padding:1px 5px}
+.ck.mini{border:0;background:none;display:inline-flex;margin:0 4px 0 0;font-size:11px}
+.ck.mini input{width:13px;height:13px}
+.x{border:0;background:transparent;color:var(--sub);font-size:17px;line-height:1;padding:2px 6px}
+.x:hover{color:var(--warn)}
+/* 미리보기 */
+#right{display:flex;flex-direction:column;min-height:0;min-width:0}
+#pvBar{flex:none;display:flex;align-items:center;gap:8px;padding:6px 10px;flex-wrap:wrap;border-bottom:1px solid var(--line);background:var(--card)}
+.seg{display:flex}
+.seg button{border:1px solid var(--line);background:var(--card);padding:4px 10px;font-size:13px}
+.seg button:first-child{border-radius:7px 0 0 7px}
+.seg button:last-child{border-radius:0 7px 7px 0}
+.seg button+button{border-left:0}
+.seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+#pvNav{display:flex;align-items:center;gap:5px;margin-left:auto}
+#pvNav select{max-width:190px;border:1px solid var(--line);background:var(--field);border-radius:6px;padding:3px 6px}
+#pvNav .lbl{font-size:13px;min-width:92px;text-align:center}
+#pvWarn{flex:none}
+#pvWarn .warnbox{margin:0;border-radius:0;padding:5px 12px}
+#pvStage{flex:1;min-height:0;background:var(--stage);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+#pvStage .arr{display:flex;gap:14px;align-items:flex-start;justify-content:center}
+#pvStage .arr.col{flex-direction:column;align-items:center}
+.pvitem .cap{font-size:12px;color:var(--sub);text-align:center;margin-bottom:3px;height:16px}
+.pvbox{position:relative;box-shadow:0 2px 10px rgba(0,0,0,.25);background:#fff}
+.pvbox .sc{transform-origin:0 0;position:absolute;left:0;top:0}
+#pvFoot{flex:none;padding:5px 12px;font-size:12px;color:var(--sub);background:var(--card);border-top:1px solid var(--line);min-height:28px}
+/* 모달·토스트 */
+.dim{position:fixed;inset:0;background:rgba(0,0,0,.45);display:grid;place-items:center;z-index:50;padding:8px}
+.mdl{background:var(--card);border-radius:12px;width:min(520px,96vw);max-height:94vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+.mdl.wide{width:min(940px,98vw)}
+.mh{display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--line)}
+.mh h3{margin:0;font-size:15px}
+.mh .back{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:5px 11px;font-size:13px;font-weight:600}
+.mb{padding:12px;overflow:auto;flex:1;min-height:0}
+.mf{display:flex;gap:8px;justify-content:flex-end;padding:10px;border-top:1px solid var(--line);flex-wrap:wrap}
+.mb p{margin:6px 0}
+.mb ol{margin:6px 0;padding-left:20px}
+.kbd{display:inline-block;border:1px solid var(--line);background:var(--field);border-radius:5px;padding:0 6px;font-size:12px}
+#toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#22262d;color:#fff;padding:8px 14px;border-radius:10px;z-index:80;display:none;align-items:center;gap:12px;max-width:92vw;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.3)}
+#toast.on{display:flex}
+#toast button{border:0;background:transparent;color:#8fb4ff;font-weight:700}
+.dropz{border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;color:var(--sub)}
+.dropz.over{border-color:var(--accent);background:var(--accent-soft)}
+.wz table{border-collapse:collapse;width:100%;font-size:13px}
+.wz th,.wz td{border-bottom:1px solid var(--line);padding:3px 6px;text-align:left;vertical-align:middle}
+.wz th{background:var(--field);font-size:12px;color:var(--sub)}
+.wz .tw{max-height:230px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin:6px 0}
+.wz select,.wz input[type=number]{border:1px solid var(--line);background:var(--field);border-radius:6px;padding:3px 6px}
+.wz .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:6px 0}
+.wz .ex{color:var(--sub);font-size:12px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* ===== 명찰 · 인쇄 (실제 mm 크기) ===== */
+.bdg{position:relative;box-sizing:border-box;overflow:hidden;background:#fff;color:#111;display:flex;flex-direction:column;--sn:1;--so:1;--se:1;--g:1;line-height:1.2}
+.bdg .bnd{flex:none;margin:-.3mm -.3mm 0;color:#fff;text-align:center;font-weight:700;white-space:nowrap;overflow:hidden}
+.bdg .fbody{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1mm;padding:1.5mm 3mm;position:relative;text-align:center}
+.bdg .nm{width:100%;white-space:nowrap;font-weight:800;line-height:1.2}
+.bdg .orgrow{width:100%;display:block;text-align:center;white-space:nowrap}
+.bdg .lgi{display:inline-block;vertical-align:middle;margin-right:1.5mm;object-fit:contain}
+.bdg .org{white-space:nowrap;font-weight:600;color:#333}
+.bdg .evn{width:100%;white-space:nowrap;color:#444;font-weight:600}
+.bdg .lg{display:block;object-fit:contain;flex:none}
+.bdg .lgc{position:absolute}
+.bdg .bkbox{flex:1;min-height:0;padding:3mm 3.5mm;display:flex;flex-direction:column;justify-content:center;overflow:hidden}
+.bdg .bkin{width:100%;--g:1;font-size:calc(var(--bpt) * var(--g))}
+.bkin .tt{font-weight:800;font-size:1.25em;text-align:center;margin-bottom:.35em}
+.bkin .nt{white-space:pre-wrap;text-align:center;margin:.3em 0;font-weight:600}
+.bkin .sec{margin:.35em 0}
+.bkin .sh{font-weight:700;font-size:.82em;color:#555;border-bottom:.2mm solid #999;margin-bottom:.15em}
+.bkin .ct{display:flex;align-items:baseline;gap:.5em;flex-wrap:wrap}
+.bkin .ct .lb{font-size:.8em;color:#555;min-width:3.6em}
+.bkin .ct .n2{font-weight:700}
+.bkin .ct .ph{font-weight:800;font-size:1.15em;margin-left:auto;white-space:nowrap}
+.bkin .evg{display:grid;grid-template-columns:max-content 1fr;gap:0 .5em}
+.bkin .evg .tm{font-weight:700;white-space:nowrap}
+.bkin .evg .wide{grid-column:1/-1}
+.bkin .fr{white-space:pre-wrap;margin:.3em 0}
+.pg{position:relative;background:#fff;overflow:hidden;flex:none}
+.pg .cell{position:absolute}
+.pg .cutd{position:absolute;outline:.2mm dashed #555;outline-offset:0;pointer-events:none}
+.pg .tick{position:absolute;background:#444}
+.fpan{position:absolute;box-sizing:border-box;overflow:hidden;color:#111;background:#fff}
+.fpan .fin{padding:3mm 3mm 0 3mm}
+.fpan .fno{position:absolute;right:1.6mm;bottom:1mm;font-size:6.5pt;color:#888}
+.fpan table.ft{width:100%;border-collapse:collapse;table-layout:auto}
+.ft th{text-align:left;font-weight:700;color:#444;border-bottom:.3mm solid #444;padding:.3mm .8mm;white-space:nowrap}
+.ft td{padding:.4mm .8mm;border-bottom:.1mm solid #bbb;vertical-align:top}
+.ft td.ph{white-space:nowrap;font-weight:700}
+.ft td.kd{font-weight:700;white-space:nowrap}
+#measure{position:absolute;left:-99999px;top:0;visibility:hidden;pointer-events:none}
+#printRoot{display:none}
+@media print{
+  html,body{height:auto!important;overflow:visible!important;background:#fff!important}
+  body>*:not(#printRoot){display:none!important}
+  #printRoot{display:block!important}
+  #printRoot,#printRoot *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #printRoot .pg{break-after:page;page-break-after:always}
+  #printRoot .pg:last-child{break-after:auto;page-break-after:auto}
+}
+@media (max-width:860px){
+  #app{grid-template-columns:1fr}
+  .seg.viewsw{display:flex}
+  #app[data-view="set"] #right{display:none}
+  #app[data-view="pv"] #left{display:none}
+  .cols{grid-template-columns:1fr}
+  .top h1{font-size:15px}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <img src="icon-192.png" alt="">
+  <h1>명찰 만들기</h1>
+  <div class="seg viewsw" id="viewSw"><button data-view="set" class="on">설정</button><button data-view="pv">미리보기</button></div>
+  <button class="ib" id="hSet" aria-label="설정" title="설정">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+  </button>
+  <button class="ib hidden" id="hFS" aria-label="전체화면" title="전체화면"></button>
+</header>
+<div id="banner" class="hidden">
+  <img src="icon-192.png" alt="">
+  <b>홈 화면에 설치해 두세요</b>
+  <span class="t">아이콘으로 바로 열리고, 인터넷이 잘 안 되는 곳에서도 열려요.</span>
+  <button class="btn pri sm" id="bInst">설치하기</button>
+  <button class="btn sm" id="bFs">전체화면</button>
+  <button class="btn sm" id="bLater">다음에</button>
+</div>
+<div id="app" data-view="set">
+  <section id="left">
+    <nav class="tabs" id="tabs">
+      <button data-tab="roster" class="on">명단</button>
+      <button data-tab="front">앞면</button>
+      <button data-tab="back">뒷면</button>
+      <button data-tab="fold">연락망</button>
+      <button data-tab="print">크기·인쇄</button>
+    </nav>
+    <div id="tabBody"></div>
+  </section>
+  <section id="right">
+    <div id="pvBar">
+      <div class="seg" id="pvSeg"><button data-pv="person" class="on">이 사람 앞·뒷면</button><button data-pv="page">명찰 인쇄 쪽</button><button data-pv="fold">연락망 쪽</button></div>
+      <div id="pvNav"></div>
+    </div>
+    <div id="pvWarn"></div>
+    <div id="pvStage"></div>
+    <div id="pvFoot"></div>
+  </section>
+</div>
+<div id="sheetRoot"></div>
+<div id="toast"><span id="toastMsg"></span><button id="toastBtn" class="hidden"></button></div>
+<div id="measure"></div>
+<div id="printRoot"></div>
+<style id="pageRule"></style>
+<input type="file" id="fileXl" accept=".xlsx,.xlsm,.csv,.tsv,.txt" multiple class="hidden">
+<input type="file" id="fileLogo" accept="image/png,image/jpeg,image/svg+xml,image/*" class="hidden">
+<input type="file" id="fileRoster" accept=".json,application/json" class="hidden">
+<input type="file" id="fileSet" accept=".json,application/json" class="hidden">
+<script>
+(function(){
+'use strict';
+// 다른 곳에 게시되어 head 태그가 body로 들어간 경우 head로 옮김
+Array.prototype.forEach.call(document.querySelectorAll('body meta, body link[rel]'), function(n){ document.head.appendChild(n); });
+
+/* ================= 공용 도구 ================= */
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm = s => String(s || '').replace(/\s+/g, '').toLowerCase();
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const MM = 96 / 25.4;
+let uidN = 0;
+const nid = () => 'p' + (++uidN).toString(36) + Math.random().toString(36).slice(2, 6);
+const LS = {
+  get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } },
+  set(k, v){ try{ localStorage.setItem(k, v); return true; }catch(e){ return false; } }
+};
+const KEY_SET = 'name-badge-settings-v1', KEY_XL = 'name-badge-xlmap-v1', KEY_KV = 'name-badge-kindvals-v1';
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || navigator.standalone === true;
+let inFrame = false; try{ inFrame = window.self !== window.top; }catch(e){ inFrame = true; }
+
+function getPath(o, path){ return path.split('.').reduce((a, k) => a == null ? undefined : a[k], o); }
+function setPath(o, path, v){ const ks = path.split('.'); let a = o; for(let i = 0; i < ks.length - 1; i++){ if(a[ks[i]] == null) a[ks[i]] = {}; a = a[ks[i]]; } a[ks[ks.length - 1]] = v; }
+function deepMerge(base, add){
+  if(add == null || typeof add !== 'object' || Array.isArray(add)) return base;
+  for(const k of Object.keys(add)){
+    const v = add[k];
+    if(Array.isArray(v)) base[k] = JSON.parse(JSON.stringify(v));
+    else if(v && typeof v === 'object') base[k] = deepMerge(base[k] && typeof base[k] === 'object' && !Array.isArray(base[k]) ? base[k] : {}, v);
+    else if(v !== undefined) base[k] = v;
+  }
+  return base;
+}
+
+function fmtPhone(v){
+  let s = String(v == null ? '' : v).trim(); if(!s) return '';
+  if(/^\d+(\.\d+)?e\+?\d+$/i.test(s)) s = String(Math.round(Number(s)));
+  if(!/^[0-9\-\s().+]+$/.test(s)) return s;
+  let x = s.replace(/\D/g, '');
+  if(x.length === 10 && x[0] === '1') x = '0' + x;
+  if(/^01\d{8,9}$/.test(x)) return x.length === 11 ? x.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3') : x.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3');
+  if(/^02\d{7,8}$/.test(x)) return x.length === 9 ? x.replace(/(\d{2})(\d{3})(\d{4})/, '$1-$2-$3') : x.replace(/(\d{2})(\d{4})(\d{4})/, '$1-$2-$3');
+  if(/^0[3-9]\d{8,9}$/.test(x)) return x.length === 10 ? x.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3') : x.replace(/(\d{3})(\d{4})(\d{4})/, '$1-$2-$3');
+  return s;
+}
+function cleanName(s){ return String(s == null ? '' : s).replace(/\s+/g, ' ').trim(); }
+
+/* ================= 설정 / 명단 상태 ================= */
+function defKinds(){
+  return [
+    {id:'u', name:'이용인', color:'#2f6fed', band:'', role:'U', pairWith:'h'},
+    {id:'h', name:'활지사', color:'#12a150', band:'', role:'H', pairWith:''},
+    {id:'s', name:'직원',   color:'#f08a00', band:'', role:'S', pairWith:''},
+    {id:'t', name:'통역사', color:'#8b4fd8', band:'', role:'T', pairWith:''}
+  ];
+}
+function defBack(role){
+  const b = {titleOn:false, titleText:'비상 연락처', noticeOn:false, noticeText:'', noticePos:'top', pairOn:false, myStaffOn:false, staffOn:false, eventOn:false, freeOn:false, freeText:''};
+  if(role === 'U'){ b.noticeOn = true; b.noticeText = '이 분이 혼자 계시면 아래 번호로 연락 부탁드립니다.'; b.pairOn = true; b.myStaffOn = true; }
+  else if(role === 'H'){ b.staffOn = true; b.eventOn = true; }
+  else if(role === 'T'){ b.staffOn = true; }
+  else if(role === 'S'){ b.noticeOn = true; b.noticeText = '비상연락망은 접는 연락망을 참고하세요.'; }
+  else { b.staffOn = true; }
+  return b;
+}
+function defSettings(){
+  const kinds = defKinds();
+  const s = {
+    ver: 1, kinds,
+    size: {w:125, h:90},
+    page: {orient:'auto', margin:8, gap:0, cut:'dash', radius:3, duplex:'both', flip:'long', backDx:0, backDy:0},
+    front: {band:true, bandPt:14, orgPos:'below', orgPt:16, namePt:44, eventText:'', eventPt:12, font:'맑은 고딕', border:2, logoData:'', logoAR:1, logoW:18, logoPos:'top'},
+    back: {pt:12, eventHeading:'행사 안내', staffLabel:'직원 연락처', myStaffLabel:'담당직원', eventText:'', byKind:{}},
+    fold: {kinds:{}, showPair:true, pt:8, cols:0, rows:0, orient:'auto', copies:1},
+    ui: {installDismissed:false, autoFS:true}
+  };
+  kinds.forEach(k => { s.back.byKind[k.id] = defBack(k.role); s.fold.kinds[k.id] = true; });
+  return s;
+}
+let S = defSettings();
+let people = [];            // 개인정보: 브라우저에 저장하지 않음
+let IDX = new Map();
+let selId = null, tab = 'roster', pvMode = 'person', pageIdx = 0, filterKind = 'all', backKind = 'u', dirtyRoster = false;
+const reindex = () => { IDX = new Map(activePeople().map(p => [p.id, p])); };
+
+function ensureSettings(){
+  if(!Array.isArray(S.kinds) || !S.kinds.length) S.kinds = defKinds();
+  S.kinds.forEach(k => {
+    if(!k.id) k.id = 'k' + nid();
+    if(k.band == null) k.band = '';
+    if(k.pairWith == null) k.pairWith = '';
+    if(k.role == null) k.role = '';
+    if(!S.back.byKind[k.id]) S.back.byKind[k.id] = defBack(k.role);
+    else S.back.byKind[k.id] = deepMerge(defBack(k.role), S.back.byKind[k.id]);
+    if(S.fold.kinds[k.id] == null) S.fold.kinds[k.id] = true;
+  });
+  if(!S.kinds.some(k => k.id === backKind)) backKind = S.kinds[0].id;
+}
+function loadSettings(){
+  const raw = LS.get(KEY_SET); if(!raw) return;
+  try{ const o = JSON.parse(raw); const d = defSettings(); S = deepMerge(d, o); if(o.kinds) S.kinds = o.kinds; }catch(e){ S = defSettings(); }
+}
+let saveT = 0, saveWarned = false;
+function saveSettings(){
+  clearTimeout(saveT);
+  saveT = setTimeout(() => {
+    const ok = LS.set(KEY_SET, JSON.stringify(S));
+    if(!ok && !saveWarned){ saveWarned = true; toast('로고 그림이 커서 설정을 자동 저장하지 못했어요. 설정 파일로 저장해 두세요.'); }
+  }, 250);
+}
+
+const kindById = id => S.kinds.find(k => k.id === id);
+const roleKind = role => S.kinds.find(k => k.role === role);
+const kindRole = id => (kindById(id) || {}).role || '';
+function activePeople(){ return people.length ? people : SAMPLE; }
+
+/* 예시 명단 (명단이 비었을 때 미리보기용) */
+const SAMPLE = [];
+function buildSample(){
+  SAMPLE.length = 0;
+  const ku = roleKind('U') || S.kinds[0], kh = roleKind('H') || S.kinds[0], ks = roleKind('S') || S.kinds[0];
+  SAMPLE.push({id:'sm-h', kind:kh.id, name:'김영자', org:'', phone:'010-2345-6789', pairIds:[], staffId:'', print:true, eventStaff:false, rep:false});
+  SAMPLE.push({id:'sm-s', kind:ks.id, name:'박직원', org:'', phone:'010-3456-7890', pairIds:[], staffId:'', print:true, eventStaff:true, rep:true});
+  SAMPLE.push({id:'sm-u', kind:ku.id, name:'홍길동', org:'우리동작센터', phone:'010-1234-5678', pairIds:['sm-h'], staffId:'', print:true, eventStaff:false, rep:false});
+}
+
+function newPerson(o){
+  return Object.assign({id:nid(), kind:S.kinds[0].id, name:'', org:'', phone:'', pairIds:[], staffId:'', print:true, eventStaff:false, rep:false}, o || {});
+}
+function staffList(){ return people.filter(p => kindRole(p.kind) === 'S'); }
+function repStaff(list){
+  const src = list || activePeople().filter(p => kindRole(p.kind) === 'S');
+  let r = src.filter(p => p.rep);
+  if(!r.length){ const e = src.filter(p => p.eventStaff); r = e.length ? [e[0]] : (src.length ? [src[0]] : []); }
+  return r.slice(0, 2);
+}
+function eventStaffList(){ return activePeople().filter(p => kindRole(p.kind) === 'S' && p.eventStaff); }
+function realPairs(p){ return (p.pairIds || []).filter(Boolean).map(id => IDX.get(id)).filter(Boolean); }
+function reversePairs(p){ return activePeople().filter(q => (q.pairIds || []).includes(p.id)); }
+function printList(){ return people.filter(p => p.print !== false && cleanName(p.name)); }
+function markDirty(){ dirtyRoster = true; }
+
+/* ================= 토스트 · 모달 ================= */
+let toastT = 0, toastFn = null;
+function toast(msg, btnLabel, fn){
+  $('toastMsg').textContent = msg;
+  const b = $('toastBtn'); toastFn = fn || null;
+  if(btnLabel){ b.textContent = btnLabel; b.classList.remove('hidden'); } else b.classList.add('hidden');
+  $('toast').classList.add('on'); clearTimeout(toastT);
+  toastT = setTimeout(() => $('toast').classList.remove('on'), btnLabel ? 8000 : 2600);
+}
+$('toastBtn').addEventListener('click', () => { const f = toastFn; toastFn = null; $('toast').classList.remove('on'); if(f) f(); });
+
+const modalStack = [];
+function openModal(o){
+  const dim = document.createElement('div'); dim.className = 'dim';
+  dim.innerHTML = '<div class="mdl' + (o.wide ? ' wide' : '') + '" role="dialog" aria-modal="true"><div class="mh"><button class="back" data-mclose>← 뒤로</button><h3>' + esc(o.title || '') + '</h3></div><div class="mb"></div><div class="mf"></div></div>';
+  const body = dim.querySelector('.mb'), foot = dim.querySelector('.mf');
+  if(o.html != null) body.innerHTML = o.html;
+  (o.buttons || []).forEach((b, i) => {
+    const bt = document.createElement('button'); bt.className = 'btn' + (b.cls ? ' ' + b.cls : ''); bt.textContent = b.label; bt.dataset.bi = i;
+    foot.appendChild(bt);
+  });
+  if(!(o.buttons || []).length) foot.classList.add('hidden');
+  const m = {el: dim, body, foot, closed: false, close(r){ if(m.closed) return; m.closed = true; const i = modalStack.indexOf(m); if(i >= 0) modalStack.splice(i, 1); dim.remove(); if(o.onClose) o.onClose(r); }};
+  dim.addEventListener('click', e => {
+    if(e.target.closest('[data-mclose]')) { m.close('back'); return; }
+    if(e.target === dim && !o.sticky) { m.close('back'); return; }
+    const bt = e.target.closest('button[data-bi]');
+    if(bt){ const b = o.buttons[+bt.dataset.bi]; if(b.act){ const r = b.act(m); if(r === false) return; } if(b.close !== false) m.close('btn'); }
+  });
+  $('sheetRoot').appendChild(dim); modalStack.push(m);
+  return m;
+}
+document.addEventListener('keydown', e => { if(e.key === 'Escape' && modalStack.length){ modalStack[modalStack.length - 1].close('back'); } });
+function askConfirm(msg, okLabel, danger){
+  return new Promise(res => {
+    let done = false;
+    openModal({title:'확인', html:'<p>' + esc(msg).replace(/\n/g, '<br>') + '</p>', buttons:[
+      {label:'취소', act(){ done = true; res(false); }},
+      {label:okLabel || '확인', cls: danger ? 'pri danger' : 'pri', act(){ done = true; res(true); }}
+    ], onClose(){ if(!done) res(false); }});
+  });
+}
+function notice(msg, title){ return openModal({title:title || '안내', html:'<p>' + esc(msg).replace(/\n/g, '<br>') + '</p>', buttons:[{label:'알겠어요', cls:'pri'}]}); }
+
+function download(name, text, type){
+  const blob = new Blob([text], {type: type || 'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+function readFileText(f){ return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(r.error); r.readAsText(f); }); }
+
+/* ================= 홈 화면 설치 · 전체화면 (저장소 공통 규칙) ================= */
+const SVGI = d => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="' + d + '"/></svg>';
+const ICON = { fsOn: SVGI('M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5'), fsOff: SVGI('M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5') };
+const FS = {
+  userExit: false,
+  supported(){ const d = document.documentElement; return !!(d.requestFullscreen || d.webkitRequestFullscreen) && !isStandalone() && !inFrame; },
+  on(){ return !!(document.fullscreenElement || document.webkitFullscreenElement); },
+  enter(){ const d = document.documentElement; try{ const r = d.requestFullscreen ? d.requestFullscreen({navigationUI:'hide'}) : (d.webkitRequestFullscreen && d.webkitRequestFullscreen()); if(r && r.catch) r.catch(function(){}); }catch(e){} },
+  exit(){ try{ const r = document.exitFullscreen ? document.exitFullscreen() : (document.webkitExitFullscreen && document.webkitExitFullscreen()); if(r && r.catch) r.catch(function(){}); }catch(e){} },
+  toggle(){ if(!FS.supported()){ installSheet(); return; } if(FS.on()){ FS.userExit = true; FS.exit(); } else { FS.userExit = false; FS.enter(); } }
+};
+let installEvt = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; paintInstall(); });
+window.addEventListener('appinstalled', () => { installEvt = null; S.ui.installDismissed = true; saveSettings(); paintInstall(); toast('홈 화면에 설치했어요'); });
+function paintInstall(){
+  const sa = isStandalone();
+  $('banner').classList.toggle('hidden', sa || inFrame || S.ui.installDismissed);
+  $('bFs').classList.toggle('hidden', !FS.supported());
+  const h = $('hFS'); h.classList.toggle('hidden', sa || !FS.supported());
+  h.innerHTML = FS.on() ? ICON.fsOff : ICON.fsOn;
+  h.setAttribute('aria-label', FS.on() ? '전체화면 끝내기' : '전체화면');
+  h.title = FS.on() ? '전체화면 끝내기' : '전체화면';
+  schedulePreview();
+}
+function doInstall(){
+  const ev = installEvt; installEvt = null;
+  try{ ev.prompt(); ev.userChoice.then(r => { if(r && r.outcome === 'accepted'){ S.ui.installDismissed = true; saveSettings(); } paintInstall(); }).catch(function(){}); }catch(e){ installSheet(); }
+}
+function installSheet(){
+  if(isStandalone()){ toast('이미 홈 화면 앱으로 실행 중이에요'); return; }
+  if(installEvt){ doInstall(); return; }
+  const ua = navigator.userAgent;
+  const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const samsung = /SamsungBrowser/i.test(ua), inapp = /KAKAOTALK|NAVER\(inapp|Instagram|FBAN|FBAV|Line\//i.test(ua);
+  const mobile = /Android|Mobi/i.test(ua) || ios;
+  const kbd = t => '<span class="kbd">' + t + '</span>';
+  let how;
+  if(location.protocol === 'file:') how = '<p>지금은 파일로 열려 있어서 설치할 수 없어요. 크롬이나 사파리에서 아래 주소로 열어 주세요.</p><p><b>handscil01-afk.github.io/Sungmo/name-badge/</b></p>';
+  else if(inapp) how = '<ol><li>오른쪽 아래(또는 위) ' + kbd('⋮') + ' 메뉴를 누르세요</li><li><b>다른 브라우저로 열기</b>(크롬·사파리)를 누르세요</li><li>열린 화면에서 다시 <b>설치하기</b>를 누르세요</li></ol>';
+  else if(ios) how = '<ol><li>사파리 아래(또는 위) ' + kbd('공유 ⬆') + ' 단추를 누르세요</li><li>메뉴를 올려 <b>홈 화면에 추가</b>를 누르세요</li><li>오른쪽 위 <b>추가</b>를 누르세요</li></ol>';
+  else if(samsung) how = '<ol><li>아래 ' + kbd('≡') + ' 메뉴를 누르세요</li><li><b>현재 페이지 추가</b> → <b>홈 화면</b>을 누르세요</li></ol>';
+  else if(mobile) how = '<ol><li>오른쪽 위 ' + kbd('⋮') + ' 메뉴를 누르세요</li><li><b>앱 설치</b> 또는 <b>홈 화면에 추가</b>를 누르세요</li><li>뜨는 창에서 <b>설치</b>를 누르세요</li></ol>';
+  else how = '<ol><li>크롬·엣지 주소창 오른쪽의 ' + kbd('설치 ⊕') + ' 아이콘을 누르세요</li><li>없으면 ' + kbd('⋮') + ' 메뉴 → <b>앱 설치</b>(또는 <b>앱</b> → <b>이 사이트를 앱으로 설치</b>)를 누르세요</li></ol>';
+  openModal({title:'홈 화면에 설치하기', html:'<p>설치하면 아이콘으로 바로 열리고, 주소창 없이 화면을 넓게 쓸 수 있어요. 인터넷이 잘 안 되는 곳에서도 열려요.</p>' + how, buttons:[{label:'알겠어요', cls:'pri'}]});
+}
+function settingsModal(){
+  let h = '';
+  if(FS.supported()){
+    h += '<label class="ck"><input type="checkbox" id="stFs"' + (S.ui.autoFS ? ' checked' : '') + '>자동 전체화면 <span class="sub">(휴대폰·태블릿에서 화면을 처음 누르면 전체화면)</span></label>';
+    h += '<div class="btns"><button class="btn" data-a="fs">' + (FS.on() ? '전체화면 끝내기' : '전체화면 켜기') + '</button></div>';
+  }
+  if(!isStandalone()) h += '<div class="btns"><button class="btn" data-a="inst">홈 화면에 설치하기</button></div>';
+  h += '<h4>설정 파일 (행사별로 바꿔 쓰기)</h4><div class="btns"><button class="btn" data-a="setsave">설정 파일로 저장</button><button class="btn" data-a="setload">설정 파일 불러오기</button><button class="btn danger" data-a="setreset">설정 처음으로 되돌리기</button></div>';
+  h += '<p class="note">설정 파일에는 문구·색·크기·로고 그림이 들어가고, 이름·연락처 같은 개인정보는 들어가지 않아요.</p>';
+  const m = openModal({title:'설정', html:h, buttons:[{label:'닫기', cls:'pri'}]});
+  const sw = m.body.querySelector('#stFs');
+  if(sw) sw.addEventListener('change', () => { S.ui.autoFS = sw.checked; saveSettings(); });
+  m.body.addEventListener('click', e => {
+    const b = e.target.closest('[data-a]'); if(!b) return; const a = b.dataset.a;
+    if(a === 'fs'){ m.close(); FS.toggle(); }
+    else if(a === 'inst'){ m.close(); installSheet(); }
+    else if(a === 'setsave') saveSettingsFile();
+    else if(a === 'setload'){ m.close(); $('fileSet').click(); }
+    else if(a === 'setreset'){ m.close(); resetSettings(); }
+  });
+}
+$('hFS').addEventListener('click', FS.toggle);
+$('hSet').addEventListener('click', settingsModal);
+$('bInst').addEventListener('click', installSheet);
+$('bFs').addEventListener('click', FS.toggle);
+$('bLater').addEventListener('click', () => { S.ui.installDismissed = true; saveSettings(); paintInstall(); toast('설정(톱니바퀴)에서 언제든 설치할 수 있어요'); });
+// 자동 전체화면: 터치 기기에서만, 화면을 처음 누를 때 (버튼으로 직접 끈 뒤에는 다시 켜지 않음)
+document.addEventListener('click', e => {
+  if(!S.ui.autoFS || FS.userExit || FS.on() || !FS.supported()) return;
+  if(!matchMedia('(pointer: coarse)').matches) return;
+  if(e.target.closest && e.target.closest('#hFS, #hSet, #banner, .dim')) return;
+  FS.enter();
+}, true);
+document.addEventListener('fullscreenchange', paintInstall);
+document.addEventListener('webkitfullscreenchange', paintInstall);
+if('serviceWorker' in navigator && location.protocol === 'https:'){
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(function(){}); });
+}
+
+/* ================= 엑셀(xlsx) · CSV 읽기 (외부 라이브러리 없음) ================= */
+async function inflateRaw(u8){
+  const stream = new Blob([u8]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  const reader = stream.getReader(); const chunks = []; let total = 0;
+  try{
+    for(;;){ const r = await reader.read(); if(r.done) break; chunks.push(r.value); total += r.value.length; }
+  }catch(e){ if(!total) throw e; }
+  const out = new Uint8Array(total); let p = 0; for(const c of chunks){ out.set(c, p); p += c.length; }
+  return out;
+}
+function openZip(buf){
+  const u8 = new Uint8Array(buf), dv = new DataView(buf);
+  let e = -1;
+  for(let i = u8.length - 22; i >= Math.max(0, u8.length - 65557); i--){ if(dv.getUint32(i, true) === 0x06054b50){ e = i; break; } }
+  if(e < 0) throw new Error('엑셀(xlsx) 파일이 아닙니다.');
+  const cnt = dv.getUint16(e + 10, true); let p = dv.getUint32(e + 16, true);
+  const td = new TextDecoder('utf-8'); const files = {};
+  for(let k = 0; k < cnt; k++){
+    if(dv.getUint32(p, true) !== 0x02014b50) break;
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
+    const nlen = dv.getUint16(p + 28, true), xlen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+    files[td.decode(u8.subarray(p + 46, p + 46 + nlen))] = {method, csize, off};
+    p += 46 + nlen + xlen + clen;
+  }
+  return {
+    has: n => !!files[n],
+    async text(n){
+      const f = files[n]; if(!f) return null;
+      const n2 = dv.getUint16(f.off + 26, true), x2 = dv.getUint16(f.off + 28, true);
+      const data = u8.subarray(f.off + 30 + n2 + x2, f.off + 30 + n2 + x2 + f.csize);
+      const raw = f.method === 0 ? data : await inflateRaw(data);
+      return td.decode(raw);
+    }
+  };
+}
+const xmlDoc = s => new DOMParser().parseFromString(s, 'application/xml');
+function colIndex(ref){ const m = /^([A-Z]+)/.exec(ref); let n = 0; for(const ch of m[1]) n = n * 26 + (ch.charCodeAt(0) - 64); return n - 1; }
+function colName(i){ let s = ''; i++; while(i > 0){ const r = (i - 1) % 26; s = String.fromCharCode(65 + r) + s; i = Math.floor((i - 1) / 26); } return s; }
+function nodeText(el){ // rPh(후리가나) 제외
+  let s = '';
+  for(const t of el.getElementsByTagName('t')){ let p = t.parentNode, skip = false; while(p && p !== el){ if(p.nodeName === 'rPh'){ skip = true; break; } p = p.parentNode; } if(!skip) s += t.textContent; }
+  return s;
+}
+async function readWorkbook(buf){
+  const z = openZip(buf);
+  const wbx = await z.text('xl/workbook.xml'); if(!wbx) throw new Error('엑셀(xlsx) 파일이 아닙니다.');
+  const wb = xmlDoc(wbx);
+  const rels = xmlDoc(await z.text('xl/_rels/workbook.xml.rels') || '<r/>');
+  const relMap = {};
+  for(const r of rels.getElementsByTagName('Relationship')) relMap[r.getAttribute('Id')] = r.getAttribute('Target');
+  const ss = [];
+  const ssx = await z.text('xl/sharedStrings.xml');
+  if(ssx){ for(const si of xmlDoc(ssx).getElementsByTagName('si')) ss.push(nodeText(si)); }
+  const sheets = [];
+  for(const s of wb.getElementsByTagName('sheet')){
+    const rid = s.getAttribute('r:id') || s.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
+    let target = relMap[rid] || ''; target = target.replace(/^\//, '');
+    if(!target.startsWith('xl/')) target = 'xl/' + target;
+    sheets.push({name: s.getAttribute('name'), path: target});
+  }
+  for(const sh of sheets){
+    const x = await z.text(sh.path); const rows = [];
+    if(x){
+      const doc = xmlDoc(x);
+      let rowNo = 0;
+      for(const row of doc.getElementsByTagName('row')){
+        const ra = parseInt(row.getAttribute('r'), 10); const r = isNaN(ra) ? rowNo : ra - 1; rowNo = r + 1;
+        const cells = {}; let cn = 0;
+        for(const c of row.getElementsByTagName('c')){
+          const t = c.getAttribute('t'); let v = '';
+          if(t === 'inlineStr'){ const is = c.getElementsByTagName('is')[0]; v = is ? nodeText(is) : ''; }
+          else { const ve = c.getElementsByTagName('v')[0]; v = ve ? ve.textContent : ''; if(t === 's'){ const ix = parseInt(v, 10); v = ss[ix] != null ? ss[ix] : ''; } else if(t === 'b') v = v === '1' ? 'TRUE' : 'FALSE'; else if(t === 'e') v = ''; }
+          const ref = c.getAttribute('r'); const ci = ref ? colIndex(ref) : cn; cn = ci + 1;
+          cells[ci] = String(v).trim();
+        }
+        rows[r] = cells;
+      }
+    }
+    sh.rows = rows;
+  }
+  return sheets;
+}
+function parseCSV(text){
+  if(text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  const first = text.split(/\r?\n/, 1)[0] || '';
+  const cnt = ch => first.split(ch).length - 1;
+  const delim = cnt('\t') > cnt(',') && cnt('\t') >= cnt(';') ? '\t' : (cnt(';') > cnt(',') ? ';' : ',');
+  const rows = []; let row = [], f = '', q = false;
+  for(let i = 0; i < text.length; i++){
+    const c = text[i];
+    if(q){ if(c === '"'){ if(text[i + 1] === '"'){ f += '"'; i++; } else q = false; } else f += c; }
+    else if(c === '"') q = true;
+    else if(c === delim){ row.push(f); f = ''; }
+    else if(c === '\n' || c === '\r'){ if(c === '\r' && text[i + 1] === '\n') i++; row.push(f); f = ''; rows.push(row); row = []; }
+    else f += c;
+  }
+  if(f !== '' || row.length){ row.push(f); rows.push(row); }
+  return rows.map(r => { const o = {}; r.forEach((v, i) => { v = String(v).trim(); if(v !== '') o[i] = v; }); return o; });
+}
+async function parseDataFile(f){
+  const ext = (f.name.split('.').pop() || '').toLowerCase();
+  if(ext === 'xls') throw new Error('옛날 형식(.xls)은 읽을 수 없어요. 엑셀에서 "다른 이름으로 저장" → xlsx 또는 CSV로 저장한 뒤 넣어 주세요.');
+  if(ext === 'xlsx' || ext === 'xlsm'){
+    const sheets = await readWorkbook(await f.arrayBuffer());
+    if(!sheets.length) throw new Error('시트가 없는 파일이에요.');
+    return {name: f.name, sheets};
+  }
+  const buf = await f.arrayBuffer();
+  let text = new TextDecoder('utf-8').decode(buf);
+  if(text.indexOf('�') >= 0){ try{ text = new TextDecoder('euc-kr').decode(buf); }catch(e){} }
+  return {name: f.name, sheets: [{name:'CSV', rows: parseCSV(text)}]};
+}
+
+/* ================= 불러오기 도우미 (열 짐작·기억) ================= */
+const NAME_EXACT = ['이름', '성명', '성함', 'name'];
+function findHeaderRow(rows){
+  for(let r = 0; r < Math.min(rows.length, 15); r++){
+    const cells = rows[r]; if(!cells) continue;
+    if(Object.values(cells).map(norm).some(v => NAME_EXACT.includes(v))) return r;
+  }
+  for(let r = 0; r < Math.min(rows.length, 15); r++){
+    const cells = rows[r]; if(!cells) continue;
+    if(Object.values(cells).map(norm).some(v => v.includes('이름') || v.includes('성명'))) return r;
+  }
+  for(let r = 0; r < Math.min(rows.length, 15); r++){ if(rows[r] && Object.keys(rows[r]).length >= 2) return r; }
+  return 0;
+}
+const USES = [['name','이름'], ['kind','구분'], ['org','소속'], ['phone','연락처'], ['pair','짝(활지사·보호자) 이름'], ['pairPhone','짝 연락처'], ['staff','담당직원'], ['skip','쓰지 않음']];
+function guessUse(h){
+  const t = norm(h); if(!t) return 'skip';
+  const hasPair = /(활지사|활동지원|활동보조|지원사|보호자|동행|짝)/.test(t);
+  const hasTel = /(연락|전화|번호|폰|핸드|휴대|tel|phone)/.test(t);
+  if(/담당/.test(t) || /^직원$/.test(t)) return 'staff';
+  if(hasPair && hasTel) return 'pairPhone';
+  if(hasPair) return 'pair';
+  if(/^(이름|성명|성함|name)$/.test(t) || /이름|성명|성함/.test(t)) return 'name';
+  if(/^(구분|분류|역할|유형|종류|참여구분|참가구분)$/.test(t) || /구분|분류|역할/.test(t)) return 'kind';
+  if(/소속|기관|단체|센터|부서|직위|직책|직급|근무/.test(t)) return 'org';
+  if(hasTel) return 'phone';
+  return 'skip';
+}
+function guessKindFor(value){
+  const t = norm(value);
+  const byName = S.kinds.find(k => norm(k.name) === t);
+  if(byName) return byName.id;
+  const role = /활지|활동지원|활동보조|지원사|활보|동행|보호자/.test(t) ? 'H' : /이용|당사자|장애|회원|참가자|참여자/.test(t) ? 'U' : /직원|스태프|staff|사회복지|실무자/.test(t) ? 'S' : /통역|수어|속기|점역|통번역/.test(t) ? 'T' : '';
+  const k = role && roleKind(role);
+  return k ? k.id : '';
+}
+function loadJSON(key){ const r = LS.get(key); if(!r) return {}; try{ const o = JSON.parse(r); return o && typeof o === 'object' ? o : {}; }catch(e){ return {}; } }
+
+/* ================= 불러오기 마법사 ================= */
+let WZ = null;
+function wzHeaders(w){
+  const sh = w.file.sheets[w.sheetIdx]; const hr = sh.rows[w.hdr] || {};
+  const colsSet = new Set(Object.keys(hr).filter(c => hr[c] !== '').map(Number));
+  for(let r = w.hdr + 1; r < Math.min(sh.rows.length, w.hdr + 25); r++){ const row = sh.rows[r]; if(row) Object.keys(row).forEach(c => { if(row[c] !== '') colsSet.add(+c); }); }
+  const cols = [...colsSet].sort((a, b) => a - b);
+  const seen = {}; const out = [];
+  cols.forEach(c => {
+    const text = hr[c] || '';
+    const base = norm(text) || ('열' + colName(c));
+    seen[base] = (seen[base] || 0) + 1;
+    const token = seen[base] > 1 ? base + '#' + seen[base] : base;
+    const ex = []; for(let r = w.hdr + 1; r < Math.min(sh.rows.length, w.hdr + 40) && ex.length < 2; r++){ const v = (sh.rows[r] || {})[c]; if(v) ex.push(v); }
+    out.push({col: c, text: text || '(머리글 없음 · ' + colName(c) + '열)', token, ex});
+  });
+  return out;
+}
+function wzInitUse(w){
+  const heads = wzHeaders(w); const mem = loadJSON(KEY_XL); w.usage = {}; const taken = {};
+  heads.forEach(h => {
+    let u = mem[h.token];
+    if(!u || !USES.some(x => x[0] === u)) u = guessUse(h.text);
+    if(u !== 'skip' && taken[u]) u = 'skip';     // 같은 용도는 처음 열에만
+    if(u !== 'skip') taken[u] = true;
+    w.usage[h.col] = u;
+  });
+}
+function wzNewFile(file){
+  const w = {file, sheetIdx: 0, hdr: 0, usage: {}, allKind: (roleKind('U') || S.kinds[0]).id, valMap: {}};
+  w.sheetIdx = Math.max(0, file.sheets.findIndex(s => s.rows && s.rows.length));
+  w.hdr = findHeaderRow(file.sheets[w.sheetIdx].rows); wzInitUse(w);
+  return w;
+}
+function wzRows(w){
+  const sh = w.file.sheets[w.sheetIdx]; const useCol = {};
+  Object.keys(w.usage).forEach(c => { const u = w.usage[c]; if(u !== 'skip' && useCol[u] == null) useCol[u] = +c; });
+  const out = [];
+  for(let r = w.hdr + 1; r < sh.rows.length; r++){
+    const row = sh.rows[r]; if(!row) continue;
+    const g = u => useCol[u] != null ? cleanName(row[useCol[u]] || '') : '';
+    const name = g('name'); if(!name || NAME_EXACT.includes(norm(name))) continue;
+    out.push({name, kindVal: g('kind'), org: g('org'), phone: g('phone'), pair: g('pair'), pairPhone: g('pairPhone'), staff: g('staff')});
+  }
+  return {rows: out, hasKind: useCol.kind != null, hasName: useCol.name != null};
+}
+function wzKindValues(w){
+  const {rows} = wzRows(w); const vals = []; rows.forEach(r => { if(r.kindVal && !vals.includes(r.kindVal)) vals.push(r.kindVal); });
+  return vals.slice(0, 40);
+}
+function wzEnsureValMap(w){
+  const mem = loadJSON(KEY_KV);
+  wzKindValues(w).forEach(v => {
+    if(w.valMap[v] === undefined){
+      const m = mem[norm(v)];
+      w.valMap[v] = m && (m === '' || kindById(m)) ? m : guessKindFor(v);
+    }
+  });
+}
+function renderWizard(){
+  const w = WZ.cur, m = WZ.modal, f = w.file;
+  const sh = f.sheets[w.sheetIdx];
+  const heads = wzHeaders(w);
+  wzEnsureValMap(w);
+  const res = wzRows(w);
+  let h = '<div class="wz">';
+  h += '<p><b>파일 ' + (WZ.i + 1) + ' / ' + WZ.files.length + ' · ' + esc(f.name) + '</b></p>';
+  h += '<div class="row"><label>시트 <select data-w="sheet">' + f.sheets.map((s, i) => '<option value="' + i + '"' + (i === w.sheetIdx ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('') + '</select></label>';
+  h += '<label>머리글(제목) 줄 <input type="number" min="1" max="200" data-w="hdr" value="' + (w.hdr + 1) + '" style="width:64px"> 째 줄</label><span class="sub">“이름·연락처”처럼 열 제목이 적힌 줄이에요</span></div>';
+  h += '<div class="tw"><table><thead><tr><th>열 머리글</th><th>예시 값</th><th>이 열은 어디에 쓸까요?</th></tr></thead><tbody>';
+  if(!heads.length) h += '<tr><td colspan="3">이 줄에서 열을 찾지 못했어요. 머리글 줄 번호를 바꿔 보세요.</td></tr>';
+  heads.forEach(hd => {
+    h += '<tr><td>' + esc(hd.text) + '</td><td class="ex">' + esc(hd.ex.join(' · ')) + '</td><td><select data-w="use" data-col="' + hd.col + '">' +
+      USES.map(u => '<option value="' + u[0] + '"' + (w.usage[hd.col] === u[0] ? ' selected' : '') + '>' + u[1] + '</option>').join('') + '</select></td></tr>';
+  });
+  h += '</tbody></table></div>';
+  if(res.hasKind){
+    const vals = wzKindValues(w);
+    h += '<p><b>구분 열의 값을 앱의 구분에 연결하세요</b> <span class="sub">(자동으로 짐작했어요. 틀리면 고쳐 주세요)</span></p><div class="tw"><table><thead><tr><th>엑셀의 값</th><th>사람 수</th><th>앱의 구분</th></tr></thead><tbody>';
+    vals.forEach(v => {
+      const n = res.rows.filter(r => r.kindVal === v).length;
+      h += '<tr><td>' + esc(v) + '</td><td>' + n + '명</td><td><select data-w="val" data-v="' + esc(v) + '">' +
+        '<option value="">(불러오지 않음)</option>' + S.kinds.map(k => '<option value="' + k.id + '"' + (w.valMap[v] === k.id ? ' selected' : '') + '>' + esc(k.name) + '</option>').join('') + '</select></td></tr>';
+    });
+    h += '</tbody></table></div>';
+  } else {
+    h += '<div class="row"><b>구분 열이 없어요.</b> 이 파일의 사람은 모두 <select data-w="all">' + S.kinds.map(k => '<option value="' + k.id + '"' + (w.allKind === k.id ? ' selected' : '') + '>' + esc(k.name) + '</option>').join('') + '</select> 으로 불러옵니다.</div>';
+  }
+  // 요약
+  let sum = '';
+  if(!res.hasName) sum = '<div class="warnbox">“이름” 열을 정해 주세요.</div>';
+  else {
+    const cnt = {}; let skipN = 0;
+    res.rows.forEach(r => { const kid = res.hasKind ? (w.valMap[r.kindVal] || '') : w.allKind; if(!kid){ skipN++; return; } cnt[kid] = (cnt[kid] || 0) + 1; });
+    const parts = S.kinds.filter(k => cnt[k.id]).map(k => esc(k.name) + ' ' + cnt[k.id] + '명');
+    sum = '<div class="infobox">불러올 사람: ' + (parts.join(', ') || '없음') + (skipN ? ' · <span style="color:var(--warn)">불러오지 않는 줄 ' + skipN + '개</span>' : '') + '</div>';
+  }
+  h += sum + '</div>';
+  m.body.innerHTML = h;
+  w._ok = res.hasName && res.rows.length > 0;
+  const nb = m.foot.querySelector('[data-bi="1"]'); if(nb) nb.disabled = !w._ok;
+  const last = WZ.i >= WZ.files.length - 1;
+  if(nb) nb.textContent = last ? '불러오기' : '불러오고 다음 파일';
+}
+async function importFiles(fileList){
+  const files = [...fileList]; if(!files.length) return;
+  const ok = [], bad = [];
+  for(const f of files){ try{ ok.push(await parseDataFile(f)); }catch(e){ bad.push(f.name + ': ' + (e && e.message ? e.message : '읽을 수 없어요')); } }
+  if(bad.length) notice(bad.join('\n'), '읽지 못한 파일');
+  if(!ok.length) return;
+  WZ = {files: ok, i: 0, cur: wzNewFile(ok[0]), total: {added: 0, merged: 0, skipped: 0, unmatchedStaff: 0}};
+  WZ.modal = openModal({title:'엑셀·CSV 불러오기', wide:true, sticky:true, html:'', buttons:[
+    {label:'이 파일 건너뛰기', close:false, act(){ wzNext(); return false; }},
+    {label:'불러오기', cls:'pri', close:false, act(){ wzCommit(); return false; }}
+  ], onClose(){ WZ = null; }});
+  WZ.modal.body.addEventListener('change', e => {
+    const el = e.target.closest('[data-w]'); if(!el || !WZ) return; const w = WZ.cur, k = el.dataset.w;
+    if(k === 'sheet'){ w.sheetIdx = +el.value; w.hdr = findHeaderRow(w.file.sheets[w.sheetIdx].rows); wzInitUse(w); w.valMap = {}; }
+    else if(k === 'hdr'){ w.hdr = clamp((parseInt(el.value, 10) || 1) - 1, 0, 199); wzInitUse(w); w.valMap = {}; }
+    else if(k === 'use'){ const c = +el.dataset.col; w.usage[c] = el.value; if(el.value !== 'skip') Object.keys(w.usage).forEach(o => { if(+o !== c && w.usage[o] === el.value) w.usage[o] = 'skip'; }); w.valMap = {}; }
+    else if(k === 'val') w.valMap[el.dataset.v] = el.value;
+    else if(k === 'all') w.allKind = el.value;
+    renderWizard();
+  });
+  renderWizard();
+}
+function wzNext(){
+  if(!WZ) return;
+  if(WZ.i >= WZ.files.length - 1){ const t = WZ.total; const m = WZ.modal; WZ = null; m.close(); finishImport(t); return; }
+  WZ.i++; WZ.cur = wzNewFile(WZ.files[WZ.i]); renderWizard();
+}
+function finishImport(t){
+  reindex(); renderRoster(); schedulePreview(); markDirty();
+  const parts = [t.added + '명 추가'];
+  if(t.merged) parts.push(t.merged + '명은 이미 있어서 합침');
+  if(t.skipped) parts.push(t.skipped + '줄 건너뜀');
+  if(t.unmatchedStaff) parts.push('담당직원 이름을 못 찾은 ' + t.unmatchedStaff + '명');
+  toast('불러왔어요: ' + parts.join(' · '));
+}
+function wzCommit(){
+  const w = WZ.cur; if(!w._ok) return;
+  // 열·구분 설정 기억 (머리글 이름 기준, 개인정보 아님)
+  const mem = loadJSON(KEY_XL); wzHeaders(w).forEach(h => { mem[h.token] = w.usage[h.col]; }); LS.set(KEY_XL, JSON.stringify(mem));
+  const res = wzRows(w);
+  if(res.hasKind){ const kv = loadJSON(KEY_KV); Object.keys(w.valMap).forEach(v => { kv[norm(v)] = w.valMap[v]; }); LS.set(KEY_KV, JSON.stringify(kv)); }
+  const t = WZ.total;
+  const links = [];
+  res.rows.forEach(r => {
+    const kid = res.hasKind ? (w.valMap[r.kindVal] || '') : w.allKind;
+    if(!kid){ t.skipped++; return; }
+    const ph = fmtPhone(r.phone);
+    let p = people.find(q => q.kind === kid && q.name === r.name && (!q.phone || !ph || q.phone === ph));
+    if(p){ if(!p.org && r.org) p.org = r.org; if(!p.phone && ph) p.phone = ph; t.merged++; }
+    else { p = newPerson({kind: kid, name: r.name, org: r.org, phone: ph}); if(kindRole(kid) === 'S'){ p.eventStaff = true; if(!people.some(q => q.rep && kindRole(q.kind) === 'S')) p.rep = true; } people.push(p); t.added++; }
+    if(r.pair || r.staff) links.push({p, r});
+  });
+  // 짝 · 담당직원 연결 (모든 사람을 만든 뒤에)
+  links.forEach(({p, r}) => {
+    if(r.pair){
+      const names = r.pair.split(/[,，、\/\n;；]+/).map(cleanName).filter(Boolean);
+      const phones = r.pairPhone ? r.pairPhone.split(/[,，、\/\n;；]+/).map(fmtPhone).filter(Boolean) : [];
+      names.forEach((nm, i) => linkPair(p, nm, phones[i] || (names.length === 1 ? phones[0] : '') || ''));
+    }
+    if(r.staff){
+      const st = staffList().find(s => s.name === cleanName(r.staff));
+      if(st) p.staffId = st.id; else t.unmatchedStaff++;
+    }
+  });
+  wzNext();
+}
+function partnerKindOf(k){
+  if(k.pairWith && kindById(k.pairWith)) return k.pairWith;
+  const rev = S.kinds.find(x => x.pairWith === k.id); if(rev) return rev.id;
+  const h = roleKind('H'); return h ? h.id : '';
+}
+function linkPair(p, name, phone){
+  const pk = kindById(p.kind) || S.kinds[0]; const pkid = partnerKindOf(pk);
+  let q = people.find(x => x !== p && x.name === name && x.kind === pkid) || people.find(x => x !== p && x.name === name);
+  if(!q){ q = newPerson({kind: pkid || p.kind, name, phone: phone || ''}); if(kindRole(q.kind) === 'S') q.eventStaff = true; people.push(q); }
+  else if(phone && !q.phone) q.phone = phone;
+  linkIds(p, q);
+}
+function linkIds(a, b){
+  const ka = kindById(a.kind), kb = kindById(b.kind);
+  let owner = a, target = b;
+  if(ka && ka.pairWith === b.kind){ owner = a; target = b; }
+  else if(kb && kb.pairWith === a.kind){ owner = b; target = a; }
+  if(!owner.pairIds.includes(target.id)) owner.pairIds = owner.pairIds.filter(Boolean).concat(target.id);
+}
+
+/* ================= 붙여넣기로 추가 ================= */
+const ROLE_RE = /^(활지사|활동지원사|활동지원인|활동보조인|활동보조|활보|지원사|동행인|동행|보호자|활지|도우미)$/;
+const ROLE_ANY = /(활지사|활동지원사|활동지원|활동보조|활보|지원사|동행인|동행|보호자|도우미)/;
+const SKIP_RE = /^(님|씨|명|분|외|및|와|과|참석|참여|신청|확정|대기|불참|늦참|일찍|조퇴|식사|이용인|당사자|장애인|본인|선생님|샘|쌤|회원)$/;
+const PHONE_RE = /0\d{1,2}[-.\s]?\d{3,4}[-.\s]?\d{4}/g;
+function tokenizeLine(line, known){
+  const toks = [], ignored = [], phones = [];
+  line = line.replace(/^\s*[-*•·▶▷◆◇○●□■☞→]+\s*/, '').replace(/^\s*\d{1,3}(?:\s*[.)\]:]\s*|\s+(?=[가-힣A-Za-z(（\[]))/, '');
+  line = line.replace(PHONE_RE, m => { phones.push(m); return ' \u0001' + (phones.length - 1) + '\u0001 '; });
+  const phoneOf = w => { const mm = /\u0001(\d+)\u0001/.exec(w); return mm ? phones[+mm[1]] : null; };
+  const re = /\(([^)]*)\)|（([^）]*)）|\[([^\]]*)\]|([^(（\[]+)/g; let m;
+  while((m = re.exec(line))){
+    const inner = m[1] != null ? m[1] : (m[2] != null ? m[2] : m[3]);
+    if(inner != null){
+      const words = inner.split(/[\s,，、;；\/·.+&|~:]+/).filter(Boolean);
+      const hasRole = words.some(w => ROLE_ANY.test(w));
+      let named = false;
+      for(const w of words){
+        const ph = phoneOf(w); if(ph){ toks.push({phone: ph}); continue; }
+        let base = w.replace(/[^가-힣A-Za-z]/g, '');
+        if(ROLE_ANY.exec(base)) base = base.replace(ROLE_ANY, '');
+        base = base.replace(/(님|씨|선생님|샘|쌤)$/, '');
+        if(base.length >= 2 && base.length <= 5 && !SKIP_RE.test(base) && (hasRole || known(base))){ toks.push({name: base, hint: hasRole ? 'H' : null}); named = true; }
+      }
+      if(hasRole && !named) toks.push({kw: 'role', paren: true});
+      continue;
+    }
+    for(const w of m[4].split(/[\s,，、;；\/·.+&|~:]+/)){
+      if(!w) continue;
+      const ph = phoneOf(w); if(ph){ toks.push({phone: ph}); continue; }
+      let base = w.replace(/[^가-힣A-Za-z0-9]/g, '');
+      if(!base) continue;
+      if(/^외\d*(명|분)?$/.test(base) || /^\d+(명|분)$/.test(base)){ if(base.startsWith('외')) toks.push({kw: 'plus'}); continue; }
+      base = base.replace(/\d+/g, '');
+      if(ROLE_RE.test(base)){ toks.push({kw: 'role'}); continue; }
+      let hint = null;
+      const pre = /^(활지사|활동지원사|활보|지원사|동행인|동행|보호자)(.+)$/.exec(base);
+      const post = /^(.+?)(활지사|활동지원사|활보|지원사|동행인|동행|보호자)$/.exec(base);
+      if(pre && pre[2].length >= 2){ base = pre[2]; hint = 'H'; }
+      else if(post && post[1].length >= 2){ base = post[1]; toks.push({name: base.replace(/(님|씨)$/, ''), hint: null}); toks.push({kw: 'role'}); continue; }
+      base = base.replace(/(님|씨|선생님|샘|쌤)$/, '');
+      if(SKIP_RE.test(base)) continue;
+      if(/^[가-힣]{2,5}$/.test(base) || /^[A-Za-z]{2,20}$/.test(base)) toks.push({name: base, hint});
+      else ignored.push(w);
+    }
+  }
+  return {toks, ignored};
+}
+function parsePaste(text, mode){
+  const kU = roleKind('U') || S.kinds[0], kH = roleKind('H') || S.kinds[0];
+  const exist = new Map(); people.forEach(p => { if(!exist.has(p.name)) exist.set(p.name, p); });
+  const seen = new Set(), items = [], dups = [], ignored = [];
+  const known = n => exist.has(n);
+  for(const line of text.split(/\r?\n/)){
+    if(!line.trim()) continue;
+    if(mode !== 'auto'){
+      // 구분을 고른 경우: "이름 010-0000-0000 소속" 한 줄씩
+      let l = line.replace(/^\s*[-*•·▶▷◆◇○●□■☞→]+\s*/, '').replace(/^\s*\d{1,3}(?:\s*[.)\]:]\s*|\s+(?=[가-힣A-Za-z]))/, '');
+      const phs = l.match(PHONE_RE) || []; l = l.replace(PHONE_RE, ' ');
+      const words = l.split(/[\s,，、;；\/|\t]+/).filter(Boolean);
+      const ni = words.findIndex(w => /^[가-힣A-Za-z]{2,20}$/.test(w.replace(/(님|씨)$/, '')));
+      if(ni < 0){ ignored.push(line.trim()); continue; }
+      const name = words[ni].replace(/(님|씨)$/, '');
+      if(seen.has(name) || exist.has(name)){ dups.push(name); continue; }
+      seen.add(name);
+      items.push({name, kind: mode, phone: phs[0] ? fmtPhone(phs[0]) : '', org: words.filter((w, i) => i !== ni).join(' '), pairs: [], pairExisting: []});
+      continue;
+    }
+    const {toks, ignored: ig} = tokenizeLine(line, known); ignored.push(...ig);
+    let cur = null, firstName = true, last = null;
+    for(let i = 0; i < toks.length; i++){
+      const t = toks[i];
+      if(t.phone){ if(last && !last.phone) last.phone = fmtPhone(t.phone); continue; }
+      if(t.kw) continue;
+      const ex = exist.get(t.name);
+      const nextRole = toks[i + 1] && toks[i + 1].kw === 'role';
+      let hint = t.hint;
+      if(nextRole && !(ex && kindRole(ex.kind) === 'U')) hint = 'H';
+      let role;
+      if(hint === 'H') role = 'H';
+      else if(ex && kindRole(ex.kind) === 'U') role = 'U';
+      else if(ex && kindRole(ex.kind) === 'H') role = 'H';
+      else role = firstName ? 'U' : 'H';
+      firstName = false;
+      if(seen.has(t.name)){ dups.push(t.name); last = null; continue; }
+      seen.add(t.name);
+      if(ex){
+        if(role === 'H' && cur && cur.u){ cur.u.pairExisting.push(ex); }
+        else if(role === 'H' && !cur){ cur = {u: null, hs: []}; }
+        else dups.push(t.name);
+        last = null; continue;
+      }
+      const it = {name: t.name, kind: role === 'U' ? kU.id : kH.id, phone: '', org: '', pairs: [], pairExisting: []};
+      items.push(it);
+      if(role === 'U'){ if(cur && !cur.u) cur.u = it; else cur = {u: it, hs: []}; }
+      else { if(!cur) cur = {u: null, hs: []}; cur.hs.push(it); }
+      last = it;
+    }
+    if(cur && cur.u) cur.u.pairs.push(...cur.hs);
+  }
+  return {items, dups: [...new Set(dups)], ignored: [...new Set(ignored)]};
+}
+function commitPaste(res){
+  const made = new Map();
+  res.items.forEach(it => {
+    const p = newPerson({kind: it.kind, name: it.name, phone: it.phone, org: it.org});
+    if(kindRole(p.kind) === 'S'){ p.eventStaff = true; if(!people.some(q => q.rep && kindRole(q.kind) === 'S')) p.rep = true; }
+    made.set(it, p); people.push(p);
+  });
+  res.items.forEach(it => {
+    const p = made.get(it);
+    it.pairs.forEach(h => { const q = made.get(h); if(q) p.pairIds.push(q.id); });
+    it.pairExisting.forEach(q => { if(!p.pairIds.includes(q.id)) p.pairIds.push(q.id); });
+  });
+  return res.items.length;
+}
+function pasteModal(){
+  const opts = '<option value="auto">자동 (이용인·활지사 구분)</option>' + S.kinds.map(k => '<option value="' + k.id + '">' + esc(k.name) + ' (모두 이 구분)</option>').join('');
+  const m = openModal({title:'붙여넣기로 추가', wide:true, html:
+    '<div class="f"><label>구분</label><select id="pmMode">' + opts + '</select></div>' +
+    '<textarea class="ta" id="pmText" rows="9" placeholder="자동: 한 줄에 첫 이름은 이용인, 뒤 이름은 그 이용인의 활지사로 봐요.\n  예) 1. 홍길동 김영자\n  예) 이순신 (활지사 박순희) 010-1111-2222\n직원·통역사 등: 한 줄에 한 명씩 &quot;이름 010-0000-0000&quot;"></textarea>' +
+    '<div id="pmInfo" class="infobox">붙여 넣으면 몇 명이 추가되는지 여기에 보여 줘요.</div>',
+    buttons:[{label:'추가', cls:'pri', act(){
+      const res = parsePaste($('pmText').value, $('pmMode').value);
+      if(!res.items.length){ $('pmInfo').textContent = '추가할 사람이 없어요.'; return false; }
+      const n = commitPaste(res); markDirty(); reindex(); renderRoster(); schedulePreview();
+      toast(n + '명 추가' + (res.dups.length ? ' · 이미 있는 이름 ' + res.dups.length + '명은 건너뜀' : ''));
+    }}]});
+  const upd = () => {
+    const res = parsePaste($('pmText').value, $('pmMode').value);
+    const byKind = {}; res.items.forEach(i => { byKind[i.kind] = (byKind[i.kind] || 0) + 1; });
+    const parts = S.kinds.filter(k => byKind[k.id]).map(k => esc(k.name) + ' ' + byKind[k.id] + '명');
+    $('pmInfo').innerHTML = res.items.length ? '추가될 사람: ' + parts.join(', ') + (res.dups.length ? ' · 중복 이름(건너뜀): ' + esc(res.dups.join(', ')) : '') + (res.ignored.length ? ' · 읽지 못한 글: ' + esc(res.ignored.slice(0, 6).join(', ')) : '') : '붙여 넣으면 몇 명이 추가되는지 여기에 보여 줘요.';
+  };
+  m.body.addEventListener('input', upd); m.body.addEventListener('change', upd);
+  setTimeout(() => { const t = $('pmText'); if(t) t.focus(); }, 30);
+}
+
+/* ================= 화면 조각 만들기 도우미 ================= */
+const rn = (label, path, min, max, step, unit) =>
+  '<div class="rn"><div class="h"><label>' + label + '</label><span><input type="number" data-s="' + path + '" min="' + min + '" max="' + max + '" step="' + step + '">' + (unit || '') + '</span></div>' +
+  '<input type="range" data-s="' + path + '" min="' + min + '" max="' + max + '" step="' + step + '"></div>';
+const ck = (label, path) => '<label class="ck"><input type="checkbox" data-s="' + path + '">' + label + '</label>';
+const tx = (label, path, ph) => '<div class="f"><label>' + label + '</label><input type="text" data-s="' + path + '" placeholder="' + esc(ph || '') + '"></div>';
+const nm = (label, path, min, max, step, unit) => '<div class="f"><label>' + label + '</label><input type="number" data-s="' + path + '" min="' + min + '" max="' + max + '" step="' + step + '">' + (unit ? '<span class="sub">' + unit + '</span>' : '') + '</div>';
+const sl = (label, path, opts) => '<div class="f"><label>' + label + '</label><select data-s="' + path + '">' + opts.map(o => '<option value="' + o[0] + '">' + o[1] + '</option>').join('') + '</select></div>';
+const ta = (path, rows, ph) => '<textarea class="ta" rows="' + rows + '" data-s="' + path + '" placeholder="' + esc(ph || '') + '"></textarea>';
+
+function syncInputs(root){
+  (root || $('tabBody')).querySelectorAll('[data-s]').forEach(el => {
+    const v = getPath(S, el.dataset.s);
+    if(el.type === 'checkbox') el.checked = !!v;
+    else if(document.activeElement !== el || el.type === 'range') el.value = v == null ? '' : v;
+  });
+}
+
+/* ================= 탭 전환 ================= */
+const TABS = {roster: renderRosterTab, front: renderFrontTab, back: renderBackTab, fold: renderFoldTab, print: renderPrintTab};
+function setTab(t){
+  tab = t; pageIdx = 0;
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  $('tabBody').classList.toggle('flexcol', t === 'roster');
+  TABS[t]();
+  if(t === 'fold') pvMode = 'fold'; else if(t === 'print') pvMode = 'page'; else pvMode = 'person';
+  schedulePreview();
+}
+
+/* ================= 명단 탭 ================= */
+function renderRosterTab(){
+  $('tabBody').innerHTML =
+    '<div class="btns" style="margin-top:0"><button class="btn pri" data-a="xl">엑셀·CSV 불러오기</button><button class="btn" data-a="paste">붙여넣기로 추가</button><button class="btn" data-a="add">＋ 한 명 추가</button><button class="btn" data-a="kinds">구분 관리</button></div>' +
+    '<div class="btns" style="margin-top:0"><button class="btn sm" data-a="sortk">구분순 정렬</button><button class="btn sm" data-a="sortn">가나다순 정렬</button><button class="btn sm" data-a="rsave">명단 파일로 저장</button><button class="btn sm" data-a="rload">명단 파일 불러오기</button><button class="btn sm danger" data-a="clear">명단 비우기</button></div>' +
+    '<div class="note" id="rosterNote"></div><div class="pills" id="kindPills"></div><div class="twrap" id="rosterWrap"></div>';
+  renderRoster();
+}
+function kindOptions(sel){ return S.kinds.map(k => '<option value="' + k.id + '"' + (k.id === sel ? ' selected' : '') + '>' + esc(k.name) + '</option>').join(''); }
+function pairOpts(tgtKind, cur){
+  const list = people.filter(q => tgtKind ? q.kind === tgtKind : true);
+  return '<option value="">(없음)</option>' + list.map(q => '<option value="' + q.id + '"' + (q.id === cur ? ' selected' : '') + '>' + esc(q.name || '(이름 없음)') + '</option>').join('');
+}
+function pairCell(p){
+  const k = kindById(p.kind);
+  if(!k || !k.pairWith){
+    const ow = reversePairs(p);
+    return ow.length ? '<span class="sub">← ' + ow.map(o => esc(o.name)).join(', ') + '</span>' : '<span class="sub">-</span>';
+  }
+  const ids = p.pairIds.length ? p.pairIds : [''];
+  let h = ids.map((pid, i) => '<select data-f="pair" data-i="' + i + '">' + pairOpts(k.pairWith, pid) + '</select>').join('');
+  if(p.pairIds.length && p.pairIds.length < 3 && p.pairIds[p.pairIds.length - 1]) h += '<button class="mini" data-act="addpair" title="활지사를 한 명 더 연결">＋</button>';
+  return '<div class="pcw">' + h + '</div>';
+}
+function staffCell(p){
+  if(kindRole(p.kind) === 'S')
+    return '<label class="ck mini"><input type="checkbox" data-f="eventStaff"' + (p.eventStaff ? ' checked' : '') + '>행사 연락처</label><label class="ck mini"><input type="checkbox" data-f="rep"' + (p.rep ? ' checked' : '') + '>대표</label>';
+  const reps = repStaff(staffList());
+  return '<select data-f="staffId" title="' + (reps.length ? '대표 직원: ' + reps.map(r => esc(r.name)).join(', ') : '') + '"><option value="">대표 직원</option>' + staffList().map(s => '<option value="' + s.id + '"' + (s.id === p.staffId ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('') + '</select>';
+}
+function rowHTML(p){
+  return '<tr data-id="' + p.id + '"' + (p.id === selId ? ' class="sel"' : '') + '>' +
+    '<td class="c"><input type="checkbox" data-f="print"' + (p.print !== false ? ' checked' : '') + ' title="명찰 인쇄"></td>' +
+    '<td><select data-f="kind">' + kindOptions(p.kind) + '</select></td>' +
+    '<td><input type="text" data-f="name" value="' + esc(p.name) + '" placeholder="이름"></td>' +
+    '<td><input type="text" data-f="org" value="' + esc(p.org) + '" placeholder="소속"></td>' +
+    '<td><input type="text" data-f="phone" value="' + esc(p.phone) + '" placeholder="연락처"></td>' +
+    '<td class="pc">' + pairCell(p) + '</td>' +
+    '<td class="sc">' + staffCell(p) + '</td>' +
+    '<td class="c"><button class="x" data-act="del" title="삭제">×</button></td></tr>';
+}
+function renderRoster(){
+  if(tab !== 'roster') return;
+  const wrap = $('rosterWrap'); if(!wrap) return;
+  const vis = people.filter(p => filterKind === 'all' || p.kind === filterKind);
+  const allOn = vis.length && vis.every(p => p.print !== false);
+  wrap.innerHTML = people.length ?
+    '<table class="rt"><colgroup><col style="width:28px"><col style="width:68px"><col style="width:76px"><col style="width:74px"><col style="width:110px"><col><col style="width:100px"><col style="width:24px"></colgroup><thead><tr><th><input type="checkbox" data-act="allprint"' + (allOn ? ' checked' : '') + ' title="보이는 사람 모두 인쇄/해제"></th><th>구분</th><th>이름</th><th>소속</th><th>연락처</th><th>짝(활지사·보호자)</th><th>담당직원</th><th></th></tr></thead><tbody>' + vis.map(rowHTML).join('') + '</tbody></table>' :
+    '<div class="dropz" id="dropz" style="margin:10px">명단이 비어 있어요.<br>위의 <b>엑셀·CSV 불러오기</b>를 누르거나, 엑셀 파일을 여기로 끌어다 놓으세요.<br><span class="sub">오른쪽 미리보기는 예시 명찰이에요.</span></div>';
+  const pills = $('kindPills');
+  const cnt = k => people.filter(p => p.kind === k).length;
+  pills.innerHTML = '<button class="pill' + (filterKind === 'all' ? ' on' : '') + '" data-k="all">전체 ' + people.length + '</button>' +
+    S.kinds.map(k => '<button class="pill' + (filterKind === k.id ? ' on' : '') + '" data-k="' + k.id + '"><i style="background:' + k.color + '"></i>' + esc(k.name) + ' ' + cnt(k.id) + '</button>').join('');
+  $('rosterNote').innerHTML = '명찰 <b>' + printList().length + '</b>명 · 이름·연락처는 이 브라우저에 저장되지 않아요. 닫기 전에 <b>명단 파일로 저장</b>을 눌러 두세요.';
+}
+function refreshPairSelects(){
+  document.querySelectorAll('#rosterWrap select[data-f="pair"]').forEach(s => {
+    const tr = s.closest('tr'); const p = people.find(q => q.id === tr.dataset.id); if(!p) return;
+    const k = kindById(p.kind); s.innerHTML = pairOpts(k && k.pairWith, p.pairIds[+s.dataset.i] || '');
+  });
+  document.querySelectorAll('#rosterWrap select[data-f="staffId"]').forEach(s => {
+    const tr = s.closest('tr'); const p = people.find(q => q.id === tr.dataset.id); if(p) s.closest('td').innerHTML = staffCell(p);
+  });
+}
+function refreshRow(p){
+  const tr = document.querySelector('#rosterWrap tr[data-id="' + p.id + '"]'); if(!tr) return;
+  tr.querySelector('.pc').innerHTML = pairCell(p); tr.querySelector('.sc').innerHTML = staffCell(p);
+}
+function selectPerson(id){
+  if(selId === id) return; selId = id;
+  document.querySelectorAll('#rosterWrap tr[data-id]').forEach(tr => tr.classList.toggle('sel', tr.dataset.id === id));
+  schedulePreview();
+}
+function removePerson(id){
+  const snap = JSON.stringify(people);
+  people = people.filter(p => p.id !== id);
+  people.forEach(p => { p.pairIds = (p.pairIds || []).filter(x => x !== id); if(p.staffId === id) p.staffId = ''; });
+  if(selId === id) selId = null;
+  markDirty(); reindex(); renderRoster(); schedulePreview();
+  toast('삭제했어요', '되돌리기', () => { people = JSON.parse(snap); reindex(); renderRoster(); schedulePreview(); });
+}
+function addBlankPerson(){
+  const kid = filterKind !== 'all' ? filterKind : (S.kinds[0].id);
+  const p = newPerson({kind: kid}); if(kindRole(kid) === 'S') p.eventStaff = true;
+  people.push(p); selId = p.id; markDirty(); reindex(); renderRoster(); schedulePreview();
+  const tr = document.querySelector('#rosterWrap tr[data-id="' + p.id + '"]');
+  if(tr){ tr.scrollIntoView({block:'nearest'}); const i = tr.querySelector('[data-f="name"]'); if(i) i.focus(); }
+}
+function sortPeople(mode){
+  if(mode === 'kind'){ const ord = {}; S.kinds.forEach((k, i) => { ord[k.id] = i; }); people = people.map((p, i) => [p, i]).sort((a, b) => (ord[a[0].kind] - ord[b[0].kind]) || (a[1] - b[1])).map(x => x[0]); }
+  else people = people.slice().sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  markDirty(); renderRoster(); schedulePreview(); toast(mode === 'kind' ? '구분 순서로 정렬했어요' : '가나다순으로 정렬했어요');
+}
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('#tabBody [data-a]');
+  if(b && tab === 'roster'){
+    const a = b.dataset.a;
+    if(a === 'xl') $('fileXl').click();
+    else if(a === 'paste') pasteModal();
+    else if(a === 'add') addBlankPerson();
+    else if(a === 'kinds') kindsModal();
+    else if(a === 'sortk') sortPeople('kind');
+    else if(a === 'sortn') sortPeople('name');
+    else if(a === 'rsave') saveRosterFile();
+    else if(a === 'rload') $('fileRoster').click();
+    else if(a === 'clear') clearRoster();
+    return;
+  }
+  const pill = e.target.closest('#kindPills [data-k]');
+  if(pill){ filterKind = pill.dataset.k; renderRoster(); return; }
+  const tr = e.target.closest('#rosterWrap tr[data-id]');
+  if(tr){
+    const id = tr.dataset.id; const p = people.find(q => q.id === id); if(!p) return;
+    const act = e.target.closest('[data-act]');
+    if(act && act.dataset.act === 'del'){ removePerson(id); return; }
+    if(act && act.dataset.act === 'addpair'){ p.pairIds.push(''); refreshRow(p); return; }
+    selectPerson(id);
+  }
+  const ap = e.target.closest('[data-act="allprint"]');
+  if(ap){ const on = ap.checked; people.forEach(p => { if(filterKind === 'all' || p.kind === filterKind) p.print = on; }); markDirty(); renderRoster(); schedulePreview(); }
+});
+document.addEventListener('focusin', e => { const tr = e.target.closest && e.target.closest('#rosterWrap tr[data-id]'); if(tr) selectPerson(tr.dataset.id); });
+function onRosterField(e){
+  const el = e.target.closest('#rosterWrap [data-f]'); if(!el) return;
+  const tr = el.closest('tr'); const p = people.find(q => q.id === tr.dataset.id); if(!p) return;
+  const f = el.dataset.f, isChange = e.type === 'change';
+  if(f === 'name' || f === 'org' || f === 'phone'){
+    if(f === 'phone' && isChange){ const v = fmtPhone(el.value); if(v !== el.value) el.value = v; }
+    p[f] = el.value; markDirty();
+    if(f === 'name' && isChange) refreshPairSelects();
+    schedulePreview(); if(f === 'name') { updateRosterNote(); }
+  }
+  else if(f === 'print'){ p.print = el.checked; markDirty(); updateRosterNote(); schedulePreview(); }
+  else if(f === 'kind'){
+    p.kind = el.value;
+    if(kindRole(p.kind) === 'S' && p.eventStaff === false && !people.some(q => q.eventStaff && kindRole(q.kind) === 'S')) p.eventStaff = true;
+    markDirty(); reindex(); renderRoster(); schedulePreview();
+  }
+  else if(f === 'pair' && isChange){
+    const i = +el.dataset.i; const ids = p.pairIds.length ? p.pairIds.slice() : [''];
+    ids[i] = el.value; p.pairIds = ids.filter(Boolean);
+    markDirty(); refreshRow(p); document.querySelectorAll('#rosterWrap tr[data-id]').forEach(t => { const q = people.find(z => z.id === t.dataset.id); if(q && q !== p) t.querySelector('.pc').innerHTML = pairCell(q); });
+    schedulePreview();
+  }
+  else if(f === 'staffId' && isChange){ p.staffId = el.value; markDirty(); schedulePreview(); }
+  else if(f === 'eventStaff' && isChange){ p.eventStaff = el.checked; markDirty(); document.querySelectorAll('#rosterWrap select[data-f="staffId"]').forEach(s => { const q = people.find(z => z.id === s.closest('tr').dataset.id); if(q) s.closest('td').innerHTML = staffCell(q); }); schedulePreview(); scheduleBackCheck(); }
+  else if(f === 'rep' && isChange){
+    if(el.checked && staffList().filter(s => s.rep && s.id !== p.id).length >= 2){ el.checked = false; toast('대표 직원은 2명까지 정할 수 있어요'); return; }
+    p.rep = el.checked; markDirty();
+    document.querySelectorAll('#rosterWrap select[data-f="staffId"]').forEach(s => { const q = people.find(z => z.id === s.closest('tr').dataset.id); if(q) s.closest('td').innerHTML = staffCell(q); });
+    schedulePreview(); scheduleBackCheck();
+  }
+}
+function updateRosterNote(){ const n = $('rosterNote'); if(n) n.innerHTML = '명찰 <b>' + printList().length + '</b>명 · 이름·연락처는 이 브라우저에 저장되지 않아요. 닫기 전에 <b>명단 파일로 저장</b>을 눌러 두세요.'; }
+document.addEventListener('input', onRosterField);
+document.addEventListener('change', onRosterField);
+
+async function clearRoster(){
+  if(!people.length){ toast('이미 비어 있어요'); return; }
+  if(!(await askConfirm('명단 ' + people.length + '명을 모두 지울까요?\n(명단 파일로 저장하지 않았다면 되돌릴 수 없어요)', '모두 지우기', true))) return;
+  people = []; selId = null; markDirty(); reindex(); renderRoster(); schedulePreview();
+}
+
+/* ----- 구분 관리 ----- */
+function kindsModal(){
+  const roleOpts = [['U','이용인형 (붙여넣기에서 첫 이름)'], ['H','활지사형 (붙여넣기에서 뒤 이름)'], ['S','직원형 (행사 직원·대표 직원)'], ['T','통역사형'], ['','기타']];
+  const build = () => {
+    let h = '<p class="note">구분 이름을 고치거나 새 구분을 추가할 수 있어요. 개수는 자유예요.</p><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr><th align="left">이름</th><th align="left">종류</th><th align="left">짝 구분</th><th></th></tr></thead><tbody>';
+    S.kinds.forEach((k, i) => {
+      h += '<tr data-i="' + i + '"><td><input type="text" data-kf="name" value="' + esc(k.name) + '" style="width:100%"></td>' +
+        '<td><select data-kf="role">' + roleOpts.map(r => '<option value="' + r[0] + '"' + (k.role === r[0] ? ' selected' : '') + '>' + r[1] + '</option>').join('') + '</select></td>' +
+        '<td><select data-kf="pairWith"><option value="">(없음)</option>' + S.kinds.filter(x => x.id !== k.id).map(x => '<option value="' + x.id + '"' + (k.pairWith === x.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></td>' +
+        '<td><button class="x" data-kd="' + i + '" title="구분 삭제">×</button></td></tr>';
+    });
+    return h + '</tbody></table><div class="btns"><button class="btn" data-kadd>＋ 구분 추가</button></div><p class="note">“짝 구분”은 그 구분의 사람 옆에 연결할 사람의 구분이에요. 예) 이용인 → 활지사 (활지사의 연락처가 이용인 명찰 뒷면에 들어가요)</p>';
+  };
+  const m = openModal({title:'구분 관리', wide:true, html:build(), buttons:[{label:'닫기', cls:'pri'}], onClose(){ ensureSettings(); saveSettings(); reindex(); renderRoster(); if(tab !== 'roster') TABS[tab](); schedulePreview(); }});
+  const body = m.body;
+  body.addEventListener('input', e => { const el = e.target.closest('[data-kf]'); if(!el) return; const k = S.kinds[+el.closest('tr').dataset.i]; k[el.dataset.kf] = el.value; });
+  body.addEventListener('change', e => { const el = e.target.closest('[data-kf]'); if(!el) return; if(el.dataset.kf !== 'name'){ const k = S.kinds[+el.closest('tr').dataset.i]; k[el.dataset.kf] = el.value; } });
+  body.addEventListener('click', async e => {
+    if(e.target.closest('[data-kadd]')){
+      const palette = ['#d6336c', '#0ca678', '#e8590c', '#1098ad', '#7048e8', '#5c940d'];
+      const id = 'k' + nid(); S.kinds.push({id, name:'새 구분', color: palette[S.kinds.length % palette.length], band:'', role:'', pairWith:''});
+      ensureSettings(); body.innerHTML = build(); return;
+    }
+    const d = e.target.closest('[data-kd]');
+    if(d){
+      if(S.kinds.length <= 1){ toast('구분은 하나 이상 있어야 해요'); return; }
+      const k = S.kinds[+d.dataset.kd]; const n = people.filter(p => p.kind === k.id).length;
+      if(n && !(await askConfirm('“' + k.name + '” 구분을 지우면 이 구분의 ' + n + '명도 명단에서 지워져요. 지울까요?', '지우기', true))) return;
+      people = people.filter(p => p.kind !== k.id);
+      S.kinds.splice(+d.dataset.kd, 1); delete S.back.byKind[k.id]; delete S.fold.kinds[k.id];
+      S.kinds.forEach(x => { if(x.pairWith === k.id) x.pairWith = ''; });
+      if(filterKind === k.id) filterKind = 'all';
+      ensureSettings(); markDirty(); body.innerHTML = build();
+    }
+  });
+}
+
+/* ----- 명단 · 설정 파일 ----- */
+function saveRosterFile(){
+  if(!people.length){ toast('저장할 명단이 없어요'); return; }
+  const o = {app:'name-badge-roster', ver:1, kinds:S.kinds.map(k => ({id:k.id, name:k.name, role:k.role, pairWith:k.pairWith})), people};
+  const d = new Date(), p2 = n => String(n).padStart(2, '0');
+  download('명찰명단_' + d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + '.json', JSON.stringify(o, null, 1));
+  dirtyRoster = false; toast('명단 파일을 저장했어요');
+}
+async function loadRosterFile(f){
+  let o; try{ o = JSON.parse(await readFileText(f)); }catch(e){ notice('명단 파일을 읽을 수 없어요.'); return; }
+  if(!o || o.app !== 'name-badge-roster' || !Array.isArray(o.people)){ notice('이 앱에서 저장한 명단 파일이 아니에요.'); return; }
+  const apply = replace => {
+    const kmap = {};
+    (o.kinds || []).forEach(k => {
+      let x = kindById(k.id) || S.kinds.find(y => y.name === k.name);
+      if(!x){ x = {id: k.id, name: k.name, color:'#6b7280', band:'', role: k.role || '', pairWith: k.pairWith || ''}; S.kinds.push(x); }
+      kmap[k.id] = x.id;
+    });
+    ensureSettings();
+    const idmap = {}; o.people.forEach(p => { idmap[p.id] = nid(); });
+    const add = o.people.map(p => Object.assign(newPerson(), p, {id: idmap[p.id], kind: kmap[p.kind] || (kindById(p.kind) ? p.kind : S.kinds[0].id), pairIds: (p.pairIds || []).map(x => idmap[x]).filter(Boolean), staffId: idmap[p.staffId] || ''}));
+    people = replace ? add : people.concat(add);
+    dirtyRoster = false; selId = null; saveSettings(); reindex(); renderRoster(); schedulePreview();
+    toast(add.length + '명을 불러왔어요');
+  };
+  if(!people.length){ apply(true); return; }
+  openModal({title:'명단 파일 불러오기', html:'<p>파일에 ' + o.people.length + '명이 있어요. 지금 명단(' + people.length + '명)은 어떻게 할까요?</p>', buttons:[
+    {label:'지금 명단 뒤에 이어 붙이기', act(){ apply(false); }}, {label:'지금 명단을 바꾸기', cls:'pri', act(){ apply(true); }}
+  ]});
+}
+function saveSettingsFile(){
+  const o = JSON.parse(JSON.stringify(S)); delete o.ui;
+  const d = new Date(), p2 = n => String(n).padStart(2, '0');
+  download('명찰설정_' + d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + '.json', JSON.stringify({app:'name-badge-settings', ver:1, settings:o}));
+  toast('설정 파일을 저장했어요');
+}
+async function loadSettingsFile(f){
+  let o; try{ o = JSON.parse(await readFileText(f)); }catch(e){ notice('설정 파일을 읽을 수 없어요.'); return; }
+  if(!o || o.app !== 'name-badge-settings' || !o.settings){ notice('이 앱에서 저장한 설정 파일이 아니에요.'); return; }
+  const ui = S.ui; const d = defSettings(); S = deepMerge(d, o.settings); if(o.settings.kinds) S.kinds = o.settings.kinds; S.ui = ui;
+  // 지금 명단의 구분 id가 설정에 없으면 첫 구분으로
+  ensureSettings(); people.forEach(p => { if(!kindById(p.kind)) p.kind = S.kinds[0].id; });
+  buildSample(); reindex(); saveSettings(); setTab(tab); toast('설정을 불러왔어요');
+}
+async function resetSettings(){
+  if(!(await askConfirm('문구·색·크기 설정을 처음 상태로 되돌릴까요?\n(명단은 그대로 둬요)', '되돌리기', true))) return;
+  const ui = S.ui; S = defSettings(); S.ui = ui; people.forEach(p => { if(!kindById(p.kind)) p.kind = S.kinds[0].id; });
+  ensureSettings(); buildSample(); reindex(); saveSettings(); setTab(tab); toast('처음 설정으로 되돌렸어요');
+}
+
+/* ================= 앞면 탭 ================= */
+function renderFrontTab(){
+  $('tabBody').innerHTML = '<div class="cols"><div>' +
+    '<h4>표시</h4>' + ck('구분 띠 (맨 위에 구분 이름)', 'front.band') + nm('띠 글씨', 'front.bandPt', 6, 40, 1, 'pt') +
+    sl('소속 위치', 'front.orgPos', [['below', '이름 아래'], ['above', '이름 위']]) +
+    tx('행사명', 'front.eventText', '비워 두면 안 보여요') + nm('행사명 글씨', 'front.eventPt', 6, 40, 1, 'pt') +
+    '<h4>글씨</h4>' + rn('이름 글씨 크기', 'front.namePt', 12, 120, 1, 'pt') + rn('소속 글씨 크기', 'front.orgPt', 6, 60, 1, 'pt') +
+    '<div class="f"><label>글꼴</label><input type="text" data-s="front.font" list="fontList" placeholder="맑은 고딕"></div>' +
+    '<datalist id="fontList"><option value="맑은 고딕"><option value="나눔고딕"><option value="나눔스퀘어"><option value="Noto Sans KR"><option value="굴림"><option value="돋움"><option value="바탕"><option value="HY견고딕"></datalist>' +
+    '<div class="note">컴퓨터에 설치된 글꼴 이름을 적어요. 없으면 기본 글꼴로 나와요. 이름이 길면 칸에 맞게 줄어들어요.</div>' +
+    '</div><div>' +
+    '<h4>로고 그림</h4><div class="btns"><button class="btn" data-a="logo">그림 올리기</button><button class="btn" data-a="nologo">지우기</button><span id="logoThumb"></span></div>' +
+    rn('로고 크기', 'front.logoW', 5, 60, 1, 'mm') +
+    sl('로고 위치', 'front.logoPos', [['top', '위 가운데'], ['tl', '왼쪽 위'], ['tr', '오른쪽 위'], ['org', '소속 옆']]) +
+    '<h4>테두리</h4>' + rn('테두리 두께', 'front.border', 0, 8, 0.5, 'mm') +
+    '<h4>구분별 색</h4>' + S.kinds.map((k, i) =>
+      '<div class="f"><label style="min-width:64px;color:var(--text)"><b>' + esc(k.name) + '</b></label><span class="sub">테두리</span><input type="color" data-s="kinds.' + i + '.color">' +
+      '<span class="sub">띠</span><input type="color" id="band' + i + '" value="' + (k.band || k.color) + '" data-band="' + i + '"><button class="mini" data-a="bandsame" data-i="' + i + '">같게</button></div>').join('') +
+    '</div></div>';
+  syncInputs(); paintLogoThumb();
+}
+function paintLogoThumb(){
+  const t = $('logoThumb'); if(!t) return;
+  t.innerHTML = S.front.logoData ? '<img src="' + S.front.logoData + '" alt="로고" style="height:34px;max-width:90px;object-fit:contain;border:1px solid var(--line);border-radius:4px;background:#fff;vertical-align:middle">' : '<span class="sub">올린 그림 없음</span>';
+}
+function loadLogo(f){
+  if(!f) return;
+  const url = URL.createObjectURL(f); const img = new Image();
+  img.onload = () => {
+    let w = img.naturalWidth || 400, h = img.naturalHeight || 400; if(!w || !h){ w = 400; h = 400; }
+    const sc = Math.min(1, 800 / Math.max(w, h)); const cw = Math.max(1, Math.round(w * sc)), ch = Math.max(1, Math.round(h * sc));
+    const c = document.createElement('canvas'); c.width = cw; c.height = ch; const cx = c.getContext('2d');
+    const jpeg = /jpe?g/i.test(f.type); if(jpeg){ cx.fillStyle = '#fff'; cx.fillRect(0, 0, cw, ch); }
+    cx.drawImage(img, 0, 0, cw, ch);
+    try{ S.front.logoData = c.toDataURL(jpeg ? 'image/jpeg' : 'image/png', 0.92); }catch(e){ toast('그림을 읽지 못했어요'); URL.revokeObjectURL(url); return; }
+    S.front.logoAR = cw / ch; URL.revokeObjectURL(url);
+    saveSettings(); paintLogoThumb(); schedulePreview(); toast('로고를 넣었어요');
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); toast('이 그림은 읽을 수 없어요 (png, jpg, svg)'); };
+  img.src = url;
+}
+
+/* ================= 뒷면 탭 ================= */
+function renderBackTab(){
+  const k = kindById(backKind) || S.kinds[0]; backKind = k.id; const bp = 'back.byKind.' + k.id + '.';
+  $('tabBody').innerHTML = '<div class="pills" id="backPills">' + S.kinds.map(x => '<button class="pill' + (x.id === backKind ? ' on' : '') + '" data-bk="' + x.id + '"><i style="background:' + x.color + '"></i>' + esc(x.name) + '</button>').join('') + '</div>' +
+    '<div class="cols"><div><h4>“' + esc(k.name) + '” 명찰 뒷면에 넣을 것</h4>' +
+    ck('제목 문구', bp + 'titleOn') + '<div class="f"><label></label><input type="text" data-s="' + bp + 'titleText" placeholder="예) 비상 연락처"></div>' +
+    ck('안내 문구', bp + 'noticeOn') + ta(bp + 'noticeText', 3, '여러 줄로 쓸 수 있어요') +
+    sl('안내 문구 위치', bp + 'noticePos', [['top', '연락처 위'], ['bottom', '연락처 아래']]) +
+    ck('짝 이름·연락처 (이용인 ↔ 활지사·보호자)', bp + 'pairOn') +
+    ck('담당직원 이름·연락처', bp + 'myStaffOn') +
+    ck('행사 직원 연락처 (명단에서 “행사 연락처” 체크한 직원)', bp + 'staffOn') +
+    ck('행사 개요·순서 (오른쪽에 적은 내용)', bp + 'eventOn') +
+    ck('자유 문구', bp + 'freeOn') + ta(bp + 'freeText', 2, '그 밖에 넣을 말') +
+    '</div><div><h4>모든 구분 공통</h4>' +
+    rn('뒷면 글씨 크기', 'back.pt', 6, 20, 0.5, 'pt') +
+    tx('행사 개요 제목', 'back.eventHeading', '행사 안내') +
+    '<div class="f"><label>행사 개요·순서</label></div>' + ta('back.eventText', 7, '한 줄에 하나씩\n10:00 접수\n10:30 개회식\n12:00 점심\n13:30 프로그램') +
+    '<div class="note">“10:00 개회식”처럼 시간으로 시작하는 줄은 시간표 모양으로 나와요.</div>' +
+    tx('직원 목록 이름', 'back.staffLabel', '직원 연락처') + tx('담당직원 이름', 'back.myStaffLabel', '담당직원') +
+    '<div class="note" id="staffNote"></div><div id="bkWarn"></div>' +
+    '</div></div>';
+  syncInputs(); updateStaffNote(); updateBackWarn();
+}
+function updateStaffNote(){
+  const n = $('staffNote'); if(!n) return;
+  const ev = eventStaffList(), rp = repStaff();
+  n.innerHTML = people.length ? '행사 직원: ' + (ev.length ? ev.map(s => esc(s.name)).join(', ') : '<span style="color:var(--warn)">없음</span>') + '<br>대표 직원: ' + (rp.length ? rp.map(s => esc(s.name)).join(', ') : '없음') + '<br>(명단 탭에서 직원 행의 “행사 연락처·대표”를 체크해요)' : '명단에 직원을 넣으면 여기에 보여요. (명단 탭의 직원 행에서 “행사 연락처·대표” 체크)';
+}
+let backWarn = [], backChkT = 0;
+function scheduleBackCheck(){ clearTimeout(backChkT); backChkT = setTimeout(checkBacks, 500); }
+function checkBacks(){
+  const list = printList(); backWarn = [];
+  if(list.length){
+    reindex(); const ms = $('measure'); ms.innerHTML = '';
+    const frag = document.createElement('div'); ms.appendChild(frag);
+    const seenKind = {};
+    list.forEach(p => {
+      const el = document.createElement('div'); el.innerHTML = faceBack(p); const f = el.firstChild; frag.appendChild(f); fitFace(f);
+      if(f.dataset.small === '1') backWarn.push({name: p.name, pt: f.dataset.pt});
+    });
+    ms.innerHTML = '';
+  }
+  updateBackWarn(); updatePvWarn();
+}
+function backWarnText(){
+  if(!backWarn.length) return '';
+  const names = backWarn.slice(0, 4).map(w => w.name + '(' + w.pt + 'pt)').join(', ') + (backWarn.length > 4 ? ' 외 ' + (backWarn.length - 4) + '명' : '');
+  return '⚠ 뒷면 글씨가 7pt보다 작아진 명찰이 ' + backWarn.length + '개 있어요: ' + names + '. 문구를 줄이거나 명찰 크기를 키워 보세요.';
+}
+function updateBackWarn(){ const w = $('bkWarn'); if(w) w.innerHTML = backWarn.length ? '<div class="warnbox">' + esc(backWarnText()) + '</div>' : ''; }
+
+/* ================= 연락망 탭 ================= */
+function renderFoldTab(){
+  $('tabBody').innerHTML = '<h4>연락망에 넣을 구분</h4>' + S.kinds.map(k => ck(esc(k.name), 'fold.kinds.' + k.id)).join('') +
+    ck('이용인 옆에 짝(활지사) 이름·연락처 함께 표시', 'fold.showPair') +
+    '<h4>모양</h4>' + rn('글씨 크기', 'fold.pt', 5, 14, 0.5, 'pt') +
+    '<div class="cols"><div>' + nm('칸 가로', 'fold.cols', 0, 6, 1, '칸 (0=자동)') + '</div><div>' + nm('칸 세로', 'fold.rows', 0, 8, 1, '칸 (0=자동)') + '</div></div>' +
+    sl('용지 방향', 'fold.orient', [['auto', '자동 (장수가 적은 쪽)'], ['portrait', 'A4 세로'], ['landscape', 'A4 가로']]) +
+    nm('인쇄할 장수', 'fold.copies', 1, 50, 1, '세트 (직원 수만큼)') +
+    '<div class="infobox" id="foldInfo"></div>' +
+    '<div class="note">명찰 크기(' + S.size.w + '×' + S.size.h + 'mm)의 칸을 이어 붙여 한 장에 인쇄해요. 점선을 따라 접으면 명찰 크기가 되어 케이스 뒤에 넣을 수 있어요. 칸마다 번호가 있어 순서대로 이어 읽어요.</div>' +
+    '<div class="btns"><button class="btn pri" data-a="printfold">연락망 인쇄</button></div>';
+  syncInputs(); updateFoldInfo();
+}
+function updateFoldInfo(){
+  const i = $('foldInfo'); if(!i) return;
+  const job = buildFold(); if(!job){ i.textContent = '연락망에 넣을 사람이 없어요.'; return; }
+  i.innerHTML = '칸 ' + job.panels + '개 → 가로 ' + job.n + ' × 세로 ' + job.m + ' (A4 ' + (job.orient === 'portrait' ? '세로' : '가로') + ') · 한 세트 ' + job.sheets.length + '장 × ' + job.copies + '세트 = 총 <b>' + (job.sheets.length * job.copies) + '장</b>' + (job.warn ? '<br><span style="color:var(--warn)">' + esc(job.warn) + '</span>' : '');
+}
+
+/* ================= 크기·인쇄 탭 ================= */
+const PRESETS = [['land', '가로형 125×90', 125, 90], ['port', '세로형 90×125', 90, 125], ['small', '작은 명찰 90×55', 90, 55]];
+function renderPrintTab(){
+  $('tabBody').innerHTML = '<div class="cols"><div>' +
+    '<h4>명찰 크기</h4><div class="btns" id="presetBtns">' + PRESETS.map(p => '<button class="btn sm" data-preset="' + p[0] + '">' + p[1] + '</button>').join('') + '</div>' +
+    rn('가로', 'size.w', 30, 200, 1, 'mm') + rn('세로', 'size.h', 30, 200, 1, 'mm') +
+    '<h4>종이</h4>' + sl('용지', 'page.orient', [['auto', 'A4 자동 (많이 들어가는 쪽)'], ['portrait', 'A4 세로'], ['landscape', 'A4 가로']]) +
+    nm('종이 여백', 'page.margin', 0, 30, 1, 'mm') + nm('명찰 사이 간격', 'page.gap', 0, 20, 0.5, 'mm (0이면 붙임)') +
+    nm('모서리 둥글기', 'page.radius', 0, 20, 0.5, 'mm') +
+    sl('자르는 선', 'page.cut', [['dash', '점선 (명찰 둘레)'], ['marks', '재단 눈금'], ['none', '없음']]) +
+    '</div><div><h4>양면 인쇄</h4>' +
+    sl('인쇄 방식', 'page.duplex', [['both', '양면 (앞·뒤 번갈아)'], ['front', '앞면만'], ['back', '뒷면만']]) +
+    sl('넘김', 'page.flip', [['long', '긴 쪽 넘김'], ['short', '짧은 쪽 넘김']]) +
+    '<div class="infobox" id="flipHint"></div>' +
+    '<h4>앞뒤 어긋남 보정 (뒷면 이동)</h4>' + rn('가로로', 'page.backDx', -5, 5, 0.1, 'mm') + rn('세로로', 'page.backDy', -5, 5, 0.1, 'mm') +
+    '<div class="infobox" id="printInfo"></div>' +
+    '<div class="note">인쇄 창에서 <b>실제 크기(100%)</b>로 인쇄하고 <b>양면 인쇄</b>를 켜세요. 처음에는 한 장만 시험 인쇄해서 앞뒤 위치가 맞는지 확인하세요.</div>' +
+    '<div class="btns"><button class="btn pri" data-a="printbadge">명찰 인쇄</button><button class="btn sm" data-a="setsave">설정 파일로 저장</button><button class="btn sm" data-a="setload">설정 파일 불러오기</button></div>' +
+    '</div></div>';
+  syncInputs(); updatePrintInfo();
+}
+function geo(){
+  const w = S.size.w, h = S.size.h, margin = S.page.margin, gap = S.page.gap;
+  const cands = [{o:'portrait', pw:210, ph:297}, {o:'landscape', pw:297, ph:210}].map(c => {
+    const aw = c.pw - 2 * margin, ah = c.ph - 2 * margin;
+    const cols = Math.max(0, Math.floor((aw + gap + 1e-6) / (w + gap))), rows = Math.max(0, Math.floor((ah + gap + 1e-6) / (h + gap)));
+    return Object.assign({cols, rows, per: cols * rows}, c);
+  });
+  const pref = S.page.orient; let pick;
+  if(pref === 'portrait') pick = cands[0]; else if(pref === 'landscape') pick = cands[1]; else pick = cands[1].per > cands[0].per ? cands[1] : cands[0];
+  let cols = pick.cols, rows = pick.rows; const fits = cols > 0 && rows > 0; cols = Math.max(1, cols); rows = Math.max(1, rows);
+  const gw = cols * w + (cols - 1) * gap, gh = rows * h + (rows - 1) * gap;
+  return {o: pick.o, pw: pick.pw, ph: pick.ph, cols, rows, per: cols * rows, x0: (pick.pw - gw) / 2, y0: (pick.ph - gh) / 2, fits};
+}
+const mirrorH = g => g.o === 'portrait' ? S.page.flip === 'long' : S.page.flip !== 'long';
+function updatePrintInfo(){
+  const g = geo(), n = printList().length, seq = pageSeq(g);
+  document.querySelectorAll('#presetBtns [data-preset]').forEach(b => { const p = PRESETS.find(x => x[0] === b.dataset.preset); b.classList.toggle('on', p[2] === S.size.w && p[3] === S.size.h); });
+  const pi = $('printInfo');
+  if(pi){
+    pi.innerHTML = 'A4 ' + (g.o === 'portrait' ? '세로' : '가로') + ' · 한 장에 <b>' + (g.fits ? g.per : 0) + '개</b> (' + g.cols + '×' + g.rows + ')' + (g.fits ? '' : '<br><span style="color:var(--warn)">⚠ 명찰이 용지보다 커요. 크기나 여백을 줄여 주세요.</span>') +
+      '<br>명찰 ' + n + '명 → 종이 <b>' + Math.ceil(n / g.per) + '장</b>' + (S.page.duplex === 'both' ? ' (앞·뒤 번갈아 ' + seq.length + '쪽)' : ' (' + seq.length + '쪽)');
+  }
+  const fh = $('flipHint');
+  if(fh){
+    const mh = mirrorH(g);
+    fh.innerHTML = '지금은 A4 <b>' + (g.o === 'portrait' ? '세로' : '가로') + '</b> 용지라서 ' + (S.page.flip === 'long' ? '긴' : '짧은') + ' 쪽 넘김이면 뒷면은 <b>' + (mh ? '좌우' : '위아래') + '</b>로 뒤집어 배치돼요.<br><span class="sub">프린터 설정의 양면 “' + (S.page.flip === 'long' ? '긴' : '짧은') + ' 쪽 넘김(' + (S.page.flip === 'long' ? 'Flip on long edge' : 'Flip on short edge') + ')”과 같게 고르세요. 앞뒤가 거꾸로 나오면 이 “넘김”을 바꿔 보세요.</span>';
+  }
+}
+
+/* ================= 명찰 앞면 · 뒷면 만들기 ================= */
+function fontCss(){
+  const f = String(S.front.font || '').replace(/['"\\;{}<>]/g, '').trim();
+  return (f ? "'" + f + "'," : '') + "'Malgun Gothic','맑은 고딕','Apple SD Gothic Neo','Noto Sans KR','Noto Sans CJK KR',sans-serif";
+}
+function logoDims(){ const F = S.front, ar = F.logoAR || 1; return ar >= 1 ? {w: F.logoW, h: F.logoW / ar} : {w: F.logoW * ar, h: F.logoW}; }
+function faceFront(p){
+  const F = S.front, k = kindById(p.kind) || S.kinds[0], G = S.size;
+  const bandH = F.band ? Math.round(F.bandPt * 0.3528 * 1.7 * 100) / 100 : 0;
+  const ld = logoDims(); const hasLogo = !!F.logoData;
+  let h = '<div class="bdg" data-side="f" data-pid="' + p.id + '" style="width:' + G.w + 'mm;height:' + G.h + 'mm;border:' + F.border + 'mm solid ' + k.color + ';border-radius:' + S.page.radius + 'mm;font-family:' + fontCss() + '">';
+  if(F.band) h += '<div class="bnd" style="background:' + (k.band || k.color) + ';height:' + bandH + 'mm;line-height:' + bandH + 'mm;font-size:' + F.bandPt + 'pt">' + esc(k.name) + '</div>';
+  if(hasLogo && (F.logoPos === 'tl' || F.logoPos === 'tr'))
+    h += '<img class="lgc" alt="" src="' + F.logoData + '" style="top:' + (bandH + 1.5) + 'mm;' + (F.logoPos === 'tl' ? 'left' : 'right') + ':2mm;width:' + ld.w + 'mm;height:' + ld.h + 'mm">';
+  h += '<div class="fbody">';
+  if(hasLogo && F.logoPos === 'top') h += '<img class="lg" alt="" src="' + F.logoData + '" style="width:' + ld.w + 'mm;height:' + ld.h + 'mm">';
+  if(String(F.eventText || '').trim()) h += '<div class="evn" style="font-size:calc(' + F.eventPt + 'pt * var(--se,1) * var(--g))">' + esc(F.eventText) + '</div>';
+  const org = String(p.org || '').trim();
+  const inlineLogo = hasLogo && F.logoPos === 'org';
+  const orgHtml = (org || inlineLogo) ? '<div class="orgrow" style="font-size:calc(' + F.orgPt + 'pt * var(--so) * var(--g))">' + (inlineLogo ? '<img class="lgi" alt="" src="' + F.logoData + '" style="width:' + ld.w + 'mm;height:' + ld.h + 'mm">' : '') + '<span class="org">' + esc(org) + '</span></div>' : '';
+  if(F.orgPos === 'above') h += orgHtml;
+  h += '<div class="nm" style="font-size:calc(' + F.namePt + 'pt * var(--sn) * var(--g))">' + esc(p.name) + '</div>';
+  if(F.orgPos !== 'above') h += orgHtml;
+  return h + '</div></div>';
+}
+const TIME_RE = /^\s*(\d{1,2}\s*[:：]\s*\d{2}(?:\s*[~\-–—]\s*\d{1,2}\s*[:：]\s*\d{2})?)\s+(.+)$/;
+function faceBack(p){
+  const k = kindById(p.kind) || S.kinds[0], B = S.back, c = B.byKind[k.id] || defBack(k.role);
+  const ctLine = (label, name, phone) => '<div class="ct">' + (label ? '<span class="lb">' + esc(label) + '</span>' : '') + '<span class="n2">' + esc(name) + '</span>' + (phone ? '<span class="ph">' + esc(phone) + '</span>' : '') + '</div>';
+  const parts = [];
+  if(c.titleOn && String(c.titleText || '').trim()) parts.push('<div class="tt">' + esc(c.titleText) + '</div>');
+  const notice = c.noticeOn && String(c.noticeText || '').trim() ? '<div class="nt">' + esc(c.noticeText) + '</div>' : '';
+  if(notice && c.noticePos !== 'bottom') parts.push(notice);
+  if(c.pairOn){
+    const prs = []; realPairs(p).concat(reversePairs(p)).forEach(q => { if(!prs.includes(q)) prs.push(q); });
+    if(prs.length) parts.push('<div class="sec">' + prs.map(q => ctLine((kindById(q.kind) || {}).name || '', q.name, q.phone)).join('') + '</div>');
+  }
+  if(c.myStaffOn){
+    const st = p.staffId && IDX.get(p.staffId) ? [IDX.get(p.staffId)] : repStaff();
+    if(st.length) parts.push('<div class="sec"><div class="sh">' + esc(B.myStaffLabel || '담당직원') + '</div>' + st.map(s => ctLine('', s.name, s.phone)).join('') + '</div>');
+  }
+  if(c.staffOn){
+    const st = eventStaffList();
+    if(st.length) parts.push('<div class="sec"><div class="sh">' + esc(B.staffLabel || '직원 연락처') + '</div>' + st.map(s => ctLine('', s.name, s.phone)).join('') + '</div>');
+  }
+  if(notice && c.noticePos === 'bottom') parts.push(notice);
+  if(c.eventOn && String(B.eventText || '').trim()){
+    let g = '';
+    String(B.eventText).split(/\r?\n/).forEach(line => {
+      if(!line.trim()) return; const m = TIME_RE.exec(line);
+      g += m ? '<span class="tm">' + esc(m[1].replace(/\s+/g, '')) + '</span><span>' + esc(m[2]) + '</span>' : '<span class="wide">' + esc(line) + '</span>';
+    });
+    parts.push('<div class="sec">' + (String(B.eventHeading || '').trim() ? '<div class="sh">' + esc(B.eventHeading) + '</div>' : '') + '<div class="evg">' + g + '</div></div>');
+  }
+  if(c.freeOn && String(c.freeText || '').trim()) parts.push('<div class="fr">' + esc(c.freeText) + '</div>');
+  return '<div class="bdg" data-side="b" data-pid="' + p.id + '" style="width:' + S.size.w + 'mm;height:' + S.size.h + 'mm;border:' + S.front.border + 'mm solid ' + k.color + ';border-radius:' + S.page.radius + 'mm;font-family:' + fontCss() + ';--bpt:' + B.pt + 'pt"><div class="bkbox"><div class="bkin">' + parts.join('') + '</div></div></div>';
+}
+/* 글씨가 칸을 넘으면 자동으로 줄임 (화면에 붙어 있을 때만 정확) */
+function fitFace(el){
+  const fb = el.querySelector('.fbody');
+  if(fb){
+    ['--sn', '--so', '--se', '--g'].forEach(v => el.style.setProperty(v, 1));
+    const fitW = (node, v) => {
+      if(!node) return;
+      if(node.scrollWidth > node.clientWidth + 0.5){
+        let s = Math.max(0.2, node.clientWidth / node.scrollWidth * 0.99); el.style.setProperty(v, s);
+        for(let i = 0; i < 10 && node.scrollWidth > node.clientWidth + 0.5 && s > 0.2; i++){ s *= 0.97; el.style.setProperty(v, s); }
+      }
+    };
+    fitW(el.querySelector('.nm'), '--sn'); fitW(el.querySelector('.orgrow'), '--so'); fitW(el.querySelector('.evn'), '--se');
+    if(fb.scrollHeight > fb.clientHeight + 0.5){
+      let g = 1; for(let i = 0; i < 30 && fb.scrollHeight > fb.clientHeight + 0.5 && g > 0.3; i++){ g -= 0.03; el.style.setProperty('--g', g); }
+    }
+  }
+  const box = el.querySelector('.bkbox');
+  if(box){
+    const inn = box.querySelector('.bkin'); inn.style.setProperty('--g', 1);
+    const cs = getComputedStyle(box); const availH = box.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const over = () => inn.offsetHeight > availH + 0.5 || inn.scrollWidth > inn.clientWidth + 0.5;
+    let g = 1;
+    if(availH > 0 && over()){
+      g = Math.max(0.25, availH / Math.max(1, inn.offsetHeight) * 0.98); inn.style.setProperty('--g', g);
+      for(let i = 0; i < 40 && over() && g > 0.25; i++){ g = Math.max(0.25, g - 0.02); inn.style.setProperty('--g', g); }
+    }
+    const pt = S.back.pt * g; el.dataset.pt = pt.toFixed(1); el.dataset.small = pt < 6.95 ? '1' : '0';
+  }
+}
+const fitAll = root => root.querySelectorAll('.bdg').forEach(fitFace);
+
+/* ================= 쪽 만들기 ================= */
+const pvList = () => people.length ? printList() : SAMPLE.filter(p => p.id === 'sm-u');
+function pageSeq(g){
+  const n = Math.ceil(pvList().length / g.per); const seq = [];
+  for(let k = 0; k < n; k++){ if(S.page.duplex !== 'back') seq.push({side:'f', k}); if(S.page.duplex !== 'front') seq.push({side:'b', k}); }
+  return seq;
+}
+function buildBadgePage(item, g){
+  const pg = document.createElement('div'); pg.className = 'pg'; pg.style.width = g.pw + 'mm'; pg.style.height = (g.ph - 0.4) + 'mm';
+  const list = pvList(); const w = S.size.w, h = S.size.h, gap = S.page.gap; const mh = mirrorH(g); const rects = [];
+  for(let i = 0; i < g.per; i++){
+    const p = list[item.k * g.per + i]; if(!p) break;
+    let c = i % g.cols, r = Math.floor(i / g.cols); let ox = 0, oy = 0;
+    if(item.side === 'b'){ if(mh) c = g.cols - 1 - c; else r = g.rows - 1 - r; ox = S.page.backDx; oy = S.page.backDy; }
+    const x = g.x0 + c * (w + gap) + ox, y = g.y0 + r * (h + gap) + oy;
+    const cell = document.createElement('div'); cell.className = 'cell'; cell.style.left = x + 'mm'; cell.style.top = y + 'mm';
+    cell.dataset.pid = p.id; cell.dataset.c = c; cell.dataset.r = r; cell.dataset.side = item.side;
+    cell.innerHTML = item.side === 'f' ? faceFront(p) : faceBack(p); pg.appendChild(cell); rects.push({x, y});
+  }
+  if(rects.length && S.page.cut !== 'none' && (item.side === 'f' || S.page.duplex === 'back')){
+    if(S.page.cut === 'dash'){
+      rects.forEach(r => { const d = document.createElement('div'); d.className = 'cutd'; d.style.cssText = 'left:' + r.x + 'mm;top:' + r.y + 'mm;width:' + w + 'mm;height:' + h + 'mm'; pg.appendChild(d); });
+    } else {
+      const xs = new Set(), ys = new Set(); rects.forEach(r => { xs.add(+r.x.toFixed(3)); xs.add(+(r.x + w).toFixed(3)); ys.add(+r.y.toFixed(3)); ys.add(+(r.y + h).toFixed(3)); });
+      const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+      const tick = (l, t, tw, th) => { const d = document.createElement('div'); d.className = 'tick'; d.style.cssText = 'left:' + l + 'mm;top:' + t + 'mm;width:' + tw + 'mm;height:' + th + 'mm'; pg.appendChild(d); };
+      xs.forEach(x => { tick(x - 0.1, Math.max(0, minY - 4), 0.2, 3); tick(x - 0.1, maxY + 1, 0.2, 3); });
+      ys.forEach(y => { tick(Math.max(0, minX - 4), y - 0.1, 3, 0.2); tick(maxX + 1, y - 0.1, 3, 0.2); });
+    }
+  }
+  return pg;
+}
+
+/* ----- 접는 비상연락망 ----- */
+function foldLines(){
+  const inc = S.kinds.filter(k => S.fold.kinds[k.id] !== false);
+  const base = people.length ? people : SAMPLE;
+  const list = base.filter(p => p.print !== false && cleanName(p.name) && inc.some(k => k.id === p.kind));
+  const ids = new Set(list.map(p => p.id)); const targets = new Set();
+  if(S.fold.showPair) list.forEach(p => realPairs(p).forEach(q => { if(ids.has(q.id)) targets.add(q.id); }));
+  const lines = [];
+  inc.forEach(k => list.filter(p => p.kind === k.id && !targets.has(p.id)).forEach(p => lines.push({kind: k, name: p.name, phone: p.phone, pairs: S.fold.showPair ? realPairs(p) : []})));
+  return lines;
+}
+function buildFold(){
+  const lines = foldLines(); if(!lines.length) return null;
+  reindex();
+  const F = S.fold, w = S.size.w, h = S.size.h, margin = S.page.margin;
+  const anyPair = F.showPair && lines.some(l => l.pairs.length);
+  const head = '<tr><th>구분</th><th>이름</th><th>연락처</th>' + (anyPair ? '<th>짝 (이름 · 연락처)</th>' : '') + '</tr>';
+  const rows = lines.map(l => '<tr><td class="kd" style="color:' + l.kind.color + '">' + esc(l.kind.name) + '</td><td><b>' + esc(l.name) + '</b></td><td class="ph">' + esc(l.phone) + '</td>' +
+    (anyPair ? '<td>' + l.pairs.map(q => esc(q.name) + (q.phone ? ' <b>' + esc(q.phone) + '</b>' : '')).join('<br>') + '</td>' : '') + '</tr>');
+  const ms = $('measure');
+  ms.innerHTML = '<div class="fpan" style="position:static;width:' + w + 'mm;height:auto;font-family:' + fontCss() + '"><div class="fin" style="font-size:' + F.pt + 'pt"><table class="ft"><thead>' + head + '</thead><tbody>' + rows.join('') + '</tbody></table></div></div>';
+  const headH = ms.querySelector('thead').offsetHeight;
+  const hs = [...ms.querySelectorAll('tbody tr')].map(tr => tr.offsetHeight);
+  ms.innerHTML = '';
+  const cap = (h - 3 - 5) * MM - 3;
+  const panels = []; let cur = [], sum = headH;
+  rows.forEach((r, i) => { if(cur.length && sum + hs[i] > cap){ panels.push(cur); cur = []; sum = headH; } cur.push(r); sum += hs[i]; });
+  if(cur.length) panels.push(cur);
+  const P = panels.length;
+  const cands = ['portrait', 'landscape'].map(o => {
+    const pw = o === 'portrait' ? 210 : 297, ph = o === 'portrait' ? 297 : 210;
+    const mc = Math.max(0, Math.floor((pw - 2 * margin + 1e-6) / w)), mr = Math.max(0, Math.floor((ph - 2 * margin + 1e-6) / h));
+    return {o, pw, ph, mc, mr, sheets: mc * mr ? Math.ceil(P / (mc * mr)) : Infinity};
+  });
+  let pick; if(F.orient === 'portrait') pick = cands[0]; else if(F.orient === 'landscape') pick = cands[1]; else pick = cands[1].sheets < cands[0].sheets ? cands[1] : cands[0];
+  let warn = '';
+  if(!pick.mc || !pick.mr){ warn = '명찰 크기가 용지보다 커서 연락망 칸을 놓을 수 없어요.'; pick = Object.assign({}, pick, {mc: 1, mr: 1}); }
+  let N = F.cols > 0 ? F.cols : Math.min(P, pick.mc), M = F.rows > 0 ? F.rows : Math.min(pick.mr, Math.ceil(P / Math.max(1, N)));
+  if(N > pick.mc){ warn = 'A4에 가로로 ' + pick.mc + '칸까지만 들어가요.'; N = pick.mc; }
+  if(M > pick.mr){ warn = 'A4에 세로로 ' + pick.mr + '칸까지만 들어가요.'; M = pick.mr; }
+  N = Math.max(1, N); M = Math.max(1, M);
+  const per = N * M, nSheets = Math.ceil(P / per);
+  const sheets = [];
+  for(let s = 0; s < nSheets; s++){
+    const pg = document.createElement('div'); pg.className = 'pg'; pg.style.width = pick.pw + 'mm'; pg.style.height = (pick.ph - 0.4) + 'mm';
+    const x0 = (pick.pw - N * w) / 2, y0 = (pick.ph - M * h) / 2;
+    const used = Math.min(per, P - s * per); const rowsUsed = Math.ceil(used / N);
+    for(let i = 0; i < rowsUsed * N; i++){
+      const c = i % N, r = Math.floor(i / N); const pi = s * per + i;
+      const d = document.createElement('div'); d.className = 'fpan';
+      d.style.cssText = 'left:' + (x0 + c * w) + 'mm;top:' + (y0 + r * h) + 'mm;width:' + w + 'mm;height:' + h + 'mm;font-family:' + fontCss() + ';font-size:' + F.pt + 'pt;border-right:.2mm dashed #777;border-bottom:.2mm dashed #777;' + (c === 0 ? 'border-left:.2mm dashed #777;' : '') + (r === 0 ? 'border-top:.2mm dashed #777;' : '');
+      if(pi < P) d.innerHTML = '<div class="fin"><table class="ft"><thead>' + head + '</thead><tbody>' + panels[pi].join('') + '</tbody></table></div><span class="fno">' + (pi + 1) + ' / ' + P + '</span>';
+      d.dataset.n = pi + 1; pg.appendChild(d);
+    }
+    sheets.push(pg);
+  }
+  return {sheets, n: N, m: M, orient: pick.o, panels: P, copies: Math.max(1, Math.round(F.copies || 1)), warn, pw: pick.pw, ph: pick.ph};
+}
+
+/* ================= 오른쪽 미리보기 ================= */
+let pvT = 0;
+function schedulePreview(){ cancelAnimationFrame(pvT); pvT = requestAnimationFrame(renderPreview); }
+function curPerson(){
+  const real = people.find(p => p.id === selId); if(real) return real;
+  const l = pvList(); return l[0] || null;
+}
+function pvBox(node, wpx, hpx, scale){
+  const box = document.createElement('div'); box.className = 'pvbox'; box.style.width = Math.round(wpx * scale) + 'px'; box.style.height = Math.round(hpx * scale) + 'px';
+  const sc = document.createElement('div'); sc.className = 'sc'; sc.style.transform = 'scale(' + scale + ')'; sc.appendChild(node); box.appendChild(sc);
+  return box;
+}
+function renderPreview(){
+  reindex();
+  const st = $('pvStage'); if(!st) return;
+  document.querySelectorAll('#pvSeg button').forEach(b => b.classList.toggle('on', b.dataset.pv === pvMode));
+  const nav = $('pvNav'); const foot = $('pvFoot'); st.innerHTML = ''; foot.textContent = '';
+  const W = st.clientWidth, H = st.clientHeight;
+  if(pvMode === 'person'){
+    const list = pvList(); const cp = curPerson();
+    nav.innerHTML = '<button class="btn sm" data-nav="-1">◀</button><select id="pvPick">' + list.map(p => '<option value="' + p.id + '"' + (cp && cp.id === p.id ? ' selected' : '') + '>' + esc(p.name) + ' (' + esc((kindById(p.kind) || {}).name || '') + ')</option>').join('') + '</select><button class="btn sm" data-nav="1">▶</button>';
+    if(!cp || W < 50 || H < 50) return;
+    const tmp = document.createElement('div'); tmp.innerHTML = faceFront(cp) + faceBack(cp);
+    const f = tmp.children[0], b = tmp.children[1];
+    const bw = S.size.w * MM, bh = S.size.h * MM, pad = 28, gap = 18, cap = 22;
+    const s1 = Math.min((W - pad - gap) / (2 * bw), (H - pad - cap) / bh), s2 = Math.min((W - pad) / bw, (H - pad - 2 * cap - gap) / (2 * bh));
+    const side = s1 >= s2; const sc = clamp(Math.max(s1, s2), 0.1, 2);
+    const arr = document.createElement('div'); arr.className = 'arr' + (side ? '' : ' col');
+    [['앞면', f], ['뒷면', b]].forEach(([cap2, node]) => { const it = document.createElement('div'); it.className = 'pvitem'; it.innerHTML = '<div class="cap">' + cap2 + '</div>'; it.appendChild(pvBox(node, bw, bh, sc)); arr.appendChild(it); });
+    st.appendChild(arr); fitAll(arr);
+    foot.textContent = (people.length ? '' : '예시 명찰이에요. 명단을 넣으면 실제 이름으로 바뀌어요. · ') + '명찰 ' + S.size.w + '×' + S.size.h + 'mm · 화면에서는 실제 크기의 ' + Math.round(sc * 100) + '%로 보여요';
+  } else {
+    let pages = [], label = '', info = '';
+    if(pvMode === 'page'){
+      const g = geo(), seq = pageSeq(g); pageIdx = clamp(pageIdx, 0, Math.max(0, seq.length - 1));
+      if(seq.length){ const it = seq[pageIdx]; pages = [buildBadgePage(it, g)]; label = (pageIdx + 1) + ' / ' + seq.length + '쪽 · ' + (it.side === 'f' ? '앞면' : '뒷면') + (S.page.duplex === 'both' ? ' (종이 ' + (it.k + 1) + '장째)' : ''); }
+      info = 'A4 ' + (g.o === 'portrait' ? '세로' : '가로') + ' · 한 장에 ' + g.per + '개 (' + g.cols + '×' + g.rows + ')' + (people.length ? '' : ' · 예시 명찰');
+      pages.dims = [g.pw, g.ph - 0.4];
+    } else {
+      const job = buildFold();
+      if(job){ pageIdx = clamp(pageIdx, 0, job.sheets.length - 1); pages = [job.sheets[pageIdx]]; label = '연락망 ' + (pageIdx + 1) + ' / ' + job.sheets.length + '장'; info = '칸 ' + job.panels + '개 · 가로 ' + job.n + '×세로 ' + job.m + (people.length ? '' : ' · 예시 명단'); pages.dims = [job.pw, job.ph - 0.4]; pages.total = job.sheets.length; }
+    }
+    const tot = pvMode === 'page' ? pageSeq(geo()).length : (pages.total || 0);
+    nav.innerHTML = '<button class="btn sm" data-nav="-1">◀</button><span class="lbl">' + esc(label || '-') + '</span><button class="btn sm" data-nav="1">▶</button>';
+    nav.dataset.total = tot;
+    if(!pages.length){ st.innerHTML = '<div class="sub" style="padding:20px">' + (pvMode === 'fold' ? '연락망에 넣을 사람이 없어요. 명단과 “연락망 탭”의 구분 체크를 확인하세요.' : '표시할 쪽이 없어요.') + '</div>'; return; }
+    if(W < 50 || H < 50) return;
+    const pwpx = pages.dims[0] * MM, phpx = pages.dims[1] * MM;
+    const sc = clamp(Math.min((W - 24) / pwpx, (H - 24) / phpx), 0.1, 2);
+    st.appendChild(pvBox(pages[0], pwpx, phpx, sc)); fitAll(pages[0]);
+    foot.textContent = info + ' · 화면에서는 실제 크기의 ' + Math.round(sc * 100) + '%로 보여요';
+  }
+  updatePvWarn();
+}
+function updatePvWarn(){
+  const w = $('pvWarn'); if(!w) return;
+  const t = backWarnText();
+  w.innerHTML = t ? '<div class="warnbox">' + esc(t) + '</div>' : '';
+}
+
+/* ================= 인쇄 ================= */
+function printJob(kind){
+  reindex();
+  let pages = [], orient = 'portrait';
+  if(kind === 'badge'){
+    if(!printList().length){ toast('명단이 비어 있어요. 명단을 먼저 넣어 주세요.'); return null; }
+    const g = geo(); if(!g.fits){ notice('명찰이 용지보다 커요. 크기나 여백을 줄여 주세요.'); return null; }
+    orient = g.o; pages = pageSeq(g).map(it => buildBadgePage(it, g));
+  } else {
+    const job = buildFold(); if(!job){ toast('연락망에 넣을 사람이 없어요'); return null; }
+    if(!people.length){ toast('명단이 비어 있어요. 명단을 먼저 넣어 주세요.'); return null; }
+    orient = job.orient;
+    for(let c = 0; c < job.copies; c++) job.sheets.forEach(sh => pages.push(c === 0 ? sh : sh.cloneNode(true)));
+  }
+  const ms = $('measure'), root = $('printRoot'); root.innerHTML = ''; ms.innerHTML = '';
+  pages.forEach(p => ms.appendChild(p)); pages.forEach(fitAll);
+  pages.forEach(p => root.appendChild(p)); ms.innerHTML = '';
+  $('pageRule').textContent = '@page{size:A4 ' + orient + ';margin:0}';
+  setTimeout(() => { try{ window.print(); }catch(e){ toast('이 화면에서는 인쇄 창을 열 수 없어요'); } }, 60);
+  return {pages: pages.length, orient};
+}
+
+/* ================= 설정 입력 연결 ================= */
+function onSettingChanged(path){
+  saveSettings();
+  if(path.indexOf('size.') === 0 || path.indexOf('page.') === 0){ updatePrintInfo(); if(tab === 'fold') updateFoldInfo(); }
+  if(path.indexOf('size.') === 0 || path.indexOf('back.') === 0 || path.indexOf('front.border') === 0 || path.indexOf('front.font') === 0) scheduleBackCheck();
+  if(path.indexOf('fold.') === 0) updateFoldInfo();
+  schedulePreview();
+}
+function handleSetting(e){
+  const el = e.target.closest ? e.target.closest('#tabBody [data-s]') : null; if(!el) return;
+  const path = el.dataset.s; let v;
+  if(el.type === 'checkbox') v = el.checked;
+  else if(el.type === 'number' || el.type === 'range'){
+    v = parseFloat(el.value); if(isNaN(v)) return;
+    const mn = el.min !== '' ? +el.min : -Infinity, mx = el.max !== '' ? +el.max : Infinity;
+    if(v < mn || v > mx){ if(e.type === 'input') return; v = clamp(v, mn, mx); el.value = v; }
+  } else v = el.value;
+  setPath(S, path, v);
+  document.querySelectorAll('#tabBody [data-s="' + path + '"]').forEach(o => { if(o !== el){ if(o.type === 'checkbox') o.checked = v; else o.value = v; } });
+  onSettingChanged(path);
+}
+$('tabBody').addEventListener('input', handleSetting);
+$('tabBody').addEventListener('change', handleSetting);
+$('tabBody').addEventListener('input', e => {
+  const b = e.target.closest('[data-band]'); if(!b) return; S.kinds[+b.dataset.band].band = b.value; saveSettings(); schedulePreview();
+});
+$('tabBody').addEventListener('click', e => {
+  if(tab === 'roster') return;
+  const pill = e.target.closest('[data-bk]'); if(pill){ backKind = pill.dataset.bk; renderBackTab(); return; }
+  const pre = e.target.closest('[data-preset]');
+  if(pre){ const p = PRESETS.find(x => x[0] === pre.dataset.preset); S.size.w = p[2]; S.size.h = p[3]; syncInputs(); onSettingChanged('size.w'); return; }
+  const b = e.target.closest('[data-a]'); if(!b) return; const a = b.dataset.a;
+  if(a === 'logo') $('fileLogo').click();
+  else if(a === 'nologo'){ S.front.logoData = ''; paintLogoThumb(); saveSettings(); schedulePreview(); }
+  else if(a === 'bandsame'){ const i = +b.dataset.i; S.kinds[i].band = ''; const c = $('band' + i); if(c) c.value = S.kinds[i].color; saveSettings(); schedulePreview(); }
+  else if(a === 'printfold') printJob('fold');
+  else if(a === 'printbadge') printJob('badge');
+  else if(a === 'setsave') saveSettingsFile();
+  else if(a === 'setload') $('fileSet').click();
+});
+// 구분 색을 바꾸면 '같게'로 둔 띠 색도 따라가도록 표시만 갱신
+$('tabBody').addEventListener('input', e => { const el = e.target; if(el.dataset && el.dataset.s && /^kinds\.\d+\.color$/.test(el.dataset.s)){ const i = +el.dataset.s.split('.')[1]; if(!S.kinds[i].band){ const c = $('band' + i); if(c) c.value = el.value; } } });
+
+$('tabs').addEventListener('click', e => { const b = e.target.closest('button[data-tab]'); if(b){ setTab(b.dataset.tab); if(b.dataset.tab === 'back') scheduleBackCheck(); } });
+$('pvSeg').addEventListener('click', e => { const b = e.target.closest('button[data-pv]'); if(b){ pvMode = b.dataset.pv; pageIdx = 0; schedulePreview(); } });
+$('pvNav').addEventListener('click', e => {
+  const b = e.target.closest('[data-nav]'); if(!b) return; const d = +b.dataset.nav;
+  if(pvMode === 'person'){
+    const l = pvList(); if(!l.length) return; const cp = curPerson(); let i = Math.max(0, l.findIndex(p => cp && p.id === cp.id)); i = (i + d + l.length) % l.length;
+    selId = l[i].id; document.querySelectorAll('#rosterWrap tr[data-id]').forEach(tr => tr.classList.toggle('sel', tr.dataset.id === selId));
+  } else { const tot = +$('pvNav').dataset.total || 1; pageIdx = clamp(pageIdx + d, 0, tot - 1); }
+  schedulePreview();
+});
+$('pvNav').addEventListener('change', e => { if(e.target.id === 'pvPick'){ selId = e.target.value; document.querySelectorAll('#rosterWrap tr[data-id]').forEach(tr => tr.classList.toggle('sel', tr.dataset.id === selId)); schedulePreview(); } });
+$('viewSw').addEventListener('click', e => { const b = e.target.closest('button[data-view]'); if(!b) return; $('app').dataset.view = b.dataset.view; document.querySelectorAll('#viewSw button').forEach(x => x.classList.toggle('on', x === b)); schedulePreview(); });
+
+/* 파일 입력 */
+$('fileXl').addEventListener('change', e => { const fs = e.target.files; if(fs && fs.length) importFiles(fs); e.target.value = ''; });
+$('fileLogo').addEventListener('change', e => { loadLogo(e.target.files[0]); e.target.value = ''; });
+$('fileRoster').addEventListener('change', e => { if(e.target.files[0]) loadRosterFile(e.target.files[0]); e.target.value = ''; });
+$('fileSet').addEventListener('change', e => { if(e.target.files[0]) loadSettingsFile(e.target.files[0]); e.target.value = ''; });
+window.addEventListener('dragover', e => { if(e.dataTransfer && [...e.dataTransfer.types].includes('Files')) e.preventDefault(); });
+window.addEventListener('drop', e => {
+  if(!e.dataTransfer || !e.dataTransfer.files.length) return; e.preventDefault();
+  const fs = [...e.dataTransfer.files]; const data = fs.filter(f => /\.(xlsx|xlsm|xls|csv|tsv|txt)$/i.test(f.name)); const js = fs.filter(f => /\.json$/i.test(f.name));
+  if(data.length) importFiles(data); else if(js.length) loadRosterFile(js[0]);
+});
+window.addEventListener('beforeunload', e => { if(dirtyRoster && people.length){ e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('resize', schedulePreview);
+if(window.ResizeObserver) new ResizeObserver(() => schedulePreview()).observe($('pvStage'));
+
+/* ================= 시작 ================= */
+loadSettings(); ensureSettings(); buildSample(); reindex();
+paintInstall();
+setTab('roster');
+window.NB = {
+  get S(){ return S; }, get people(){ return people; }, geo, pageSeq, buildBadgePage, buildFold, printJob, mirrorH, fmtPhone, parsePaste,
+  setSel(id){ selId = id; schedulePreview(); }, get backWarn(){ return backWarn; }, checkBacks, renderPreview,
+  setPvMode(m){ pvMode = m; pageIdx = 0; schedulePreview(); }
+};
+})();
+</script>
+</body>
+</html>
