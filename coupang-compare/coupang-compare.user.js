@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         쿠팡 비교견적 도우미
 // @namespace    https://handscil01-afk.github.io/Sungmo/
-// @version      1.0.1
+// @version      1.0.2
 // @description  쿠팡 장바구니 물품을 11번가·G마켓에서 찾아 비교견적용 장바구니에 담습니다
 // @match        https://cart.coupang.com/*
 // @match        https://search.11st.co.kr/*
@@ -243,7 +243,8 @@
         if (hrefs.size > 1) return; // 여러 줄을 감싼 바깥 컨테이너는 건너뜀
         seenId.add(div.id);
 
-        const name = links.map((a) => txt(a)).find(Boolean) || '';
+        // 링크 글자 안에 '옵션: …'이 함께 들어 있으므로 잘라 낸다
+        const name = links.map((a) => txt(a).replace(/\s*옵션\s*:.*$/, '').trim()).find(Boolean) || '';
         if (!name) return;
 
         let option = '';
