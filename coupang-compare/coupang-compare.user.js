@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name         쿠팡 비교견적 도우미
 // @namespace    https://handscil01-afk.github.io/Sungmo/
-// @version      2.0.3
+// @version      3.0.0
 // @description  쿠팡 장바구니 물품을 11번가·G마켓에서 개당 가격으로 비교해, 쿠팡보다 비싼 비교견적용 상품을 장바구니에 담습니다
 // @match        https://cart.coupang.com/*
 // @match        https://search.11st.co.kr/*
 // @match        https://www.11st.co.kr/products/*
 // @match        https://buy.11st.co.kr/*
+// @match        https://cart.11st.co.kr/*
 // @match        https://www.gmarket.co.kr/n/search*
 // @match        https://item.gmarket.co.kr/*
 // @match        https://cart.gmarket.co.kr/*
@@ -15,27 +16,42 @@
 // @grant        GM_setClipboard
 // @grant        GM_addStyle
 // @grant        unsafeWindow
+// @grant        GM_xmlhttpRequest
+// @connect      *
+// @require      https://handscil01-afk.github.io/Sungmo/coupang-compare/vendor/html-to-image.js
 // @run-at       document-idle
 // @updateURL    https://handscil01-afk.github.io/Sungmo/coupang-compare/coupang-compare.user.js
 // @downloadURL  https://handscil01-afk.github.io/Sungmo/coupang-compare/coupang-compare.user.js
 // ==/UserScript==
 
 /*
- * [사용법 - 2.0]
+ * [사용법 - 3.0]
  * 1) 쿠팡 장바구니(cart.coupang.com)에서 오른쪽 아래 "비교견적 시작"을 누릅니다.
- *    물품마다 "묶음 개수(예: 24개, 10쌍)", "수량(묶음 수)", "쿠팡 금액", "검색어"가 자동으로 채워집니다. 필요하면 고치세요.
+ *    물품마다 "품명(깔끔한 이름)", "묶음 개수(예: 24개, 10쌍)", "수량(묶음 수)", "쿠팡 금액", "검색어"가 자동으로 채워집니다. 필요하면 고치세요.
+ *    - 품명은 쿠팡 상품명에서 상표·꾸밈말을 뺀 이름입니다(예: "베픽스 충격흡수 군인 무릎 팔꿈치 보호대 세트" -> "무릎 팔꿈치 보호대 세트").
+ *      검색어와 관련 상품 판별, 요약표의 품명 칸에 쓰입니다.
  *    - 필요 개수 = 묶음 개수 × 수량, 개당 가격 = 쿠팡 금액 ÷ 필요 개수 (1쌍 = 2개로 환산합니다).
- *    - 검색어는 "상품명 핵심어 + 옵션 + 묶음 개수"입니다. 결과가 너무 적으면 15초 뒤 옵션을 뺀 검색어로 한 번 자동 재검색합니다.
- * 2) "11번가부터 시작"을 누르면 11번가 검색 결과가 열립니다. 오른쪽 패널에 사진·개당 가격이 붙은 후보가 나옵니다.
+ *    - 검색어는 "품명 + 옵션 + 묶음 개수"입니다. 결과가 너무 적으면 15초 뒤 옵션을 뺀 검색어로 한 번 자동 재검색합니다.
+ *    - 검색 화면에서 사이트 검색창으로 검색어를 직접 고쳐 검색하면, 그 검색어를 기억해 G마켓과 "다시"에서도 씁니다.
+ * 2) "11번가부터 시작"(직접 고르기) 또는 "자동으로 전부 담기"(자동)를 누릅니다.
+ *    [직접 고르기] 오른쪽 패널에 사진·개당 가격이 붙은 후보가 나옵니다.
  *    - 기본은 "쿠팡보다 비싼 것만 보기"(개당 가격이 쿠팡보다 높은 것, 낮은 가격 순)입니다. 체크를 끄면 전부 보입니다.
- *    - 묶음 개수를 알 수 없는 상품은 "개수 확인 필요" 목록에 따로 모입니다.
- * 3) 후보를 누르면 상품 페이지가 열리고, 쿠팡 옵션(색상·크기·묶음 개수)과 가장 비슷한 옵션을 자동으로 고른 뒤
- *    필요한 개수에 맞게 수량을 자동으로 넣습니다. "옵션 다시 자동 선택", "수량 다시 맞추기"로 다시 할 수 있습니다.
- *    패널에서 선택 옵션·넣은 수량·총액·개당 가격과 "쿠팡보다 N% 비쌈" 여부를 확인하세요.
- * 4) "장바구니 담고 다음 →"을 누르면 기록 후 장바구니에 담고 1.5초 뒤 다음 상품으로 넘어갑니다.
- *    개당 가격이 쿠팡 이하이면 경고가 먼저 나오며, 한 번 더 눌러야 진행합니다. 11번가가 끝나면 같은 방식으로 G마켓을 진행합니다.
- * 5) 마지막에 쿠팡·11번가·G마켓 비교표(품명·수량·단가·금액)가 나옵니다. "표 복사"로 엑셀·한글에 붙여 넣고,
- *    각 장바구니 화면은 캡처해 견적서로 씁니다.
+ *    - 상품명에 개수가 없는 후보는 1세트/1개로 보고 계산합니다("1세트로 봄"). "2인", "3종"은 개수가 아닙니다.
+ *      그래도 알 수 없는 상품은 "개수 확인 필요" 목록에 따로 모입니다.
+ *    - 후보를 누르면 상품 페이지가 열리고, 쿠팡 옵션(색상·크기·묶음 개수)과 가장 비슷한 옵션을 자동으로 고른 뒤
+ *      필요한 개수에 맞게 수량을 자동으로 넣습니다. "옵션 다시 자동 선택", "수량 다시 맞추기"로 다시 할 수 있습니다.
+ *    - "장바구니 담고 다음 →"을 누르면 기록 후 장바구니에 담고 1.5초 뒤 다음 상품으로 넘어갑니다.
+ *      개당 가격이 쿠팡 이하이면 경고가 먼저 나오며, 한 번 더 눌러야 진행합니다. 11번가가 끝나면 같은 방식으로 G마켓을 진행합니다.
+ *    [자동으로 전부 담기] 검색 결과가 안정되면(2초 변화 없음, 최대 15초) 검색어 관련도가 높은 후보 중
+ *    쿠팡보다 비싼 것(차이가 가장 작은 것)을 골라 상품 페이지에서 옵션·수량을 맞춘 뒤 장바구니에 담고 다음 품목으로 넘어갑니다.
+ *    - 옵션 경고, 개당 가격 불명, 쿠팡 이하, 수량 불일치, 장바구니 버튼 없음이면 그 상품은 버리고 같은 검색의 다음 후보를 고릅니다(품목·사이트당 최대 3번).
+ *      3번 모두 실패하면 "자동 실패 - 직접 고르세요"로 기록하고 넘어갑니다. 요약에서 "다시"로 직접 고르세요.
+ *    - 패널 위쪽 "자동 진행 중…" 줄의 빨간 "자동 멈춤" 버튼으로 언제든 멈추고 직접 이어갈 수 있습니다.
+ *    - 보안 확인(Cloudflare 등) 화면이 나오면 20초 뒤 안내가 뜹니다. 직접 통과하면 자동으로 이어집니다.
+ * 3) 끝나면 쿠팡·11번가·G마켓 비교표(품명·수량·단가·금액)가 나옵니다. "표 복사"로 엑셀·한글에 붙여 넣으세요.
+ * 4) 견적서 캡처: 요약의 "쿠팡 장바구니 열고 캡처" 등을 누르면 장바구니가 새 탭으로 열리고, 저장할 영역(파란 테두리)이 표시됩니다.
+ *    "이 영역 저장"을 누르면 PNG 그림 파일로 내려받습니다. 영역이 다르면 "다른 영역 고르기"(마우스로 고르기, ↑↓ 키로 바깥/안쪽, Esc 취소)나
+ *    "전체 페이지 저장"을 쓰세요. 장바구니 화면 오른쪽 아래 "견적서 캡처" 버튼으로도 언제든 시작할 수 있습니다.
  * ※ 이 스크립트는 구매·주문·결제·선물 버튼을 절대 누르지 않으며, 오직 옵션 "선택하기"와 "장바구니" 버튼만 누릅니다.
  */
 
@@ -162,13 +178,16 @@
     return String(s == null ? '' : s).replace(reMult(), ' ').replace(reCount(), ' ');
   }
   // 옵션에서 묶음 개수를 뺀 낱말 (예: "빨강, 24개" -> ["빨강"])
+  const OPTION_DROP = new Set(['free', '프리', '프리사이즈', '단품', '기본', '선택안함']);
   function optionWords(option) {
-    return stripCounts(option).replace(/[()\[\]{}]/g, ' ').split(/[\s,\/]+/).map(cleanWord)
-      .filter((w) => w && !/^\d+$/.test(w) && w !== '옵션').slice(0, 3);
+    return stripCounts(option).replace(/선택\s*안\s*함/g, ' ').replace(/[()\[\]{}]/g, ' ').split(/[\s,\/]+/).map(cleanWord)
+      .filter((w) => w && !/^\d+$/.test(w) && w !== '옵션' && !OPTION_DROP.has(w.toLowerCase())).slice(0, 3);
   }
   // pack: 상품명·옵션에서 실제로 읽은 묶음(없으면 null). 2개 이상일 때만 검색어에 넣는다
-  function buildKeywords(name, option, pack) {
-    const core = coreWords(name, 3);
+  // pname: 품명(cleanName 결과 또는 사용자가 고친 값). 있으면 상품명 대신 품명의 낱말을 핵심어로 쓴다
+  function buildKeywords(name, option, pack, pname) {
+    const pw = pname ? pnameWords(pname).slice(0, 5) : [];
+    const core = pw.length ? pw : coreWords(name, 3);
     const opt = optionWords(option);
     const parts = [];
     const seen = {};
@@ -196,6 +215,95 @@
     const a = String(title == null ? '' : title);
     const b = a.replace(/\s+/g, '');
     return words.some((w) => a.indexOf(w) >= 0 || b.indexOf(w) >= 0);
+  }
+
+  // ---- 품명(깔끔한 이름) ----
+  // 꾸밈말: 품명에서 뺀다
+  const NAME_MODIFIERS = new Set(['충격흡수', '다이어트', '입문용', '군인', '군용', '고급', '프리미엄', '국산', '국내산', '대용량', '초경량', '경량',
+    '남녀공용', '남녀', '휴대용', '가정용', '업소용', '미끄럼방지', '논슬립', '두꺼운', '신형', '정품', '인기', '베스트', '특가', '고탄력', '고강도',
+    '튼튼한', '저자극', '무료배송', '당일발송', '1+1', '신상', '최신형', '대형', '소형', '중형', '실내용', '야외용', '학교', '체육대회', '운동회',
+    '행사용', '단체', '단체용']);
+  // 낱말이 3개일 때 첫 낱말이 이런 일반 낱말이면 상표가 아니라고 보고 남긴다
+  const GENERIC_FIRST = new Set(['스포츠', '운동', '야외', '실내', '일회용', '접이식', '투명', '종이', '플라스틱', '스테인리스', '실리콘', '미니', '일반',
+    '기본', '나무', '철제', '고무', '유리', '전동', '무선', '자동', '수동', '안전', '방수', '컬러', '사무용', '청소', '주방', '욕실', '어린이', '성인',
+    '아동', '유아', '초등', '남성', '여성', '어른', '야구', '축구', '농구', '배드민턴', '탁구', '줄넘기', '손목', '무릎', '팔꿈치', '발목']);
+  // 쿠팡 상품명 -> 품명: 첫 쉼표 앞, [..] (..) {..} 【..】 제거, 꾸밈말·숫자/크기 제거, 상표(첫 낱말) 제거, 뒤쪽 최대 4낱말
+  function cleanName(name) {
+    const raw = String(name == null ? '' : name);
+    let head = raw.split(',')[0];
+    if (!stripBrackets(head)) head = raw;
+    let ws = stripBrackets(head).split(' ').map(cleanWord).filter(Boolean);
+    ws = ws.filter((w) => !NAME_MODIFIERS.has(w) && !isNumberOrSizeWord(w));
+    const seen = {};
+    ws = ws.filter((w) => { const k = w.toLowerCase(); if (seen[k]) return false; seen[k] = true; return true; });
+    if (ws.length >= 4 || (ws.length === 3 && !GENERIC_FIRST.has(ws[0]))) ws = ws.slice(1);
+    ws = ws.slice(-4);
+    return ws.join(' ') || coreWords(raw, 3).join(' ') || stripBrackets(head);
+  }
+  function pnameWords(pname) {
+    return String(pname == null ? '' : pname).split(/\s+/).map(cleanWord).filter(Boolean);
+  }
+  // 자동 고르기용 관련도 낱말: 품명 낱말 + 검색어 낱말 (2자 이상, 개수·크기 표기 제외)
+  function relWordsOf(item) {
+    const out = [];
+    const add = (w) => {
+      w = cleanWord(w);
+      if (!w || w.length < 2 || isNumberOrSizeWord(w) || out.indexOf(w) >= 0) return;
+      out.push(w);
+    };
+    pnameWords(item && item.pname ? item.pname : cleanName(item && item.name)).forEach(add);
+    String(item && item.keyword ? item.keyword : '').split(/\s+/).forEach(add);
+    return out;
+  }
+  // 제목에 낱말이 몇 개 들어 있는지 (띄어쓰기·대소문자 무시)
+  function relScore(title, words) {
+    const a = String(title == null ? '' : title).replace(/\s+/g, '').toLowerCase();
+    let n = 0;
+    (words || []).forEach((w) => { if (w && a.indexOf(String(w).replace(/\s+/g, '').toLowerCase()) >= 0) n++; });
+    return n;
+  }
+  // 자동 고르기: 이미 해 본 주소(tried)를 빼고, 관련도가 가장 높은 층(없으면 한 단계 아래 층)에서
+  // 쿠팡보다 비싼(rel === 'higher') 후보 중 차이(diffPct)가 가장 작은 것
+  function autoPickCandidate(cands, words, tried) {
+    const skip = {};
+    (tried || []).forEach((u) => { skip[u] = true; });
+    const pool = (cands || []).filter((c) => c && c.url && !skip[c.url]).map((c) => ({ c, score: relScore(c.title, words) }));
+    if (!pool.length) return null;
+    const max = Math.max.apply(null, pool.map((x) => x.score));
+    for (const th of [max, max - 1]) {
+      const hi = pool.filter((x) => x.score >= th && x.c.rel === 'higher' && x.c.diffPct > 0);
+      if (hi.length) {
+        hi.sort((a, b) => (a.c.diffPct - b.c.diffPct) || (b.score - a.score) || ((a.c.price || 0) - (b.c.price || 0)));
+        return { cand: hi[0].c, score: hi[0].score };
+      }
+    }
+    return null;
+  }
+  // 상품명에 개수가 없을 때 1묶음으로 볼지: 세트·팩 단위이거나 쿠팡 묶음이 2 이하, 또는 쿠팡에도 개수 표기가 없던 낱개 상품
+  function assumeSingle(item) {
+    if (!item) return false;
+    const u = item.packUnit;
+    return u === '세트' || u === '팩' || (item.packN > 0 && item.packN <= 2) || (!item.packExplicit && item.packN === 1);
+  }
+  // "1세트로 봄", "1개로 봄", "1묶음으로 봄" (받침에 맞춰 로/으로)
+  function assumedLabel(unit) {
+    const u = String(unit || '개');
+    const code = u.charCodeAt(u.length - 1);
+    let josa = '로';
+    if (code >= 0xAC00 && code <= 0xD7A3) {
+      const jong = (code - 0xAC00) % 28;
+      if (jong !== 0 && jong !== 8) josa = '으로';
+    }
+    return '1' + u + josa + ' 봄';
+  }
+  // 11번가 카드의 배송비 값("3,000원", "무료")
+  function shipFromValue(t) {
+    t = String(t == null ? '' : t).replace(/\s+/g, ' ').trim();
+    if (!t) return '';
+    if (/조건|이상/.test(t)) return t.slice(0, 18);
+    if (/무료/.test(t)) return '무료';
+    const m = t.match(/([\d,]+)\s*원/);
+    return m ? m[1] + '원' : '';
   }
 
   // ---- 옵션 점수 ----
@@ -285,8 +393,8 @@
   // item: {packUnit, needUnits, cpUnitPrice}. rel: higher(쿠팡보다 비쌈) / same / lower(쌈) / unknown
   function evalCandidate(c, item) {
     let pack = parsePack(c.title, item.packUnit);
-    // 쿠팡 상품에도 개수 표기가 없었다면(낱개 상품) 후보도 1개짜리로 본다
-    if (!pack && !item.packExplicit && item.packN === 1) pack = { n: 1, unit: item.packUnit, assumed: true };
+    // 상품명에 개수가 없으면 1묶음으로 본다(세트·팩 단위, 쿠팡 묶음 2 이하, 쿠팡도 개수 표기가 없던 낱개 상품). "2인", "3종"은 개수가 아니다
+    if (!pack && assumeSingle(item)) pack = { n: 1, unit: item.packUnit, assumed: true };
     const conv = pack ? convertPack(pack, item.packUnit) : null;
     const cpu = item.cpUnitPrice || 0;
     const o = Object.assign({}, c, { pack, conv, unitPrice: null, bundles: null, estTotal: null, diffPct: null, rel: 'unknown' });
@@ -428,7 +536,12 @@
     if (!it.broadKeyword) it.broadKeyword = coreWords(it.name, 3).join(' ') || String(it.name || '').split(/\s+/).slice(0, 3).join(' ');
     if (!it.fullKeyword) it.fullKeyword = it.keyword || it.broadKeyword;
     if (!it.keyword) it.keyword = it.fullKeyword;
-    if (!Array.isArray(it.relWords)) it.relWords = hangulWords(it.name);
+    if (!it.pname) it.pname = cleanName(it.name); // 2.x 상태: 품명이 없으면 만든다
+    if (!Array.isArray(it.relWords)) it.relWords = hangulWords(it.pname || it.name);
+    if (!it.tried || typeof it.tried !== 'object') it.tried = { st: [], gm: [] };
+    if (!Array.isArray(it.tried.st)) it.tried.st = [];
+    if (!Array.isArray(it.tried.gm)) it.tried.gm = [];
+    if (typeof it.kwManual !== 'boolean') it.kwManual = false; // 사용자가 사이트 검색창에서 직접 고친 검색어인가
     return it;
   }
   function loadState() {
@@ -438,6 +551,7 @@
       const s = typeof v === 'string' ? JSON.parse(v) : v;
       if (!(s && Array.isArray(s.items))) return null;
       s.items.forEach(normItem);
+      s.auto = !!s.auto;
       return s;
     } catch (e) {
       return null;
@@ -470,9 +584,11 @@
     if (host === 'cart.coupang.com') return { site: 'cp', kind: 'cp-cart' };
     if (host === 'search.11st.co.kr') return { site: 'st', kind: 'st-search' };
     if (host === 'www.11st.co.kr' && /^\/products\//.test(path)) return { site: 'st', kind: 'st-product' };
+    if (host === 'buy.11st.co.kr' || host === 'cart.11st.co.kr') return { site: 'st', kind: 'st-cart' };
     if (/11st\.co\.kr$/.test(host)) return { site: 'st', kind: 'st-other' };
     if (host === 'www.gmarket.co.kr' && path.indexOf('/n/search') === 0) return { site: 'gm', kind: 'gm-search' };
     if (host === 'item.gmarket.co.kr') return { site: 'gm', kind: 'gm-product' };
+    if (host === 'cart.gmarket.co.kr') return { site: 'gm', kind: 'gm-cart' };
     if (/gmarket\.co\.kr$/.test(host)) return { site: 'gm', kind: 'gm-other' };
     return { site: '', kind: 'other' };
   }
@@ -634,7 +750,8 @@
         const title = txt($('.c-card-item__name dd', card)) || txt($('.c-card-item__name', card));
         if (!title) return;
         const price = num(txt($('.c-card-item__price .value', card)));
-        const ship = shipFromText(card.innerText || card.textContent);
+        // 배송비: 카드의 배송비 칸(.c-card-item__price-delivery .value)을 먼저, 없으면 카드 글자에서 찾는다
+        const ship = shipFromValue(txt($('.c-card-item__price-delivery .value', card))) || shipFromText(card.innerText || card.textContent);
         seen.add(id);
         out.push({ id, title, price, shipping: ship, image: imgOf($('img', card)), url: 'https://www.11st.co.kr/products/' + id });
       } catch (e) { /* 건너뜀 */ }
@@ -956,8 +1073,10 @@
     const s = loadState();
     if (!s) return;
     s.pendingCandidate = null;
+    s.adding = null;
     if (s.redo) {
       s.redo = false;
+      s.auto = false;
       if (s.resume) { s.site = s.resume.site; s.idx = s.resume.idx; } else { s.site = 'done'; }
       s.resume = null;
       saveState(s);
@@ -979,6 +1098,7 @@
       return;
     }
     s.site = 'done';
+    s.auto = false; // 모두 끝나면 자동 진행도 끝
     saveState(s);
     renderAll();
     showSummary();
@@ -1003,10 +1123,164 @@
     s.idx = i;
     s.items[i][site] = null;
     s.items[i].broadened = false;
-    s.items[i].keyword = s.items[i].fullKeyword || s.items[i].keyword;
+    s.items[i].tried[site] = []; // 검색어(keyword)는 되돌리지 않고 그대로 쓴다
+    s.auto = false; // 다시 고르기는 직접 고른다
     s.pendingCandidate = null;
     saveState(s);
     gotoSearch(s);
+  }
+
+  // ------------------------------------------------------------------
+  // 자동 진행 도우미 ("자동으로 전부 담기")
+  // ------------------------------------------------------------------
+  const SECURITY_MSG = '보안 확인 화면이면 직접 통과해 주세요. 통과하면 자동으로 이어집니다';
+  const AUTO_MAX_TRIES = 3; // 품목·사이트마다 상품 페이지를 열어 보는 최대 횟수
+  const normKw = (t) => String(t == null ? '' : t).replace(/\s+/g, ' ').trim();
+
+  // 패널의 메시지 줄에 글을 띄운다(패널이 다시 그려져도 마지막 패널로 간다)
+  function panelSay(t, kind) {
+    try { if (ui.setMsg) ui.setMsg(t, kind); } catch (e) { /* 무시 */ }
+  }
+  // "자동 진행 중…" 줄의 작은 설명 글
+  function autoDetail(text, warn) {
+    ui.autoDetail = text || '';
+    ui.autoWarn = !!warn;
+    const e = document.getElementById('cmp-auto-detail');
+    if (e) { e.textContent = ui.autoDetail; e.className = 'cmp-autodetail' + (warn ? ' cmp-autowarn' : ''); }
+  }
+  // 이 흐름(tok)이 아직 유효한가: 자동 멈춤을 눌렀거나 다른 흐름이 시작됐으면 false
+  function autoAlive(tok) {
+    if (tok !== ui.autoTok) return false;
+    const s = loadState();
+    return !!(s && s.auto);
+  }
+  // cond()가 참값을 줄 때까지 기다린다. 20초가 지나면 보안 확인 안내를 띄우고 계속 기다린다(실패로 보지 않음). 흐름이 끝나면 null
+  async function autoWait(cond, tok, slowMs) {
+    const t0 = Date.now();
+    let slow = false;
+    for (;;) {
+      if (!autoAlive(tok)) return null;
+      let v = null;
+      try { v = cond(); } catch (e) { v = null; }
+      if (v) { if (slow) autoDetail(''); return v; }
+      if (!slow && Date.now() - t0 >= (slowMs || 20000)) { slow = true; autoDetail(SECURITY_MSG, true); }
+      await sleep(500);
+    }
+  }
+  // "검색 결과가 없습니다" 화면인가
+  function noResultsText() {
+    try {
+      const t = ((document.body && document.body.innerText) || '').slice(0, 30000);
+      return /검색\s*결과가?\s*(가\s*)?없|일치하는\s*(상품|결과)(이|가)?\s*없|검색\s*결과\s*0\s*건|검색된\s*상품이\s*없/.test(t);
+    } catch (e) { return false; }
+  }
+  // 판매 종료·품절·없는 상품 화면인가 (장바구니 버튼도 옵션도 없을 때만 확인)
+  function productGone() {
+    try {
+      const t = ((document.body && document.body.innerText) || '').slice(0, 30000);
+      return /품절|판매\s*종료|판매\s*중지|판매가\s*종료|존재하지\s*않|삭제된\s*상품|페이지를\s*찾을\s*수\s*없|판매\s*기간이\s*종료/.test(t);
+    } catch (e) { return false; }
+  }
+
+  // 후보를 눌렀을 때(직접·자동 공통) 상품 페이지에 넘겨 줄 정보. kw: 그때의 검색어(주소창 값)
+  function makePending(s, c) {
+    const it = s.items[s.idx];
+    return {
+      url: c.url, shipping: c.shipping, title: c.title, price: c.price, image: c.image || '',
+      packN: c.pack ? c.pack.n : null, packUnit: c.pack ? c.pack.unit : null, site: s.site, idx: s.idx,
+      kw: normKw(currentUrlKeyword()) || normKw(it && it.keyword),
+    };
+  }
+
+  // 사이트 검색창에서 사용자가 직접 고친 검색어를 기억한다(자동 재검색으로 바뀐 것은 이미 item.keyword와 같아서 해당 없음)
+  function adoptUrlKeyword(state) {
+    try {
+      const it = state && state.items[state.idx];
+      const urlKw = normKw(currentUrlKeyword());
+      if (!it || !urlKw || urlKw === normKw(it.keyword)) return false;
+      it.keyword = urlKw;
+      it.fullKeyword = urlKw;
+      it.kwManual = true; // 사용자가 직접 정한 검색어: 자동으로 옵션을 빼고 다시 검색하지 않는다
+      saveState(state);
+      return true;
+    } catch (e) { return false; }
+  }
+
+  // 관련 후보가 3개 미만이고 처음 만든(옵션 포함) 검색어 그대로면, 옵션을 뺀 검색어로 한 번만 다시 검색. 이동했으면 true
+  function tryBroaden(site) {
+    try {
+      const s = loadState();
+      const it = s && s.items[s.idx];
+      if (!it || s.site !== site) return false;
+      if (it.broadened || it.kwManual || !it.broadKeyword || it.broadKeyword === it.fullKeyword) return false;
+      if (normKw(currentUrlKeyword()) !== normKw(it.fullKeyword)) return false;
+      const rel = evaluateCandidates(parseRawCandidates(site), it).length;
+      if (rel >= 3) return false;
+      it.broadened = true;
+      it.keyword = it.broadKeyword;
+      s.notice = '검색 결과가 적어 옵션을 빼고 다시 검색했습니다';
+      saveState(s);
+      location.href = searchUrl(site, it.broadKeyword, currentSortLow());
+      return true;
+    } catch (e) {
+      panelSay('다시 검색하는 중 오류: ' + errMsg(e), 'err');
+      return false;
+    }
+  }
+
+  // 자동 실패로 기록하고 다음으로 넘어간다
+  function autoFailSkip(s, reason) {
+    const it = s.items[s.idx];
+    if (!it) return;
+    it[s.site] = { title: '', url: '', option: '', qty: 0, total: 0, shipping: '', skipped: true, autoFail: true, reason: reason || '' };
+    saveState(s);
+    advance();
+  }
+
+  // 자동 멈춤: 이 화면에 그대로 머물며 직접 진행
+  function stopAuto() {
+    try {
+      const s = loadState();
+      if (s) { s.auto = false; saveState(s); }
+      ui.autoTok++;
+      autoDetail('');
+    } catch (e) { /* 무시 */ }
+    renderAll();
+  }
+
+  // 검색 화면의 자동 단계: 결과가 안정되기를 기다린 뒤 후보를 골라 상품 페이지로 간다
+  async function runAutoSearch(site, tok) {
+    autoDetail('검색 결과를 기다리는 중…');
+    const got = await autoWait(() => (parseRawCandidates(site).length > 0 ? 'cards' : (noResultsText() ? 'none' : null)), tok);
+    if (!got) return;
+    // 2초 동안 후보에 변화가 없을 때까지(최대 15초) 기다린다
+    const t0 = Date.now();
+    let lastSig = null;
+    let lastChange = Date.now();
+    while (autoAlive(tok)) {
+      const sig = parseRawCandidates(site).map((c) => c.id + '|' + c.price + '|' + c.shipping + '|' + (c.image ? 1 : 0)).join(',');
+      if (sig !== lastSig) { lastSig = sig; lastChange = Date.now(); }
+      if (Date.now() - lastChange >= 2000 || Date.now() - t0 >= 15000) break;
+      await sleep(500);
+    }
+    if (!autoAlive(tok)) return;
+    // 결과가 적으면 옵션을 뺀 검색어로 먼저 다시 검색(이동하면 새 화면에서 이어짐)
+    if (tryBroaden(site)) { autoDetail('결과가 적어 옵션을 빼고 다시 검색합니다…'); return; }
+    const s = loadState();
+    if (!s || !s.auto || s.site !== site) return;
+    const it = s.items[s.idx];
+    if (!it) return;
+    const tried = it.tried[site];
+    if (tried.length >= AUTO_MAX_TRIES) { autoFailSkip(s, '맞는 상품을 ' + AUTO_MAX_TRIES + '번 확인했지만 찾지 못함'); return; }
+    autoDetail('후보를 고르는 중…');
+    const cands = evaluateCandidates(parseRawCandidates(site), it);
+    const pk = autoPickCandidate(cands, relWordsOf(it), tried);
+    if (!pk) { autoFailSkip(s, '후보 없음'); return; }
+    tried.push(pk.cand.url);
+    s.pendingCandidate = makePending(s, pk.cand);
+    saveState(s);
+    autoDetail('상품 페이지를 여는 중…');
+    location.href = pk.cand.url;
   }
 
   // ------------------------------------------------------------------
@@ -1105,13 +1379,32 @@
 #cmp-root .cmp-sub a { color: #2563eb; }
 #cmp-root .cmp-bad { color: #b91c1c; }
 #cmp-root .cmp-gray { color: #94a3b8; }
+#cmp-root .cmp-autobar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border-radius: 8px; background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; }
+#cmp-root .cmp-autotxt { display: flex; flex-direction: column; min-width: 0; font-size: 13px; }
+#cmp-root .cmp-autodetail { font-size: 12px; color: #78350f; word-break: keep-all; }
+#cmp-root .cmp-autodetail.cmp-autowarn { color: #b91c1c; font-weight: 700; }
+#cmp-root .cmp-stop { background: #dc2626; border-color: #dc2626; color: #fff; white-space: nowrap; font-weight: 700; }
+#cmp-root .cmp-stop:hover { background: #b91c1c; }
+#cmp-root .cmp-pn { font-weight: 700; }
+#cmp-root .cmp-fail { color: #b91c1c; font-weight: 700; }
+
+#cmp-root .cmp-cartbar { position: fixed; right: 16px; bottom: 16px; z-index: 2147483600; display: flex; gap: 8px; align-items: center; }
+#cmp-root .cmp-cartbar .cmp-fab { position: static; }
+#cmp-root .cmp-capfab { min-height: 44px; padding: 8px 18px; border-radius: 22px; border: none; background: #0f766e; color: #fff; font-size: 15px; font-weight: 700; box-shadow: 0 4px 14px rgba(0,0,0,.3); cursor: pointer; }
+#cmp-root .cmp-capfab:hover { background: #115e59; }
+#cmp-root .cmp-capfab.cmp-above { position: fixed; right: 12px; bottom: 62px; z-index: 2147483600; }
+#cmp-root .cmp-capbox { position: fixed; z-index: 2147483500; border: 3px solid #2563eb; background: rgba(37,99,235,.08); pointer-events: none; box-sizing: border-box; }
+#cmp-root .cmp-capbar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 2147483620; width: min(560px, calc(100vw - 24px)); display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: #fff; color: #111827; border: 1px solid #d1d5db; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,.35); font-size: 13px; }
+#cmp-root .cmp-toast { position: fixed; left: 50%; top: 16px; transform: translateX(-50%); z-index: 2147483640; max-width: calc(100vw - 32px); padding: 8px 14px; border-radius: 10px; background: #1e293b; color: #fff; font-size: 13px; box-shadow: 0 6px 20px rgba(0,0,0,.35); display: none; }
+#cmp-root .cmp-toast.cmp-t-err { background: #b91c1c; }
+#cmp-root .cmp-toast.cmp-t-ok { background: #15803d; }
 @media (max-width: 600px) { #cmp-root .cmp-table { font-size: 12px; } #cmp-root #cmp-panel { width: calc(100vw - 24px); } }
 `);
 
   // ------------------------------------------------------------------
   // 루트 / 모달
   // ------------------------------------------------------------------
-  const ui = { cleanups: [], lastHref: '', autoKey: '' };
+  const ui = { cleanups: [], lastHref: '', autoKey: '', autoTok: 0, autoRunKey: '', autoDetail: '', autoWarn: false, setMsg: null, capAuto: false, addRecover: false };
 
   function ensureRoot() {
     let r = document.getElementById('cmp-root');
@@ -1189,11 +1482,13 @@
     if (!lines.length) {
       body.appendChild(h('div', { class: 'cmp-empty', text: '장바구니 물품을 찾지 못했습니다. 페이지가 모두 불러와진 뒤 다시 눌러 주세요.' }));
     } else {
-      body.appendChild(h('div', { class: 'cmp-hint', text: '비교할 물품을 확인하세요. 묶음 개수(상품명·옵션에서 읽은 값)와 수량(묶음 수)을 맞게 고치면 필요 개수와 쿠팡 개당 가격이 계산됩니다. 쿠팡 금액은 수량을 바꿔도 자동으로 바뀌지 않으니 이 물품의 합계 금액으로 입력하세요.' }));
+      body.appendChild(h('div', { class: 'cmp-hint', text: '비교할 물품을 확인하세요. 품명은 쿠팡 상품명에서 상표·꾸밈말을 뺀 이름이며 검색어와 관련 상품 판별에 쓰이니 고쳐도 됩니다. 묶음 개수(상품명·옵션에서 읽은 값)와 수량(묶음 수)을 맞게 고치면 필요 개수와 쿠팡 개당 가격이 계산됩니다. 쿠팡 금액은 수량을 바꿔도 자동으로 바뀌지 않으니 이 물품의 합계 금액으로 입력하세요.' }));
+      body.appendChild(h('div', { class: 'cmp-hint', text: '"11번가부터 시작"은 후보를 직접 고르고, "자동으로 전부 담기"는 쿠팡보다 비싼 후보를 자동으로 골라 장바구니까지 담습니다(구매·결제는 하지 않으며, 패널의 "자동 멈춤"으로 언제든 멈출 수 있습니다).' }));
       lines.forEach((ln) => {
         const pk = parsePack(ln.option) || parsePack(ln.name); // 옵션에서 읽은 값을 상품명보다 우선
         const pack0 = pk || { n: 1, unit: '개' };
-        const kws = buildKeywords(ln.name, ln.option, pk);
+        const pname0 = cleanName(ln.name);
+        const kws = buildKeywords(ln.name, ln.option, pk, pname0);
         const chk = h('input', { type: 'checkbox', checked: true });
         const packN = h('input', { type: 'number', min: '1', value: String(pack0.n), 'aria-label': '묶음 개수' });
         const unit = h('select', { 'aria-label': '단위' }, UNIT_CHOICES.map((u) => h('option', { value: u, text: u })));
@@ -1201,9 +1496,10 @@
         const qty = h('input', { type: 'number', min: '1', value: String(ln.qty), 'aria-label': '수량(묶음 수)' });
         const price = h('input', { type: 'text', class: 'cmp-wide', value: fmt(ln.cpTotal), 'aria-label': '쿠팡 금액' });
         const kw = h('input', { type: 'text', value: kws.full, 'aria-label': '검색어' });
+        const pnameIn = h('input', { type: 'text', value: pname0, 'aria-label': '품명' });
         const needEl = h('b', { text: '' });
         const unitEl = h('b', { text: '' });
-        const r = { ln, pk, chk, packN, unit, qty, price, kw, needEl, unitEl, kwTouched: false, packTouched: !!pk };
+        const r = { ln, pk, chk, packN, unit, qty, price, kw, pnameIn, needEl, unitEl, kwTouched: false, packTouched: !!pk };
         rows.push(r);
 
         const recalc = () => {
@@ -1217,8 +1513,9 @@
         const rekey = () => {
           if (r.kwTouched) return;
           const explicit = r.packTouched ? { n: Math.max(1, parseInt(packN.value, 10) || 1), unit: unit.value } : null;
-          kw.value = buildKeywords(ln.name, ln.option, explicit).full;
+          kw.value = buildKeywords(ln.name, ln.option, explicit, pnameIn.value.trim() || pname0).full;
         };
+        pnameIn.addEventListener('input', rekey);
         packN.addEventListener('input', () => { r.packTouched = true; recalc(); rekey(); });
         unit.addEventListener('change', () => { r.packTouched = true; recalc(); rekey(); });
         qty.addEventListener('input', recalc);
@@ -1240,11 +1537,12 @@
             field('필요 개수', needEl),
             field('쿠팡 금액(원)', price),
             field('개당 가격', unitEl)),
+          h('label', { class: 'cmp-kw' }, h('span', { text: '품명' }), pnameIn),
           h('label', { class: 'cmp-kw' }, h('span', { text: '검색어' }), kw)));
       });
     }
 
-    const start = () => {
+    const start = (auto) => {
       const items = [];
       rows.forEach((r) => {
         if (!r.chk.checked) return;
@@ -1252,10 +1550,12 @@
         const pn = Math.max(1, parseInt(r.packN.value, 10) || 1);
         const need = pn * q;
         const total = num(r.price.value);
-        const keyword = r.kw.value.trim() || buildKeywords(r.ln.name, r.ln.option, r.pk).full;
-        const kws = buildKeywords(r.ln.name, r.ln.option, r.pk);
+        const pname = r.pnameIn.value.trim() || cleanName(r.ln.name) || r.ln.name;
+        const kws = buildKeywords(r.ln.name, r.ln.option, r.pk, pname);
+        const keyword = r.kw.value.trim() || kws.full;
         items.push({
           name: r.ln.name,
+          pname,
           option: r.ln.option,
           qty: q,
           packN: pn,
@@ -1267,20 +1567,23 @@
           keyword,
           fullKeyword: keyword,
           broadKeyword: kws.broad,
-          relWords: hangulWords(r.ln.name),
+          relWords: hangulWords(pname).length ? hangulWords(pname) : hangulWords(r.ln.name),
           broadened: false,
+          kwManual: false,
+          tried: { st: [], gm: [] },
           st: null,
           gm: null,
         });
       });
       if (!items.length) { showMsg('비교할 물품을 하나 이상 선택하세요'); return; }
-      const state = { version: 2, items, site: 'st', idx: 0, startedAt: Date.now(), sortLow: false, pendingCandidate: null, redo: false, resume: null, notice: '' };
+      const state = { version: 3, items, site: 'st', idx: 0, startedAt: Date.now(), sortLow: false, pendingCandidate: null, redo: false, resume: null, notice: '', auto: !!auto, adding: null };
       saveState(state);
       location.href = searchUrl('st', items[0].keyword, false);
     };
 
     const foot = [
-      h('button', { class: 'cmp-btn cmp-primary', text: '11번가부터 시작', disabled: !lines.length, onclick: start }),
+      h('button', { class: 'cmp-btn cmp-primary', text: '11번가부터 시작', disabled: !lines.length, onclick: () => start(false) }),
+      h('button', { class: 'cmp-btn cmp-primary', text: '자동으로 전부 담기', disabled: !lines.length, onclick: () => start(true) }),
       h('button', { class: 'cmp-btn', text: '닫기', onclick: closeModal }),
       msg,
     ];
@@ -1302,7 +1605,7 @@
     s.items.forEach((it) => {
       a += it.cpTotal || 0; b += pickAmt(it.st); c += pickAmt(it.gm);
       lines.push([
-        clean(it.name + (it.option ? ' (' + it.option + ')' : '')),
+        clean(it.pname || it.name),
         it.needUnits,
         it.cpUnitPrice ? Math.round(it.cpUnitPrice) : '',
         it.cpTotal || '',
@@ -1334,6 +1637,13 @@
       const redo = h('button', { class: 'cmp-btn cmp-small', style: 'margin-top:4px', text: SITE_NAME[site] + ' 다시', onclick: () => startRedo(i, site) });
       if (p === null || p === undefined) {
         tr.appendChild(h('td', { class: 'cmp-r cmp-gray', colspan: '2' }, '미진행', h('br'), redo));
+        return false;
+      }
+      if (p.skipped && p.autoFail) {
+        tr.appendChild(h('td', { class: 'cmp-r', colspan: '2' },
+          h('span', { class: 'cmp-fail', text: '자동 실패 - 직접 고르세요' }),
+          p.reason ? h('span', { class: 'cmp-sub cmp-bad', style: 'text-align:right', text: p.reason }) : null,
+          redo));
         return false;
       }
       if (p.skipped) {
@@ -1380,7 +1690,8 @@
       a += it.cpTotal || 0; b += pickAmt(it.st); c += pickAmt(it.gm);
       const tr = h('tr', null);
       const nameTd = h('td', null,
-        h('div', { class: 'cmp-clamp2', text: shortName(it.name, 60) }),
+        h('div', { class: 'cmp-clamp2 cmp-pn', text: it.pname || shortName(it.name, 60) }),
+        h('span', { class: 'cmp-sub', text: shortName(it.name, 60) }), // 쿠팡 상품명 전체(작게)
         it.option ? h('span', { class: 'cmp-sub', text: '옵션: ' + it.option }) : null);
       const qtySub = (it.packN > 1 || it.qty > 1) ? h('span', { class: 'cmp-sub', text: '(' + packText(it.packN, it.packUnit) + ' × ' + it.qty + ')' }) : null;
       tr.appendChild(nameTd);
@@ -1409,6 +1720,11 @@
       h('a', { class: 'cmp-btn', href: CART_URL.cp, target: '_blank', rel: 'noopener', text: '쿠팡 장바구니' }),
       h('a', { class: 'cmp-btn', href: CART_URL.st, target: '_blank', rel: 'noopener', text: '11번가 장바구니' }),
       h('a', { class: 'cmp-btn', href: CART_URL.gm, target: '_blank', rel: 'noopener', text: 'G마켓 장바구니' })));
+    body.appendChild(h('div', { class: 'cmp-hint', style: 'margin-top:8px', text: '견적서 캡처: 장바구니를 새 탭으로 열고 저장할 영역을 보여 줍니다. 확인 후 "이 영역 저장"을 누르면 그림 파일(PNG)로 내려받습니다.' }));
+    body.appendChild(h('div', { class: 'cmp-btns' },
+      h('a', { class: 'cmp-btn cmp-primary', href: CART_URL.cp + '#cmp-capture', target: '_blank', rel: 'noopener', text: '쿠팡 장바구니 열고 캡처' }),
+      h('a', { class: 'cmp-btn cmp-primary', href: CART_URL.st + '#cmp-capture', target: '_blank', rel: 'noopener', text: '11번가 장바구니 열고 캡처' }),
+      h('a', { class: 'cmp-btn cmp-primary', href: CART_URL.gm + '#cmp-capture', target: '_blank', rel: 'noopener', text: 'G마켓 장바구니 열고 캡처' })));
 
     const drawFoot = () => {
       foot.textContent = '';
@@ -1454,14 +1770,28 @@
       const state = loadState();
 
       if (pg.kind === 'cp-cart') {
-        dock.appendChild(h('button', { class: 'cmp-fab', text: '비교견적 시작', onclick: openStartModal }));
+        dock.appendChild(h('div', { class: 'cmp-cartbar' },
+          h('button', { class: 'cmp-capfab', text: '견적서 캡처', onclick: () => capStart('cp') }),
+          h('button', { class: 'cmp-fab', text: '비교견적 시작', onclick: openStartModal })));
+        capMaybeAuto(pg);
         return;
       }
       const isSearch = /-search$/.test(pg.kind);
       const isProduct = /-product$/.test(pg.kind);
+      if (/-cart$/.test(pg.kind)) {
+        dock.appendChild(h('button', { class: 'cmp-capfab cmp-above', text: '견적서 캡처', onclick: () => capStart(pg.site) }));
+        capMaybeAuto(pg);
+      }
+      // 자동 진행 중 장바구니 버튼을 누른 뒤 사이트가 다른 화면으로 이동해 버린 경우: 1.5초 뒤 다음 상품으로 넘어간다
+      if (state && state.auto && state.adding && pg.site && state.adding.site === pg.site && state.site === pg.site && state.idx === state.adding.idx
+        && /-(other|cart)$/.test(pg.kind) && Date.now() - state.adding.t < 120000 && !ui.addRecover) {
+        ui.addRecover = true;
+        setTimeout(() => { try { const s2 = loadState(); if (s2 && s2.auto && s2.adding) advance(); } catch (e) { /* 무시 */ } }, 1500);
+      }
       const active = !!(state && pg.site && state.site === pg.site && (isSearch || isProduct) && state.items[state.idx]);
+      if (active && isSearch) adoptUrlKeyword(state); // 사용자가 사이트 검색창에서 고친 검색어를 기억
 
-      if (active && !uiPref.collapsed) {
+      if (active && (!uiPref.collapsed || state.auto)) {
         renderPanel(dock, state, pg, isSearch);
       } else {
         const label = active ? '비교견적 ' + (state.idx + 1) + '/' + state.items.length : '비교견적';
@@ -1490,6 +1820,7 @@
       msg.className = 'cmp-msg' + (kind ? ' cmp-' + kind : '');
       msg.style.display = t ? 'block' : 'none';
     };
+    ui.setMsg = setMsg;
     const guard = (fn) => function () {
       try { return fn.apply(this, arguments); } catch (e) { setMsg('오류: ' + errMsg(e), 'err'); }
     };
@@ -1499,6 +1830,13 @@
       h('span', { class: 'cmp-row2' },
         h('button', { class: 'cmp-btn cmp-small', text: side === 'left' ? '오른쪽으로 ▶' : '◀ 왼쪽으로', title: '패널이 사이트 화면을 가리면 반대쪽으로 옮기세요', onclick: () => { uiPref.side[kindKey] = side === 'left' ? 'right' : 'left'; saveUi(); renderAll(); } }),
         h('button', { class: 'cmp-btn cmp-small', text: '접기', onclick: () => { uiPref.collapsed = true; saveUi(); renderAll(); } }))));
+    if (state.auto) {
+      panel.appendChild(h('div', { class: 'cmp-autobar' },
+        h('span', { class: 'cmp-autotxt' },
+          h('b', { text: '자동 진행 중… (' + SITE_NAME[state.site] + ' ' + (state.idx + 1) + '/' + state.items.length + ')' }),
+          h('span', { id: 'cmp-auto-detail', class: 'cmp-autodetail' + (ui.autoWarn ? ' cmp-autowarn' : ''), text: ui.autoDetail || '' })),
+        h('button', { class: 'cmp-btn cmp-stop', text: '자동 멈춤', onclick: stopAuto })));
+    }
     panel.appendChild(h('div', { class: 'cmp-name cmp-clamp2', text: item.name + (item.option ? ' (' + item.option + ')' : '') }));
     panel.appendChild(h('div', { class: 'cmp-meta', text:
       '필요 ' + packText(item.needUnits, item.packUnit) + ' (' + packText(item.packN, item.packUnit) + ' × ' + item.qty + ') · 쿠팡 ' + fmt(item.cpTotal) + '원 · ' + perLabel(item.packUnit) + ' ' + (item.cpUnitPrice ? fmtP(item.cpUnitPrice) + '원' : '-') }));
@@ -1530,7 +1868,12 @@
       const kw = kwInput.value.trim();
       if (!kw) { setMsg('검색어를 입력하세요', 'warn'); return; }
       const s = loadState();
-      s.items[s.idx].keyword = kw;
+      const it0 = s.items[s.idx];
+      if (normKw(kw) !== normKw(it0.keyword)) {
+        it0.fullKeyword = kw; // 사용자가 직접 정한 검색어: G마켓·다시 검색에서도 이 검색어를 쓴다
+        it0.kwManual = true;
+      }
+      it0.keyword = kw;
       saveState(s);
       location.href = searchUrl(site, kw, currentSortLow());
     });
@@ -1564,10 +1907,7 @@
 
     const pick = guard((c) => {
       const s = loadState();
-      s.pendingCandidate = {
-        url: c.url, shipping: c.shipping, title: c.title, price: c.price, image: c.image || '',
-        packN: c.pack ? c.pack.n : null, packUnit: c.pack ? c.pack.unit : null, site: s.site, idx: s.idx,
-      };
+      s.pendingCandidate = makePending(s, c); // 그때의 검색어(kw)도 함께 기억
       saveState(s);
       location.href = c.url;
     });
@@ -1578,7 +1918,7 @@
       lines.push(priceLine);
       // 묶음 표시
       let packLine;
-      if (c.conv && c.pack && c.pack.assumed) packLine = '낱개로 봄(상품명에 개수 없음)';
+      if (c.conv && c.pack && c.pack.assumed) packLine = assumedLabel(c.pack.unit);
       else if (c.conv) packLine = '묶음 ' + (c.conv.conv ? packText(c.conv.n, item.packUnit) + '(환산)' : packText(c.pack.n, c.pack.unit));
       else if (c.pack) packLine = '묶음 ' + packText(c.pack.n, c.pack.unit) + ' · 단위 다름';
       else packLine = '묶음 개수 확인 필요';
@@ -1665,26 +2005,18 @@
     waitFor(() => parseRawCandidates(site).length > 0, 15000, 500).then(() => refresh());
 
     // 15초 뒤에도 관련 후보가 3개 미만이고 처음 만든(옵션 포함) 검색어 그대로면, 옵션을 뺀 검색어로 한 번만 다시 검색
-    const checkBroaden = () => {
-      try {
-        const s = loadState();
-        const it = s && s.items[s.idx];
-        if (!it || s.site !== site) return;
-        if (it.broadened || !it.broadKeyword || it.broadKeyword === it.fullKeyword) return;
-        if (currentUrlKeyword().trim() !== String(it.fullKeyword || '').trim()) return;
-        const rel = evaluateCandidates(parseRawCandidates(site), it).length;
-        if (rel >= 3) return;
-        it.broadened = true;
-        it.keyword = it.broadKeyword;
-        s.notice = '검색 결과가 적어 옵션을 빼고 다시 검색했습니다';
-        saveState(s);
-        location.href = searchUrl(site, it.broadKeyword, currentSortLow());
-      } catch (e) {
-        setMsg('다시 검색하는 중 오류: ' + errMsg(e), 'err');
-      }
-    };
-    const bt = setTimeout(checkBroaden, 15000);
+    const bt = setTimeout(() => tryBroaden(site), 15000);
     addCleanup(() => clearTimeout(bt));
+
+    // 자동 진행: 이 검색 화면에서 한 번만 시작한다(패널을 다시 그려도 반복하지 않음)
+    if (state.auto) {
+      const key = 'S|' + site + '|' + state.idx + '|' + normKw(currentUrlKeyword());
+      if (ui.autoRunKey !== key) {
+        ui.autoRunKey = key;
+        const tok = ++ui.autoTok;
+        runAutoSearch(site, tok).catch((e) => { autoDetail('자동 진행 중 오류: ' + errMsg(e), true); });
+      }
+    }
   }
 
   // ---- 상품 페이지 패널 ----
@@ -1721,7 +2053,7 @@
       let from = '선택 옵션';
       if (!p) { p = parsePack(api.title(), item.packUnit); from = '상품명'; }
       if (!p && pc0 && pc0.packN) { p = { n: pc0.packN, unit: pc0.packUnit || '개' }; from = '검색 결과'; }
-      if (!p && !item.packExplicit && item.packN === 1) { p = { n: 1, unit: item.packUnit }; from = '낱개로 봄'; }
+      if (!p && assumeSingle(item)) { p = { n: 1, unit: item.packUnit }; from = assumedLabel('묶음'); } // "1묶음으로 봄"
       // 옵션 글자와 상품명의 묶음 개수가 다르면 알려 준다(예: 상품명 10쌍, 옵션 2개1세트)
       let alt = null;
       if (p && from === '선택 옵션') {
@@ -1841,7 +2173,7 @@
 
     // 옵션 자동 선택 -> 묶음 개수 읽기 -> 수량 맞추기
     const runAuto = aguard(async () => {
-      if (busy) return;
+      if (busy) return { warns: [], busy: true };
       busy = true;
       setMsg('옵션을 자동으로 고르는 중입니다…', '');
       const warns = [];
@@ -1864,16 +2196,18 @@
       if (warns.length) setMsg(Array.from(new Set(warns)).join(' / ') + (notes.length ? ' · ' + notes.join(' ') : ''), 'warn');
       else if (notes.length) setMsg(notes.join(' '), 'ok');
       else setMsg('', '');
+      return { warns: Array.from(new Set(warns)), res };
     });
 
     // 기록(+장바구니 담기)
+    // 기록했으면 true (자동 진행은 이 값으로 성공 여부를 안다)
     const record = guard((click) => {
-      if (adding) return;
+      if (adding) return false;
       const s = loadState();
-      if (!s || !s.items[s.idx]) { setMsg('진행 정보를 읽지 못했습니다', 'err'); return; }
+      if (!s || !s.items[s.idx]) { setMsg('진행 정보를 읽지 못했습니다', 'err'); return false; }
       const it = s.items[s.idx];
       const L = calc();
-      if (!L.inputs.length && api.hasOptionSelectors()) { setMsg('옵션을 먼저 고르세요', 'warn'); return; }
+      if (!L.inputs.length && api.hasOptionSelectors()) { setMsg('옵션을 먼저 고르세요', 'warn'); return false; }
       const warns = [];
       if (L.qty !== L.need) warns.push('수량이 ' + L.qty + '개입니다(필요 ' + L.need + '묶음)');
       if (L.unitPrice != null && cpu && L.unitPrice <= cpu + 1e-9) warns.push(perLabel(item.packUnit) + ' 가격이 쿠팡 이하입니다(비교견적은 쿠팡보다 비싸야 합니다)');
@@ -1881,12 +2215,12 @@
       if (warns.length && ackSig !== sig) {
         ackSig = sig;
         setMsg(warns.join(' / ') + ' - 그대로 진행하려면 한 번 더 누르세요', 'warn');
-        return;
+        return false;
       }
       let btn = null;
       if (click) {
         btn = api.addBtn();
-        if (!btn) { setMsg('장바구니 버튼을 찾지 못했습니다. 직접 담은 뒤 "기록만 하기"를 누르세요', 'err'); return; }
+        if (!btn) { setMsg('장바구니 버튼을 찾지 못했습니다. 직접 담은 뒤 "기록만 하기"를 누르세요', 'err'); return false; }
         assertSafeCartButton(btn); // 구매 관련 버튼이면 예외 발생, 저장·클릭하지 않음
       }
       const url = api.canon();
@@ -1907,6 +2241,9 @@
         image,
         skipped: false,
       };
+      // 이 상품을 고를 때의 검색어를 기억한다(G마켓·다시 검색에서 이 검색어를 씀)
+      if (pc && pc.url === url && pc.kw) { it.keyword = pc.kw; it.fullKeyword = pc.kw; }
+      if (click) s.adding = { site: s.site, idx: s.idx, t: Date.now() };
       saveState(s);
       const notes = [];
       if (click) {
@@ -1921,6 +2258,7 @@
       doneMsg.textContent = notes.join(' ');
       setMsg('', '');
       sync();
+      return true;
     });
 
     const sync = () => {
@@ -1955,12 +2293,514 @@
       h('button', { class: 'cmp-btn', text: '이 상품 건너뛰기', onclick: guard(skipCurrent) }),
       h('button', { class: 'cmp-btn', text: '요약 보기', onclick: guard(showSummary) })));
 
+    // ---- 자동 진행(자동으로 전부 담기): 옵션·수량을 맞춘 뒤 조건이 맞으면 담고, 아니면 이 상품을 버리고 같은 검색의 다음 후보로 ----
+    const autoProdFail = (reason) => {
+      const s = loadState();
+      if (!s || !s.auto) return;
+      const it = s.items[s.idx];
+      if (!it) return;
+      const tr = it.tried[s.site];
+      if (tr.indexOf(canon) < 0) tr.push(canon);
+      autoDetail('이 상품은 쓰지 않습니다 (' + reason + ')', true);
+      if (tr.length < AUTO_MAX_TRIES) {
+        saveState(s);
+        setTimeout(() => { try { const s2 = loadState(); if (s2 && s2.auto) gotoSearch(s2); } catch (e) { /* 무시 */ } }, 900);
+        return;
+      }
+      autoFailSkip(s, '자동으로 맞는 상품을 찾지 못함 (' + reason + ')');
+    };
+    const autoProductFlow = async (tok) => {
+      autoDetail('상품 페이지를 기다리는 중…');
+      const ready = await autoWait(() => ((api.addBtn() || api.optionUiExists()) ? 'ok' : (productGone() ? 'gone' : null)), tok);
+      if (!ready) return;
+      if (ready === 'gone') { autoProdFail('판매 중이 아니거나 장바구니 버튼이 없음'); return; }
+      autoDetail('옵션을 고르는 중…');
+      const r = (await runAuto()) || { warns: ['옵션을 고르는 중 오류'] };
+      if (!autoAlive(tok)) return;
+      autoDetail('총액을 확인하는 중…');
+      await sleep(1500);
+      if (!autoAlive(tok)) return;
+      applyPack(detectPack());
+      live();
+      let L = calc();
+      if (L.inputs.length && L.qty !== L.need) { fit(); await sleep(1200); if (!autoAlive(tok)) return; L = calc(); }
+      const fails = [];
+      if (r.warns && r.warns.length) fails.push('옵션 확인 필요');
+      if (L.unitPrice == null) fails.push('개당 가격을 알 수 없음');
+      else if (cpu > 0 && L.unitPrice <= cpu + 1e-9) fails.push('개당 가격이 쿠팡 이하');
+      if (!(cpu > 0)) fails.push('쿠팡 금액 없음');
+      if (L.qty !== L.need) fails.push('수량 불일치');
+      if (!api.addBtn()) fails.push('장바구니 버튼 없음');
+      if (fails.length) { autoProdFail(fails.join(', ')); return; }
+      autoDetail('장바구니에 담는 중…');
+      const ok = record(true); // 기록 + 장바구니 버튼(assertSafeCartButton 통과 시에만) 클릭, 1.5초 뒤 다음으로
+      if (!ok) autoProdFail('기록·장바구니 담기 실패');
+    };
+
     // 이 상품 페이지에서 처음 한 번만 자동 실행 (패널을 다시 그려도 반복하지 않는다)
     const autoKey = site + '|' + state.idx + '|' + canon;
     if (ui.autoKey !== autoKey) {
       ui.autoKey = autoKey;
-      setTimeout(() => runAuto(), 600);
+      if (state.auto) {
+        const tok = ++ui.autoTok;
+        setTimeout(() => { autoProductFlow(tok).catch((e) => { autoDetail('자동 진행 중 오류: ' + errMsg(e), true); }); }, 600);
+      } else {
+        setTimeout(() => runAuto(), 600);
+      }
     }
+  }
+
+  // ------------------------------------------------------------------
+  // 견적서 캡처: 장바구니 화면의 상품 목록·합계 영역을 PNG 그림 파일로 저장
+  // (사이트마다 화면 구조가 달라 상품 링크·합계 글자로 영역을 추정하고, 미리 보여 준 뒤 사용자가 확인한다)
+  // ------------------------------------------------------------------
+  const CAP_LINK_RE = { cp: /\/vp\/products\//, st: /products\/\d+|prdNo=\d+/i, gm: /goodscode=\d+/i };
+  const CAP_TOTAL_RE = /(총\s*(상품|주문|결제)\s*(금액|가격)|결제\s*예정\s*금액|주문\s*예상\s*금액|최종\s*결제\s*금액)/;
+  const CAP_NOISE_HEAD_RE = /추천|함께|최근\s*본|광고/;
+  const CAP_NOISE_ATTR_RE = /recommend|(^|[\s_-])reco([\s_-]|$)|(^|[\s_-])ad[-_]|banner/i;
+  const cap = { site: '', target: null, view: null, box: null, bar: null, timer: 0, toastTimer: 0, busy: false, stopPick: null };
+
+  function capHost() {
+    const { root } = ensureRoot();
+    let host = $('#cmp-cap', root);
+    if (!host) { host = h('div', { id: 'cmp-cap' }); root.appendChild(host); }
+    return host;
+  }
+  // 작은 안내창: sticky가 아니면 몇 초 뒤 사라진다
+  function capToast(text, kind, sticky) {
+    try {
+      const host = capHost();
+      let t = $('#cmp-cap-toast', host);
+      if (!t) { t = h('div', { id: 'cmp-cap-toast', class: 'cmp-toast' }); host.appendChild(t); }
+      t.textContent = text;
+      t.className = 'cmp-toast' + (kind ? ' cmp-t-' + kind : '');
+      t.style.display = 'block';
+      clearTimeout(cap.toastTimer);
+      if (!sticky) cap.toastTimer = setTimeout(() => { t.style.display = 'none'; }, kind === 'err' ? 10000 : 6000);
+    } catch (e) { /* 무시 */ }
+  }
+  function getH2I() {
+    try { if (typeof htmlToImage !== 'undefined' && htmlToImage) return htmlToImage; } catch (e) { /* 아래 대체 */ }
+    try { return PW.htmlToImage || window.htmlToImage || null; } catch (e) { return null; }
+  }
+  function ymd() {
+    const d = new Date();
+    const p = (n) => (n < 10 ? '0' : '') + n;
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+  function capAbsUrl(raw) {
+    try {
+      const t = String(raw == null ? '' : raw).trim();
+      if (!t || /^(data|blob|javascript|about):/i.test(t)) return '';
+      const u = new URL(t, location.href);
+      return /^https?:$/.test(u.protocol) ? u.href : '';
+    } catch (e) { return ''; }
+  }
+
+  // 머리말·메뉴·바닥글, 추천·광고 영역 안의 요소인가
+  function capIsNoise(el) {
+    try {
+      if (el.closest('#cmp-root')) return true;
+      if (el.closest('header, nav, footer, [role="banner"], [role="navigation"], [role="contentinfo"]')) return true;
+      let n = el;
+      for (let depth = 0; n && n !== document.body && depth < 12; depth++, n = n.parentElement) {
+        const cls = typeof n.className === 'string' ? n.className : ((n.className && n.className.baseVal) || '');
+        if (CAP_NOISE_ATTR_RE.test(cls + ' ' + (n.id || ''))) return true;
+        if (depth < 8) {
+          const hd = n.querySelector(':scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > header h2, :scope > header h3, :scope > div > h2, :scope > div > h3');
+          if (hd) {
+            const t = txt(hd);
+            if (t.length <= 40 && CAP_NOISE_HEAD_RE.test(t)) return true;
+          }
+        }
+      }
+    } catch (e) { /* 무시 */ }
+    return false;
+  }
+  // 장바구니 상품 링크(보이는 것, 추천·광고·머리말 제외)
+  function capCartLinks(site) {
+    const re = CAP_LINK_RE[site];
+    if (!re) return [];
+    return $$('a[href]').filter((a) => {
+      try {
+        if (!re.test(a.getAttribute('href') || '')) return false;
+        if (!visible(a) || (a.offsetWidth === 0 && a.offsetHeight === 0)) return false;
+        return !capIsNoise(a);
+      } catch (e) { return false; }
+    });
+  }
+  // "총 상품금액", "결제예정금액" 같은 글자를 가진 가장 작은 보이는 요소
+  function capTotalEl() {
+    const found = [];
+    try {
+      const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+      let n;
+      while ((n = w.nextNode())) {
+        const v = n.nodeValue;
+        if (!v || v.length > 60 || !CAP_TOTAL_RE.test(v)) continue;
+        const el = n.parentElement;
+        if (!el || /^(SCRIPT|STYLE|NOSCRIPT|TITLE)$/.test(el.tagName)) continue;
+        if (!visible(el) || capIsNoise(el)) continue;
+        found.push(el);
+        if (found.length > 40) break;
+      }
+    } catch (e) { /* 무시 */ }
+    if (!found.length) return null;
+    found.sort((a, b) => (a.offsetWidth * a.offsetHeight) - (b.offsetWidth * b.offsetHeight));
+    return found[0];
+  }
+  function capCommonAncestor(els) {
+    if (!els.length) return null;
+    let a = els[0];
+    while (a && !els.every((e) => a.contains(e))) a = a.parentElement;
+    return a;
+  }
+  // 영역이 너무 작으면(한 줄짜리 등) 바깥 요소로 조금 넓힌다
+  function capGrow(el) {
+    let n = el;
+    for (let i = 0; i < 6 && n.parentElement && n.parentElement !== document.body && n.parentElement !== document.documentElement; i++) {
+      const r = n.getBoundingClientRect();
+      if (r.height >= 160 && r.width >= 360) break;
+      if (n.parentElement.getBoundingClientRect().height > 9000) break;
+      n = n.parentElement;
+    }
+    return n;
+  }
+  // 저장할 영역 추정: 상품 링크와 합계 글자의 가장 가까운 공통 조상 (body이거나 9000px보다 길면 상품 링크만으로)
+  function capDetect(site) {
+    const links = capCartLinks(site);
+    const tot = capTotalEl();
+    if (!links.length && !tot) return { el: document.body, found: false };
+    const huge = (el) => !el || el === document.body || el === document.documentElement || el.getBoundingClientRect().height > 9000;
+    let t = capCommonAncestor(links.concat(tot ? [tot] : []));
+    if (huge(t) && links.length) t = capCommonAncestor(links);
+    if (!t || t === document.body || t === document.documentElement) return { el: document.body, found: false };
+    if (!huge(t)) t = capGrow(t);
+    return { el: t, found: true };
+  }
+
+  // ---- 미리 보기(파란 테두리)와 버튼 줄 ----
+  function capBoxUpdate() {
+    const b = cap.box;
+    if (!b) return;
+    const el = cap.view;
+    if (!el || !el.isConnected) { b.style.display = 'none'; return; }
+    const r = el.getBoundingClientRect();
+    b.style.display = 'block';
+    b.style.left = r.left + 'px';
+    b.style.top = r.top + 'px';
+    b.style.width = Math.max(0, r.width) + 'px';
+    b.style.height = Math.max(0, r.height) + 'px';
+  }
+  function capEnsureBox() {
+    if (!cap.box) {
+      cap.box = h('div', { class: 'cmp-capbox' });
+      capHost().appendChild(cap.box);
+      window.addEventListener('scroll', capBoxUpdate, true);
+      window.addEventListener('resize', capBoxUpdate);
+      cap.timer = setInterval(capBoxUpdate, 300);
+    }
+  }
+  function capSetBar(node) {
+    if (cap.bar) { cap.bar.remove(); cap.bar = null; }
+    cap.bar = node;
+    capHost().appendChild(node);
+  }
+  function capClose() {
+    try { if (cap.stopPick) cap.stopPick(); } catch (e) { /* 무시 */ }
+    cap.stopPick = null;
+    if (cap.bar) { cap.bar.remove(); cap.bar = null; }
+    if (cap.box) {
+      cap.box.remove();
+      cap.box = null;
+      window.removeEventListener('scroll', capBoxUpdate, true);
+      window.removeEventListener('resize', capBoxUpdate);
+      clearInterval(cap.timer);
+    }
+    cap.view = null;
+  }
+  const capSizeText = (el) => {
+    try { const r = el.getBoundingClientRect(); return Math.round(r.width) + '×' + Math.round(r.height) + 'px'; } catch (e) { return ''; }
+  };
+  const capDescribe = (el) => {
+    if (!el) return '';
+    return (el.tagName || '').toLowerCase() + (el.id ? '#' + el.id : '') + ' (' + capSizeText(el) + ')';
+  };
+
+  function capPreview(note) {
+    capEnsureBox();
+    cap.view = cap.target;
+    try { if (cap.target && cap.target !== document.body) cap.target.scrollIntoView({ block: 'start' }); } catch (e) { /* 무시 */ }
+    capBoxUpdate();
+    const site = cap.site;
+    const target = cap.target;
+    const save = (el) => { capClose(); capSave(el, site); };
+    capSetBar(h('div', { class: 'cmp-capbar' },
+      h('b', { text: '견적서 캡처 - ' + (SITE_NAME[site] || '') }),
+      h('div', { class: 'cmp-meta', text: '파란 테두리 안을 그림 파일(PNG)로 저장합니다. 영역: ' + capDescribe(target) }),
+      note ? h('div', { class: 'cmp-msg cmp-warn', style: 'display:block', text: note }) : null,
+      h('div', { class: 'cmp-btns' },
+        h('button', { class: 'cmp-btn cmp-primary', text: '이 영역 저장', onclick: () => save(target) }),
+        h('button', { class: 'cmp-btn', text: '다른 영역 고르기', onclick: () => capPick() }),
+        h('button', { class: 'cmp-btn', text: '전체 페이지 저장', onclick: () => save(document.body) }),
+        h('button', { class: 'cmp-btn', text: '취소', onclick: capClose }))));
+  }
+
+  // 마우스로 영역 고르기: 올리면 파란 테두리, 클릭하면 선택. ↑ 바깥 영역, ↓ 안쪽 영역, Esc 취소
+  function capPick() {
+    if (cap.stopPick) cap.stopPick();
+    const inUi = (n) => !!(n && n.closest && n.closest('#cmp-root'));
+    let hover = cap.target;
+    let stack = [];
+    const info = h('div', { class: 'cmp-meta', text: '' });
+    const show = (el) => {
+      hover = el;
+      cap.view = el;
+      capBoxUpdate();
+      info.textContent = '지금 가리키는 영역: ' + capDescribe(el);
+    };
+    const onMove = (ev) => {
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      if (!el || inUi(el) || el === hover) return;
+      stack = [];
+      show(el);
+    };
+    const block = (ev) => {
+      if (inUi(ev.target)) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+    };
+    const finish = (el) => {
+      stop();
+      cap.target = el || cap.target;
+      capPreview('');
+    };
+    const onClick = (ev) => {
+      if (inUi(ev.target)) return;
+      block(ev);
+      finish(hover || ev.target);
+    };
+    const onKey = (ev) => {
+      if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); finish(cap.target); return; }
+      if (ev.key === 'ArrowUp' && hover && hover.parentElement && hover.parentElement !== document.documentElement) {
+        ev.preventDefault(); stack.push(hover); show(hover.parentElement);
+      } else if (ev.key === 'ArrowDown' && stack.length) {
+        ev.preventDefault(); show(stack.pop());
+      }
+    };
+    const evs = ['mousedown', 'mouseup', 'pointerdown', 'pointerup'];
+    document.addEventListener('mousemove', onMove, true);
+    document.addEventListener('click', onClick, true);
+    document.addEventListener('keydown', onKey, true);
+    evs.forEach((n) => document.addEventListener(n, block, true));
+    const stop = () => {
+      document.removeEventListener('mousemove', onMove, true);
+      document.removeEventListener('click', onClick, true);
+      document.removeEventListener('keydown', onKey, true);
+      evs.forEach((n) => document.removeEventListener(n, block, true));
+      cap.stopPick = null;
+    };
+    cap.stopPick = stop;
+    show(cap.target);
+    capSetBar(h('div', { class: 'cmp-capbar' },
+      h('b', { text: '저장할 영역을 고르세요' }),
+      h('div', { class: 'cmp-meta', text: '마우스를 올려 파란 테두리를 확인하고 클릭하세요. ↑ 키: 바깥 영역, ↓ 키: 안쪽 영역, Esc: 취소(원래 영역으로)' }),
+      info,
+      h('div', { class: 'cmp-btns' }, h('button', { class: 'cmp-btn', text: '고르기 취소', onclick: () => finish(cap.target) }))));
+  }
+
+  // ---- 그림 만들기 ----
+  // 사이트 이미지는 다른 주소라 그림에 바로 못 넣으므로, 확장 프로그램 기능으로 받아 data 주소로 바꿔 넣는다
+  function gmBlobToDataUrl(url) {
+    return new Promise((resolve) => {
+      if (typeof GM_xmlhttpRequest !== 'function') { resolve(''); return; }
+      let done = false;
+      const fin = (v) => { if (!done) { done = true; resolve(v); } };
+      try {
+        GM_xmlhttpRequest({
+          method: 'GET', url, responseType: 'blob', timeout: 20000,
+          onload: (r) => {
+            try {
+              if ((r.status && r.status >= 400) || !r.response) { fin(''); return; }
+              const fr = new FileReader();
+              fr.onload = () => fin(String(fr.result || ''));
+              fr.onerror = () => fin('');
+              fr.readAsDataURL(r.response);
+            } catch (e) { fin(''); }
+          },
+          onerror: () => fin(''),
+          ontimeout: () => fin(''),
+          onabort: () => fin(''),
+        });
+      } catch (e) { fin(''); }
+    });
+  }
+  // 늦게 불러오는(lazy) 이미지가 로드되도록 영역을 위에서 아래로 훑어 내려간다
+  async function capLoadLazy(target) {
+    const r = target.getBoundingClientRect();
+    const top = r.top + window.scrollY;
+    const step = Math.max(300, Math.floor(window.innerHeight * 0.8));
+    let n = 0;
+    for (let y = top; y < top + r.height && n < 40; y += step, n++) {
+      window.scrollTo(0, y);
+      await sleep(220);
+    }
+    window.scrollTo(0, 0);
+    await sleep(300);
+  }
+  const restoreAttr = (el, name, v) => { if (v == null) el.removeAttribute(name); else el.setAttribute(name, v); };
+  // 영역 안의 이미지(img, 배경 그림)를 data 주소로 바꾼다. 원래대로 돌리는 함수들을 restores에 쌓는다. 못 받은 개수를 돌려준다
+  async function capInlineImages(target, restores) {
+    const imgRecs = [];
+    $$('img', target).forEach((img) => {
+      if (img.closest('#cmp-root')) return;
+      const url = capAbsUrl(img.currentSrc || img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-original') || '');
+      if (url) imgRecs.push({ img, url });
+    });
+    const bgRecs = [];
+    const re = /url\((['"]?)(.*?)\1\)/g;
+    $$('*', target).slice(0, 4000).forEach((el) => {
+      try {
+        if (el.closest('#cmp-root')) return;
+        const bg = getComputedStyle(el).backgroundImage;
+        if (!bg || bg === 'none' || bg.indexOf('url(') < 0) return;
+        const urls = [];
+        bg.replace(re, (m, q, u) => { const a = capAbsUrl(u); if (a) urls.push(a); return m; });
+        if (urls.length) bgRecs.push({ el, bg });
+      } catch (e) { /* 무시 */ }
+    });
+    const all = [];
+    imgRecs.forEach((r) => all.push(r.url));
+    bgRecs.forEach((r) => r.bg.replace(re, (m, q, u) => { const a = capAbsUrl(u); if (a) all.push(a); return m; }));
+    const uniq = Array.from(new Set(all));
+    const map = new Map();
+    let done = 0;
+    let failed = 0;
+    let next = 0;
+    if (uniq.length) capToast('이미지 불러오는 중 0/' + uniq.length + '…', 'info', true);
+    const worker = async () => {
+      while (next < uniq.length) {
+        const u = uniq[next++];
+        const d = await gmBlobToDataUrl(u);
+        if (d && d.indexOf('data:') === 0) map.set(u, d); else failed++;
+        done++;
+        capToast('이미지 불러오는 중 ' + done + '/' + uniq.length + '…', 'info', true);
+      }
+    };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+
+    const replaced = [];
+    imgRecs.forEach(({ img, url }) => {
+      const d = map.get(url);
+      if (!d) return;
+      const o = { src: img.getAttribute('src'), srcset: img.getAttribute('srcset'), sizes: img.getAttribute('sizes'), loading: img.getAttribute('loading') };
+      const pic = img.parentElement && img.parentElement.tagName === 'PICTURE' ? img.parentElement : null;
+      const srcs = pic ? $$('source', pic).map((sc) => ({ sc, srcset: sc.getAttribute('srcset') })) : [];
+      img.removeAttribute('srcset');
+      img.removeAttribute('sizes');
+      img.removeAttribute('loading');
+      srcs.forEach((x) => x.sc.removeAttribute('srcset'));
+      img.setAttribute('src', d);
+      replaced.push(img);
+      restores.push(() => {
+        restoreAttr(img, 'src', o.src);
+        restoreAttr(img, 'srcset', o.srcset);
+        restoreAttr(img, 'sizes', o.sizes);
+        restoreAttr(img, 'loading', o.loading);
+        srcs.forEach((x) => restoreAttr(x.sc, 'srcset', x.srcset));
+      });
+    });
+    bgRecs.forEach(({ el, bg }) => {
+      let changed = false;
+      const nb = bg.replace(re, (m, q, u) => {
+        const d = map.get(capAbsUrl(u));
+        if (d) { changed = true; return 'url("' + d + '")'; }
+        return m;
+      });
+      if (!changed) return;
+      const oVal = el.style.getPropertyValue('background-image');
+      const oPri = el.style.getPropertyPriority('background-image');
+      el.style.setProperty('background-image', nb, 'important');
+      restores.push(() => { if (oVal) el.style.setProperty('background-image', oVal, oPri); else el.style.removeProperty('background-image'); });
+    });
+    await Promise.all(replaced.slice(0, 300).map((img) => Promise.race([img.decode ? img.decode().catch(() => {}) : Promise.resolve(), sleep(2500)])));
+    return failed;
+  }
+  function capDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { try { a.remove(); URL.revokeObjectURL(url); } catch (e) { /* 무시 */ } }, 15000);
+  }
+  async function capSave(target, site) {
+    if (cap.busy) { capToast('이미 저장하는 중입니다', 'info'); return; }
+    cap.busy = true;
+    const restores = [];
+    try {
+      const H2I = getH2I();
+      if (!H2I || typeof H2I.toBlob !== 'function') throw new Error('이미지 저장 도구(html-to-image)를 불러오지 못했습니다. 스크립트를 다시 설치(업데이트)해 주세요');
+      if (!target || !target.isConnected) throw new Error('저장할 영역이 화면에서 사라졌습니다. 다시 시도하세요');
+      capToast('화면을 불러오는 중…', 'info', true);
+      await capLoadLazy(target);
+      const failed = await capInlineImages(target, restores);
+      capToast('그리는 중…', 'info', true);
+      window.scrollTo(0, 0);
+      await sleep(200);
+      const rect = target.getBoundingClientRect();
+      const ratio = Math.min(rect.height > 6000 ? 1 : 1.5, 16000 / Math.max(rect.height, rect.width, 1));
+      const opts = (pr) => ({
+        pixelRatio: pr, backgroundColor: '#ffffff', skipFonts: true, cacheBust: false,
+        filter: (node) => !(node.id === 'cmp-root' || (node.closest && node.closest('#cmp-root'))),
+      });
+      let blob = null;
+      try {
+        blob = await H2I.toBlob(target, opts(ratio));
+      } catch (e1) {
+        if (ratio > 1) blob = await H2I.toBlob(target, opts(1)); else throw e1;
+      }
+      if (!blob) throw new Error('그림을 만들지 못했습니다(영역이 너무 크거나 비어 있을 수 있습니다)');
+      const fname = (SITE_NAME[site] || '장바구니') + '_비교견적_' + ymd() + '.png';
+      capDownload(blob, fname);
+      capToast('저장했습니다: ' + fname + (failed ? ' (이미지 ' + failed + '개는 불러오지 못해 빠졌을 수 있습니다)' : ''), 'ok');
+    } catch (e) {
+      capToast('견적서 저장 중 오류: ' + errMsg(e), 'err');
+    } finally {
+      restores.reverse().forEach((fn) => { try { fn(); } catch (e2) { /* 무시 */ } });
+      cap.busy = false;
+    }
+  }
+
+  // "견적서 캡처" 버튼 / 요약의 "…장바구니 열고 캡처"(주소에 #cmp-capture)
+  function capStart(site) {
+    try {
+      if (cap.busy) { capToast('이미 저장하는 중입니다', 'info'); return; }
+      capClose();
+      cap.site = site;
+      const d = capDetect(site);
+      cap.target = d.el;
+      capPreview(d.found ? '' : '영역을 좁히지 못해 전체 화면을 골랐습니다. 필요하면 "다른 영역 고르기"로 직접 고르세요.');
+    } catch (e) {
+      capToast('견적서 캡처를 시작하지 못했습니다: ' + errMsg(e), 'err');
+    }
+  }
+  function capMaybeAuto(pg) {
+    try {
+      if (ui.capAuto || location.hash.indexOf('cmp-capture') < 0) return;
+      ui.capAuto = true;
+      (async () => {
+        capToast('장바구니가 모두 보일 때까지 기다리는 중…', 'info', true);
+        await waitFor(() => capCartLinks(pg.site).length > 0, 25000, 600);
+        await sleep(1200);
+        const t = $('#cmp-cap-toast', capHost());
+        if (t) t.style.display = 'none';
+        capStart(pg.site);
+      })().catch((e) => { capToast('견적서 캡처를 시작하지 못했습니다: ' + errMsg(e), 'err'); });
+    } catch (e) { /* 무시 */ }
   }
 
   // ------------------------------------------------------------------
