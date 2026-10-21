@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         쿠팡 비교견적 도우미
 // @namespace    https://handscil01-afk.github.io/Sungmo/
-// @version      2.0.2
+// @version      2.0.3
 // @description  쿠팡 장바구니 물품을 11번가·G마켓에서 개당 가격으로 비교해, 쿠팡보다 비싼 비교견적용 상품을 장바구니에 담습니다
 // @match        https://cart.coupang.com/*
 // @match        https://search.11st.co.kr/*
@@ -284,7 +284,9 @@
   // ---- 후보 계산 ----
   // item: {packUnit, needUnits, cpUnitPrice}. rel: higher(쿠팡보다 비쌈) / same / lower(쌈) / unknown
   function evalCandidate(c, item) {
-    const pack = parsePack(c.title, item.packUnit);
+    let pack = parsePack(c.title, item.packUnit);
+    // 쿠팡 상품에도 개수 표기가 없었다면(낱개 상품) 후보도 1개짜리로 본다
+    if (!pack && !item.packExplicit && item.packN === 1) pack = { n: 1, unit: item.packUnit, assumed: true };
     const conv = pack ? convertPack(pack, item.packUnit) : null;
     const cpu = item.cpUnitPrice || 0;
     const o = Object.assign({}, c, { pack, conv, unitPrice: null, bundles: null, estTotal: null, diffPct: null, rel: 'unknown' });
@@ -1576,7 +1578,8 @@
       lines.push(priceLine);
       // 묶음 표시
       let packLine;
-      if (c.conv) packLine = '묶음 ' + (c.conv.conv ? packText(c.conv.n, item.packUnit) + '(환산)' : packText(c.pack.n, c.pack.unit));
+      if (c.conv && c.pack && c.pack.assumed) packLine = '낱개로 봄(상품명에 개수 없음)';
+      else if (c.conv) packLine = '묶음 ' + (c.conv.conv ? packText(c.conv.n, item.packUnit) + '(환산)' : packText(c.pack.n, c.pack.unit));
       else if (c.pack) packLine = '묶음 ' + packText(c.pack.n, c.pack.unit) + ' · 단위 다름';
       else packLine = '묶음 개수 확인 필요';
       const s1 = h('div', { class: 'cmp-cand-s' }, packLine);
@@ -1718,6 +1721,7 @@
       let from = '선택 옵션';
       if (!p) { p = parsePack(api.title(), item.packUnit); from = '상품명'; }
       if (!p && pc0 && pc0.packN) { p = { n: pc0.packN, unit: pc0.packUnit || '개' }; from = '검색 결과'; }
+      if (!p && !item.packExplicit && item.packN === 1) { p = { n: 1, unit: item.packUnit }; from = '낱개로 봄'; }
       // 옵션 글자와 상품명의 묶음 개수가 다르면 알려 준다(예: 상품명 10쌍, 옵션 2개1세트)
       let alt = null;
       if (p && from === '선택 옵션') {
