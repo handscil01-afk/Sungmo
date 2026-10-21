@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         쿠팡 비교견적 도우미
 // @namespace    https://handscil01-afk.github.io/Sungmo/
-// @version      2.0.0
+// @version      2.0.1
 // @description  쿠팡 장바구니 물품을 11번가·G마켓에서 개당 가격으로 비교해, 쿠팡보다 비싼 비교견적용 상품을 장바구니에 담습니다
 // @match        https://cart.coupang.com/*
 // @match        https://search.11st.co.kr/*
@@ -87,7 +87,9 @@
   }
 
   // 상품명·옵션에서 묶음 개수를 읽는다. 못 읽으면 null
-  function parsePack(text) {
+  // preferUnit: 쿠팡 상품의 단위. 같은 단위(쌍↔켤레 포함) 표기가 있으면 그것을 우선한다(예: '10쌍 … 180개' → 10쌍)
+  function perLabel(unit) { return (unit && unit !== '개' ? unit : '개') + '당'; }
+  function parsePack(text, preferUnit) {
     const t = String(text == null ? '' : text);
     if (!t.trim()) return null;
     let m;
@@ -115,7 +117,9 @@
     }
     if (!toks.length) return null;
     const nonSet = toks.filter((x) => x.unit !== '세트');
-    const pool = nonSet.length ? nonSet : toks;
+    const pairLike = (u) => u === '쌍' || u === '켤레';
+    const same = preferUnit ? nonSet.filter((x) => x.unit === preferUnit || (pairLike(x.unit) && pairLike(preferUnit))) : [];
+    const pool = same.length ? same : (nonSet.length ? nonSet : toks);
     let best = pool[0];
     pool.forEach((x) => { if (x.n > best.n) best = x; });
     return { n: best.n, unit: best.unit };
@@ -247,7 +251,7 @@
     target.colors.forEach((g) => { if (cg.has(g)) score += 10; });
     const sg = sizesOf(t);
     target.sizes.forEach((s) => { if (sg.has(s)) score += 8; });
-    const pk = parsePack(t);
+    const pk = parsePack(t, target.pack ? target.pack.unit : '');
     if (pk && target.pack) {
       const c = convertPack(pk, target.pack.unit);
       if (c) {
@@ -280,7 +284,7 @@
   // ---- 후보 계산 ----
   // item: {packUnit, needUnits, cpUnitPrice}. rel: higher(쿠팡보다 비쌈) / same / lower(쌈) / unknown
   function evalCandidate(c, item) {
-    const pack = parsePack(c.title);
+    const pack = parsePack(c.title, item.packUnit);
     const conv = pack ? convertPack(pack, item.packUnit) : null;
     const cpu = item.cpUnitPrice || 0;
     const o = Object.assign({}, c, { pack, conv, unitPrice: null, bundles: null, estTotal: null, diffPct: null, rel: 'unknown' });
@@ -1495,7 +1499,7 @@
         h('button', { class: 'cmp-btn cmp-small', text: '접기', onclick: () => { uiPref.collapsed = true; saveUi(); renderAll(); } }))));
     panel.appendChild(h('div', { class: 'cmp-name cmp-clamp2', text: item.name + (item.option ? ' (' + item.option + ')' : '') }));
     panel.appendChild(h('div', { class: 'cmp-meta', text:
-      '필요 ' + packText(item.needUnits, item.packUnit) + ' (' + packText(item.packN, item.packUnit) + ' × ' + item.qty + ') · 쿠팡 ' + fmt(item.cpTotal) + '원 · 개당 ' + (item.cpUnitPrice ? fmtP(item.cpUnitPrice) + '원' : '-') }));
+      '필요 ' + packText(item.needUnits, item.packUnit) + ' (' + packText(item.packN, item.packUnit) + ' × ' + item.qty + ') · 쿠팡 ' + fmt(item.cpTotal) + '원 · ' + perLabel(item.packUnit) + ' ' + (item.cpUnitPrice ? fmtP(item.cpUnitPrice) + '원' : '-') }));
     panel.appendChild(msg);
 
     try {
@@ -1578,7 +1582,7 @@
       const s1 = h('div', { class: 'cmp-cand-s' }, packLine);
       lines.push(s1);
       if (c.unitPrice != null) {
-        const s2 = h('div', { class: 'cmp-cand-s' }, h('b', { text: '개당 ' + fmtP(c.unitPrice) + '원' }));
+        const s2 = h('div', { class: 'cmp-cand-s' }, h('b', { text: perLabel(item.packUnit) + ' ' + fmtP(c.unitPrice) + '원' }));
         if (c.diffPct != null) {
           const d = Math.round(c.diffPct * 10) / 10;
           s2.appendChild(document.createTextNode(' (쿠팡 대비 '));
@@ -1710,9 +1714,9 @@
     const statusEl = h('div', { class: 'cmp-status', text: '옵션을 확인하는 중…' });
 
     const detectPack = () => {
-      let p = parsePack(api.options());
+      let p = parsePack(api.options(), item.packUnit);
       let from = '선택 옵션';
-      if (!p) { p = parsePack(api.title()); from = '상품명'; }
+      if (!p) { p = parsePack(api.title(), item.packUnit); from = '상품명'; }
       if (!p && pc0 && pc0.packN) { p = { n: pc0.packN, unit: pc0.packUnit || '개' }; from = '검색 결과'; }
       return p ? { packN: p.n, packUnit: p.unit, from } : null;
     };
@@ -1784,7 +1788,7 @@
       row('묶음 개수', packInput, unitSel, h('button', { class: 'cmp-btn cmp-small', text: '수량 다시 맞추기', onclick: guard(() => fit()) })),
       row('넣은 수량', qtyEl, ' / 필요 ', needEl, '묶음'),
       row('총액', totEl),
-      row('개당 가격', unitPriceEl, ' / 쿠팡 ', cpUnitEl),
+      row(perLabel(item.packUnit) + ' 가격', unitPriceEl, ' / 쿠팡 ', cpUnitEl),
       statusEl));
 
     const doneBox = h('div', { class: 'cmp-donebox' });
