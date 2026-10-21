@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>쿠팡 비교견적 도우미</title>
+<meta name="description" content="쿠팡 장바구니 물품을 11번가·G마켓에서 찾아 비교견적용 장바구니에 담는 템퍼몽키 스크립트 설치 안내">
+<style>
+  :root{--bg:#f5f7fb;--card:#fff;--ink:#1f2937;--sub:#4b5563;--line:#e5e7eb;--pri:#2563eb;--ok:#16a34a;--warn:#b45309;--warnbg:#fffbeb}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0f172a;--card:#1e293b;--ink:#e5e7eb;--sub:#94a3b8;--line:#334155;--pri:#60a5fa;--ok:#4ade80;--warn:#fbbf24;--warnbg:#3b2f12}}
+  :root[data-theme="dark"]{--bg:#0f172a;--card:#1e293b;--ink:#e5e7eb;--sub:#94a3b8;--line:#334155;--pri:#60a5fa;--ok:#4ade80;--warn:#fbbf24;--warnbg:#3b2f12}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;line-height:1.6}
+  main{max-width:860px;margin:0 auto;padding:24px 16px 48px}
+  h1{font-size:26px;margin:0 0 4px}
+  .lead{color:var(--sub);margin:0 0 20px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media (max-width:720px){.grid{grid-template-columns:1fr}}
+  section{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+  h2{font-size:18px;margin:0 0 10px}
+  ol{margin:0;padding-left:22px}
+  li{margin:4px 0}
+  .install{display:inline-block;margin:6px 0 4px;padding:12px 22px;border-radius:10px;background:var(--pri);color:#fff;font-weight:700;text-decoration:none;font-size:17px}
+  .note{background:var(--warnbg);border-color:var(--warn);margin-top:16px}
+  .note h2{color:var(--warn)}
+  code{background:rgba(127,127,127,.15);padding:1px 6px;border-radius:5px}
+  a{color:var(--pri)}
+</style>
+</head>
+<body>
+<main>
+  <h1>쿠팡 비교견적 도우미</h1>
+  <p class="lead">쿠팡 장바구니에 담은 물품을 11번가와 G마켓에서 차례로 찾아 장바구니에 담고, 세 곳의 금액을 비교표로 정리합니다. PC 크롬의 템퍼몽키에서 동작합니다.</p>
+
+  <div class="grid">
+    <section>
+      <h2>설치하기 (처음 한 번)</h2>
+      <ol>
+        <li>크롬에 템퍼몽키(Tampermonkey) 확장 프로그램을 설치합니다.</li>
+        <li>크롬 주소창에 <code>chrome://extensions</code>를 입력하고, 템퍼몽키의 <b>세부정보</b>에서 <b>사용자 스크립트 허용</b>을 켭니다.</li>
+        <li>아래 버튼을 누르고, 템퍼몽키 화면에서 <b>설치</b>를 누릅니다.</li>
+      </ol>
+      <a class="install" href="coupang-compare.user.js">스크립트 설치하기</a>
+      <p style="margin:6px 0 0;color:var(--sub);font-size:14px">새 버전을 올리면 템퍼몽키가 자동으로 업데이트합니다.</p>
+    </section>
+
+    <section>
+      <h2>사용 순서</h2>
+      <ol>
+        <li>쿠팡 장바구니에 살 물품을 담고 장바구니 화면을 엽니다.</li>
+        <li>오른쪽 아래 <b>비교견적 시작</b>을 누르고, 견적에 넣을 물품과 검색어를 확인합니다.</li>
+        <li>11번가 검색 화면 오른쪽 패널의 후보 중 하나를 고릅니다.</li>
+        <li>상품 화면에서 옵션을 직접 고르고 <b>수량 맞추기</b> → <b>장바구니 담고 기록</b>을 누른 뒤 <b>다음 상품</b>으로 넘어갑니다.</li>
+        <li>11번가가 끝나면 G마켓에서 같은 순서로 진행합니다.</li>
+        <li>마지막 <b>요약</b>에서 표를 복사하고, 세 곳의 장바구니 화면을 캡처해 견적서로 씁니다.</li>
+      </ol>
+    </section>
+  </div>
+
+  <section class="note">
+    <h2>알아 둘 점</h2>
+    <ol>
+      <li>이 스크립트는 장바구니에 담기까지만 합니다. 구매하기·결제·선물하기 버튼은 누르지 않습니다.</li>
+      <li>상품과 옵션(색상·사이즈)은 직접 고릅니다. 옵션이 여러 개면 수량도 직접 나눠 입력합니다.</li>
+      <li>G마켓에서 '사람인지 확인' 화면이 나오면 직접 눌러 통과한 뒤 계속하면 됩니다.</li>
+      <li>쇼핑몰 화면 구조가 바뀌면 일부 기능이 멈출 수 있습니다. 그때는 수정한 버전을 다시 올립니다.</li>
+    </ol>
+  </section>
+</main>
+</body>
+</html>

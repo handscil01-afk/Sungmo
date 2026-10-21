@@ -8,6 +8,7 @@
 - DICEBOUND 운명의 주사위: https://handscil01-afk.github.io/Sungmo/dicebound/
 - 다과비 계산기: https://handscil01-afk.github.io/Sungmo/snack-calc/
 - 명찰 만들기: https://handscil01-afk.github.io/Sungmo/name-badge/
+- 쿠팡 비교견적 도우미(PC 크롬 템퍼몽키): https://handscil01-afk.github.io/Sungmo/coupang-compare/
 
 각 앱은 따로 홈 화면에 설치해서 따로 실행할 수 있습니다. `main` 브랜치에 올린 내용이 몇 분 안에 사이트에 반영됩니다.
 
@@ -149,3 +150,7 @@
 - 인쇄: A4 세로·가로 자동 선택, 양면(긴 쪽·짧은 쪽 넘김) 뒷면 반전 배치, 앞뒤 어긋남 보정, 재단 점선·눈금.
 - 이름·연락처는 브라우저에 저장하지 않고 “명단 파일(.json)”로 저장·불러옵니다. 문구·색·크기·로고 같은 설정은 자동 저장되고 “설정 파일(.json)”로도 저장·불러올 수 있습니다.
 - 홈 화면 설치·전체화면·오프라인 실행을 지원합니다.
+
+## 쿠팡 비교견적 도우미 (`coupang-compare/`)
+
+물품구입비 기안의 비교견적을 만들 때 쓰는 PC 크롬 템퍼몽키 스크립트입니다. 쿠팡 장바구니 물품을 기준으로 11번가·G마켓 검색 결과의 후보를 보여 주고, 사용자가 상품과 옵션을 고르면 수량을 맞춰 장바구니에 담고 금액을 기록합니다. 마지막에 세 쇼핑몰 금액 비교표를 복사할 수 있습니다. 구매·결제 버튼은 누르지 않습니다. 홈 화면 설치용 앱이 아니라서 설치 안내 페이지(`index.html`)와 스크립트(`coupang-compare.user.js`)만 둡니다.
