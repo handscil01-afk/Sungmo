@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         쿠팡 비교견적 도우미
 // @namespace    https://handscil01-afk.github.io/Sungmo/
-// @version      2.0.1
+// @version      2.0.2
 // @description  쿠팡 장바구니 물품을 11번가·G마켓에서 개당 가격으로 비교해, 쿠팡보다 비싼 비교견적용 상품을 장바구니에 담습니다
 // @match        https://cart.coupang.com/*
 // @match        https://search.11st.co.kr/*
@@ -1718,16 +1718,24 @@
       let from = '선택 옵션';
       if (!p) { p = parsePack(api.title(), item.packUnit); from = '상품명'; }
       if (!p && pc0 && pc0.packN) { p = { n: pc0.packN, unit: pc0.packUnit || '개' }; from = '검색 결과'; }
-      return p ? { packN: p.n, packUnit: p.unit, from } : null;
+      // 옵션 글자와 상품명의 묶음 개수가 다르면 알려 준다(예: 상품명 10쌍, 옵션 2개1세트)
+      let alt = null;
+      if (p && from === '선택 옵션') {
+        const tp = parsePack(api.title(), item.packUnit);
+        const a = convertPack(p, item.packUnit);
+        const b = tp ? convertPack(tp, item.packUnit) : null;
+        if (tp && a && b && Math.abs(a.n - b.n) > 1e-9) alt = { packN: tp.n, packUnit: tp.unit };
+      }
+      return p ? { packN: p.n, packUnit: p.unit, from, alt } : null;
     };
     const applyPack = (d) => {
       if (ps.manual) return;
       if (d) {
-        ps.packN = d.packN; ps.packUnit = d.packUnit; ps.from = d.from;
+        ps.packN = d.packN; ps.packUnit = d.packUnit; ps.from = d.from; ps.alt = d.alt || null;
         if (document.activeElement !== packInput) packInput.value = String(d.packN);
         unitSel.value = d.packUnit;
       } else {
-        ps.packN = null; ps.packUnit = item.packUnit; ps.from = '';
+        ps.packN = null; ps.packUnit = item.packUnit; ps.from = ''; ps.alt = null;
         if (document.activeElement !== packInput) packInput.value = '';
         unitSel.value = item.packUnit;
       }
@@ -1779,9 +1787,23 @@
         }
         statusEl.textContent = t;
         statusEl.className = cls;
+        if (ps.alt && !ps.manual) {
+          altEl.style.display = 'block';
+          altTxt.textContent = '상품명에는 ' + packText(ps.alt.packN, ps.alt.packUnit) + ', 옵션에는 ' + packText(ps.packN, ps.packUnit) + '로 적혀 있습니다. 실제 묶음 개수를 확인하세요. ';
+        } else {
+          altEl.style.display = 'none';
+        }
       } catch (e) { /* 무시 */ }
     };
 
+    const altTxt = h('span');
+    const altEl = h('div', { class: 'cmp-msg cmp-warn', style: 'display:none' }, altTxt,
+      h('button', { class: 'cmp-btn cmp-small', text: '상품명 개수로 바꾸기', onclick: guard(() => {
+        if (!ps.alt) return;
+        ps.manual = true; ps.packN = ps.alt.packN; ps.packUnit = ps.alt.packUnit; ps.from = '상품명';
+        packInput.value = String(ps.packN); unitSel.value = ps.packUnit; ps.alt = null;
+        fit(); live();
+      }) }));
     const row = (k, ...nodes) => h('div', { class: 'cmp-lr' }, h('span', { class: 'cmp-lk', text: k }), nodes);
     panel.appendChild(h('div', { class: 'cmp-live' },
       row('선택 옵션', optEl),
@@ -1789,7 +1811,7 @@
       row('넣은 수량', qtyEl, ' / 필요 ', needEl, '묶음'),
       row('총액', totEl),
       row(perLabel(item.packUnit) + ' 가격', unitPriceEl, ' / 쿠팡 ', cpUnitEl),
-      statusEl));
+      statusEl, altEl));
 
     const doneBox = h('div', { class: 'cmp-donebox' });
     const doneMsg = h('div', { class: 'cmp-msg cmp-ok', style: 'display:block', text: '기록했습니다' });
@@ -1850,7 +1872,7 @@
       if (!L.inputs.length && api.hasOptionSelectors()) { setMsg('옵션을 먼저 고르세요', 'warn'); return; }
       const warns = [];
       if (L.qty !== L.need) warns.push('수량이 ' + L.qty + '개입니다(필요 ' + L.need + '묶음)');
-      if (L.unitPrice != null && cpu && L.unitPrice <= cpu + 1e-9) warns.push('개당 가격이 쿠팡 이하입니다(비교견적은 쿠팡보다 비싸야 합니다)');
+      if (L.unitPrice != null && cpu && L.unitPrice <= cpu + 1e-9) warns.push(perLabel(item.packUnit) + ' 가격이 쿠팡 이하입니다(비교견적은 쿠팡보다 비싸야 합니다)');
       const sig = L.qty + '|' + L.total + '|' + ps.packN + ps.packUnit;
       if (warns.length && ackSig !== sig) {
         ackSig = sig;
