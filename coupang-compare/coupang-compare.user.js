@@ -2748,6 +2748,15 @@
       capToast('화면을 불러오는 중…', 'info', true);
       await capLoadLazy(target);
       const failed = await capInlineImages(target, restores);
+      // 영역 안 첫·끝 요소의 바깥 여백이 영역 밖으로 합쳐져 있으면 그림에서 아래가 잘리므로, 일반 블록이면 잠시 여백을 가두는 상자(flow-root)로 만든다
+      try {
+        if (getComputedStyle(target).display === 'block') {
+          const oVal = target.style.getPropertyValue('display');
+          const oPri = target.style.getPropertyPriority('display');
+          target.style.setProperty('display', 'flow-root', 'important');
+          restores.push(() => { if (oVal) target.style.setProperty('display', oVal, oPri); else target.style.removeProperty('display'); });
+        }
+      } catch (e) { /* 무시 */ }
       capToast('그리는 중…', 'info', true);
       window.scrollTo(0, 0);
       await sleep(200);
