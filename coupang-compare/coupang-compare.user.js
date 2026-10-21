@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         쿠팡 비교견적 도우미
 // @namespace    https://handscil01-afk.github.io/Sungmo/
-// @version      1.0.0
+// @version      1.0.1
 // @description  쿠팡 장바구니 물품을 11번가·G마켓에서 찾아 비교견적용 장바구니에 담습니다
 // @match        https://cart.coupang.com/*
 // @match        https://search.11st.co.kr/*
@@ -150,11 +150,16 @@
   function saveState(s) { GM_setValue(KEY, JSON.stringify(s)); }
   function clearState() { GM_setValue(KEY, ''); }
 
-  const uiPref = { collapsed: false };
+  // side: 검색 화면은 오른쪽 위, 상품 화면은 사이트의 옵션 영역을 가리지 않게 왼쪽 아래가 기본
+  const uiPref = { collapsed: false, side: { search: 'right', product: 'left' } };
   function loadUi() {
     try {
       const v = GM_getValue(UIKEY, '');
-      if (v) Object.assign(uiPref, typeof v === 'string' ? JSON.parse(v) : v);
+      if (v) {
+        const o = typeof v === 'string' ? JSON.parse(v) : v;
+        if (o && typeof o.collapsed === 'boolean') uiPref.collapsed = o.collapsed;
+        if (o && o.side) Object.assign(uiPref.side, o.side);
+      }
     } catch (e) { /* 무시 */ }
   }
   function saveUi() { try { GM_setValue(UIKEY, JSON.stringify(uiPref)); } catch (e) { /* 무시 */ } }
@@ -363,7 +368,8 @@
         const m = location.pathname.match(/\/products\/(\d+)/);
         return m ? 'https://www.11st.co.kr/products/' + m[1] : location.origin + location.pathname;
       },
-      rows() { return $$('li.option_item').filter(visible); },
+      // 상품 화면의 옵션 목록(선택하기 버튼)도 li.option_item이므로, 수량 칸이 있는 '선택한 옵션' 줄만 센다
+      rows() { return $$('li.option_item').filter((r) => visible(r) && r.querySelector('input[name="prdcAmount"]')); },
       qtyInputs() { return $$('input[name="prdcAmount"], input[title="수량설정"]').filter(visible); },
       qtyKey: false,
       options() {
@@ -376,7 +382,7 @@
           this.rows().forEach((r) => {
             const qi = $('input[name="prdcAmount"]', r);
             const q = qi ? parseInt(qi.value, 10) || 1 : 1;
-            n += (parseInt(r.getAttribute('data-price'), 10) || 0) * q;
+            n += num(r.getAttribute('data-price')) * q;
           });
         }
         return n;
@@ -519,6 +525,7 @@
 #cmp-root .cmp-pill { position: fixed; right: 12px; bottom: 16px; z-index: 2147483600; min-height: 36px; padding: 6px 14px; border-radius: 18px; border: none; background: #2563eb; color: #fff; font-weight: 700; box-shadow: 0 4px 14px rgba(0,0,0,.3); cursor: pointer; }
 
 #cmp-root #cmp-panel { position: fixed; top: 12px; right: 12px; width: 340px; max-width: calc(100vw - 24px); max-height: 80vh; display: flex; flex-direction: column; gap: 8px; padding: 12px; background: #fff; color: #111827; border: 1px solid #d1d5db; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,.28); z-index: 2147483600; font-size: 14px; line-height: 1.4; overflow: hidden; }
+#cmp-root #cmp-panel.cmp-left { right: auto; left: 12px; top: auto; bottom: 12px; }
 #cmp-root .cmp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 #cmp-root .cmp-title { font-size: 15px; color: #1e3a8a; }
 #cmp-root .cmp-name { font-weight: 700; font-size: 14px; }
@@ -844,7 +851,9 @@
 
   function renderPanel(dock, state, pg, isSearch) {
     const item = state.items[state.idx];
-    const panel = h('div', { id: 'cmp-panel' });
+    const kindKey = isSearch ? 'search' : 'product';
+    const side = uiPref.side[kindKey] === 'left' ? 'left' : 'right';
+    const panel = h('div', { id: 'cmp-panel', class: side === 'left' ? 'cmp-left' : '' });
     const msg = h('div', { class: 'cmp-msg', id: 'cmp-msg' });
     const setMsg = (t, kind) => {
       msg.textContent = t || '';
@@ -857,7 +866,9 @@
 
     panel.appendChild(h('div', { class: 'cmp-head' },
       h('b', { class: 'cmp-title', text: SITE_NAME[state.site] + ' 비교견적 ' + (state.idx + 1) + '/' + state.items.length + (state.redo ? ' (다시 고르기)' : '') }),
-      h('button', { class: 'cmp-btn cmp-small', text: '접기', onclick: () => { uiPref.collapsed = true; saveUi(); renderAll(); } })));
+      h('span', { class: 'cmp-row2' },
+        h('button', { class: 'cmp-btn cmp-small', text: side === 'left' ? '오른쪽으로 ▶' : '◀ 왼쪽으로', title: '패널이 사이트 화면을 가리면 반대쪽으로 옮기세요', onclick: () => { uiPref.side[kindKey] = side === 'left' ? 'right' : 'left'; saveUi(); renderAll(); } }),
+        h('button', { class: 'cmp-btn cmp-small', text: '접기', onclick: () => { uiPref.collapsed = true; saveUi(); renderAll(); } }))));
     panel.appendChild(h('div', { class: 'cmp-name cmp-clamp2', text: item.name + (item.option ? ' (' + item.option + ')' : '') }));
     panel.appendChild(h('div', { class: 'cmp-meta', text: '필요 수량 ' + fmt(item.qty) + '개 · 쿠팡 ' + fmt(item.cpTotal) + '원' }));
     panel.appendChild(msg);
