@@ -435,9 +435,9 @@
     var apH = at.H + 566, FILL = 1760;
     // 결재 표가 쪽 아래쪽에 앉도록 빈 줄을 채운다 (안 들어가면 다음 쪽)
     var room = PAGE_H - apH - fl.y;
-    if (room >= 0) for (var k = Math.floor(room / FILL); k > 0; k--) fl.text({ pp: 0, cp: 9, text: '' });
+    if (fl.page === 1 && room >= 0) for (var k = Math.floor(room / FILL); k > 0; k--) fl.text({ pp: 0, cp: 9, text: '' });
     var r2 = fl.place(function (c) { return { xml: tblParaXml({ pp: 0, cp: 9, id: '0', tbl: apTbl, v: c.v, vs: apH, sp: 660, pageBreak: c.pb }), ext: apH, adv: apH + 660 }; });
-    if (r2.moved) W.push('기안: 결재란까지 1쪽에 들어가지 않아 결재란이 다음 쪽으로 넘어갔습니다. (품목이 많음)');
+    if (fl.page > 1) W.push('기안: 내용이 1쪽에 다 들어가지 않아 결재란(또는 붙임)이 2쪽으로 넘어갔습니다. 품목이 많거나 문장이 깁니다.');
   }
 
   // 결재선 이름 줄: 첫 사람은 왼쪽, 마지막 사람은 오른쪽 끝, 가운데는 가운데에 오도록 공백으로 채움
