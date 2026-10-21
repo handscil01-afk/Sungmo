@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         쿠팡 비교견적 도우미
 // @namespace    https://handscil01-afk.github.io/Sungmo/
-// @version      3.0.0
+// @version      3.1.0
 // @description  쿠팡 장바구니 물품을 11번가·G마켓에서 개당 가격으로 비교해, 쿠팡보다 비싼 비교견적용 상품을 장바구니에 담습니다
 // @match        https://cart.coupang.com/*
 // @match        https://search.11st.co.kr/*
@@ -19,13 +19,14 @@
 // @grant        GM_xmlhttpRequest
 // @connect      *
 // @require      https://handscil01-afk.github.io/Sungmo/coupang-compare/vendor/html-to-image.js
+// @require      https://handscil01-afk.github.io/Sungmo/coupang-compare/hwpx-builder.js
 // @run-at       document-idle
 // @updateURL    https://handscil01-afk.github.io/Sungmo/coupang-compare/coupang-compare.user.js
 // @downloadURL  https://handscil01-afk.github.io/Sungmo/coupang-compare/coupang-compare.user.js
 // ==/UserScript==
 
 /*
- * [사용법 - 3.0]
+ * [사용법 - 3.1]
  * 1) 쿠팡 장바구니(cart.coupang.com)에서 오른쪽 아래 "비교견적 시작"을 누릅니다.
  *    물품마다 "품명(깔끔한 이름)", "묶음 개수(예: 24개, 10쌍)", "수량(묶음 수)", "쿠팡 금액", "검색어"가 자동으로 채워집니다. 필요하면 고치세요.
  *    - 품명은 쿠팡 상품명에서 상표·꾸밈말을 뺀 이름입니다(예: "베픽스 충격흡수 군인 무릎 팔꿈치 보호대 세트" -> "무릎 팔꿈치 보호대 세트").
@@ -49,9 +50,16 @@
  *    - 패널 위쪽 "자동 진행 중…" 줄의 빨간 "자동 멈춤" 버튼으로 언제든 멈추고 직접 이어갈 수 있습니다.
  *    - 보안 확인(Cloudflare 등) 화면이 나오면 20초 뒤 안내가 뜹니다. 직접 통과하면 자동으로 이어집니다.
  * 3) 끝나면 쿠팡·11번가·G마켓 비교표(품명·수량·단가·금액)가 나옵니다. "표 복사"로 엑셀·한글에 붙여 넣으세요.
- * 4) 견적서 캡처: 요약의 "쿠팡 장바구니 열고 캡처" 등을 누르면 장바구니가 새 탭으로 열리고, 저장할 영역(파란 테두리)이 표시됩니다.
- *    "이 영역 저장"을 누르면 PNG 그림 파일로 내려받습니다. 영역이 다르면 "다른 영역 고르기"(마우스로 고르기, ↑↓ 키로 바깥/안쪽, Esc 취소)나
- *    "전체 페이지 저장"을 쓰세요. 장바구니 화면 오른쪽 아래 "견적서 캡처" 버튼으로도 언제든 시작할 수 있습니다.
+ * 4) 견적서 캡처: 요약의 "쿠팡 장바구니 열고 캡처" 등을 누르면 장바구니가 새 탭으로 열리고, 저장할 영역이 자동으로 잡혀 어둡게 강조됩니다.
+ *    자동 영역 = "장바구니" 제목부터 마지막 상품 줄까지 + 오른쪽 합계 상자("주문 예상 금액" 등). 아래의 "같이 보면 좋은 상품" 같은 추천은 넣지 않습니다.
+ *    캡처 프로그램처럼 마우스로 고칠 수 있습니다: 어두운 곳을 끌면 새 영역, 안쪽을 끌면 이동, 테두리·모서리를 끌면 크기 변경.
+ *    끌면서 화면 위·아래 끝(60px)으로 가면 자동으로 스크롤되어 화면보다 긴 영역도 잡을 수 있습니다. 크기는 px로 표시됩니다.
+ *    아래 막대: "이 영역 저장"(Enter) / "자동 영역 다시 잡기" / "전체 페이지" / "취소"(Esc).
+ *    저장하면 PNG 그림 파일로 내려받고, 서류 만들기에 쓰도록 사이트별(쿠팡·11번가·G마켓)로 한 장씩 보관합니다(요약의 "견적서 캡처"에서 확인·지우기).
+ *    장바구니 화면 오른쪽 아래 "견적서 캡처" 버튼으로도 언제든 시작할 수 있습니다.
+ * 5) 물품구입비 서류 만들기: 요약의 "물품구입비 서류 만들기(hwpx)"를 누르면 기안 · 산출기초조사서 · 견적서(캡처) · 물품검수조서를 담은 hwpx 한 개를 만듭니다.
+ *    문서번호·제목·일시·장소·대상·지출처·지출일·예산과목·결재란·조사자·검수자 등을 입력하면(다음에도 미리 채워짐) "만들기"로 내려받습니다.
+ *    품목 표(품명·규격·단위·수량·단가·금액)는 비교견적 결과에서 채워지며 고칠 수 있습니다. 서류 파일 제작은 hwpx-builder.js가 맡습니다.
  * ※ 이 스크립트는 구매·주문·결제·선물 버튼을 절대 누르지 않으며, 오직 옵션 "선택하기"와 "장바구니" 버튼만 누릅니다.
  */
 
@@ -422,6 +430,110 @@
     const main = cands.filter((c) => c.rel === 'higher').sort((a, b) => a.unitPrice - b.unitPrice).slice(0, 20);
     const check = cands.filter((c) => c.unitPrice == null && c.price > cpu).sort((a, b) => a.price - b.price).slice(0, 20);
     return { main, check };
+  }
+
+  // ---- 견적서 캡처 영역 / 물품구입비 서류 도우미 (화면(DOM)을 쓰지 않는 순수 함수) ----
+  const pad2 = (n) => (n < 10 ? '0' : '') + n;
+  const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+  function fmtDocDate(d) { return d.getFullYear() + '. ' + (d.getMonth() + 1) + '. ' + d.getDate() + '.'; }
+  function fmtKorDate(d) { return d.getFullYear() + '년 ' + (d.getMonth() + 1) + '월 ' + d.getDate() + '일(' + WEEKDAYS[d.getDay()] + ')'; }
+  function addDaysDate(d, n) {
+    const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    x.setDate(x.getDate() + n);
+    return x;
+  }
+  // '2026. 10. 21.' / '2026년 10월 21일(수)' / '2026-10-21' -> Date (아니면 null)
+  function parseAnyDate(s) {
+    const m = String(s == null ? '' : s).match(/(\d{4})\s*[.\-\/년]\s*(\d{1,2})\s*[.\-\/월]\s*(\d{1,2})/);
+    if (!m) return null;
+    const y = +m[1], mo = +m[2], da = +m[3];
+    const d = new Date(y, mo - 1, da);
+    return d.getFullYear() === y && d.getMonth() === mo - 1 && d.getDate() === da ? d : null;
+  }
+  function mmddOf(s, fallbackDate) {
+    const d = parseAnyDate(s) || fallbackDate || new Date();
+    return pad2(d.getMonth() + 1) + pad2(d.getDate());
+  }
+  function defaultDocNo(d) { return '손잡다' + pad2((d || new Date()).getFullYear() % 100) + '-0000'; }
+  // 기안 첫 문장: "…의 물품구입비를" (제목 끝의 '물품구입비'는 뺀다)
+  function introText(biz, title) {
+    const core = String(title == null ? '' : title).replace(/\s*물품구입비\s*$/, '').trim();
+    const b = String(biz == null ? '' : biz).trim();
+    return b + ' 수행에 있어, ' + (core ? core + '의 ' : '') + '물품구입비를 다음과 같이 지출하고자 하오니 결재 바랍니다.';
+  }
+  // 쿠팡 옵션 -> 규격: free/Free/FREE/프리 낱말을 빼고 쉼표를 정리한다
+  function specFromOption(option) {
+    const s = String(option == null ? '' : option).replace(/(^|[\s,\/(])(free|프리)(?=$|[\s,\/)])/gi, '$1');
+    return s.split(',').map((x) => x.replace(/\s+/g, ' ').trim()).filter(Boolean).join(', ');
+  }
+  // 배송비 글자("3,000원", "무료", "50,000원 이상 무료") -> 숫자
+  function shipNumOf(text) {
+    const t = String(text == null ? '' : text);
+    if (/무료|조건|이상/.test(t)) return 0;
+    const m = t.match(/([\d,]+)\s*원/);
+    return m ? parseInt(m[1].replace(/,/g, ''), 10) || 0 : 0;
+  }
+  function unitPriceOf(total, qty) { return qty > 0 ? Math.round((Number(total) || 0) / qty) : 0; }
+  // 아주 긴 캡처를 읽기 좋게 나누는 조각(세로 비율이 1.45를 넘으면 너비 × 1.41 높이씩)
+  function sliceSpecs(w, h) {
+    if (!(w > 0) || !(h > 0) || h / w <= 1.45) return [{ y: 0, h }];
+    const sh = Math.round(w * 1.41);
+    const out = [];
+    for (let y = 0; y < h; y += sh) out.push({ y, h: Math.min(sh, h - y) });
+    return out;
+  }
+  function attachmentLines(o) {
+    const a = [];
+    if (o && o.survey) a.push('산출기초조사서 1부');
+    if (o && o.quotes > 0) a.push('견적서 ' + o.quotes + '부');
+    if (o && o.inspection) a.push('물품검수조서 1부');
+    return a;
+  }
+  function safeFileName(s) { return String(s == null ? '' : s).replace(/[\\\/:*?"<>|\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+
+  // ---- 사각형 {x, y, w, h} (페이지 좌표) ----
+  const rectOk = (r) => !!r && isFinite(r.x) && isFinite(r.y) && r.w > 0 && r.h > 0;
+  function rectUnion(list) {
+    const rs = (list || []).filter(rectOk);
+    if (!rs.length) return null;
+    let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+    rs.forEach((q) => { l = Math.min(l, q.x); t = Math.min(t, q.y); r = Math.max(r, q.x + q.w); b = Math.max(b, q.y + q.h); });
+    return { x: l, y: t, w: r - l, h: b - t };
+  }
+  function rectPad(r, p) { return { x: r.x - p, y: r.y - p, w: r.w + 2 * p, h: r.h + 2 * p }; }
+  // 바깥은 내림, 안쪽 끝은 올림해서 정수 사각형으로
+  function rectRound(r) {
+    const x0 = Math.floor(r.x), y0 = Math.floor(r.y), x1 = Math.ceil(r.x + r.w), y1 = Math.ceil(r.y + r.h);
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  }
+  // 문서 범위 [0, W] x [0, H]와 겹치는 부분
+  function rectClamp(r, W, H) {
+    const x0 = Math.max(0, Math.min(W, r.x)), y0 = Math.max(0, Math.min(H, r.y));
+    const x1 = Math.max(0, Math.min(W, r.x + r.w)), y1 = Math.max(0, Math.min(H, r.y + r.h));
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  }
+  // 크기는 그대로 두고 문서 안으로 옮긴다
+  function rectShiftInto(r, W, H) {
+    const w = Math.min(r.w, W), h = Math.min(r.h, H);
+    return { x: Math.max(0, Math.min(W - w, r.x)), y: Math.max(0, Math.min(H - h, r.y)), w, h };
+  }
+  function rectFromPoints(x1, y1, x2, y2) {
+    return { x: Math.min(x1, x2), y: Math.min(y1, y2), w: Math.abs(x2 - x1), h: Math.abs(y2 - y1) };
+  }
+  // dir: n s e w ne nw se sw. 최소 크기 min 아래로는 줄지 않는다
+  function rectResize(r, dir, dx, dy, min) {
+    let l = r.x, t = r.y, rt = r.x + r.w, b = r.y + r.h;
+    if (dir.indexOf('w') >= 0) l += dx;
+    if (dir.indexOf('e') >= 0) rt += dx;
+    if (dir.indexOf('n') >= 0) t += dy;
+    if (dir.indexOf('s') >= 0) b += dy;
+    if (rt - l < min) { if (dir.indexOf('w') >= 0) l = rt - min; else rt = l + min; }
+    if (b - t < min) { if (dir.indexOf('n') >= 0) t = b - min; else b = t + min; }
+    return { x: l, y: t, w: rt - l, h: b - t };
+  }
+  function rectContains(outer, inner, tol) {
+    tol = tol || 0;
+    return outer.x <= inner.x + tol && outer.y <= inner.y + tol && outer.x + outer.w >= inner.x + inner.w - tol && outer.y + outer.h >= inner.y + inner.h - tol;
   }
 
   // ==== PURE-END ====
@@ -1393,11 +1505,25 @@
 #cmp-root .cmp-capfab { min-height: 44px; padding: 8px 18px; border-radius: 22px; border: none; background: #0f766e; color: #fff; font-size: 15px; font-weight: 700; box-shadow: 0 4px 14px rgba(0,0,0,.3); cursor: pointer; }
 #cmp-root .cmp-capfab:hover { background: #115e59; }
 #cmp-root .cmp-capfab.cmp-above { position: fixed; right: 12px; bottom: 62px; z-index: 2147483600; }
-#cmp-root .cmp-capbox { position: fixed; z-index: 2147483500; border: 3px solid #2563eb; background: rgba(37,99,235,.08); pointer-events: none; box-sizing: border-box; }
-#cmp-root .cmp-capbar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 2147483620; width: min(560px, calc(100vw - 24px)); display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: #fff; color: #111827; border: 1px solid #d1d5db; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,.35); font-size: 13px; }
+#cmp-root .cmp-capbar { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 2147483620; width: min(640px, calc(100vw - 24px)); display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: #fff; color: #111827; border: 1px solid #d1d5db; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,.35); font-size: 13px; }
 #cmp-root .cmp-toast { position: fixed; left: 50%; top: 16px; transform: translateX(-50%); z-index: 2147483640; max-width: calc(100vw - 32px); padding: 8px 14px; border-radius: 10px; background: #1e293b; color: #fff; font-size: 13px; box-shadow: 0 6px 20px rgba(0,0,0,.35); display: none; }
 #cmp-root .cmp-toast.cmp-t-err { background: #b91c1c; }
 #cmp-root .cmp-toast.cmp-t-ok { background: #15803d; }
+#cmp-root .cmp-caps { border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; margin-top: 10px; }
+#cmp-root .cmp-caphead { font-weight: 700; color: #1e3a8a; }
+#cmp-root .cmp-caprow { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 4px 0; border-top: 1px dashed #e2e8f0; }
+#cmp-root .cmp-caprow b { min-width: 52px; }
+#cmp-root .cmp-capst { flex: 1 1 150px; font-size: 12.5px; color: #64748b; }
+#cmp-root .cmp-capst.cmp-has { color: #166534; font-weight: 700; }
+#cmp-root .cmp-fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+#cmp-root .cmp-fgrid .cmp-w2 { grid-column: 1 / -1; }
+#cmp-root .cmp-fsec { margin: 12px 0 4px; padding-bottom: 3px; border-bottom: 2px solid #dbeafe; color: #1e3a8a; font-weight: 700; }
+#cmp-root label.cmp-f { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #64748b; }
+#cmp-root textarea { padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #111827; width: 100%; font-size: 13px; line-height: 1.4; resize: vertical; }
+#cmp-root .cmp-checks { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; }
+#cmp-root label.cmp-chk { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font-size: 13px; }
+#cmp-root .cmp-itbl input { min-height: 28px; padding: 2px 4px; font-size: 12.5px; }
+@media (max-width: 600px) { #cmp-root .cmp-fgrid { grid-template-columns: 1fr; } }
 @media (max-width: 600px) { #cmp-root .cmp-table { font-size: 12px; } #cmp-root #cmp-panel { width: calc(100vw - 24px); } }
 `);
 
@@ -1426,7 +1552,8 @@
   }
 
   // 모달 열기: bodyNode와 footerNodes(배열 또는 노드)를 받아 표시한다.
-  function openModal(title, bodyNode, footerNode) {
+  // keepOpen: 바깥을 눌러도 닫지 않는다(길게 입력하는 창)
+  function openModal(title, bodyNode, footerNode, keepOpen) {
     const { modalHost } = ensureRoot();
     modalHost.textContent = '';
     const bg = h('div', { class: 'cmp-bg' },
@@ -1434,7 +1561,7 @@
         h('div', { class: 'cmp-mhead' }, h('b', { text: title }), h('button', { class: 'cmp-btn cmp-small', text: '닫기', onclick: closeModal })),
         h('div', { class: 'cmp-mbody' }, bodyNode),
         footerNode ? h('div', { class: 'cmp-mfoot' }, footerNode) : null));
-    bg.addEventListener('mousedown', (ev) => { if (ev.target === bg) closeModal(); });
+    if (!keepOpen) bg.addEventListener('mousedown', (ev) => { if (ev.target === bg) closeModal(); });
     modalHost.appendChild(bg);
   }
 
@@ -1720,11 +1847,7 @@
       h('a', { class: 'cmp-btn', href: CART_URL.cp, target: '_blank', rel: 'noopener', text: '쿠팡 장바구니' }),
       h('a', { class: 'cmp-btn', href: CART_URL.st, target: '_blank', rel: 'noopener', text: '11번가 장바구니' }),
       h('a', { class: 'cmp-btn', href: CART_URL.gm, target: '_blank', rel: 'noopener', text: 'G마켓 장바구니' })));
-    body.appendChild(h('div', { class: 'cmp-hint', style: 'margin-top:8px', text: '견적서 캡처: 장바구니를 새 탭으로 열고 저장할 영역을 보여 줍니다. 확인 후 "이 영역 저장"을 누르면 그림 파일(PNG)로 내려받습니다.' }));
-    body.appendChild(h('div', { class: 'cmp-btns' },
-      h('a', { class: 'cmp-btn cmp-primary', href: CART_URL.cp + '#cmp-capture', target: '_blank', rel: 'noopener', text: '쿠팡 장바구니 열고 캡처' }),
-      h('a', { class: 'cmp-btn cmp-primary', href: CART_URL.st + '#cmp-capture', target: '_blank', rel: 'noopener', text: '11번가 장바구니 열고 캡처' }),
-      h('a', { class: 'cmp-btn cmp-primary', href: CART_URL.gm + '#cmp-capture', target: '_blank', rel: 'noopener', text: 'G마켓 장바구니 열고 캡처' })));
+    body.appendChild(buildCapSection());
 
     const drawFoot = () => {
       foot.textContent = '';
@@ -1735,6 +1858,7 @@
             copyMsg.textContent = ok ? '복사했습니다. 엑셀이나 한글 표에 붙여 넣으세요' : '복사에 실패했습니다. 브라우저 권한을 확인하세요';
           },
         }));
+        foot.appendChild(h('button', { class: 'cmp-btn cmp-primary', text: '물품구입비 서류 만들기(hwpx)', onclick: () => showDocForm() }));
         if (s.site !== 'done') {
           foot.appendChild(h('button', { class: 'cmp-btn cmp-success', text: '이어서 진행', onclick: () => { closeModal(); gotoSearch(loadState()); } }));
         }
@@ -2351,14 +2475,22 @@
   }
 
   // ------------------------------------------------------------------
-  // 견적서 캡처: 장바구니 화면의 상품 목록·합계 영역을 PNG 그림 파일로 저장
-  // (사이트마다 화면 구조가 달라 상품 링크·합계 글자로 영역을 추정하고, 미리 보여 준 뒤 사용자가 확인한다)
+  // 견적서 캡처 (3.1): 장바구니의 "장바구니" 제목부터 마지막 상품까지와 오른쪽 합계 상자(주문 예상 금액)를 한 장의 그림으로 저장
+  // 처음 영역은 자동으로 잡고, 캡처 프로그램처럼 마우스로 새로 그리거나 옮기고 크기를 바꿀 수 있다
+  // (사이트마다 화면 구조가 달라 글자·링크로 추정하므로, 저장 전에 영역을 확인한다)
   // ------------------------------------------------------------------
   const CAP_LINK_RE = { cp: /\/vp\/products\//, st: /products\/\d+|prdNo=\d+/i, gm: /goodscode=\d+/i };
   const CAP_TOTAL_RE = /(총\s*(상품|주문|결제)\s*(금액|가격)|결제\s*예정\s*금액|주문\s*예상\s*금액|최종\s*결제\s*금액)/;
+  const CAP_SUM_RE = /(주문\s*예상\s*금액|결제\s*예정\s*금액|결제예정금액|총\s*결제\s*금액|최종\s*결제\s*금액|총\s*주문\s*금액)/;
+  const CAP_SUM2_RE = /(총\s*상품\s*(금액|가격)|결제\s*예상\s*금액|결제예상금액)/;
+  const CAP_HEAD_RE = /^\s*<?\s*장바구니(?![가-힣])/;
+  const CAP_AMT_RE = /\d[\d,]*\s*원/;
   const CAP_NOISE_HEAD_RE = /추천|함께|최근\s*본|광고/;
   const CAP_NOISE_ATTR_RE = /recommend|(^|[\s_-])reco([\s_-]|$)|(^|[\s_-])ad[-_]|banner/i;
-  const cap = { site: '', target: null, view: null, box: null, bar: null, timer: 0, toastTimer: 0, busy: false, stopPick: null };
+  const CAP_PAD = 8; // 자동 영역의 바깥 여백(px)
+  const CAP_JPEG_OVER = 6 * 1024 * 1024; // PNG 주소가 이보다 길면 서류용으로는 JPEG을 저장
+  const cap = { site: '', rect: null, doc: { w: 0, h: 0 }, ov: null, sel: null, sizeEl: null, infoEl: null, noteEl: null, bar: null, keyH: null, resizeH: null,
+    timer: 0, toastTimer: 0, busy: false, drag: null, raf: 0 };
 
   function capHost() {
     const { root } = ensureRoot();
@@ -2385,8 +2517,7 @@
   }
   function ymd() {
     const d = new Date();
-    const p = (n) => (n < 10 ? '0' : '') + n;
-    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
   }
   function capAbsUrl(raw) {
     try {
@@ -2395,6 +2526,27 @@
       const u = new URL(t, location.href);
       return /^https?:$/.test(u.protocol) ? u.href : '';
     } catch (e) { return ''; }
+  }
+  // 스크롤 애니메이션(scroll-behavior: smooth)을 쓰는 사이트에서도 바로 이동
+  function scrollNow(x, y) {
+    try { window.scrollTo({ left: x, top: y, behavior: 'instant' }); } catch (e) { window.scrollTo(x, y); }
+  }
+  // 요소의 페이지 좌표 사각형 (지금 스크롤 위치를 더한 값)
+  function pageRectOf(el) {
+    const r = el.getBoundingClientRect();
+    return { x: r.left + window.scrollX, y: r.top + window.scrollY, w: r.width, h: r.height };
+  }
+  // 문서 전체 크기 (캡처 화면의 덮개는 빼고 잰다)
+  function capDocSize() {
+    const ov = cap.ov;
+    let prev = '';
+    if (ov) { prev = ov.style.display; ov.style.display = 'none'; }
+    const de = document.documentElement;
+    const b = document.body;
+    const w = Math.max(de.scrollWidth, b ? b.scrollWidth : 0, de.clientWidth);
+    const hh = Math.max(de.scrollHeight, b ? b.scrollHeight : 0, de.clientHeight);
+    if (ov) ov.style.display = prev;
+    return { w, h: hh };
   }
 
   // 머리말·메뉴·바닥글, 추천·광고 영역 안의 요소인가
@@ -2429,22 +2581,27 @@
       } catch (e) { return false; }
     });
   }
-  // "총 상품금액", "결제예정금액" 같은 글자를 가진 가장 작은 보이는 요소
-  function capTotalEl() {
-    const found = [];
+  // 글자가 re와 맞는 보이는 요소(글자 바로 위 요소)들
+  function capTextEls(re, maxLen, limit) {
+    const out = [];
     try {
       const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
       let n;
       while ((n = w.nextNode())) {
         const v = n.nodeValue;
-        if (!v || v.length > 60 || !CAP_TOTAL_RE.test(v)) continue;
+        if (!v || v.length > maxLen || !re.test(v)) continue;
         const el = n.parentElement;
         if (!el || /^(SCRIPT|STYLE|NOSCRIPT|TITLE)$/.test(el.tagName)) continue;
-        if (!visible(el) || capIsNoise(el)) continue;
-        found.push(el);
-        if (found.length > 40) break;
+        if (el.closest('#cmp-root') || !visible(el)) continue;
+        out.push(el);
+        if (out.length >= (limit || 60)) break;
       }
     } catch (e) { /* 무시 */ }
+    return out;
+  }
+  // "총 상품금액", "결제예정금액" 같은 글자를 가진 가장 작은 보이는 요소 (영역을 좁히지 못할 때의 대체 방법에 쓴다)
+  function capTotalEl() {
+    const found = capTextEls(CAP_TOTAL_RE, 60, 40).filter((el) => !capIsNoise(el));
     if (!found.length) return null;
     found.sort((a, b) => (a.offsetWidth * a.offsetHeight) - (b.offsetWidth * b.offsetHeight));
     return found[0];
@@ -2466,7 +2623,7 @@
     }
     return n;
   }
-  // 저장할 영역 추정: 상품 링크와 합계 글자의 가장 가까운 공통 조상 (body이거나 9000px보다 길면 상품 링크만으로)
+  // 대체 방법: 상품 링크와 합계 글자의 가장 가까운 공통 조상 (body이거나 9000px보다 길면 상품 링크만으로)
   function capDetect(site) {
     const links = capCartLinks(site);
     const tot = capTotalEl();
@@ -2479,135 +2636,339 @@
     return { el: t, found: true };
   }
 
-  // ---- 미리 보기(파란 테두리)와 버튼 줄 ----
-  function capBoxUpdate() {
-    const b = cap.box;
-    if (!b) return;
-    const el = cap.view;
-    if (!el || !el.isConnected) { b.style.display = 'none'; return; }
-    const r = el.getBoundingClientRect();
-    b.style.display = 'block';
-    b.style.left = r.left + 'px';
-    b.style.top = r.top + 'px';
-    b.style.width = Math.max(0, r.width) + 'px';
-    b.style.height = Math.max(0, r.height) + 'px';
+  // ---- 자동 영역: "장바구니" 제목 + 모든 상품 줄 + 오른쪽 합계 상자 ----
+  // 테두리·배경(흰색 제외)·그림자가 있어서 상자처럼 보이는 요소인가
+  function capLooksBox(el) {
+    try {
+      const cs = getComputedStyle(el);
+      const clear = (c) => !c || c === 'transparent' || /rgba\(\s*\d+,\s*\d+,\s*\d+,\s*0\s*\)/.test(c);
+      const sides = ['Top', 'Right', 'Bottom', 'Left'];
+      for (let i = 0; i < sides.length; i++) {
+        const sd = sides[i];
+        if (parseFloat(cs['border' + sd + 'Width']) > 0 && cs['border' + sd + 'Style'] !== 'none' && !clear(cs['border' + sd + 'Color'])) return true;
+      }
+      if (cs.boxShadow && cs.boxShadow !== 'none') return true;
+      const bg = cs.backgroundColor;
+      if (!clear(bg) && !/^rgba?\(\s*255,\s*255,\s*255(,\s*1)?\s*\)$/.test(bg)) return true;
+    } catch (e) { /* 무시 */ }
+    return false;
   }
-  function capEnsureBox() {
-    if (!cap.box) {
-      cap.box = h('div', { class: 'cmp-capbox' });
-      capHost().appendChild(cap.box);
-      window.addEventListener('scroll', capBoxUpdate, true);
-      window.addEventListener('resize', capBoxUpdate);
-      cap.timer = setInterval(capBoxUpdate, 300);
+  // 합계 글자가 든 요소를 가장 가까운 상자(최대 3단계 바깥)로 넓힌다
+  function capBoxOf(base) {
+    const big = (e) => { const r = e.getBoundingClientRect(); return r.height >= 90 && r.width >= 180; };
+    let n = base;
+    for (let i = 0; i <= 3 && n && n !== document.body && n !== document.documentElement; i++, n = n.parentElement) {
+      if (big(n) && capLooksBox(n) && n.getBoundingClientRect().height <= 1500) return n;
     }
+    n = base;
+    for (let i = 0; i < 3 && n.parentElement && n.parentElement !== document.body && n.parentElement !== document.documentElement && !big(n); i++) n = n.parentElement;
+    return n;
   }
-  function capSetBar(node) {
-    if (cap.bar) { cap.bar.remove(); cap.bar = null; }
-    cap.bar = node;
-    capHost().appendChild(node);
+  // 오른쪽 합계 상자("주문 예상 금액" 등 글자와 "원" 금액이 함께 든 가장 작은 보이는 요소 -> 상자)
+  function capSummaryBox() {
+    const res = [CAP_SUM_RE, CAP_SUM2_RE];
+    for (let k = 0; k < res.length; k++) {
+      const labels = capTextEls(res[k], 40, 40).filter((el) => !capIsNoise(el));
+      const cands = [];
+      labels.forEach((el) => {
+        let n = el;
+        for (let i = 0; i < 6 && n && n !== document.body && n !== document.documentElement; i++, n = n.parentElement) {
+          if (CAP_AMT_RE.test(n.textContent || '')) { if (visible(n)) cands.push(n); break; }
+        }
+      });
+      if (!cands.length) continue;
+      const area = (e) => { const r = e.getBoundingClientRect(); return r.width * r.height; };
+      cands.sort((a, b) => area(a) - area(b));
+      const base = cands.find((e) => area(e) > 0) || cands[0];
+      return { box: capBoxOf(base), base };
+    }
+    return null;
+  }
+  // "장바구니" 제목 후보들 (메뉴의 장바구니 링크는 뺀다)
+  function capHeadCands() {
+    return capTextEls(CAP_HEAD_RE, 24, 40).filter((el) => {
+      try {
+        if (el.closest('nav, [role="navigation"]')) return false;
+        if (el.closest('header') && el.closest('a')) return false;
+        return true;
+      } catch (e) { return true; }
+    });
+  }
+  // 상품 줄들: 쿠팡은 div[id^="item_"], 11번가·G마켓은 상품 링크를 감싼 줄(다른 상품 링크를 만나기 직전까지 바깥으로)
+  function capItemRows(site, stops) {
+    if (site === 'cp') {
+      const seen = new Set();
+      const divs = $$('div[id^="item_"]').filter((d) => {
+        if (seen.has(d.id) || d.closest('#cmp-root') || !visible(d)) return false;
+        if (!$('a[href*="/vp/products/"]', d)) return false;
+        if ($('div[id^="item_"]', d)) return false; // 여러 줄을 감싼 바깥 컨테이너
+        seen.add(d.id);
+        return true;
+      });
+      const clean = divs.filter((d) => !capIsNoise(d));
+      return clean.length ? clean : divs;
+    }
+    const links = capCartLinks(site);
+    const idOf = (a) => {
+      const m = (a.getAttribute('href') || '').match(/products\/(\d+)|prdNo=(\d+)|goodscode=(\d+)/i);
+      return m ? (m[1] || m[2] || m[3]) : '';
+    };
+    const rows = new Set();
+    links.forEach((a) => {
+      const id = idOf(a);
+      let n = a;
+      for (let i = 0; i < 30; i++) {
+        if (n.tagName === 'LI' || n.tagName === 'TR') break;
+        const p = n.parentElement;
+        if (!p || p === document.body || p === document.documentElement) break;
+        if (links.some((o) => o !== a && idOf(o) !== id && p.contains(o))) break;
+        if (p.getBoundingClientRect().height > 600) break;
+        if (stops.some((s) => p.contains(s))) break;
+        n = p;
+      }
+      rows.add(n);
+    });
+    return Array.from(rows).filter(visible);
+  }
+  // 자동 영역(페이지 좌표). { rect, note }
+  function capAutoRect(site) {
+    scrollNow(0, 0);
+    const D = capDocSize();
+    const full = { x: 0, y: 0, w: D.w, h: D.h };
+    const finish = (r) => rectRound(rectClamp(rectPad(r, CAP_PAD), D.w, D.h));
+    const heads = capHeadCands();
+    const sumInfo = capSummaryBox();
+    let sum = sumInfo ? sumInfo.box : null;
+    const rows = capItemRows(site, heads.concat(sum ? [sum] : []));
+    // 넓힌 상자가 상품 줄을 품으면(상자를 못 찾아 바깥으로 너무 넓어진 경우) 합계 글자가 든 원래 요소만 쓴다
+    const overlaps = (e) => rows.some((r) => r.contains(e) || e.contains(r));
+    if (sum && overlaps(sum)) sum = sumInfo.base && !overlaps(sumInfo.base) ? sumInfo.base : null;
+    if (!rows.length) {
+      const d = capDetect(site);
+      if (d.found) {
+        const parts = [pageRectOf(d.el)];
+        if (sum) parts.push(pageRectOf(sum));
+        return { rect: finish(rectUnion(parts)), note: '상품 줄을 정확히 찾지 못해 상품·합계 근처를 대략 골랐습니다. 영역을 확인하고 필요하면 고쳐 주세요.' };
+      }
+      return { rect: full, note: '영역을 좁히지 못해 전체 화면을 골랐습니다. 마우스로 저장할 영역을 새로 그려 주세요.' };
+    }
+    const rects = rows.map(pageRectOf);
+    const firstTop = Math.min.apply(null, rects.map((r) => r.y));
+    let head = null;
+    let hy = -1;
+    heads.forEach((el) => {
+      const r = pageRectOf(el);
+      if (r.w > 0 && r.h > 0 && r.y + r.h <= firstTop + 4 && firstTop - r.y <= 700 && r.y > hy) { head = el; hy = r.y; }
+    });
+    if (head) rects.push(pageRectOf(head));
+    if (sum) rects.push(pageRectOf(sum));
+    return {
+      rect: finish(rectUnion(rects)),
+      note: sum ? '' : '오른쪽 합계(주문 예상 금액) 상자를 찾지 못했습니다. 필요하면 영역을 직접 늘려 주세요.',
+    };
+  }
+
+  // ---- 영역 편집 화면: 문서 전체를 덮는 반투명 덮개 + 선택 사각형 ----
+  const CAP_CURSOR = { nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize' };
+  const CAP_HIT = 10; // 테두리·모서리로 보는 거리(px)
+  const CAP_EDGE = 60; // 화면 위·아래 끝에서 자동 스크롤이 시작되는 거리(px)
+  const CAP_MIN = 12;
+  function capHit(px, py) {
+    const r = cap.rect;
+    if (!r) return { mode: 'new', dir: '' };
+    const T = CAP_HIT;
+    if (px < r.x - T || px > r.x + r.w + T || py < r.y - T || py > r.y + r.h + T) return { mode: 'new', dir: '' };
+    let dir = '';
+    const dT = Math.abs(py - r.y), dB = Math.abs(py - (r.y + r.h));
+    if (dT <= T && dT <= dB) dir += 'n'; else if (dB <= T) dir += 's';
+    const dL = Math.abs(px - r.x), dR = Math.abs(px - (r.x + r.w));
+    if (dL <= T && dL <= dR) dir += 'w'; else if (dR <= T) dir += 'e';
+    return dir ? { mode: 'resize', dir } : { mode: 'move', dir: '' };
+  }
+  function capRender() {
+    const r = cap.rect;
+    const sel = cap.sel;
+    if (!r || !sel) return;
+    sel.style.left = r.x + 'px';
+    sel.style.top = r.y + 'px';
+    sel.style.width = r.w + 'px';
+    sel.style.height = r.h + 'px';
+    const t = Math.round(r.w) + ' × ' + Math.round(r.h) + ' px';
+    if (cap.sizeEl) {
+      cap.sizeEl.textContent = t;
+      cap.sizeEl.style.top = r.y > 30 ? '-28px' : '4px';
+      cap.sizeEl.style.left = r.y > 30 ? '-2px' : '4px';
+    }
+    if (cap.infoEl) cap.infoEl.textContent = '선택 영역 ' + t;
+  }
+  function capApplyDrag() {
+    const d = cap.drag;
+    if (!d) return;
+    const px = d.cx + window.scrollX;
+    const py = d.cy + window.scrollY;
+    const dx = px - d.sx;
+    const dy = py - d.sy;
+    const W = cap.doc.w;
+    const Hh = cap.doc.h;
+    let r;
+    if (d.mode === 'new') r = rectClamp(rectFromPoints(d.sx, d.sy, px, py), W, Hh);
+    else if (d.mode === 'move') r = rectShiftInto({ x: d.r0.x + dx, y: d.r0.y + dy, w: d.r0.w, h: d.r0.h }, W, Hh);
+    else r = rectClamp(rectResize(d.r0, d.dir, dx, dy, CAP_MIN), W, Hh);
+    cap.rect = r;
+    capRender();
+  }
+  // 끌고 있는 동안 화면 위·아래 끝에 가까우면 창을 자동으로 스크롤한다(끝에 가까울수록 빠르게)
+  function capTick() {
+    cap.raf = 0;
+    const d = cap.drag;
+    if (!d) return;
+    try {
+      const vh = window.innerHeight;
+      const y = Math.max(-CAP_EDGE, Math.min(vh + CAP_EDGE, d.cy));
+      let dy = 0;
+      if (y < CAP_EDGE) dy = -Math.max(2, Math.ceil(((CAP_EDGE - y) / CAP_EDGE) * 32));
+      else if (y > vh - CAP_EDGE) dy = Math.max(2, Math.ceil(((y - (vh - CAP_EDGE)) / CAP_EDGE) * 32));
+      if (dy) {
+        const before = window.scrollY;
+        scrollNow(window.scrollX, before + dy);
+        if (window.scrollY !== before) capApplyDrag();
+      }
+    } catch (e) { /* 무시 */ }
+    cap.raf = requestAnimationFrame(capTick);
+  }
+  function capEndDrag(ev) {
+    const d = cap.drag;
+    if (!d) return;
+    if (ev && typeof ev.clientX === 'number') { d.cx = ev.clientX; d.cy = ev.clientY; }
+    capApplyDrag();
+    if (d.mode === 'new' && (cap.rect.w < 10 || cap.rect.h < 10)) cap.rect = d.r0; // 그냥 클릭만 한 경우는 원래 영역 유지
+    cap.drag = null;
+    if (cap.raf) { cancelAnimationFrame(cap.raf); cap.raf = 0; }
+    try { if (cap.ov && ev && ev.pointerId != null) cap.ov.releasePointerCapture(ev.pointerId); } catch (e) { /* 무시 */ }
+    capRender();
+  }
+  function capSetNote(t) {
+    if (!cap.noteEl) return;
+    cap.noteEl.textContent = t || '';
+    cap.noteEl.style.display = t ? 'block' : 'none';
+  }
+  function capRevealRect() {
+    try { if (cap.rect) scrollNow(0, Math.max(0, cap.rect.y - 80)); } catch (e) { /* 무시 */ }
+  }
+  function capEditorShow(on) {
+    if (cap.ov) cap.ov.style.display = on ? '' : 'none';
+    if (cap.bar) cap.bar.style.display = on ? '' : 'none';
   }
   function capClose() {
-    try { if (cap.stopPick) cap.stopPick(); } catch (e) { /* 무시 */ }
-    cap.stopPick = null;
+    if (cap.raf) { cancelAnimationFrame(cap.raf); cap.raf = 0; }
+    cap.drag = null;
+    if (cap.keyH) { document.removeEventListener('keydown', cap.keyH, true); cap.keyH = null; }
+    if (cap.resizeH) { window.removeEventListener('resize', cap.resizeH); cap.resizeH = null; }
+    if (cap.timer) { clearInterval(cap.timer); cap.timer = 0; }
+    if (cap.ov) { cap.ov.remove(); cap.ov = null; }
     if (cap.bar) { cap.bar.remove(); cap.bar = null; }
-    if (cap.box) {
-      cap.box.remove();
-      cap.box = null;
-      window.removeEventListener('scroll', capBoxUpdate, true);
-      window.removeEventListener('resize', capBoxUpdate);
-      clearInterval(cap.timer);
+    cap.sel = null; cap.sizeEl = null; cap.infoEl = null; cap.noteEl = null;
+  }
+  function capSync() {
+    if (!cap.ov || cap.busy) return;
+    const D = capDocSize();
+    if (D.w !== cap.doc.w || D.h !== cap.doc.h) {
+      cap.doc = D;
+      cap.ov.style.width = D.w + 'px';
+      cap.ov.style.height = D.h + 'px';
     }
-    cap.view = null;
   }
-  const capSizeText = (el) => {
-    try { const r = el.getBoundingClientRect(); return Math.round(r.width) + '×' + Math.round(r.height) + 'px'; } catch (e) { return ''; }
-  };
-  const capDescribe = (el) => {
-    if (!el) return '';
-    return (el.tagName || '').toLowerCase() + (el.id ? '#' + el.id : '') + ' (' + capSizeText(el) + ')';
-  };
+  function capOpenEditor(note) {
+    capClose();
+    cap.doc = capDocSize();
+    const ov = document.createElement('div');
+    ov.id = 'cmp-cap-overlay';
+    ov.style.cssText = 'position:absolute;left:0;top:0;margin:0;padding:0;border:0;overflow:hidden;z-index:2147483000;cursor:crosshair;touch-action:none;'
+      + '-webkit-user-select:none;user-select:none;background:transparent;width:' + cap.doc.w + 'px;height:' + cap.doc.h + 'px;';
+    const sel = document.createElement('div');
+    sel.id = 'cmp-cap-sel';
+    sel.style.cssText = 'position:absolute;box-sizing:border-box;border:2px solid #2563eb;box-shadow:0 0 0 200000px rgba(15,23,42,.55);cursor:move;';
+    const sizeEl = document.createElement('div');
+    sizeEl.style.cssText = 'position:absolute;padding:2px 8px;border-radius:10px;background:#1e3a8a;color:#fff;font:700 12px/1.5 "Malgun Gothic","Apple SD Gothic Neo",sans-serif;white-space:nowrap;pointer-events:none;';
+    sel.appendChild(sizeEl);
+    const pos = { nw: [0, 0], n: [50, 0], ne: [100, 0], e: [100, 50], se: [100, 100], s: [50, 100], sw: [0, 100], w: [0, 50] };
+    Object.keys(pos).forEach((k) => {
+      const hd = document.createElement('div');
+      hd.style.cssText = 'position:absolute;width:12px;height:12px;box-sizing:border-box;background:#fff;border:2px solid #2563eb;border-radius:2px;pointer-events:none;'
+        + 'left:' + pos[k][0] + '%;top:' + pos[k][1] + '%;transform:translate(-50%,-50%);';
+      hd.setAttribute('data-h', k);
+      sel.appendChild(hd);
+    });
+    ov.appendChild(sel);
+    cap.ov = ov; cap.sel = sel; cap.sizeEl = sizeEl;
 
-  function capPreview(note) {
-    capEnsureBox();
-    cap.view = cap.target;
-    try { if (cap.target && cap.target !== document.body) cap.target.scrollIntoView({ block: 'start' }); } catch (e) { /* 무시 */ }
-    capBoxUpdate();
-    const site = cap.site;
-    const target = cap.target;
-    const save = (el) => { capClose(); capSave(el, site); };
-    capSetBar(h('div', { class: 'cmp-capbar' },
-      h('b', { text: '견적서 캡처 - ' + (SITE_NAME[site] || '') }),
-      h('div', { class: 'cmp-meta', text: '파란 테두리 안을 그림 파일(PNG)로 저장합니다. 영역: ' + capDescribe(target) }),
-      note ? h('div', { class: 'cmp-msg cmp-warn', style: 'display:block', text: note }) : null,
-      h('div', { class: 'cmp-btns' },
-        h('button', { class: 'cmp-btn cmp-primary', text: '이 영역 저장', onclick: () => save(target) }),
-        h('button', { class: 'cmp-btn', text: '다른 영역 고르기', onclick: () => capPick() }),
-        h('button', { class: 'cmp-btn', text: '전체 페이지 저장', onclick: () => save(document.body) }),
-        h('button', { class: 'cmp-btn', text: '취소', onclick: capClose }))));
-  }
-
-  // 마우스로 영역 고르기: 올리면 파란 테두리, 클릭하면 선택. ↑ 바깥 영역, ↓ 안쪽 영역, Esc 취소
-  function capPick() {
-    if (cap.stopPick) cap.stopPick();
-    const inUi = (n) => !!(n && n.closest && n.closest('#cmp-root'));
-    let hover = cap.target;
-    let stack = [];
-    const info = h('div', { class: 'cmp-meta', text: '' });
-    const show = (el) => {
-      hover = el;
-      cap.view = el;
-      capBoxUpdate();
-      info.textContent = '지금 가리키는 영역: ' + capDescribe(el);
-    };
-    const onMove = (ev) => {
-      const el = document.elementFromPoint(ev.clientX, ev.clientY);
-      if (!el || inUi(el) || el === hover) return;
-      stack = [];
-      show(el);
-    };
-    const block = (ev) => {
-      if (inUi(ev.target)) return;
+    ov.addEventListener('pointerdown', (ev) => {
+      if (cap.busy || (ev.button != null && ev.button !== 0)) return;
       ev.preventDefault();
-      ev.stopPropagation();
-      if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
-    };
-    const finish = (el) => {
-      stop();
-      cap.target = el || cap.target;
-      capPreview('');
-    };
-    const onClick = (ev) => {
-      if (inUi(ev.target)) return;
-      block(ev);
-      finish(hover || ev.target);
-    };
-    const onKey = (ev) => {
-      if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); finish(cap.target); return; }
-      if (ev.key === 'ArrowUp' && hover && hover.parentElement && hover.parentElement !== document.documentElement) {
-        ev.preventDefault(); stack.push(hover); show(hover.parentElement);
-      } else if (ev.key === 'ArrowDown' && stack.length) {
-        ev.preventDefault(); show(stack.pop());
+      const px = ev.clientX + window.scrollX;
+      const py = ev.clientY + window.scrollY;
+      const hit = capHit(px, py);
+      cap.drag = { mode: hit.mode, dir: hit.dir, sx: px, sy: py, r0: Object.assign({}, cap.rect), cx: ev.clientX, cy: ev.clientY };
+      try { ov.setPointerCapture(ev.pointerId); } catch (e) { /* 무시 */ }
+      if (!cap.raf) cap.raf = requestAnimationFrame(capTick);
+    });
+    ov.addEventListener('pointermove', (ev) => {
+      const d = cap.drag;
+      if (!d) {
+        const hit = capHit(ev.clientX + window.scrollX, ev.clientY + window.scrollY);
+        ov.style.cursor = hit.mode === 'new' ? 'crosshair' : hit.mode === 'move' ? 'move' : CAP_CURSOR[hit.dir];
+        return;
+      }
+      d.cx = ev.clientX; d.cy = ev.clientY;
+      capApplyDrag();
+    });
+    ov.addEventListener('pointerup', capEndDrag);
+    ov.addEventListener('pointercancel', capEndDrag);
+
+    const noteEl = h('div', { class: 'cmp-msg cmp-warn' });
+    cap.noteEl = noteEl;
+    cap.infoEl = h('b', { text: '' });
+    const saveNow = () => capSave(cap.rect, cap.site);
+    const bar = h('div', { class: 'cmp-capbar' },
+      h('div', { class: 'cmp-row2', style: 'justify-content:space-between;flex-wrap:wrap' }, h('b', { text: '견적서 캡처 - ' + (SITE_NAME[cap.site] || '') }), cap.infoEl),
+      h('div', { class: 'cmp-meta', text: '마우스로 끌어 새로 그리거나, 테두리·모서리를 끌어 크기를 바꾸세요. 화면 위·아래 끝으로 끌면 자동으로 스크롤됩니다.' }),
+      noteEl,
+      h('div', { class: 'cmp-btns' },
+        h('button', { class: 'cmp-btn cmp-primary', text: '이 영역 저장', onclick: saveNow }),
+        h('button', { class: 'cmp-btn', text: '자동 영역 다시 잡기', onclick: () => {
+          try { const d = capAutoRect(cap.site); cap.rect = d.rect; capSetNote(d.note); capRender(); capRevealRect(); } catch (e) { capToast('자동 영역을 잡지 못했습니다: ' + errMsg(e), 'err'); }
+        } }),
+        h('button', { class: 'cmp-btn', text: '전체 페이지', onclick: () => {
+          cap.doc = capDocSize();
+          cap.rect = { x: 0, y: 0, w: cap.doc.w, h: cap.doc.h };
+          capSetNote('');
+          capRender();
+          capRevealRect();
+        } }),
+        h('button', { class: 'cmp-btn', text: '취소', onclick: capClose })),
+      h('div', { class: 'cmp-meta', text: 'Enter: 저장 · Esc: 취소' }));
+    cap.bar = bar;
+    capHost().appendChild(bar);
+    (document.documentElement || document.body).appendChild(ov);
+
+    cap.keyH = (ev) => {
+      if (cap.busy) return;
+      if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); capClose(); return; }
+      if (ev.key === 'Enter') {
+        const t = ev.target;
+        if (t && t.closest && t.closest('.cmp-capbar, .cmp-bg') && /^(BUTTON|A|INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return; // 막대·창의 버튼은 Enter로 눌리게 둔다
+        ev.preventDefault(); ev.stopPropagation();
+        saveNow();
       }
     };
-    const evs = ['mousedown', 'mouseup', 'pointerdown', 'pointerup'];
-    document.addEventListener('mousemove', onMove, true);
-    document.addEventListener('click', onClick, true);
-    document.addEventListener('keydown', onKey, true);
-    evs.forEach((n) => document.addEventListener(n, block, true));
-    const stop = () => {
-      document.removeEventListener('mousemove', onMove, true);
-      document.removeEventListener('click', onClick, true);
-      document.removeEventListener('keydown', onKey, true);
-      evs.forEach((n) => document.removeEventListener(n, block, true));
-      cap.stopPick = null;
-    };
-    cap.stopPick = stop;
-    show(cap.target);
-    capSetBar(h('div', { class: 'cmp-capbar' },
-      h('b', { text: '저장할 영역을 고르세요' }),
-      h('div', { class: 'cmp-meta', text: '마우스를 올려 파란 테두리를 확인하고 클릭하세요. ↑ 키: 바깥 영역, ↓ 키: 안쪽 영역, Esc: 취소(원래 영역으로)' }),
-      info,
-      h('div', { class: 'cmp-btns' }, h('button', { class: 'cmp-btn', text: '고르기 취소', onclick: () => finish(cap.target) }))));
+    document.addEventListener('keydown', cap.keyH, true);
+    cap.resizeH = () => capSync();
+    window.addEventListener('resize', cap.resizeH);
+    cap.timer = setInterval(capSync, 1000);
+    capSetNote(note);
+    capRender();
+    capRevealRect();
+    try { if (document.activeElement && document.activeElement !== document.body && document.activeElement.blur) document.activeElement.blur(); } catch (e) { /* 무시 */ } // 방금 누른 버튼에 Enter가 또 먹지 않게
   }
 
   // ---- 그림 만들기 ----
@@ -2638,15 +2999,14 @@
   }
   // 늦게 불러오는(lazy) 이미지가 로드되도록 영역을 위에서 아래로 훑어 내려간다
   async function capLoadLazy(target) {
-    const r = target.getBoundingClientRect();
-    const top = r.top + window.scrollY;
+    const r = pageRectOf(target);
     const step = Math.max(300, Math.floor(window.innerHeight * 0.8));
     let n = 0;
-    for (let y = top; y < top + r.height && n < 40; y += step, n++) {
-      window.scrollTo(0, y);
+    for (let y = r.y; y < r.y + r.h && n < 40; y += step, n++) {
+      scrollNow(0, y);
       await sleep(220);
     }
-    window.scrollTo(0, 0);
+    scrollNow(0, 0);
     await sleep(300);
   }
   const restoreAttr = (el, name, v) => { if (v == null) el.removeAttribute(name); else el.setAttribute(name, v); };
@@ -2727,6 +3087,54 @@
     await Promise.all(replaced.slice(0, 300).map((img) => Promise.race([img.decode ? img.decode().catch(() => {}) : Promise.resolve(), sleep(2500)])));
     return failed;
   }
+
+  // 그림으로 그릴 때 sticky(붙어 다니는)·fixed(고정) 요소가 엉뚱한 자리에 찍히지 않도록, 그리는 동안만 제자리(relative)에 둔다. restores로 원래 style을 그대로 되돌린다
+  function capFlattenSticky(root, restores) {
+    let n = 0;
+    [root].concat($$('*', root)).forEach((el) => {
+      try {
+        if (el.closest('#cmp-root')) return;
+        const pos = getComputedStyle(el).position;
+        if (pos !== 'sticky' && pos !== 'fixed') return;
+        const prev = el.getAttribute('style');
+        restores.push(() => { if (prev == null) el.removeAttribute('style'); else el.setAttribute('style', prev); });
+        el.style.setProperty('position', 'relative', 'important');
+        ['top', 'bottom', 'left', 'right'].forEach((p) => el.style.setProperty(p, 'auto', 'important'));
+        el.style.setProperty('transform', 'none', 'important');
+        n++;
+      } catch (e) { /* 무시 */ }
+    });
+    return n;
+  }
+  // 선택 영역을 모두 담는 가장 작은 요소(그리는 기준). 영역 왼쪽 위·오른쪽 아래 점에서 위로 올라가며 찾고, 없으면 body
+  async function capFindRoot(sel) {
+    const rootEl = ensureRoot().root;
+    const prevVis = rootEl.style.visibility;
+    rootEl.style.visibility = 'hidden'; // 우리 버튼이 점 찾기를 가로막지 않게
+    try {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const probe = (px, py, top) => {
+        scrollNow(px > vw - 40 ? Math.max(0, px - Math.round(vw / 2)) : 0, top ? Math.max(0, py - 40) : Math.max(0, py - vh + 40));
+        const cx = Math.min(Math.max(px - window.scrollX, 1), vw - 2);
+        const cy = Math.min(Math.max(py - window.scrollY, 1), vh - 2);
+        return document.elementFromPoint(cx, cy);
+      };
+      const a = probe(sel.x + 2, sel.y + 2, true);
+      const b = probe(sel.x + sel.w - 2, sel.y + sel.h - 2, false);
+      let n = null;
+      if (a && b) n = capCommonAncestor([a, b]);
+      if (!n || n === document.documentElement) n = document.body;
+      scrollNow(0, 0);
+      while (n && n !== document.body) {
+        if (rectContains(pageRectOf(n), sel, 1)) return n;
+        n = n.parentElement;
+      }
+      return document.body;
+    } finally {
+      rootEl.style.visibility = prevVis;
+    }
+  }
   function capDownload(blob, filename) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -2737,50 +3145,87 @@
     a.click();
     setTimeout(() => { try { a.remove(); URL.revokeObjectURL(url); } catch (e) { /* 무시 */ } }, 15000);
   }
-  async function capSave(target, site) {
+  const canvasToBlob = (c, type, q) => new Promise((res) => { try { c.toBlob(res, type, q); } catch (e) { res(null); } });
+
+  // 저장: 선택 영역(페이지 좌표)을 담는 요소를 그린 뒤 영역만 잘라 PNG로 내려받고, 서류 만들기용으로도 보관한다
+  async function capSave(rect, site) {
     if (cap.busy) { capToast('이미 저장하는 중입니다', 'info'); return; }
     cap.busy = true;
     const restores = [];
+    const rootEl = ensureRoot().root;
+    const prevVis = rootEl.style.visibility;
+    const y0 = window.scrollY;
+    let closeAfter = false;
     try {
       const H2I = getH2I();
-      if (!H2I || typeof H2I.toBlob !== 'function') throw new Error('이미지 저장 도구(html-to-image)를 불러오지 못했습니다. 스크립트를 다시 설치(업데이트)해 주세요');
-      if (!target || !target.isConnected) throw new Error('저장할 영역이 화면에서 사라졌습니다. 다시 시도하세요');
+      if (!H2I || typeof H2I.toCanvas !== 'function') throw new Error('이미지 저장 도구(html-to-image)를 불러오지 못했습니다. 스크립트를 다시 설치(업데이트)해 주세요');
+      if (!rect || !rectOk(rect)) throw new Error('저장할 영역이 없습니다. 마우스로 영역을 그려 주세요');
+      const sel = rectRound(rect);
+      if (sel.w < 10 || sel.h < 10) throw new Error('저장할 영역이 너무 작습니다');
+      capEditorShow(false);
       capToast('화면을 불러오는 중…', 'info', true);
-      await capLoadLazy(target);
-      const failed = await capInlineImages(target, restores);
-      // 영역 안 첫·끝 요소의 바깥 여백이 영역 밖으로 합쳐져 있으면 그림에서 아래가 잘리므로, 일반 블록이면 잠시 여백을 가두는 상자(flow-root)로 만든다
-      try {
-        if (getComputedStyle(target).display === 'block') {
-          const oVal = target.style.getPropertyValue('display');
-          const oPri = target.style.getPropertyPriority('display');
-          target.style.setProperty('display', 'flow-root', 'important');
-          restores.push(() => { if (oVal) target.style.setProperty('display', oVal, oPri); else target.style.removeProperty('display'); });
-        }
-      } catch (e) { /* 무시 */ }
-      capToast('그리는 중…', 'info', true);
-      window.scrollTo(0, 0);
-      await sleep(200);
-      const rect = target.getBoundingClientRect();
-      const ratio = Math.min(rect.height > 6000 ? 1 : 1.5, 16000 / Math.max(rect.height, rect.width, 1));
+      const root = await capFindRoot(sel);
+      await capLoadLazy(root);
+      const failed = await capInlineImages(root, restores);
+      scrollNow(0, 0);
+      capFlattenSticky(root, restores);
+      await sleep(250);
+      const rr = pageRectOf(root);
+      let ratio = Math.min(rr.h > 6000 ? 1 : 1.5, 16000 / Math.max(rr.h, rr.w, 1));
+      const rootStyle = { margin: '0' };
+      try { if (getComputedStyle(root).position === 'absolute') { rootStyle.left = '0px'; rootStyle.top = '0px'; } } catch (e) { /* 무시 */ }
       const opts = (pr) => ({
-        pixelRatio: pr, backgroundColor: '#ffffff', skipFonts: true, cacheBust: false,
-        filter: (node) => !(node.id === 'cmp-root' || (node.closest && node.closest('#cmp-root'))),
+        pixelRatio: pr, backgroundColor: '#ffffff', skipFonts: true, cacheBust: false, style: rootStyle,
+        filter: (node) => !(node.id === 'cmp-root' || node.id === 'cmp-cap-overlay' || (node.closest && (node.closest('#cmp-root') || node.closest('#cmp-cap-overlay')))),
       });
-      let blob = null;
+      capToast('그리는 중…', 'info', true);
+      await sleep(60);
+      rootEl.style.visibility = 'hidden'; // 그리는 동안 우리 화면은 숨긴다
+      let canvas = null;
       try {
-        blob = await H2I.toBlob(target, opts(ratio));
+        canvas = await H2I.toCanvas(root, opts(ratio));
       } catch (e1) {
-        if (ratio > 1) blob = await H2I.toBlob(target, opts(1)); else throw e1;
+        if (ratio > 1) { ratio = 1; canvas = await H2I.toCanvas(root, opts(1)); } else throw e1;
+      } finally {
+        rootEl.style.visibility = prevVis;
       }
-      if (!blob) throw new Error('그림을 만들지 못했습니다(영역이 너무 크거나 비어 있을 수 있습니다)');
+      if (!canvas || !canvas.width || !canvas.height) throw new Error('그림을 만들지 못했습니다(영역이 너무 크거나 비어 있을 수 있습니다)');
+      // 영역만 잘라 낸다 (영역이 그린 요소 밖으로 조금 나가면 흰색)
+      const ox = Math.round((sel.x - rr.x) * ratio);
+      const oy = Math.round((sel.y - rr.y) * ratio);
+      const out = document.createElement('canvas');
+      out.width = Math.max(1, Math.round(sel.w * ratio));
+      out.height = Math.max(1, Math.round(sel.h * ratio));
+      const ctx = out.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, out.width, out.height);
+      ctx.drawImage(canvas, -ox, -oy);
+      canvas.width = 1; canvas.height = 1; // 큰 그림 메모리 반환
+      const blob = await canvasToBlob(out, 'image/png');
+      if (!blob) throw new Error('그림 파일을 만들지 못했습니다(영역이 너무 큽니다. 영역을 줄여 보세요)');
       const fname = (SITE_NAME[site] || '장바구니') + '_비교견적_' + ymd() + '.png';
       capDownload(blob, fname);
-      capToast('저장했습니다: ' + fname + (failed ? ' (이미지 ' + failed + '개는 불러오지 못해 빠졌을 수 있습니다)' : ''), 'ok');
+      // 서류 만들기용으로 보관 (PNG 주소가 6MB를 넘으면 JPEG)
+      let stored = true;
+      try {
+        let dataUrl = out.toDataURL('image/png');
+        let mime = 'image/png';
+        if (dataUrl.length > CAP_JPEG_OVER) { dataUrl = out.toDataURL('image/jpeg', 0.85); mime = 'image/jpeg'; }
+        GM_setValue('cmpCap_' + site, JSON.stringify({ dataUrl, width: out.width, height: out.height, date: ymd(), mime }));
+      } catch (e2) { stored = false; }
+      closeAfter = true;
+      capToast(stored
+        ? '저장했습니다(서류 만들기에 사용됩니다): ' + fname + (failed ? ' (이미지 ' + failed + '개는 불러오지 못해 빠졌을 수 있습니다)' : '')
+        : '그림 파일은 저장했지만 서류 만들기용 보관에는 실패했습니다: ' + fname, stored ? 'ok' : 'err');
     } catch (e) {
+      capEditorShow(true);
       capToast('견적서 저장 중 오류: ' + errMsg(e), 'err');
     } finally {
       restores.reverse().forEach((fn) => { try { fn(); } catch (e2) { /* 무시 */ } });
+      rootEl.style.visibility = prevVis;
+      try { scrollNow(0, y0); } catch (e3) { /* 무시 */ }
       cap.busy = false;
+      if (closeAfter) capClose();
     }
   }
 
@@ -2790,9 +3235,9 @@
       if (cap.busy) { capToast('이미 저장하는 중입니다', 'info'); return; }
       capClose();
       cap.site = site;
-      const d = capDetect(site);
-      cap.target = d.el;
-      capPreview(d.found ? '' : '영역을 좁히지 못해 전체 화면을 골랐습니다. 필요하면 "다른 영역 고르기"로 직접 고르세요.');
+      const d = capAutoRect(site);
+      cap.rect = d.rect;
+      capOpenEditor(d.note);
     } catch (e) {
       capToast('견적서 캡처를 시작하지 못했습니다: ' + errMsg(e), 'err');
     }
@@ -2810,6 +3255,415 @@
         capStart(pg.site);
       })().catch((e) => { capToast('견적서 캡처를 시작하지 못했습니다: ' + errMsg(e), 'err'); });
     } catch (e) { /* 무시 */ }
+  }
+
+  // ------------------------------------------------------------------
+  // 물품구입비 서류 만들기 (3.1): 기안 · 산출기초조사서 · 견적서(캡처) · 물품검수조서를 한 개의 hwpx로
+  // hwpx 파일 자체는 hwpx-builder.js(CmpHwpx)가 만든다
+  // ------------------------------------------------------------------
+  const DOCKEY = 'cmpDocPrefs';
+  const CAP_SITES = ['cp', 'st', 'gm'];
+  const CAP_LABEL = { cp: '쿠팡 장바구니', st: '11번가 장바구니', gm: 'G마켓 장바구니' };
+  const HWPX_MISSING = '서류 만들기 기능을 불러오지 못했습니다. 스크립트를 다시 설치해 주세요';
+  const DEFAULT_VENDOR = '쿠팡(주) / 120-88-00767 / 로저스 해롤드 린 / 서울시 광진구 아차산로 412, 2층';
+  // 다음에 미리 채울 글자 칸들 (이름 칸은 처음엔 비어 있다)
+  const DOC_PREF_KEYS = ['docNo', 'title', 'biz', 'when', 'place', 'target', 'vendor', 'payMethod', 'gwan', 'hang', 'mok', 'semok', 'source',
+    'ap1', 'ap2', 'ap3', 'surveyor', 'checker', 'v1', 'v2', 'v3', 'decision', 'supplier', 'invPlace', 'inspector', 'witness'];
+
+  function getHwpx() {
+    try { if (typeof CmpHwpx !== 'undefined' && CmpHwpx) return CmpHwpx; } catch (e) { /* 아래 대체 */ }
+    try { return PW.CmpHwpx || window.CmpHwpx || null; } catch (e) { return null; }
+  }
+  function loadDocPrefs() {
+    try {
+      const v = GM_getValue(DOCKEY, '');
+      if (!v) return {};
+      const o = typeof v === 'string' ? JSON.parse(v) : v;
+      return o && typeof o === 'object' ? o : {};
+    } catch (e) { return {}; }
+  }
+  function saveDocPrefs(F) {
+    try {
+      const o = {};
+      DOC_PREF_KEYS.forEach((k) => { if (typeof F[k] === 'string') o[k] = F[k]; });
+      GM_setValue(DOCKEY, JSON.stringify(o));
+    } catch (e) { /* 무시 */ }
+  }
+  // 저장해 둔 견적서 캡처 ({dataUrl, width, height, date, mime} 또는 null)
+  function capLoad(site) {
+    try {
+      const v = GM_getValue('cmpCap_' + site, '');
+      if (!v) return null;
+      const o = typeof v === 'string' ? JSON.parse(v) : v;
+      return o && o.dataUrl ? o : null;
+    } catch (e) { return null; }
+  }
+  function capClear(site) { try { GM_setValue('cmpCap_' + site, ''); } catch (e) { /* 무시 */ } }
+
+  function dataUrlToBytes(d) {
+    const i = String(d).indexOf(',');
+    const bin = atob(String(d).slice(i + 1));
+    const u = new Uint8Array(bin.length);
+    for (let k = 0; k < bin.length; k++) u[k] = bin.charCodeAt(k);
+    return u;
+  }
+  function loadImageEl(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('저장된 견적서 그림을 읽지 못했습니다. 다시 캡처해 주세요'));
+      img.src = src;
+    });
+  }
+  // 저장된 캡처들을 쿠팡, 11번가, G마켓 순서로 quotes 배열로. 세로가 너무 길면 조각으로 나눈다
+  async function buildQuotes(sites) {
+    const out = [];
+    for (let i = 0; i < sites.length; i++) {
+      const site = sites[i];
+      const c = capLoad(site);
+      if (!c) continue;
+      const mime = c.mime === 'image/jpeg' ? 'image/jpeg' : 'image/png';
+      const img = await loadImageEl(c.dataUrl);
+      const w = img.naturalWidth || c.width;
+      const hh = img.naturalHeight || c.height;
+      const sl = sliceSpecs(w, hh);
+      if (sl.length === 1) {
+        out.push({ label: CAP_LABEL[site], mime, bytes: dataUrlToBytes(c.dataUrl), width: w, height: hh });
+        continue;
+      }
+      for (let k = 0; k < sl.length; k++) {
+        const cv = document.createElement('canvas');
+        cv.width = w; cv.height = sl[k].h;
+        const ctx = cv.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, sl[k].h);
+        ctx.drawImage(img, 0, sl[k].y, w, sl[k].h, 0, 0, w, sl[k].h);
+        const blob = await canvasToBlob(cv, mime, 0.92);
+        if (!blob) throw new Error('긴 견적서 그림을 나누지 못했습니다');
+        out.push({ label: CAP_LABEL[site] + ' (' + (k + 1) + '/' + sl.length + ')', mime, bytes: new Uint8Array(await blob.arrayBuffer()), width: w, height: sl[k].h });
+      }
+    }
+    return out;
+  }
+
+  // 요약 모달의 "견적서 캡처" 구역: 사이트별 저장 상태, 캡처 열기, 지우기
+  function buildCapSection(onChange) {
+    const box = h('div', { class: 'cmp-caps' });
+    const draw = () => {
+      box.textContent = '';
+      box.appendChild(h('div', { class: 'cmp-caphead', text: '견적서 캡처' }));
+      box.appendChild(h('div', { class: 'cmp-hint', text: '장바구니를 새 탭으로 열고 저장할 영역(장바구니 제목 ~ 마지막 상품 + 오른쪽 합계)을 자동으로 잡아 보여 줍니다. 마우스로 고쳐 그린 뒤 "이 영역 저장"을 누르면 그림 파일(PNG)로 내려받고, 서류 만들기에도 쓰입니다.' }));
+      CAP_SITES.forEach((site) => {
+        const c = capLoad(site);
+        box.appendChild(h('div', { class: 'cmp-caprow' },
+          h('b', { text: SITE_NAME[site] }),
+          h('span', { class: 'cmp-capst' + (c ? ' cmp-has' : ''), text: c ? '저장됨 ' + (c.date || '') + ' ' + (c.width || '?') + '×' + (c.height || '?') : '없음' }),
+          h('a', { class: 'cmp-btn cmp-primary cmp-small', href: CART_URL[site] + '#cmp-capture', target: '_blank', rel: 'noopener', text: SITE_NAME[site] + ' 장바구니 열고 캡처' }),
+          h('button', { class: 'cmp-btn cmp-small cmp-danger', text: '지우기', disabled: !c, onclick: () => { capClear(site); draw(); if (onChange) onChange(); } })));
+      });
+    };
+    draw();
+    // 다른 탭에서 캡처하고 돌아오면 상태를 새로 보여 준다
+    const onFocus = () => { if (!box.isConnected) { window.removeEventListener('focus', onFocus); return; } draw(); if (onChange) onChange(); };
+    window.addEventListener('focus', onFocus);
+    return box;
+  }
+
+  function showDocForm() {
+    try {
+      buildDocForm();
+    } catch (e) {
+      openModal('물품구입비 서류 만들기', h('div', { class: 'cmp-bad', text: '서류 화면을 만드는 중 오류가 발생했습니다: ' + errMsg(e) }), [h('button', { class: 'cmp-btn', text: '닫기', onclick: closeModal })]);
+    }
+  }
+
+  function buildDocForm() {
+    const s = loadState();
+    if (!s || !s.items.length) throw new Error('비교견적 기록이 없습니다. 먼저 비교견적을 진행해 주세요');
+    const capSites = CAP_SITES.filter((k) => !!capLoad(k));
+    const prefs = loadDocPrefs();
+    const now = new Date();
+    const pv = (k, d) => (typeof prefs[k] === 'string' ? prefs[k] : d);
+
+    // ---- 값 (F) ----
+    const F = {
+      incDraft: true, incSurvey: true, incQuote: capSites.length > 0, incInsp: true,
+      docNo: pv('docNo', defaultDocNo(now)), docDate: fmtDocDate(now),
+      title: pv('title', '물품구입비'), biz: pv('biz', '장애인자립생활지원사업'), intro: '', content: '',
+      when: pv('when', ''), place: pv('place', ''), target: pv('target', ''),
+      vendor: pv('vendor', DEFAULT_VENDOR), payDate: fmtKorDate(addDaysDate(now, 1)), payMethod: pv('payMethod', '카드결제'),
+      gwan: pv('gwan', ''), hang: pv('hang', ''), mok: pv('mok', ''), semok: pv('semok', ''), source: pv('source', '보조금'),
+      ap1: pv('ap1', ''), ap2: pv('ap2', ''), ap3: pv('ap3', ''), attach: '',
+      survDate: '', surveyor: pv('surveyor', ''), checker: pv('checker', ''),
+      v1: pv('v1', '㈜쿠팡'), v2: pv('v2', '십일번가㈜'), v3: pv('v3', '주식회사 지마켓'), decision: pv('decision', '가격이 가장 저렴한 곳으로 선택함'),
+      contractName: '', supplier: pv('supplier', '㈜쿠팡'), amount: '0', contractDate: '', dueDate: '', inspectDate: '',
+      invPlace: pv('invPlace', '사무실'), inspector: pv('inspector', ''), witness: pv('witness', ''),
+    };
+    // 다른 칸을 따라가는 칸: 직접 고치기 전까지 자동으로 채운다
+    const auto = { intro: true, content: true, survDate: true, contractName: true, amount: true, contractDate: true, dueDate: true, inspectDate: true, attach: true };
+    const E = {};
+    const setF = (k, v) => {
+      F[k] = v;
+      const el = E[k];
+      if (el && el.value !== String(v)) el.value = v;
+    };
+
+    // ---- 품목 / 배송비 ----
+    const rows = s.items.map((it) => {
+      const cp = it.cpTotal || 0;
+      const qty = Math.max(1, it.qty || 1);
+      return { pname: it.pname || it.name, spec: specFromOption(it.option), unit: '개', qty, unitPrice: unitPriceOf(cp, qty), unitTouched: false, cp, st: pickAmt(it.st) || '', gm: pickAmt(it.gm) || '' };
+    });
+    const shipInit = (site) => s.items.reduce((a, it) => a + (it[site] && !it[site].skipped ? shipNumOf(it[site].shipping) : 0), 0);
+    const ship = { cp: 0, st: shipInit('st'), gm: shipInit('gm') };
+    const shipIn = {};
+    const sumOf = (key) => rows.reduce((a, r) => a + (num(r[key]) || 0), 0);
+    const totEls = {};
+    const msg = h('div', { class: 'cmp-msg', style: 'flex:1 1 100%' });
+    const say = (t, kind) => { msg.textContent = ''; msg.className = 'cmp-msg' + (kind ? ' cmp-' + kind : ''); msg.style.display = t ? 'block' : 'none'; if (t) msg.appendChild(document.createTextNode(t)); return msg; };
+    say('');
+
+    const sections = {};
+    const derive = () => {
+      if (auto.intro) setF('intro', introText(F.biz, F.title));
+      if (auto.content) setF('content', F.title + ' 지출');
+      if (auto.contractName) setF('contractName', F.title);
+      if (auto.survDate) setF('survDate', F.docDate);
+      const pd = parseAnyDate(F.payDate);
+      if (auto.contractDate) setF('contractDate', pd ? fmtDocDate(pd) : '');
+      if (auto.dueDate) setF('dueDate', pd ? fmtDocDate(addDaysDate(pd, 3)) : '');
+      if (auto.inspectDate) setF('inspectDate', F.dueDate);
+      if (auto.amount) setF('amount', String(sumOf('cp') + (num(ship.cp) || 0)));
+      if (auto.attach) {
+        setF('attach', attachmentLines({ survey: F.incSurvey, quotes: F.incQuote ? capSites.length : 0, inspection: F.incInsp }).join('\n'));
+      }
+      Object.keys(sections).forEach((k) => { sections[k].style.opacity = F[k] ? '' : '.45'; });
+      ['cp', 'st', 'gm'].forEach((k) => { if (totEls[k]) totEls[k].textContent = fmt(sumOf(k)) + '원'; });
+    };
+    let prefTimer = 0;
+    const onEdit = () => {
+      derive();
+      clearTimeout(prefTimer);
+      prefTimer = setTimeout(() => saveDocPrefs(F), 500);
+    };
+
+    // ---- 칸 만들기 도우미 ----
+    const field = (key, label, opts) => {
+      opts = opts || {};
+      const inp = opts.area ? h('textarea', { rows: String(opts.rows || 2) }) : h('input', { type: opts.type || 'text' });
+      if (opts.placeholder) inp.setAttribute('placeholder', opts.placeholder);
+      inp.setAttribute('aria-label', label);
+      inp.value = F[key];
+      inp.addEventListener('input', () => {
+        F[key] = inp.value;
+        if (Object.prototype.hasOwnProperty.call(auto, key)) auto[key] = false;
+        onEdit();
+      });
+      E[key] = inp;
+      return h('label', { class: 'cmp-f' + (opts.wide ? ' cmp-w2' : '') }, h('span', { text: label }), inp);
+    };
+    const selectField = (key, label, values) => {
+      const sel = h('select', { 'aria-label': label }, values.map((v) => h('option', { value: v, text: v })));
+      sel.value = values.indexOf(F[key]) >= 0 ? F[key] : values[0];
+      F[key] = sel.value;
+      sel.addEventListener('change', () => { F[key] = sel.value; onEdit(); });
+      E[key] = sel;
+      return h('label', { class: 'cmp-f' }, h('span', { text: label }), sel);
+    };
+    const check = (key, label, disabled, note) => {
+      const c = h('input', { type: 'checkbox', checked: !!F[key], disabled: !!disabled });
+      c.setAttribute('aria-label', label);
+      c.addEventListener('change', () => { F[key] = c.checked; onEdit(); });
+      E[key] = c;
+      return h('label', { class: 'cmp-chk' }, c, h('span', { text: label }), note ? h('span', { class: 'cmp-gray', text: note }) : null);
+    };
+    const section = (flagKey, title, kids) => {
+      const box = h('div', null, h('div', { class: 'cmp-fsec', text: title }), h('div', { class: 'cmp-fgrid' }, kids));
+      if (flagKey) sections[flagKey] = box;
+      return box;
+    };
+
+    const body = h('div', null);
+    body.appendChild(h('div', { class: 'cmp-hint', text: '비교견적 결과와 저장해 둔 견적서 캡처로 hwpx 서류 한 개를 만듭니다. 칸을 고치면 다음에도 같은 내용이 미리 채워집니다(날짜·금액은 제외). 이름 칸은 직접 입력하세요.' }));
+    body.appendChild(h('div', { class: 'cmp-fsec', text: '포함할 쪽' }));
+    body.appendChild(h('div', { class: 'cmp-checks' },
+      check('incDraft', '기안'), check('incSurvey', '산출기초조사서'),
+      check('incQuote', '견적서(캡처)', capSites.length === 0, capSites.length === 0 ? '(저장된 캡처 없음)' : '(' + capSites.map((k) => SITE_NAME[k]).join('·') + ')'),
+      check('incInsp', '물품검수조서')));
+
+    body.appendChild(section('incDraft', '기안', [
+      field('docNo', '문서번호'), field('docDate', '기안일'),
+      field('title', '제목', { wide: true }), field('biz', '사업 문구', { wide: true }),
+      field('intro', '첫 문장(제목·사업 문구에 맞춰 자동으로 만들어지며, 고치면 더는 바뀌지 않습니다)', { wide: true, area: true, rows: 2 }),
+      field('content', '내용', { wide: true }),
+      field('when', '일시'), field('place', '장소'), field('target', '대상', { wide: true }),
+      field('vendor', '지출처', { wide: true }),
+      field('payDate', '지출일'), field('payMethod', '지출방법'),
+      field('gwan', '예산과목 관'), field('hang', '예산과목 항'), field('mok', '예산과목 목'), field('semok', '예산과목 세목'),
+      selectField('source', '재원', ['보조금', '자부담']),
+      field('ap1', '결재란 1', { placeholder: '예: 팀장 홍길동' }), field('ap2', '결재란 2'), field('ap3', '결재란 3'),
+      field('attach', '붙임(한 줄에 하나. 포함할 쪽에 맞춰 자동으로 만들어지며, 고치면 더는 바뀌지 않습니다)', { wide: true, area: true, rows: 3 }),
+    ]));
+    body.appendChild(section('incSurvey', '산출기초조사서', [
+      field('survDate', '조사일(기안일을 따라갑니다)'), field('decision', '결정 사유'),
+      field('surveyor', '조사자'), field('checker', '확인자'),
+      field('v1', '업체명 1 (쿠팡)'), field('v2', '업체명 2 (11번가)'), field('v3', '업체명 3 (G마켓)', { wide: true }),
+    ]));
+
+    body.appendChild(section('incInsp', '물품검수조서', [
+      field('contractName', '계약건명(제목을 따라갑니다)', { wide: true }),
+      field('supplier', '납품자'), field('amount', '계약금액(쿠팡 합계 + 쿠팡 배송비)', { type: 'number' }),
+      field('contractDate', '계약체결일(지출일)'), field('dueDate', '납품기한(+3일)'),
+      field('inspectDate', '검수일(납품기한)'), field('invPlace', '검수장소'),
+      field('inspector', '검수자'), field('witness', '입회자'),
+    ]));
+
+    // ---- 품목 표 ----
+    const tbody = h('tbody', null);
+    const cellIn = (r, key, opts) => {
+      opts = opts || {};
+      const inp = h('input', { type: opts.num ? 'number' : 'text', value: String(r[key] == null ? '' : r[key]) });
+      if (opts.num) inp.setAttribute('min', '0');
+      inp.setAttribute('aria-label', opts.label);
+      if (opts.w) inp.style.width = opts.w;
+      return inp;
+    };
+    rows.forEach((r, i) => {
+      const tr = h('tr', null);
+      const note = h('span', { class: 'cmp-sub cmp-bad', text: '' });
+      const ins = {};
+      const upd = (init) => {
+        const calc = unitPriceOf(num(r.cp), Math.max(0, parseInt(r.qty, 10) || 0));
+        if (!r.unitTouched) { r.unitPrice = calc; ins.unitPrice.value = String(calc); }
+        const prod = (num(r.unitPrice) || 0) * (parseInt(r.qty, 10) || 0);
+        note.textContent = prod !== (num(r.cp) || 0) ? '단가×수량(' + fmt(prod) + ')이 금액과 달라 서류에는 금액 ' + fmt(num(r.cp)) + '원을 씁니다' : '';
+        if (init) derive(); else onEdit();
+      };
+      const mkc = (key, label, opts) => {
+        const inp = cellIn(r, key, Object.assign({ label: '품목 ' + (i + 1) + ' ' + label }, opts));
+        inp.addEventListener('input', () => {
+          r[key] = inp.value;
+          if (key === 'unitPrice') r.unitTouched = true;
+          upd();
+        });
+        ins[key] = inp;
+        return inp;
+      };
+      tr.appendChild(h('td', null, mkc('pname', '품명', { w: '150px' })));
+      tr.appendChild(h('td', null, mkc('spec', '규격', { w: '120px' })));
+      tr.appendChild(h('td', null, mkc('unit', '단위', { w: '48px' })));
+      tr.appendChild(h('td', null, mkc('qty', '수량', { num: true, w: '60px' })));
+      tr.appendChild(h('td', null, mkc('unitPrice', '단가', { num: true, w: '84px' }), note));
+      tr.appendChild(h('td', null, mkc('cp', '쿠팡 금액', { num: true, w: '92px' })));
+      tr.appendChild(h('td', null, mkc('st', '11번가 금액', { num: true, w: '92px' })));
+      tr.appendChild(h('td', null, mkc('gm', 'G마켓 금액', { num: true, w: '92px' })));
+      tbody.appendChild(tr);
+      upd(true);
+    });
+    const sumRow = h('tr', { class: 'cmp-sum' }, h('td', { text: '합계', colspan: '5' }));
+    ['cp', 'st', 'gm'].forEach((k) => { totEls[k] = h('b', { text: '' }); sumRow.appendChild(h('td', { class: 'cmp-r' }, totEls[k])); });
+    tbody.appendChild(sumRow);
+    body.appendChild(h('div', { class: 'cmp-fsec', text: '품목 (서류에 들어갈 값을 고칠 수 있습니다)' }));
+    body.appendChild(h('div', { style: 'overflow-x:auto' }, h('table', { class: 'cmp-table cmp-itbl' },
+      h('thead', null, h('tr', null, ['품명', '규격', '단위', '수량', '단가', '쿠팡 금액', '11번가 금액', 'G마켓 금액'].map((t) => h('th', { text: t })))), tbody)));
+    body.appendChild(h('div', { class: 'cmp-hint', text: '규격은 쿠팡 옵션에서 가져옵니다(free·프리 표시는 뺌). 수량은 쿠팡 주문 수량, 단가는 쿠팡 금액 ÷ 수량입니다. 서류의 금액은 단가가 아니라 쿠팡 금액을 씁니다. 11번가·G마켓 금액이 비어 있으면 서류에도 빈칸으로 둡니다.' }));
+
+    // ---- 배송비 ----
+    body.appendChild(h('div', { class: 'cmp-fsec', text: '배송비 (원, 없으면 0)' }));
+    const shipGrid = h('div', { class: 'cmp-fgrid', style: 'grid-template-columns:repeat(3,1fr)' });
+    [['cp', '쿠팡'], ['st', '11번가'], ['gm', 'G마켓']].forEach(([k, label]) => {
+      const inp = h('input', { type: 'number', value: String(ship[k]) });
+      inp.setAttribute('min', '0');
+      inp.setAttribute('aria-label', label + ' 배송비');
+      inp.addEventListener('input', () => { ship[k] = inp.value; onEdit(); });
+      shipIn[k] = inp;
+      shipGrid.appendChild(h('label', { class: 'cmp-f' }, h('span', { text: label }), inp));
+    });
+    body.appendChild(shipGrid);
+    body.appendChild(h('div', { class: 'cmp-hint', text: '11번가·G마켓은 담은 상품에 기록된 배송비("3,000원")를 더한 값이고 "무료"는 0입니다. 같은 판매자 배송비가 겹쳤다면 고쳐 주세요.' }));
+
+    derive();
+
+    // ---- 만들기 ----
+    const collect = () => {
+      const need = (v, name) => { if (!String(v == null ? '' : v).trim()) throw new Error(name + '을(를) 입력하세요'); };
+      if (!(F.incDraft || F.incSurvey || F.incQuote || F.incInsp)) throw new Error('만들 쪽을 하나 이상 고르세요');
+      need(F.docNo, '문서번호'); need(F.docDate, '기안일'); need(F.title, '제목');
+      const items = rows.map((r, i) => {
+        if (!String(r.pname).trim()) throw new Error('품목 ' + (i + 1) + '의 품명을 입력하세요');
+        const qty = parseInt(r.qty, 10);
+        if (!(qty > 0)) throw new Error('품목 ' + (i + 1) + '의 수량을 확인하세요');
+        const orNull = (v) => (String(v == null ? '' : v).trim() === '' ? null : num(v));
+        return { pname: String(r.pname).trim(), spec: String(r.spec).trim(), unit: String(r.unit).trim() || '개', qty, unitPrice: num(r.unitPrice) || 0, cpTotal: num(r.cp) || 0, stTotal: orNull(r.st), gmTotal: orNull(r.gm) };
+      });
+      const lines = [{ label: '내용', text: F.content }, { label: '일시', text: F.when }, { label: '장소', text: F.place }, { label: '대상', text: F.target },
+        { label: '지출처', text: F.vendor }, { label: '지출일', text: F.payDate }, { label: '지출방법', text: F.payMethod }]
+        .map((x) => ({ label: x.label, text: String(x.text || '').trim() })).filter((x) => x.text);
+      return {
+        draft: {
+          include: !!F.incDraft, title: F.title.trim(), intro: F.intro.trim(), lines,
+          budget: { gwan: F.gwan.trim(), hang: F.hang.trim(), mok: F.mok.trim(), semok: F.semok.trim(), source: F.source },
+          attachments: F.attach.split('\n').map((x) => x.trim()).filter(Boolean),
+          docNo: F.docNo.trim(), docDate: F.docDate.trim(), approvers: [F.ap1, F.ap2, F.ap3].map((x) => String(x || '').trim()),
+        },
+        items,
+        shipping: { cp: num(ship.cp) || 0, st: num(ship.st) || 0, gm: num(ship.gm) || 0 },
+        survey: { include: !!F.incSurvey, vendors: [F.v1, F.v2, F.v3].map((x) => String(x || '').trim()), date: F.survDate.trim(), surveyor: F.surveyor.trim(), checker: F.checker.trim(), decision: F.decision.trim() },
+        quotes: [],
+        inspection: {
+          include: !!F.incInsp, contractName: F.contractName.trim(), supplier: F.supplier.trim(), dueDate: F.dueDate.trim(), amount: num(F.amount) || 0,
+          inspectDate: F.inspectDate.trim(), contractDate: F.contractDate.trim(), place: F.invPlace.trim(), inspector: F.inspector.trim(), witness: F.witness.trim(),
+        },
+      };
+    };
+    // 만든 결과에서 파일 바이트와 경고 목록을 꺼낸다 (build는 바이트만, buildWithReport는 {바이트, 경고}를 돌려준다)
+    const unpack = (res) => {
+      if (res instanceof Uint8Array) return { bytes: res, warnings: [] };
+      if (res && typeof res === 'object') {
+        const bytes = res.bytes || res.data || res.hwpx || res.file || res.output || null;
+        let w = res.warnings || (res.report && (res.report.warnings || res.report)) || [];
+        if (!Array.isArray(w)) w = typeof w === 'string' ? [w] : [];
+        return { bytes, warnings: w.map((x) => (x && typeof x === 'object' ? (x.message || x.msg || JSON.stringify(x)) : String(x))).filter(Boolean) };
+      }
+      return { bytes: null, warnings: [] };
+    };
+    let building = false;
+    const buildBtn = h('button', { class: 'cmp-btn cmp-primary', text: '만들기', onclick: async () => {
+      if (building) return;
+      building = true;
+      buildBtn.disabled = true;
+      try {
+        say('');
+        const B = getHwpx();
+        if (!B || (typeof B.build !== 'function' && typeof B.buildWithReport !== 'function')) { say(HWPX_MISSING, 'err'); return; }
+        const data = collect();
+        saveDocPrefs(F);
+        if (F.incQuote) data.quotes = await buildQuotes(capSites);
+        if (F.incQuote && !data.quotes.length) throw new Error('저장된 견적서 그림이 없습니다. "견적서(캡처)" 체크를 끄거나 다시 캡처해 주세요');
+        say('서류를 만드는 중…', 'ok');
+        const res = typeof B.buildWithReport === 'function' ? await B.buildWithReport(data) : await B.build(data);
+        const out = unpack(res);
+        if (!out.bytes || !out.bytes.length) throw new Error('서류 파일을 만들지 못했습니다');
+        const fname = safeFileName(data.draft.docNo + ' ' + mmddOf(data.draft.docDate, now) + ' ' + data.draft.title) + '.hwpx';
+        capDownload(new Blob([out.bytes], { type: 'application/hwp+zip' }), fname);
+        say('만들었습니다: ' + fname + ' (내려받기 폴더를 확인하세요)', 'ok');
+        if (out.warnings.length) {
+          msg.className = 'cmp-msg cmp-warn';
+          msg.appendChild(h('div', { style: 'margin-top:4px;font-weight:700', text: '확인할 점' }));
+          out.warnings.forEach((w) => msg.appendChild(h('div', { text: '· ' + w })));
+        }
+      } catch (e) {
+        say('서류를 만들지 못했습니다: ' + errMsg(e), 'err');
+      } finally {
+        building = false;
+        buildBtn.disabled = false;
+      }
+    } });
+    const foot = [buildBtn,
+      h('button', { class: 'cmp-btn', text: '요약으로 돌아가기', onclick: () => showSummary() }),
+      h('button', { class: 'cmp-btn', text: '닫기', onclick: closeModal }),
+      msg];
+    openModal('물품구입비 서류 만들기 (hwpx)', body, foot, true);
   }
 
   // ------------------------------------------------------------------
