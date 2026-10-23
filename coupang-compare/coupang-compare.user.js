@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         쿠팡 비교견적 도우미
 // @namespace    https://handscil01-afk.github.io/Sungmo/
-// @version      3.2.0
+// @version      3.2.1
 // @description  쿠팡 장바구니 물품을 11번가·G마켓에서 개당 가격으로 비교해, 쿠팡보다 비싼 비교견적용 상품을 장바구니에 담습니다
 // @match        https://cart.coupang.com/*
 // @match        https://search.11st.co.kr/*
@@ -728,7 +728,7 @@
   }
 
   function gotoSearch(s) {
-    if (s && s.restock) { gotoRestock(s); return; }
+    if (isRestockSame(s)) { gotoRestock(s); return; }
     if (!s || s.site === 'done') { showSummary(); return; }
     const it = s.items[s.idx];
     if (!it) { showSummary(); return; }
@@ -1188,6 +1188,7 @@
     s.pendingCandidate = null;
     s.adding = null;
     if (s.restock) {
+      s.restock.replacing = false;
       s.restock.pos += 1;
       saveState(s);
       gotoRestock(s);
@@ -1235,6 +1236,8 @@
   // 다시 담기 (3.2): 기록해 둔 11번가·G마켓 상품 주소·옵션으로 장바구니를 다시 채운다
   // (로그인 전에 담아서 장바구니가 사라졌거나, 쿠팡 수량을 바꾼 뒤 새 수량으로 담을 때)
   // ------------------------------------------------------------------
+  // 기록해 둔 같은 상품을 다시 담는 중인가(비슷한 상품으로 바꾸는 중이면 false)
+  function isRestockSame(st) { return !!(st && st.restock && !st.restock.replacing); }
   // 쿠팡 수량이 바뀐 뒤 이 상품에서 담아야 할 묶음 수
   function packsNeeded(it, p) {
     const conv = p && p.packN ? convertPack({ n: p.packN, unit: p.packUnit || it.packUnit }, it.packUnit) : null;
@@ -1297,25 +1300,42 @@
     }
   }
   function finishRestock(s) {
-    const r = s.restock || { failed: [] };
+    const r = s.restock || { replaced: [] };
+    const replaced = r.replaced || [];
+    // 비슷한 상품으로 바꾸려 했지만 끝내 못 담은 것
+    const failed = replaced.filter((x) => { const p = s.items[x.idx] && s.items[x.idx][x.site]; return !p || p.skipped; })
+      .map((x) => ({ site: x.site, idx: x.idx, reason: x.reason }));
     s.restock = null;
     s.auto = false;
     s.pendingCandidate = null;
     s.adding = null;
-    s.restockReport = { failed: r.failed || [], t: Date.now() };
+    s.restockReport = { replaced, failed, t: Date.now() };
     if (r.resume) { s.site = r.resume.site; s.idx = r.resume.idx; } else { s.site = 'done'; }
     saveState(s);
     renderAll();
     showSummary();
   }
-  function restockFail(s, reason) {
-    const r = s.restock;
+  // 이 상품은 판매 중단·페이지 오류·담기 불가 등으로 다시 담을 수 없으므로, 검색해서 비슷한 상품을 자동으로 담는다
+  function restockReplace(s, reason) {
+    const r = s && s.restock;
     if (!r) return;
-    const t = r.targets[r.pos] || {};
-    r.failed = r.failed || [];
-    r.failed.push({ site: t.site, idx: t.idx, reason: reason || '' });
+    const t = r.targets[r.pos];
+    const it = t && s.items[t.idx];
+    if (!it) { advance(); return; }
+    const old = it[t.site];
+    r.replaced = r.replaced || [];
+    r.replaced.push({ site: t.site, idx: t.idx, reason: reason || '' });
+    r.replacing = true;
+    it.tried[t.site] = old && old.url ? [old.url] : []; // 담을 수 없는 이 상품은 다시 고르지 않는다
+    it.broadened = false;
+    s.site = t.site;
+    s.idx = t.idx;
+    s.pendingCandidate = null;
+    s.adding = null;
+    s.auto = true;
+    s.redo = false;
     saveState(s);
-    advance();
+    location.href = searchUrl(t.site, it.keyword || makeKeyword(it.name), !!s.sortLow);
   }
   // 쿠팡 장바구니를 다시 읽어 수량·금액이 바뀐 품목을 기록에 반영한다
   function syncFromCoupang() {
@@ -1340,8 +1360,8 @@
         if (ln.cpTotal > 0) it.cpTotal = ln.cpTotal;
         it.cpUnitPrice = it.cpTotal && it.needUnits ? it.cpTotal / it.needUnits : 0;
         changed += 1;
+        refreshStale(it); // 수량이 바뀐 품목만 11번가·G마켓 수량 맞는지 다시 계산
       });
-      s.items.forEach(refreshStale);
       saveState(s);
       const staleN = s.items.reduce((n, it) => n + ['st', 'gm'].filter((k) => it[k] && it[k].stale).length, 0);
       let t = changed ? '쿠팡 장바구니의 바뀐 ' + changed + '개 품목을 기록에 반영했습니다.' : '바뀐 수량이 없습니다.';
@@ -1973,13 +1993,13 @@
 
     const staleCount = s.items.reduce((n, it) => n + ['st', 'gm'].filter((k) => it[k] && it[k].stale).length, 0);
     const pickCount = restockTargets(s, false).length;
+    const rrName = (f) => { const it = s.items[f.idx]; return SITE_NAME[f.site] + ' ' + ((it && (it.pname || shortName(it.name, 16))) || '?') + (f.reason ? ' (' + f.reason + ')' : ''); };
+    if (s.restockReport && s.restockReport.replaced && s.restockReport.replaced.length) {
+      body.appendChild(h('div', { class: 'cmp-msg cmp-warn', style: 'display:block;margin-bottom:8px', text: '기록해 둔 상품을 담을 수 없어 비슷한 상품으로 바꿔 담았습니다: ' + s.restockReport.replaced.map(rrName).join(' / ') + '. 표에서 바뀐 상품이 맞는지 확인하세요.' }));
+    }
     if (s.restockReport && s.restockReport.failed && s.restockReport.failed.length) {
-      const names = s.restockReport.failed.map((f) => {
-        const it = s.items[f.idx];
-        return SITE_NAME[f.site] + ' ' + ((it && (it.pname || shortName(it.name, 16))) || '?') + (f.reason ? ' (' + f.reason + ')' : '');
-      });
-      body.appendChild(h('div', { class: 'cmp-msg cmp-warn', style: 'display:block;margin-bottom:8px', text: '다시 담지 못한 상품이 있습니다: ' + names.join(' / ') + '. 표의 "다시" 버튼으로 직접 고르세요.' }));
-    } else if (s.restockReport) {
+      body.appendChild(h('div', { class: 'cmp-msg cmp-warn', style: 'display:block;margin-bottom:8px', text: '비슷한 상품도 찾지 못한 것이 있습니다: ' + s.restockReport.failed.map(rrName).join(' / ') + '. 표의 "다시" 버튼으로 직접 고르세요.' }));
+    } else if (s.restockReport && !(s.restockReport.replaced && s.restockReport.replaced.length)) {
       body.appendChild(h('div', { class: 'cmp-msg cmp-ok', style: 'display:block;margin-bottom:8px', text: '기록해 둔 상품을 모두 다시 담았습니다. 11번가·G마켓 장바구니에서 수량과 금액을 확인하세요.' }));
     }
     if (staleCount) {
@@ -2072,6 +2092,12 @@
         ui.addRecover = true;
         setTimeout(() => { try { const s2 = loadState(); if (s2 && s2.auto && s2.adding) advance(); } catch (e) { /* 무시 */ } }, 1500);
       }
+      // 다시 담기: 기록해 둔 상품 주소가 오류·메인 같은 다른 화면으로 넘어갔으면 비슷한 상품으로 바꾼다
+      if (isRestockSame(state) && state.auto && pg.site && state.site === pg.site && /-other$/.test(pg.kind)
+        && !(state.adding && Date.now() - state.adding.t < 120000) && !ui.restockRecover) {
+        ui.restockRecover = true;
+        setTimeout(() => { try { const s2 = loadState(); if (isRestockSame(s2) && s2.auto) restockReplace(s2, '상품 페이지가 열리지 않고 다른 화면으로 이동함'); } catch (e) { /* 무시 */ } }, 2500);
+      }
       const active = !!(state && pg.site && state.site === pg.site && (isSearch || isProduct) && state.items[state.idx]);
       if (active && isSearch) adoptUrlKeyword(state); // 사용자가 사이트 검색창에서 고친 검색어를 기억
 
@@ -2141,9 +2167,10 @@
     const site = state.site;
     const cpu = item.cpUnitPrice || 0;
 
-    if (state.restock && state.auto) {
-      setMsg('다시 담기 중입니다. 기록해 둔 상품 화면으로 이동합니다…', 'warn');
-      setTimeout(() => { try { const s2 = loadState(); if (s2 && s2.restock && s2.auto) gotoRestock(s2); } catch (e) { /* 무시 */ } }, 1000);
+    if (isRestockSame(state) && state.auto) {
+      // 기록해 둔 상품 주소를 열었는데 검색 화면으로 넘어옴 = 상품이 없어졌거나 주소가 바뀜
+      setMsg('기록해 둔 상품 페이지가 열리지 않아 비슷한 상품을 찾습니다…', 'warn');
+      setTimeout(() => { try { const s2 = loadState(); if (isRestockSame(s2) && s2.auto) restockReplace(s2, '상품 페이지가 열리지 않고 검색 화면으로 이동함'); } catch (e) { /* 무시 */ } }, 1200);
       return;
     }
     if (state.notice) {
@@ -2316,6 +2343,7 @@
     const canon = api.canon();
     const pc0 = state.pendingCandidate && state.pendingCandidate.url === canon ? state.pendingCandidate : null;
     const ps = { packN: null, packUnit: item.packUnit, from: '', manual: false };
+    const rsPick = isRestockSame(state) && item[site] && !item[site].skipped ? item[site] : null; // 다시 담기 중이면 전에 담은 기록
     let ackSig = '';
     let busy = false;
     let adding = false;
@@ -2342,6 +2370,7 @@
       let from = '선택 옵션';
       if (!p) { p = parsePack(api.title(), item.packUnit); from = '상품명'; }
       if (!p && pc0 && pc0.packN) { p = { n: pc0.packN, unit: pc0.packUnit || '개' }; from = '검색 결과'; }
+      if (!p && rsPick && rsPick.packN) { p = { n: rsPick.packN, unit: rsPick.packUnit || item.packUnit }; from = '기록'; } // 다시 담기: 전에 기록한 묶음 개수
       if (!p && assumeSingle(item)) { p = { n: 1, unit: item.packUnit }; from = assumedLabel('묶음'); } // "1묶음으로 봄"
       // 옵션 글자와 상품명의 묶음 개수가 다르면 알려 준다(예: 상품명 10쌍, 옵션 2개1세트)
       let alt = null;
@@ -2468,7 +2497,7 @@
       const warns = [];
       const t0 = Date.now();
       await waitFor(() => api.optionUiExists() || (api.addBtn() && api.qtyInputs().length && Date.now() - t0 > 3000), 15000, 400);
-      const rsP = (loadState() || {}).restock ? item[site] : null; // 다시 담기: 전에 담은 옵션과 같은 것을 고른다
+      const rsP = isRestockSame(loadState()) ? item[site] : null; // 다시 담기: 전에 담은 옵션과 같은 것을 고른다
       const target = rsP && rsP.option
         ? buildTarget(rsP.option, rsP.title, rsP.packN ? { n: rsP.packN, unit: rsP.packUnit || item.packUnit } : null)
         : buildTarget(item.option, item.name, item.packExplicit ? { n: item.packN, unit: item.packUnit } : null);
@@ -2481,7 +2510,7 @@
       if (res === 'already') notes.push('이미 선택된 옵션이 있어 옵션은 그대로 두었습니다.');
       else if (res === 'none') notes.push('고를 옵션이 없는 상품으로 보입니다.');
       else if (api.rows().length === 0 && api.optionUiExists()) warns.push('옵션이 선택되지 않았습니다. 직접 골라 주세요');
-      if (!ps.packN) warns.push('묶음 개수를 확인하세요');
+      if (!ps.packN && !rsPick) warns.push('묶음 개수를 확인하세요');
       const ok = api.qtyInputs().length ? fit() : false;
       if (ok) notes.push('수량을 ' + calc().need + '묶음으로 맞췄습니다.');
       busy = false;
@@ -2502,7 +2531,7 @@
       if (!L.inputs.length && api.hasOptionSelectors()) { setMsg('옵션을 먼저 고르세요', 'warn'); return false; }
       const warns = [];
       if (L.qty !== L.need) warns.push('수량이 ' + L.qty + '개입니다(필요 ' + L.need + '묶음)');
-      if (!s.restock && L.unitPrice != null && cpu && L.unitPrice <= cpu + 1e-9) warns.push(perLabel(item.packUnit) + ' 가격이 쿠팡 이하입니다(비교견적은 쿠팡보다 비싸야 합니다)');
+      if (!isRestockSame(s) && L.unitPrice != null && cpu && L.unitPrice <= cpu + 1e-9) warns.push(perLabel(item.packUnit) + ' 가격이 쿠팡 이하입니다(비교견적은 쿠팡보다 비싸야 합니다)');
       const sig = L.qty + '|' + L.total + '|' + ps.packN + ps.packUnit;
       if (warns.length && ackSig !== sig) {
         ackSig = sig;
@@ -2591,7 +2620,7 @@
       if (!s || !s.auto) return;
       const it = s.items[s.idx];
       if (!it) return;
-      if (s.restock) { autoDetail('이 상품은 다시 담지 못했습니다 (' + reason + ')', true); restockFail(s, reason); return; }
+      if (isRestockSame(s)) { autoDetail('이 상품은 다시 담을 수 없어 비슷한 상품을 찾습니다 (' + reason + ')', true); restockReplace(s, reason); return; }
       const tr = it.tried[s.site];
       if (tr.indexOf(canon) < 0) tr.push(canon);
       autoDetail('이 상품은 쓰지 않습니다 (' + reason + ')', true);
@@ -2617,8 +2646,22 @@
       live();
       let L = calc();
       if (L.inputs.length && L.qty !== L.need) { fit(); await sleep(1200); if (!autoAlive(tok)) return; L = calc(); }
+      const rs = isRestockSame(loadState()); // 다시 담기: 이미 고른 상품이므로 쿠팡과의 가격 비교는 하지 않음
+      if (rs) {
+        // 옵션·수량이 맞지 않으면 건너뛰지 않고 사용자가 직접 고르게 한다. 장바구니 버튼이 없으면 비슷한 상품으로 바꾼다
+        if (!api.addBtn()) { autoProdFail('장바구니 버튼 없음'); return; }
+        if ((r.warns && r.warns.length) || (L.inputs.length && L.qty !== L.need)) {
+          const why = (r.warns && r.warns.length ? Array.from(new Set(r.warns)).join(' / ') : '수량이 ' + L.qty + '개로 보임(필요 ' + L.need + '묶음)');
+          autoDetail('옵션이나 수량을 직접 확인해 주세요 (' + why + '). 고른 뒤 아래 "장바구니 담고 다음 →"을 누르면 이어서 진행합니다', true);
+          setMsg('이 상품은 옵션을 자동으로 맞추지 못했습니다. 옵션과 수량을 직접 고른 뒤 "장바구니 담고 다음 →"을 누르세요', 'warn');
+          return;
+        }
+        autoDetail('장바구니에 담는 중…');
+        const ok0 = record(true);
+        if (!ok0) autoProdFail('기록·장바구니 담기 실패');
+        return;
+      }
       const fails = [];
-      const rs = !!(loadState() || {}).restock; // 다시 담기: 이미 고른 상품이므로 쿠팡과의 가격 비교는 하지 않음
       if (r.warns && r.warns.length) fails.push('옵션 확인 필요');
       if (L.unitPrice == null) fails.push('개당 가격을 알 수 없음');
       else if (!rs && cpu > 0 && L.unitPrice <= cpu + 1e-9) fails.push('개당 가격이 쿠팡 이하');
