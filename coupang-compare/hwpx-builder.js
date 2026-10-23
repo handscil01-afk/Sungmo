@@ -329,9 +329,13 @@
     var sh = data.shipping || {};
     D.ship = { cp: optNum(sh.cp) || 0, st: optNum(sh.st) || 0, gm: optNum(sh.gm) || 0 };
     D.hasShip = D.ship.cp > 0 || D.ship.st > 0 || D.ship.gm > 0;
-    var cp = D.items.reduce(function (a, b) { return a + b.cpTotal; }, 0) + D.ship.cp;
-    var st = D.items.every(function (it) { return it.stTotal != null; }) ? D.items.reduce(function (a, b) { return a + b.stTotal; }, 0) + D.ship.st : null;
-    var gm = D.items.every(function (it) { return it.gmTotal != null; }) ? D.items.reduce(function (a, b) { return a + b.gmTotal; }, 0) + D.ship.gm : null;
+    // 장바구니 할인(전체 할인금액): 업체별 합계에서 뺀다. 모두 0이면 이전 결과와 같다
+    var dcn = data.discount || {};
+    D.disc = { cp: Math.max(0, optNum(dcn.cp) || 0), st: Math.max(0, optNum(dcn.st) || 0), gm: Math.max(0, optNum(dcn.gm) || 0) };
+    D.hasDisc = D.disc.cp > 0 || D.disc.st > 0 || D.disc.gm > 0;
+    var cp = D.items.reduce(function (a, b) { return a + b.cpTotal; }, 0) + D.ship.cp - D.disc.cp;
+    var st = D.items.every(function (it) { return it.stTotal != null; }) ? D.items.reduce(function (a, b) { return a + b.stTotal; }, 0) + D.ship.st - D.disc.st : null;
+    var gm = D.items.every(function (it) { return it.gmTotal != null; }) ? D.items.reduce(function (a, b) { return a + b.gmTotal; }, 0) + D.ship.gm - D.disc.gm : null;
     D.sum = { cp: cp, st: st, gm: gm };
     D.items.forEach(function (it) {
       if (Math.round(it.unitPrice * it.qty) !== Math.round(it.cpTotal)) W.push('품목 "' + it.pname + '": 단가×수량(' + fmt(it.unitPrice * it.qty) + ')이 금액(' + fmt(it.cpTotal) + ')과 다릅니다. 입력한 값 그대로 적었습니다.');
@@ -382,6 +386,7 @@
     var bud = d.budget || {};
     var bl = items.map(function (it) { return it.pname + ' ' + fmt(it.unitPrice) + '원×' + qs(it.qty) + it.unit + '=' + fmt(it.cpTotal) + '원'; });
     if (D.ship.cp > 0) bl.push('배송비 ' + fmt(D.ship.cp) + '원');
+    if (D.disc.cp > 0) bl.push('장바구니 할인 -' + fmt(D.disc.cp) + '원');
     var spec = function (arr, pp, cp) { return arr.map(function (t) { return P(pp, cp, t); }); };
     var bt = layoutTable({
       cols: bc, mg: bm, hasMargin: true,
@@ -520,6 +525,7 @@
       rows.push(itemRow([it.pname, it.spec || '-', qs(it.qty), fmt(it.cpTotal), optf(it.stTotal), optf(it.gmTotal), fmt(it.unitPrice), fmt(it.cpTotal)]));
     });
     if (D.hasShip) rows.push(itemRow(['배송비', '-', '-', fmt(ship.cp), fmt(ship.st), fmt(ship.gm), fmt(ship.cp), fmt(ship.cp)]));
+    if (D.hasDisc) rows.push(itemRow(['장바구니 할인', '-', '-', fmt(-D.disc.cp), fmt(-D.disc.st), fmt(-D.disc.gm), fmt(-D.disc.cp), fmt(-D.disc.cp)]));
     var one2 = function (t, cp) { return [P(22, cp || 10, t)]; };
     rows.push({ pref: 3600, cells: [
       { c: 0, cs: 2, bf: 24, specs: [P(22, 7, '총 계')] }, { c: 2, bf: 25, specs: one2('-', 26) }, { c: 3, bf: 25, specs: one2(fmt(D.sum.cp)) },

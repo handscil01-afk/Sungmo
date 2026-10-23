@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         쿠팡 비교견적 도우미
 // @namespace    https://handscil01-afk.github.io/Sungmo/
-// @version      3.2.2
+// @version      3.3.0
 // @description  쿠팡 장바구니 물품을 11번가·G마켓에서 개당 가격으로 비교해, 쿠팡보다 비싼 비교견적용 상품을 장바구니에 담습니다
 // @match        https://cart.coupang.com/*
 // @match        https://search.11st.co.kr/*
@@ -60,6 +60,15 @@
  * 5) 물품구입비 서류 만들기: 요약의 "물품구입비 서류 만들기(hwpx)"를 누르면 기안 · 산출기초조사서 · 견적서(캡처) · 물품검수조서를 담은 hwpx 한 개를 만듭니다.
  *    문서번호·제목·일시·장소·대상·지출처·지출일·예산과목·결재란·조사자·검수자 등을 입력하면(다음에도 미리 채워짐) "만들기"로 내려받습니다.
  *    품목 표(품명·규격·단위·수량·단가·금액)는 비교견적 결과에서 채워지며 고칠 수 있습니다. 서류 파일 제작은 hwpx-builder.js가 맡습니다.
+ * 6) [3.3] 금액과 전체 할인금액: 품목별 금액은 세 곳 모두 즉시할인이 이미 반영된 최종 판매가입니다. 장바구니 쿠폰처럼 장바구니 전체에 붙는 할인은
+ *    요약표 맨 아래 "전체 할인금액(장바구니 쿠폰 등)"에 사이트별로 따로 넣고, 그 아래 "합계(할인 반영)"을 보여 줍니다(표 복사에도 들어갑니다).
+ *    값은 각 사이트 장바구니 화면에서 (품목 최종가 합 + 배송비) - 화면의 결제 예정 금액으로 자동 계산합니다. 읽지 못하면 0이며 직접 고칠 수 있습니다.
+ *    장바구니를 읽는 때: 장바구니 화면을 열었을 때, 견적서 캡처를 시작할 때, 장바구니 화면에서 "요약 보기"를 눌렀을 때.
+ *    서류 만들기의 산출기초조사서·기안 금액·결정가격도 "품목 합계 - 전체 할인금액"으로 계산되고, 할인이 있으면 표에 "장바구니 할인" 행이 들어갑니다.
+ * 7) [3.3] 쿠팡 업체 정보: 쿠팡 페이지 하단의 상호명·대표이사·사업자등록번호·주소를 읽어 서류 만들기의 지출처에 채웁니다(못 읽으면 기본값, 직접 고친 값이 우선).
+ * 8) [3.3] 병렬 진행: "자동으로 전부 담기"와 "11번가·G마켓 다시 담기"는 현재 탭이 11번가를, 새 창이 G마켓을 동시에 맡습니다(설정 "11번가·G마켓 동시에 진행").
+ *    크롬은 가려진 탭을 느리게 하므로 두 창을 나란히 놓아 둘 다 보이게 하세요. 옵션 선택이 필요해 멈추면 그 창만 멈추고 다른 창은 계속 진행합니다.
+ *    둘 다 끝나면 마지막으로 끝난 창에서 요약이 열립니다. 끄면 이전처럼 11번가 다음 G마켓 순서로 한 탭에서 진행합니다.
  * ※ 이 스크립트는 구매·주문·결제·선물 버튼을 절대 누르지 않으며, 오직 옵션 "선택하기"와 "장바구니" 버튼만 누릅니다.
  */
 
@@ -536,6 +545,88 @@
     return outer.x <= inner.x + tol && outer.y <= inner.y + tol && outer.x + outer.w >= inner.x + inner.w - tol && outer.y + outer.h >= inner.y + inner.h - tol;
   }
 
+  // ---- 장바구니 할인(3.3): 장바구니 화면 글자에서 금액 읽기, 전체 할인금액 계산 ----
+  // text에서 label 바로 뒤에 "N원"이 붙어 있는 첫 금액. 못 찾으면 null. opts.free: 라벨 뒤가 "무료"이면 0
+  function amountAfter(text, labelRe, opts) {
+    const t = String(text == null ? '' : text).replace(/\s+/g, ' ');
+    const re = new RegExp(labelRe.source, 'g' + (labelRe.ignoreCase ? 'i' : ''));
+    let m;
+    while ((m = re.exec(t))) {
+      const rest = t.slice(m.index + m[0].length);
+      const a = rest.match(/^\s*[:：]?\s*(?:[+\-−–]\s*)?(\d{1,3}(?:,\d{3})+|\d+)\s*원/);
+      if (a) return parseInt(a[1].replace(/,/g, ''), 10);
+      if (opts && opts.free && /^\s*[:：]?\s*(무료|없음)/.test(rest)) return 0;
+      if (m[0].length === 0) re.lastIndex++;
+    }
+    return null;
+  }
+  // 전체 할인금액 = (품목 최종가 합 + 배송비) - 결제 예정 금액. 읽지 못했거나 음수이면 0
+  function calcCartDiscount(itemsSum, ship, pay) {
+    const a = Number(itemsSum) || 0;
+    const b = Number(ship) || 0;
+    const p = Number(pay) || 0;
+    if (!(p > 0) || !(a > 0)) return 0;
+    const d = Math.round(a + b - p);
+    return d > 0 ? d : 0;
+  }
+
+  // 쿠팡 장바구니 오른쪽 "주문 예상 금액" 상자 글: 총 상품 가격 / 총 즉시할인 / 총 쿠폰할인 / 총 배송비 / (이름 없는) 결제 금액
+  // -> { total, instant, coupon, ship, pay } (읽은 것만 숫자, 아니면 null). pay가 이름 없이 마지막에 오므로 못 읽으면 계산해 채운다
+  function parseCoupangBox(text) {
+    const t = String(text == null ? '' : text).replace(/\s+/g, ' ');
+    const o = {
+      total: amountAfter(t, /총\s*상품\s*가격/), instant: amountAfter(t, /총\s*즉시\s*할인/), coupon: amountAfter(t, /총\s*쿠폰\s*할인/),
+      ship: amountAfter(t, /총\s*배송비/, { free: true }), pay: null,
+    };
+    const pm = t.match(/총\s*배송비\s*[:：]?\s*(?:[+\-−–]\s*)?(?:\d{1,3}(?:,\d{3})+|\d+)\s*원\s*(\d{1,3}(?:,\d{3})+|\d+)\s*원/);
+    if (pm) o.pay = parseInt(pm[1].replace(/,/g, ''), 10);
+    if (o.pay == null && o.total != null) o.pay = o.total - (o.instant || 0) - (o.coupon || 0) + (o.ship || 0);
+    if (o.total == null && o.pay == null) return null;
+    return o;
+  }
+  // 쿠팡 상품 줄 글에서 "1,000원 쿠폰할인 적용됨"의 금액(굵은 가격에 이미 빠져 있다). 없으면 0
+  function itemCouponOf(text) {
+    const m = String(text == null ? '' : text).replace(/\s+/g, ' ').match(/(\d{1,3}(?:,\d{3})+|\d+)\s*원\s*쿠폰\s*할인\s*적용/);
+    return m ? parseInt(m[1].replace(/,/g, ''), 10) : 0;
+  }
+
+  // ---- 쿠팡 하단 사업자 정보(3.3): "상호명 : 쿠팡(주) / 대표이사 : … / 사업자등록번호 : … / 주소 : …" ----
+  const VENDOR_DEFAULT = { name: '쿠팡(주)', brn: '120-88-00767', rep: '로저스 해롤드 린', addr: '서울시 광진구 아차산로 412, 2층' };
+  const VI_LABELS = '상호\\s*명|상호|법인명|대표\\s*이사|대표\\s*자|대표|사업자\\s*등록\\s*번호|사업자\\s*번호|통신\\s*판매\\s*업|호스팅|사업장\\s*소재지|소재지|주소|전화|고객\\s*센터|이메일|e-?mail|개인정보|사업자\\s*정보|COPYRIGHT|Copyright';
+  function viField(t, labelRe, maxLen) {
+    const re = new RegExp('(?:^|[\\s/|│·,])(?:' + labelRe + ')\\s*[:：]?\\s*', 'i');
+    const m = re.exec(t);
+    if (!m) return '';
+    const rest = t.slice(m.index + m[0].length);
+    const stop = new RegExp('\\s*[/|│·]\\s+|\\s*\\(\\d{5}\\)|\\s+(?:' + VI_LABELS + ')(?=\\s|[:：]|신고|$)', 'i');
+    const e = stop.exec(rest);
+    let v = (e ? rest.slice(0, e.index) : rest.slice(0, maxLen || 80)).trim();
+    v = v.replace(/\s*\([A-Za-z][A-Za-z0-9 ,.\-&']*\)/g, '').replace(/[\s,;:·/|-]+$/, '').trim();
+    return v.length > (maxLen || 80) ? '' : v;
+  }
+  // 하단 글 -> { name, rep, brn, addr } (읽은 것만 채움). 사업자등록번호나 상호명을 못 읽으면 null
+  function parseVendorInfo(text) {
+    const t = String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
+    if (!t) return null;
+    const out = { name: '', rep: '', brn: '', addr: '' };
+    const bm = t.match(/사업자\s*(?:등록)?\s*번호\s*[:：]?\s*(\d{3}-\d{2}-\d{5})/) || t.match(/(\d{3}-\d{2}-\d{5})/);
+    if (bm) out.brn = bm[1];
+    out.name = viField(t, '상호\\s*명(?:\\s*및\\s*호스팅\\s*서비스\\s*제공)?|상호|법인명', 30);
+    out.rep = viField(t, '대표\\s*이사|대표\\s*자|대표', 40);
+    out.addr = viField(t, '사업장\\s*소재지|소재지|주소', 100);
+    if (!out.addr) { // 라벨 없이 우편번호 "(05050)" 뒤에 주소가 오는 형태
+      const am = t.match(/\(\d{5}\)\s*([^()]*?)(?=\s*\(\d{5}\)|\s+(?:사업자|통신\s*판매|호스팅|전화|고객\s*센터|365)|\s*[/|│·]\s|$)/);
+      if (am && am[1].length <= 100) out.addr = am[1].trim();
+    }
+    if (!out.brn || !out.name) return null;
+    return out;
+  }
+  // 읽은 값(없는 칸은 기본값)으로 지출처 한 줄 "상호 / 사업자번호 / 대표 / 주소"
+  function vendorLine(v) {
+    const x = Object.assign({}, VENDOR_DEFAULT, Object.fromEntries(Object.entries(v || {}).filter((e) => e[1])));
+    return [x.name, x.brn, x.rep, x.addr].join(' / ');
+  }
+
   // ==== PURE-END ====
 
   // ------------------------------------------------------------------
@@ -665,24 +756,213 @@
     if (typeof it.kwManual !== 'boolean') it.kwManual = false; // 사용자가 사이트 검색창에서 직접 고친 검색어인가
     return it;
   }
-  function loadState() {
+  // ------------------------------------------------------------------
+  // 3.3 상태 저장소: 11번가·G마켓을 두 탭에서 동시에 진행해도 서로 덮어쓰지 않도록, 쓰는 곳(탭)마다 키를 나눈다.
+  //   cmpState        기본 정보(품목 목록, 시작 시각 …). 시작·수량 반영 때만 쓴다
+  //   cmpRun_st/gm    그 사이트 전용 진행 상태(위치 idx, auto, pendingCandidate, redo, restock …)와 품목별 결과(res)·tried·검색어
+  //   cmpCart_cp/st/gm  그 사이트 장바구니 전체 할인금액(읽은 값 또는 직접 입력)
+  //   cmpVendorCp     쿠팡 하단에서 읽은 사업자 정보
+  // loadState(lane)는 이 키들을 합쳐 예전과 같은 모양의 상태(s.site, s.idx, s.auto, s.items[i].st/gm …)로 보여 주고,
+  // saveState(s)는 그 lane(11번가 또는 G마켓)의 키에만 쓴다. 다른 사이트의 키는 건드리지 않는다.
+  // ------------------------------------------------------------------
+  const RUNKEY = { st: 'cmpRun_st', gm: 'cmpRun_gm' };
+  const CARTKEY = { cp: 'cmpCart_cp', st: 'cmpCart_st', gm: 'cmpCart_gm' };
+  const VENDORKEY = 'cmpVendorCp';
+  const LANES = ['st', 'gm'];
+  const LANE_STALE_MS = 20000; // 이 시간 동안 하트비트가 없으면 그 창은 닫힌 것으로 본다
+  const otherLane = (l) => (l === 'st' ? 'gm' : 'st');
+
+  function readJson(key) {
     try {
-      const v = GM_getValue(KEY, '');
+      const v = GM_getValue(key, '');
       if (!v) return null;
-      const s = typeof v === 'string' ? JSON.parse(v) : v;
-      if (!(s && Array.isArray(s.items))) return null;
-      s.items.forEach(normItem);
-      s.auto = !!s.auto;
+      return typeof v === 'string' ? JSON.parse(v) : v;
+    } catch (e) { return null; }
+  }
+  function writeJson(key, o) { GM_setValue(key, o == null ? '' : JSON.stringify(o)); }
+
+  function freshRun(gen) {
+    return { gen: gen || 0, status: 'idle', idx: 0, auto: false, sortLow: false, pendingCandidate: null, adding: null, redo: false, resume: null,
+      notice: '', restock: null, restockReport: null, res: {}, tried: {}, kw: {}, hb: 0, doneAt: 0, startedAt: 0 };
+  }
+  function loadRun(lane, base) {
+    const r = readJson(RUNKEY[lane]);
+    const gen = (base && base.startedAt) || 0;
+    if (!r || typeof r !== 'object' || (r.gen || 0) !== gen) return freshRun(gen);
+    const o = Object.assign(freshRun(gen), r);
+    if (!o.res || typeof o.res !== 'object') o.res = {};
+    if (!o.tried || typeof o.tried !== 'object') o.tried = {};
+    if (!o.kw || typeof o.kw !== 'object') o.kw = {};
+    return o;
+  }
+  // 3.2.x까지의 단일 상태(version 3)를 새 구조로 옮긴다
+  function migrateLegacy(b) {
+    const gen = b.startedAt || 0;
+    const cur = b.site === 'st' || b.site === 'gm' ? b.site : '';
+    LANES.forEach((lane) => {
+      const r = freshRun(gen);
+      b.items.forEach((it, i) => {
+        if (it[lane]) r.res[i] = it[lane];
+        if (it.tried && Array.isArray(it.tried[lane]) && it.tried[lane].length) r.tried[i] = it.tried[lane];
+        r.kw[i] = { keyword: it.keyword, fullKeyword: it.fullKeyword, kwManual: !!it.kwManual, broadened: !!it.broadened };
+      });
+      r.sortLow = !!b.sortLow;
+      if (b.site === 'done' || (b.site === 'gm' && lane === 'st')) { r.status = 'done'; r.doneAt = 1; }
+      else if (cur === lane) {
+        r.status = 'run'; r.idx = b.idx || 0; r.auto = !!b.auto; r.pendingCandidate = b.pendingCandidate || null; r.adding = b.adding || null;
+        r.redo = !!b.redo; r.resume = b.resume || null; r.notice = b.notice || ''; r.hb = Date.now();
+      } else r.status = 'queued';
+      writeJson(RUNKEY[lane], r);
+    });
+    const nb = { version: 4, startedAt: gen, par: false, items: b.items };
+    writeBase(nb);
+    return nb;
+  }
+  function loadBase() {
+    const b = readJson(KEY);
+    if (!b || !Array.isArray(b.items)) return null;
+    b.items.forEach(normItem);
+    if (b.version !== 4) return migrateLegacy(b);
+    return b;
+  }
+  function writeBase(b) {
+    const o = { version: 4, startedAt: b.startedAt || 0, par: !!b.par, sumAt: b.sumAt || 0,
+      items: b.items.map((it) => { const c = Object.assign({}, it); delete c.st; delete c.gm; delete c.tried; delete c.broadened; delete c.kwManual; return c; }) };
+    GM_setValue(KEY, JSON.stringify(o));
+  }
+  function updateBase(fn) {
+    const b = loadBase();
+    if (!b) return null;
+    fn(b);
+    writeBase(b);
+    return b;
+  }
+  // 이 탭이 11번가/G마켓 페이지면 그 사이트가 lane. 쿠팡 등 다른 페이지는 진행 중인 lane(없으면 st)
+  function pageLane() { const p = detectPage().site; return p === 'st' || p === 'gm' ? p : ''; }
+  function ctxLane(runs) { return pageLane() || (runs.st.status === 'run' ? 'st' : runs.gm.status === 'run' ? 'gm' : 'st'); }
+
+  function loadCart(site, base) {
+    const c = readJson(CARTKEY[site]);
+    if (!c || typeof c !== 'object' || (c.gen || 0) !== ((base && base.startedAt) || 0)) return null;
+    return c;
+  }
+  // 장바구니 전체 할인금액 저장. src: 'auto'(읽음) / 'manual'(직접 입력). 직접 입력한 값은 자동으로 덮어쓰지 않는다
+  function setCart(site, patch, force) {
+    const base = readJson(KEY);
+    if (!base) return null;
+    const gen = base.startedAt || 0;
+    const cur = loadCart(site, { startedAt: gen }) || { gen, cd: 0, src: 'auto', pay: 0, ship: 0, sum: 0, t: 0 };
+    if (cur.src === 'manual' && !force && patch.src !== 'manual') return cur;
+    const nx = Object.assign({}, cur, patch, { gen });
+    writeJson(CARTKEY[site], nx);
+    return nx;
+  }
+  function loadVendor() {
+    const v = readJson(VENDORKEY);
+    return v && typeof v === 'object' && v.brn ? v : null;
+  }
+
+  // lane을 기준으로 합친 상태를 만든다 (lane 생략: 이 탭의 lane)
+  function loadState(lane) {
+    try {
+      const base = loadBase();
+      if (!base) return null;
+      const runs = { st: loadRun('st', base), gm: loadRun('gm', base) };
+      lane = lane || ctxLane(runs);
+      const L = runs[lane];
+      const s = base;
+      s.runs = runs;
+      s.lane = lane;
+      s.items.forEach((it, i) => {
+        it.st = runs.st.res[i] || null;
+        it.gm = runs.gm.res[i] || null;
+        it.tried = { st: runs.st.tried[i] || [], gm: runs.gm.tried[i] || [] };
+        const k = L.kw[i];
+        if (k) {
+          if (k.keyword) it.keyword = k.keyword;
+          if (k.fullKeyword) it.fullKeyword = k.fullKeyword;
+        }
+        it.kwManual = !!(k && k.kwManual);
+        it.broadened = !!(k && k.broadened);
+      });
+      s.site = L.status === 'run' ? lane : (L.status === 'done' ? 'done' : 'idle');
+      s.idx = L.idx || 0;
+      s.auto = !!L.auto;
+      s.sortLow = !!L.sortLow;
+      s.pendingCandidate = L.pendingCandidate || null;
+      s.adding = L.adding || null;
+      s.redo = !!L.redo;
+      s.resume = L.resume || null;
+      s.notice = L.notice || '';
+      s.restock = L.restock || null;
+      s.restockReport = L.restockReport || null;
+      s.cart = { cp: loadCart('cp', base), st: loadCart('st', base), gm: loadCart('gm', base) };
+      s.cartDiscount = { cp: (s.cart.cp && s.cart.cp.cd) || 0, st: (s.cart.st && s.cart.st.cd) || 0, gm: (s.cart.gm && s.cart.gm.cd) || 0 };
       return s;
     } catch (e) {
       return null;
     }
   }
-  function saveState(s) { GM_setValue(KEY, JSON.stringify(s)); }
-  function clearState() { GM_setValue(KEY, ''); }
+  // 한 lane의 키에 쓴다. full: 위치·자동 같은 진행 상태까지(그 lane의 상태일 때), 아니면 결과(res)·tried만
+  function saveLane(s, lane, full) {
+    const L = s.runs[lane];
+    const prev = L.status;
+    L.gen = s.startedAt || 0;
+    if (full) {
+      if (s.site === 'done') L.status = 'done';
+      else if (s.site === lane) L.status = 'run';
+      if (L.status === 'run' && pageLane() === lane) L.hb = Date.now();
+      L.idx = s.idx; L.auto = !!s.auto; L.sortLow = !!s.sortLow; L.pendingCandidate = s.pendingCandidate || null; L.adding = s.adding || null;
+      L.redo = !!s.redo; L.resume = s.resume || null; L.notice = s.notice || ''; L.restock = s.restock || null; L.restockReport = s.restockReport || null;
+      L.kw = {};
+      s.items.forEach((it, i) => { L.kw[i] = { keyword: it.keyword, fullKeyword: it.fullKeyword, kwManual: !!it.kwManual, broadened: !!it.broadened }; });
+    }
+    if (L.status === 'done' && prev !== 'done') L.doneAt = Date.now();
+    else if (L.status !== 'done') L.doneAt = 0;
+    L.res = {}; L.tried = {};
+    s.items.forEach((it, i) => {
+      if (it[lane]) L.res[i] = it[lane];
+      if (it.tried && it.tried[lane] && it.tried[lane].length) L.tried[i] = it.tried[lane];
+    });
+    writeJson(RUNKEY[lane], L);
+  }
+  function saveState(s) {
+    if (!s || (s.lane !== 'st' && s.lane !== 'gm')) return;
+    saveLane(s, s.lane, true);
+  }
+  // 기본 정보(품목 수량·금액 등)를 고친 뒤: 기본 키 + 두 lane의 결과(stale 표시 등)
+  function saveAll(s) {
+    writeBase(s);
+    LANES.forEach((l) => saveLane(s, l, l === s.lane));
+  }
+  // 짧은 갱신: 그 lane의 상태를 읽어 fn으로 고치고 그 lane에만 저장
+  function updateLane(lane, fn) {
+    const s = loadState(lane);
+    if (!s) return null;
+    fn(s);
+    saveState(s);
+    return s;
+  }
+  function clearState() {
+    GM_setValue(KEY, '');
+    LANES.forEach((l) => GM_setValue(RUNKEY[l], ''));
+    ['cp', 'st', 'gm'].forEach((k) => GM_setValue(CARTKEY[k], ''));
+  }
+  // 그 lane이 지금 살아 있는 탭에서 진행 중인가 (하트비트)
+  function laneAlive(r) { return !!r && r.status === 'run' && Date.now() - (r.hb || 0) < LANE_STALE_MS; }
+  function touchHb(lane) {
+    try {
+      const base = readJson(KEY);
+      if (!base) return;
+      const r = loadRun(lane, base);
+      if (r.status !== 'run') return;
+      r.hb = Date.now();
+      writeJson(RUNKEY[lane], r);
+    } catch (e) { /* 무시 */ }
+  }
 
   // side: 검색 화면은 오른쪽 위, 상품 화면은 사이트의 옵션 영역을 가리지 않게 왼쪽 아래가 기본
-  const uiPref = { collapsed: false, side: { search: 'right', product: 'left' }, onlyHigher: true };
+  const uiPref = { collapsed: false, side: { search: 'right', product: 'left' }, onlyHigher: true, parallel: true };
   function loadUi() {
     try {
       const v = GM_getValue(UIKEY, '');
@@ -691,6 +971,7 @@
         if (o && typeof o.collapsed === 'boolean') uiPref.collapsed = o.collapsed;
         if (o && o.side) Object.assign(uiPref.side, o.side);
         if (o && typeof o.onlyHigher === 'boolean') uiPref.onlyHigher = o.onlyHigher;
+        if (o && typeof o.parallel === 'boolean') uiPref.parallel = o.parallel;
       }
     } catch (e) { /* 무시 */ }
   }
@@ -737,11 +1018,35 @@
   }
 
   function gotoSearch(s) {
+    if (!s) { showSummary(); return; }
     if (isRestockSame(s)) { gotoRestock(s); return; }
-    if (!s || s.site === 'done') { showSummary(); return; }
+    if (s.site !== 'st' && s.site !== 'gm') { showSummary(); return; }
     const it = s.items[s.idx];
     if (!it) { showSummary(); return; }
     location.href = searchUrl(s.site, it.keyword || makeKeyword(it.name), !!s.sortLow);
+  }
+  // 그 lane이 지금 열어야 할 주소 (다른 창에서 이어 갈 때). 다시 담기 중이면 기록해 둔 상품 주소
+  function laneResumeUrl(s) {
+    if (s.restock && !s.restock.replacing) {
+      const t = s.restock.targets[s.restock.pos];
+      const p = t && s.items[t.idx] && s.items[t.idx][t.site];
+      if (p && p.url && /^https:\/\//.test(p.url)) return p.url;
+    }
+    const it = s.items[s.idx];
+    return it ? searchUrl(s.lane, it.keyword || makeKeyword(it.name), !!s.sortLow) : '';
+  }
+  // 다른 사이트를 맡을 새 창을 연다. 막히면 null (패널의 "창 열기" 버튼으로 다시 눌러 열 수 있다)
+  function openLaneWindow(lane, url) {
+    try {
+      const sw = (screen && screen.availWidth) || 1280;
+      const sh = (screen && screen.availHeight) || 800;
+      const aw = (screen && screen.availLeft) || 0;
+      const at = (screen && screen.availTop) || 0;
+      const w = Math.max(640, Math.floor(sw / 2));
+      const feat = 'popup=yes,width=' + w + ',height=' + Math.max(600, sh - 40) + ',left=' + (aw + sw - w) + ',top=' + (at + 10);
+      const win = window.open(url, 'cmpLane_' + lane, feat);
+      return win || null;
+    } catch (e) { return null; }
   }
 
   // ------------------------------------------------------------------
@@ -819,21 +1124,120 @@
         let price = 0;
         const bold = $$('span[class*="twc-font-bold"]', div).find((sp) => {
           if (!/^[\d,]+$/.test(txt(sp))) return false;
-          return !sp.closest('[class*="line-through"]');
+          return !sp.closest('[class*="line-through"], del, s, strike');
         });
         if (bold) price = num(txt(bold));
         if (!price) {
           const clone = div.cloneNode(true);
-          $$('[class*="line-through"]', clone).forEach((x) => x.remove());
+          $$('[class*="line-through"], del, s, strike', clone).forEach((x) => x.remove());
           const re = /([\d,]+)\s*원/g;
           const t = clone.textContent || '';
           let m;
           while ((m = re.exec(t))) { price = Math.max(price, num(m[1])); }
         }
-        out.push({ name, option, qty, cpTotal: price });
+        // 굵은 가격에는 "1,000원 쿠폰할인 적용됨"의 쿠폰이 이미 빠져 있다. 품목 금액은 즉시할인만 반영한 가격으로 두고, 쿠폰은 전체 할인금액에 따로 넣는다
+        const coupon = price > 0 ? itemCouponOf(div.textContent) : 0;
+        out.push({ name, option, qty, cpTotal: price + coupon, coupon });
       } catch (e) { /* 한 줄 실패는 건너뜀 */ }
     });
     return out;
+  }
+
+  // ------------------------------------------------------------------
+  // 장바구니 전체 할인금액 / 쿠팡 사업자 정보 읽기 (3.3)
+  // ------------------------------------------------------------------
+  // 쿠팡: 오른쪽 "주문 예상 금액" 상자 (총 상품 가격 / 총 즉시할인 / 총 쿠폰할인 / 총 배송비 / 결제 금액)
+  function coupangBoxFromDom() {
+    const labels = capTextEls(/^\s*주문\s*예상\s*금액\s*$/, 24, 20);
+    for (let k = 0; k < labels.length; k++) {
+      let n = labels[k];
+      for (let i = 0; i < 8 && n && n !== document.body; i++, n = n.parentElement) {
+        const b = parseCoupangBox(n.textContent || '');
+        if (b && b.total != null && b.pay > 0) return b;
+      }
+    }
+    try {
+      const t = ((document.body && document.body.innerText) || '').replace(/\s+/g, ' ');
+      const i = t.indexOf('주문 예상 금액');
+      if (i >= 0) { const b = parseCoupangBox(t.slice(i, i + 400)); if (b && b.total != null && b.pay > 0) return b; }
+    } catch (e) { /* 무시 */ }
+    return null;
+  }
+  // 11번가·G마켓: "결제 예정 금액"(합계) / "총 결제금액" 같은 라벨 바로 옆 금액과, 같은 상자 안의 배송비
+  const PAY_LABEL_RES = [/결제\s*예정\s*금액/, /주문\s*예상\s*금액/, /총\s*결제\s*금액/, /최종\s*결제\s*금액/, /결제\s*예상\s*금액/, /합계/];
+  const SHIP_LABEL_RE = /(?:총\s*)?배송비(?:\s*\([^)]*\))?/;
+  function readCartBox(site) {
+    for (let k = 0; k < PAY_LABEL_RES.length; k++) {
+      const re = PAY_LABEL_RES[k];
+      const labels = capTextEls(re, 24, 40).filter((el) => !capIsNoise(el));
+      for (let li = 0; li < labels.length; li++) {
+        let n = labels[li];
+        for (let i = 0; i < 8 && n && n !== document.body && n !== document.documentElement; i++, n = n.parentElement) {
+          const t = (n.textContent || '').replace(/\s+/g, ' ');
+          const pay = amountAfter(t, re);
+          if (!(pay > 0)) continue;
+          let ship = null;
+          let m = n;
+          for (let j = 0; j < 5 && m && m !== document.body; j++, m = m.parentElement) {
+            const tt = (m.textContent || '').replace(/\s+/g, ' ');
+            if (tt.length > 900) break;
+            const sh = amountAfter(tt, SHIP_LABEL_RE, { free: true });
+            if (sh != null) { ship = sh; break; }
+          }
+          if (re.source === '합계' && ship == null) continue; // 일반 "합계"는 배송비가 함께 있는 상자 안에서만 믿는다
+          return { pay, ship };
+        }
+      }
+    }
+    return null;
+  }
+  // 이 장바구니 화면에서 전체 할인금액을 읽어 저장한다. 읽었으면 저장한 값({cd, pay, ship, sum}), 못 읽었으면 null
+  function readCartNow(site, toast) {
+    try {
+      const base = readJson(KEY);
+      if (!base || !Array.isArray(base.items) || !base.items.length) return null;
+      let pay = 0, ship = null, sum = 0;
+      if (site === 'cp') {
+        const lines = parseCoupangCart();
+        if (!lines.length) return null;
+        sum = lines.reduce((a, ln) => a + (ln.cpTotal || 0), 0);
+        const b = coupangBoxFromDom();
+        if (!b) return null;
+        pay = b.pay;
+        ship = b.ship || 0;
+      } else {
+        const b = readCartBox(site);
+        if (!b) return null;
+        const s = loadState(site);
+        if (!s) return null;
+        sum = s.items.reduce((a, it) => a + pickAmt(it[site]), 0);
+        pay = b.pay;
+        ship = b.ship != null ? b.ship : s.items.reduce((a, it) => a + (it[site] && !it[site].skipped ? shipNumOf(it[site].shipping) : 0), 0);
+      }
+      const cd = calcCartDiscount(sum, ship, pay);
+      const c = setCart(site, { cd, src: 'auto', pay, ship, sum, t: Date.now() });
+      if (toast && c && c.src === 'auto') capToast(SITE_NAME[site] + ' 장바구니 전체 할인금액: ' + fmt(cd) + '원 (결제 예정 ' + fmt(pay) + '원 기준)', cd ? 'ok' : '');
+      return c;
+    } catch (e) { return null; }
+  }
+  // 쿠팡 하단 사업자 정보를 읽어 저장한다
+  function readVendorNow() {
+    try {
+      const cands = $$('footer, #footer, [class*="footer" i], [id*="footer" i]').filter((e) => !e.closest('#cmp-root'))
+        .map((e) => (e.innerText || e.textContent || '').replace(/\s+/g, ' ')).filter((x) => /사업자\s*등?\s*록?\s*번호/.test(x) || /\d{3}-\d{2}-\d{5}/.test(x));
+      cands.sort((a, b) => a.length - b.length);
+      let v = null;
+      for (let i = 0; i < cands.length && !v; i++) v = parseVendorInfo(cands[i]);
+      if (!v) {
+        const t = ((document.body && document.body.innerText) || '').replace(/\s+/g, ' ');
+        const i = t.search(/상호\s*명/);
+        if (i >= 0) v = parseVendorInfo(t.slice(i, i + 700));
+      }
+      if (!v) return null;
+      const rec = Object.assign({}, v, { t: Date.now() });
+      writeJson(VENDORKEY, rec);
+      return rec;
+    } catch (e) { return null; }
   }
 
   // ------------------------------------------------------------------
@@ -1191,8 +1595,9 @@
   // ------------------------------------------------------------------
   // 흐름 제어
   // ------------------------------------------------------------------
-  function advance() {
-    const s = loadState();
+  function advance(lane) {
+    lane = lane || pageLane();
+    const s = loadState(lane);
     if (!s) return;
     s.pendingCandidate = null;
     s.adding = null;
@@ -1210,7 +1615,7 @@
       s.resume = null;
       saveState(s);
       renderAll();
-      showSummary();
+      afterLane(s.lane);
       return;
     }
     if (s.idx + 1 < s.items.length) {
@@ -1219,26 +1624,60 @@
       gotoSearch(s);
       return;
     }
-    if (s.site === 'st') {
-      s.site = 'gm';
-      s.idx = 0;
+    // 이 사이트의 마지막 품목까지 끝남
+    const nx = otherLane(s.lane);
+    const g = s.runs[nx];
+    if (g.status === 'queued') {
+      // 순서대로 진행(병렬 끔): 11번가가 끝나면 같은 탭에서 G마켓을 이어서 시작. 검색어 변경은 이어받는다
+      const auto = s.auto;
+      s.site = 'done';
+      s.auto = false;
       saveState(s);
-      gotoSearch(s);
+      const g2 = loadState(nx);
+      g2.site = nx;
+      g2.idx = 0;
+      g2.auto = auto;
+      g2.sortLow = s.sortLow;
+      g2.items.forEach((it, i) => { const k = s.items[i]; it.keyword = k.keyword; it.fullKeyword = k.fullKeyword; it.kwManual = k.kwManual; it.broadened = k.broadened; });
+      g2.runs[nx].startedAt = Date.now();
+      g2.runs[nx].hb = Date.now();
+      saveState(g2);
+      gotoSearch(g2);
       return;
     }
     s.site = 'done';
-    s.auto = false; // 모두 끝나면 자동 진행도 끝
+    s.auto = false; // 이 사이트가 모두 끝나면 자동 진행도 끝
     saveState(s);
     renderAll();
-    showSummary();
+    afterLane(s.lane);
+  }
+
+  // 한 lane의 흐름(진행·다시 담기·다시 고르기)이 끝났을 때: 다른 사이트도 끝났으면 요약을 연다
+  function afterLane(lane) {
+    try {
+      const base = readJson(KEY);
+      if (!base) { showSummary(); return; }
+      const o = loadRun(otherLane(lane), base);
+      if (o.restock && o.restock.queued) {
+        const s2 = loadState(otherLane(lane));
+        s2.restock.queued = false;
+        saveState(s2);
+        gotoRestock(s2);
+        return;
+      }
+      ui.sawActive = true;
+      if (laneAlive(o)) { renderAll(); return; } // 다른 사이트가 다른 창에서 아직 진행 중: 이 창은 안내만
+      ui.sumHandled = true;
+      showSummary();
+    } catch (e) { showSummary(); }
   }
 
   function skipCurrent() {
     const s = loadState();
-    if (!s || !s.items[s.idx]) return;
+    if (!s || !s.items[s.idx] || (s.site !== 'st' && s.site !== 'gm')) return;
     s.items[s.idx][s.site] = { title: '', url: '', option: '', qty: 0, total: 0, shipping: '', skipped: true };
     saveState(s);
-    advance();
+    advance(s.lane);
   }
 
   // ------------------------------------------------------------------
@@ -1271,28 +1710,53 @@
     });
     return targets;
   }
+  // 그 사이트가 다른 창에서 지금 진행 중인가 (이 탭이 그 사이트 탭이면 아님)
+  function laneBusyElsewhere(lane) {
+    try {
+      const base = readJson(KEY);
+      if (!base) return false;
+      return laneAlive(loadRun(lane, base)) && pageLane() !== lane;
+    } catch (e) { return false; }
+  }
   function startRestock(onlyStale) {
-    const s = loadState();
-    if (!s) return false;
-    const targets = restockTargets(s, onlyStale);
+    const s0 = loadState();
+    if (!s0) return false;
+    const targets = restockTargets(s0, onlyStale);
     if (!targets.length) return false;
-    s.restock = { targets, pos: 0, failed: [], resume: s.site === 'done' ? null : { site: s.site, idx: s.idx } };
-    s.restockReport = null;
-    s.auto = true;
-    s.redo = false;
-    s.resume = null;
-    s.pendingCandidate = null;
-    s.adding = null;
-    saveState(s);
-    gotoRestock(s);
+    const lanes = LANES.filter((l) => targets.some((t) => t.site === l));
+    const busy = lanes.filter(laneBusyElsewhere);
+    if (busy.length) { capToast(SITE_NAME[busy[0]] + '이(가) 다른 창에서 진행 중입니다. 그 창이 끝난 뒤에 눌러 주세요', 'err'); return false; }
+    const par = !!uiPref.parallel && lanes.length === 2;
+    lanes.forEach((l, k) => {
+      const ls = loadState(l);
+      ls.restock = { targets: targets.filter((t) => t.site === l), pos: 0, failed: [], queued: !par && k > 0, resume: ls.site === 'done' || ls.site === 'idle' ? null : { site: ls.site, idx: ls.idx } };
+      ls.restockReport = null;
+      ls.auto = true;
+      ls.redo = false;
+      ls.resume = null;
+      ls.pendingCandidate = null;
+      ls.adding = null;
+      saveState(ls);
+    });
+    if (par) {
+      const sb = loadState(lanes[1]);
+      sb.runs[lanes[1]].hb = Date.now();
+      const url = restockNext(sb);
+      if (url) {
+        const w = openLaneWindow(lanes[1], url);
+        if (!w) capToast(SITE_NAME[lanes[1]] + ' 창이 열리지 않았습니다. 패널의 "' + SITE_NAME[lanes[1]] + ' 창 열기" 버튼을 누르세요', 'err');
+      }
+    }
+    gotoRestock(loadState(lanes[0]));
     return true;
   }
-  function gotoRestock(s) {
+  // 다음 다시 담기 대상으로 옮기고 그 상품 주소를 돌려준다. 더는 없으면 마무리하고 ''
+  function restockNext(s) {
     const r = s && s.restock;
-    if (!r) { gotoSearch(s); return; }
+    if (!r) return '';
     for (;;) {
       const t = r.targets[r.pos];
-      if (!t) { finishRestock(s); return; }
+      if (!t) { finishRestock(s); return ''; }
       const it = s.items[t.idx];
       const p = it && it[t.site];
       if (p && !p.skipped && p.url && /^https:\/\//.test(p.url)) {
@@ -1302,11 +1766,16 @@
         s.pendingCandidate = { url: p.url, shipping: p.shipping || '', title: p.title || '', price: 0, image: p.image || '',
           packN: p.packN || null, packUnit: p.packUnit || null, site: t.site, idx: t.idx, kw: '' };
         saveState(s);
-        location.href = p.url;
-        return;
+        return p.url;
       }
       r.pos += 1;
     }
+  }
+  function gotoRestock(s) {
+    const r = s && s.restock;
+    if (!r) { gotoSearch(s); return; }
+    const url = restockNext(s);
+    if (url) location.href = url;
   }
   function finishRestock(s) {
     const r = s.restock || { replaced: [] };
@@ -1322,7 +1791,7 @@
     if (r.resume) { s.site = r.resume.site; s.idx = r.resume.idx; } else { s.site = 'done'; }
     saveState(s);
     renderAll();
-    showSummary();
+    afterLane(s.lane);
   }
   // 이 상품은 판매 중단·페이지 오류·담기 불가 등으로 다시 담을 수 없으므로, 검색해서 비슷한 상품을 자동으로 담는다
   function restockReplace(s, reason) {
@@ -1330,7 +1799,7 @@
     if (!r) return;
     const t = r.targets[r.pos];
     const it = t && s.items[t.idx];
-    if (!it) { advance(); return; }
+    if (!it) { advance(s.lane); return; }
     const old = it[t.site];
     r.replaced = r.replaced || [];
     r.replaced.push({ site: t.site, idx: t.idx, reason: reason || '' });
@@ -1371,7 +1840,8 @@
         changed += 1;
         refreshStale(it); // 수량이 바뀐 품목만 11번가·G마켓 수량 맞는지 다시 계산
       });
-      saveState(s);
+      saveAll(s);
+      readCartNow('cp', false); // 수량이 바뀌면 쿠폰 할인도 달라질 수 있으니 다시 읽는다
       const staleN = s.items.reduce((n, it) => n + ['st', 'gm'].filter((k) => it[k] && it[k].stale).length, 0);
       let t = changed ? '쿠팡 장바구니의 바뀐 ' + changed + '개 품목을 기록에 반영했습니다.' : '바뀐 수량이 없습니다.';
       if (staleN) t += ' 11번가·G마켓 ' + staleN + '건은 담긴 수량을 다시 맞춰야 합니다.';
@@ -1384,10 +1854,11 @@
   }
 
   function startRedo(i, site) {
-    const s = loadState();
+    if (laneBusyElsewhere(site)) { capToast(SITE_NAME[site] + '이(가) 다른 창에서 진행 중입니다. 그 창이 끝난 뒤에 눌러 주세요', 'err'); return; }
+    const s = loadState(site);
     if (!s || !s.items[i]) return;
     if (!s.redo) {
-      s.resume = s.site === 'done' ? null : { site: s.site, idx: s.idx };
+      s.resume = s.site === 'done' || s.site === 'idle' ? null : { site: s.site, idx: s.idx };
       s.redo = true;
     }
     s.site = site;
@@ -1672,6 +2143,12 @@
 #cmp-root .cmp-table td.cmp-r { text-align: right; }
 #cmp-root .cmp-table td.cmp-nw { white-space: nowrap; }
 #cmp-root .cmp-table tr.cmp-sum td { background: #f8fafc; font-weight: 700; }
+#cmp-root .cmp-table tr.cmp-disc td { background: #fff7ed; }
+#cmp-root .cmp-table tr.cmp-disc td.cmp-r { white-space: normal; }
+#cmp-root input[type="text"].cmp-cdin { width: 92px; min-height: 28px; padding: 2px 6px; text-align: right; }
+#cmp-root .cmp-laneinfo { display: flex; flex-direction: column; gap: 4px; padding: 6px 8px; border-radius: 8px; background: #ecfeff; border: 1px solid #67e8f9; color: #155e75; font-size: 12.5px; }
+#cmp-root .cmp-laneinfo .cmp-lrow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+#cmp-root .cmp-lanebar { position: fixed; left: 12px; top: 12px; z-index: 2147483600; width: 340px; max-width: calc(100vw - 24px); box-shadow: 0 4px 14px rgba(0,0,0,.3); background: #ecfeff; }
 #cmp-root .cmp-sub { display: block; font-size: 11.5px; color: #64748b; font-weight: 400; white-space: normal; text-align: left; }
 #cmp-root .cmp-sub a { color: #2563eb; }
 #cmp-root .cmp-bad { color: #b91c1c; }
@@ -1770,18 +2247,65 @@
     }
   }
 
+  // 한 사이트의 진행 상황 글
+  function laneProgressText(r, n) {
+    if (!r) return '-';
+    if (r.restock) return '다시 담기 ' + (r.restock.pos + 1) + '/' + r.restock.targets.length;
+    if (r.status === 'done') return '끝남';
+    if (r.status === 'run') return (r.idx + 1) + '/' + n + '번째 품목';
+    return '대기';
+  }
+  function allLanesDone(s) { return LANES.every((l) => s.runs[l].status === 'done'); }
+
+  // 이어서 진행: 끝나지 않은 사이트를 이어 간다. 병렬이면 이 탭은 한 사이트를, 다른 사이트는 새 창에서
+  function resumeAll() {
+    const s0 = loadState();
+    if (!s0) return;
+    const runs = s0.runs;
+    const pend = LANES.filter((l) => runs[l].status === 'run' || runs[l].status === 'queued' || (runs[l].restock && runs[l].restock.queued));
+    if (!pend.length) { showSummary(); return; }
+    const running = pend.filter((l) => runs[l].status === 'run');
+    let mine = running.indexOf(pageLane()) >= 0 ? pageLane() : (running[0] || pend[0]);
+    const par = !!uiPref.parallel && running.length === 2;
+    if (par) {
+      const oth = otherLane(mine);
+      if (!laneAlive(runs[oth])) {
+        const so = loadState(oth);
+        const u = laneResumeUrl(so);
+        if (u) {
+          const ro = so.runs[oth];
+          ro.hb = Date.now();
+          writeJson(RUNKEY[oth], ro);
+          if (!openLaneWindow(oth, u)) { ro.hb = 0; writeJson(RUNKEY[oth], ro); }
+        }
+      }
+    }
+    const s = loadState(mine);
+    if (s.site !== mine && runs[mine].status === 'queued') { s.site = mine; s.idx = 0; saveState(s); }
+    if (s.restock) { s.auto = true; saveState(s); }
+    gotoSearch(s);
+  }
+
   function showPrevChoice(prev) {
-    const where = prev.site === 'done' ? '모두 끝남(요약 확인 가능)' : SITE_NAME[prev.site] + ' ' + (prev.idx + 1) + '/' + prev.items.length + '번째 품목';
+    const where = allLanesDone(prev) ? '모두 끝남(요약 확인 가능)' : LANES.map((l) => SITE_NAME[l] + ' ' + laneProgressText(prev.runs[l], prev.items.length)).join(' · ');
     const body = h('div', null,
       h('p', { text: '이전에 진행하던 비교견적 기록이 있습니다.' }),
       h('p', { class: 'cmp-hint', text: '품목 ' + prev.items.length + '개 · 진행 위치: ' + where }));
     const foot = [
-      h('button', { class: 'cmp-btn cmp-primary', text: '이어서 하기', onclick: () => { closeModal(); const s = loadState(); if (s.site === 'done') showSummary(); else gotoSearch(s); } }),
+      h('button', { class: 'cmp-btn cmp-primary', text: '이어서 하기', onclick: () => { closeModal(); const s = loadState(); if (s && allLanesDone(s)) showSummary(); else resumeAll(); } }),
       h('button', { class: 'cmp-btn', text: '요약 보기', onclick: () => showSummary() }),
       h('button', { class: 'cmp-btn', text: '처음부터 다시', onclick: () => showCartList() }),
       h('button', { class: 'cmp-btn', text: '닫기', onclick: closeModal }),
     ];
     openModal('비교견적', body, foot);
+  }
+
+  // 설정: 11번가·G마켓 동시에 진행(기본 켬). 끄면 11번가 다음 G마켓 순서로 한 탭에서
+  function parallelSwitch() {
+    const c = h('input', { type: 'checkbox', checked: !!uiPref.parallel });
+    c.setAttribute('aria-label', '11번가·G마켓 동시에 진행');
+    c.addEventListener('change', () => { uiPref.parallel = c.checked; saveUi(); });
+    return h('label', { class: 'cmp-chk', title: '켜면 자동 진행·다시 담기에서 이 탭은 11번가를, 새 창은 G마켓을 동시에 맡습니다' }, c, h('span', { text: '11번가·G마켓 동시에 진행(새 창)' }));
   }
 
   function showCartList() {
@@ -1795,6 +2319,7 @@
       body.appendChild(h('div', { class: 'cmp-empty', text: '장바구니 물품을 찾지 못했습니다. 페이지가 모두 불러와진 뒤 다시 눌러 주세요.' }));
     } else {
       body.appendChild(h('div', { class: 'cmp-hint', text: '비교할 물품을 확인하세요. 품명은 쿠팡 상품명에서 상표·꾸밈말을 뺀 이름이며 검색어와 관련 상품 판별에 쓰이니 고쳐도 됩니다. 묶음 개수(상품명·옵션에서 읽은 값)와 수량(묶음 수)을 맞게 고치면 필요 개수와 쿠팡 개당 가격이 계산됩니다. 쿠팡 금액은 수량을 바꿔도 자동으로 바뀌지 않으니 이 물품의 합계 금액으로 입력하세요.' }));
+      body.appendChild(h('div', { class: 'cmp-hint', text: '"자동으로 전부 담기"는 "11번가·G마켓 동시에 진행"이 켜져 있으면 이 탭에서 11번가를, 새 창에서 G마켓을 함께 진행합니다. 크롬은 가려진 창을 느리게 하므로 두 창을 나란히 놓아 둘 다 보이게 하세요. 새 창이 막히면 패널의 "G마켓 창 열기" 버튼을 누르세요.' }));
       body.appendChild(h('div', { class: 'cmp-hint', text: '"11번가부터 시작"은 후보를 직접 고르고, "자동으로 전부 담기"는 쿠팡보다 비싼 후보를 자동으로 골라 장바구니까지 담습니다(구매·결제는 하지 않으며, 패널의 "자동 멈춤"으로 언제든 멈출 수 있습니다).' }));
       lines.forEach((ln) => {
         const pk = parsePack(ln.option) || parsePack(ln.name); // 옵션에서 읽은 값을 상품명보다 우선
@@ -1888,8 +2413,21 @@
         });
       });
       if (!items.length) { showMsg('비교할 물품을 하나 이상 선택하세요'); return; }
-      const state = { version: 3, items, site: 'st', idx: 0, startedAt: Date.now(), sortLow: false, pendingCandidate: null, redo: false, resume: null, notice: '', auto: !!auto, adding: null };
-      saveState(state);
+      const par = !!auto && !!uiPref.parallel;
+      const now = Date.now();
+      writeBase({ version: 4, startedAt: now, par, items });
+      const mk = (status) => { const r = freshRun(now); r.status = status; r.auto = !!auto; r.hb = now; r.startedAt = now; return r; };
+      writeJson(RUNKEY.st, mk('run'));
+      writeJson(RUNKEY.gm, mk(par ? 'run' : 'queued'));
+      ['cp', 'st', 'gm'].forEach((k) => GM_setValue(CARTKEY[k], ''));
+      readCartNow('cp', false); // 쿠팡 장바구니 전체 할인금액(쿠폰 등)
+      readVendorNow(); // 쿠팡 하단 사업자 정보
+      saveUi();
+      if (par) {
+        // 이 탭은 11번가, 새 창은 G마켓. 창 열기는 버튼을 누른 바로 이 순간에 해야 막히지 않는다
+        const w = openLaneWindow('gm', searchUrl('gm', items[0].keyword, false));
+        if (!w) { const g = freshRun(now); g.status = 'run'; g.auto = true; g.hb = 0; g.startedAt = now; writeJson(RUNKEY.gm, g); }
+      }
       location.href = searchUrl('st', items[0].keyword, false);
     };
 
@@ -1897,6 +2435,7 @@
       h('button', { class: 'cmp-btn cmp-primary', text: '11번가부터 시작', disabled: !lines.length, onclick: () => start(false) }),
       h('button', { class: 'cmp-btn cmp-primary', text: '자동으로 전부 담기', disabled: !lines.length, onclick: () => start(true) }),
       h('button', { class: 'cmp-btn', text: '닫기', onclick: closeModal }),
+      parallelSwitch(),
       msg,
     ];
     openModal('비교견적 대상 물품 (' + lines.length + '개 발견)', body, foot);
@@ -1926,10 +2465,15 @@
       ].join('\t'));
     });
     lines.push(['합계', '', '', a, '', b, '', c].join('\t'));
+    const cd = s.cartDiscount || {};
+    const dc = cd.cp || 0, ds = cd.st || 0, dg = cd.gm || 0;
+    lines.push(['전체 할인금액(장바구니 쿠폰 등)', '', '', dc, '', ds, '', dg].join('\t'));
+    lines.push(['합계(할인 반영)', '', '', a - dc, '', b - ds, '', c - dg].join('\t'));
     return lines.join('\n');
   }
 
   function showSummary() {
+    try { const pg0 = detectPage(); if (/-cart$/.test(pg0.kind)) readCartNow(pg0.site, false); } catch (e) { /* 무시 */ }
     const s = loadState();
     if (!s || !s.items.length) {
       openModal('비교견적 요약',
@@ -2025,26 +2569,76 @@
       h('td', { text: '' }), h('td', { class: 'cmp-r', text: fmt(a) + '원' }),
       h('td', { text: '' }), h('td', { class: 'cmp-r', text: fmt(b) + '원' }),
       h('td', { text: '' }), h('td', { class: 'cmp-r', text: fmt(c) + '원' })));
+    // 전체 할인금액(장바구니 쿠폰 등): 사이트별. 장바구니 화면에서 자동으로 읽고, 숫자를 직접 고칠 수 있다(고치면 기억)
+    const itemSums = { cp: a, st: b, gm: c };
+    const netEls = {};
+    const noteEls = {};
+    const discTr = h('tr', { class: 'cmp-disc' }, h('td', { colspan: '2' }, h('b', { text: '전체 할인금액' }), h('span', { class: 'cmp-sub', text: '(장바구니 쿠폰 등. 품목 금액은 즉시할인 반영가)' })));
+    const netTr = h('tr', { class: 'cmp-sum' }, h('td', { colspan: '2', text: '합계(할인 반영)' }));
+    const cartNote = (site) => {
+      const ct = s.cart && s.cart[site];
+      if (ct && ct.src === 'manual') return '직접 입력';
+      if (ct && ct.pay) return '결제 예정 ' + fmt(ct.pay) + '원 기준 자동 계산';
+      return '읽지 못함. ' + SITE_NAME[site] + ' 장바구니 화면에서 "요약 보기"를 누르면 읽습니다';
+    };
+    const updNet = () => {
+      ['cp', 'st', 'gm'].forEach((k) => { netEls[k].textContent = fmt(itemSums[k] - (s.cartDiscount[k] || 0)) + '원'; });
+    };
+    ['cp', 'st', 'gm'].forEach((site) => {
+      const inp = h('input', { type: 'text', value: fmt(s.cartDiscount[site] || 0), class: 'cmp-cdin' });
+      inp.setAttribute('aria-label', SITE_NAME[site] + ' 전체 할인금액');
+      inp.setAttribute('inputmode', 'numeric');
+      const note = h('span', { class: 'cmp-sub', text: cartNote(site) });
+      noteEls[site] = note;
+      inp.addEventListener('change', () => {
+        const raw = inp.value.trim();
+        if (raw === '') {
+          setCart(site, { cd: 0, src: 'auto', t: Date.now() }, true);
+          const pg1 = detectPage();
+          if (pg1.site === site && /-cart$/.test(pg1.kind)) readCartNow(site, false);
+        } else {
+          setCart(site, { cd: Math.max(0, num(raw)), src: 'manual', t: Date.now() }, true);
+        }
+        const s2 = loadState();
+        s.cart = s2.cart; s.cartDiscount = s2.cartDiscount;
+        inp.value = fmt(s.cartDiscount[site] || 0);
+        note.textContent = cartNote(site);
+        updNet();
+      });
+      discTr.appendChild(h('td', { class: 'cmp-r' }, note));
+      discTr.appendChild(h('td', { class: 'cmp-r' }, h('span', { text: '-' }), inp, h('span', { text: '원' })));
+      netEls[site] = h('b', { text: '' });
+      netTr.appendChild(h('td', { text: '' }));
+      netTr.appendChild(h('td', { class: 'cmp-r' }, netEls[site]));
+    });
+    tbody.appendChild(discTr);
+    tbody.appendChild(netTr);
+    updNet();
 
     const staleCount = s.items.reduce((n, it) => n + ['st', 'gm'].filter((k) => it[k] && it[k].stale).length, 0);
     const pickCount = restockTargets(s, false).length;
     const rrName = (f) => { const it = s.items[f.idx]; return SITE_NAME[f.site] + ' ' + ((it && (it.pname || shortName(it.name, 16))) || '?') + (f.reason ? ' (' + f.reason + ')' : ''); };
-    if (s.restockReport && s.restockReport.replaced && s.restockReport.replaced.length) {
-      body.appendChild(h('div', { class: 'cmp-msg cmp-warn', style: 'display:block;margin-bottom:8px', text: '기록해 둔 상품을 담을 수 없어 비슷한 상품으로 바꿔 담았습니다: ' + s.restockReport.replaced.map(rrName).join(' / ') + '. 표에서 바뀐 상품이 맞는지 확인하세요.' }));
+    const rep0 = { replaced: [], failed: [] };
+    let hasRep = false;
+    LANES.forEach((l) => { const r = s.runs[l].restockReport; if (r) { hasRep = true; rep0.replaced = rep0.replaced.concat(r.replaced || []); rep0.failed = rep0.failed.concat(r.failed || []); } });
+    const anyRestock = LANES.some((l) => s.runs[l].restock);
+    if (rep0.replaced.length) {
+      body.appendChild(h('div', { class: 'cmp-msg cmp-warn', style: 'display:block;margin-bottom:8px', text: '기록해 둔 상품을 담을 수 없어 비슷한 상품으로 바꿔 담았습니다: ' + rep0.replaced.map(rrName).join(' / ') + '. 표에서 바뀐 상품이 맞는지 확인하세요.' }));
     }
-    if (s.restockReport && s.restockReport.failed && s.restockReport.failed.length) {
-      body.appendChild(h('div', { class: 'cmp-msg cmp-warn', style: 'display:block;margin-bottom:8px', text: '비슷한 상품도 찾지 못한 것이 있습니다: ' + s.restockReport.failed.map(rrName).join(' / ') + '. 표의 "다시" 버튼으로 직접 고르세요.' }));
-    } else if (s.restockReport && !(s.restockReport.replaced && s.restockReport.replaced.length)) {
+    if (rep0.failed.length) {
+      body.appendChild(h('div', { class: 'cmp-msg cmp-warn', style: 'display:block;margin-bottom:8px', text: '비슷한 상품도 찾지 못한 것이 있습니다: ' + rep0.failed.map(rrName).join(' / ') + '. 표의 "다시" 버튼으로 직접 고르세요.' }));
+    } else if (hasRep && !rep0.replaced.length) {
       body.appendChild(h('div', { class: 'cmp-msg cmp-ok', style: 'display:block;margin-bottom:8px', text: '기록해 둔 상품을 모두 다시 담았습니다. 11번가·G마켓 장바구니에서 수량과 금액을 확인하세요.' }));
     }
     if (staleCount) {
       body.appendChild(h('div', { class: 'cmp-msg cmp-warn', style: 'display:block;margin-bottom:8px', text: '쿠팡 수량이 바뀌어 11번가·G마켓 ' + staleCount + '건의 수량이 맞지 않습니다. 장바구니가 비어 있으면 아래 "다시 담기"를 누르세요. 이미 담긴 상품이 남아 있으면 중복되므로 그 장바구니에서 해당 상품을 먼저 지운 뒤 누르세요.' }));
     }
-    if (s.site !== 'done') {
-      body.appendChild(h('div', { class: 'cmp-msg cmp-warn', style: 'display:block;margin-bottom:8px', text: '아직 진행 중입니다: ' + SITE_NAME[s.site] + ' ' + (s.idx + 1) + '/' + s.items.length + '번째 품목.' }));
+    if (!allLanesDone(s)) {
+      const parts = LANES.filter((l) => s.runs[l].status !== 'done').map((l) => SITE_NAME[l] + ' ' + laneProgressText(s.runs[l], s.items.length) + (s.runs[l].status === 'run' ? (laneAlive(s.runs[l]) ? ' (진행 중)' : ' (멈춤)') : ''));
+      body.appendChild(h('div', { class: 'cmp-msg cmp-warn', style: 'display:block;margin-bottom:8px', text: '아직 끝나지 않았습니다: ' + parts.join(' / ') + '.' }));
     }
     body.appendChild(h('div', { style: 'overflow-x:auto' }, h('table', { class: 'cmp-table' }, h('thead', null, head1, head2), tbody)));
-    body.appendChild(h('div', { class: 'cmp-hint', text: '합계는 기록된 품목만 더한 값입니다. 건너뛰었거나 미진행인 품목이 있으면 쿠팡 합계와 단순 비교하지 마세요. 단가는 1쌍 = 2개로 환산한 개당 가격입니다.' }));
+    body.appendChild(h('div', { class: 'cmp-hint', text: '품목 금액은 세 곳 모두 즉시할인이 반영된 최종 판매가이고, 장바구니 전체에 붙는 쿠폰 같은 할인만 "전체 할인금액"에 따로 넣습니다(결제 예정 금액과 같아지도록 사이트 장바구니 화면에서 읽거나, 숫자를 직접 고치세요). 합계는 기록된 품목만 더한 값입니다. 건너뛰었거나 미진행인 품목이 있으면 쿠팡 합계와 단순 비교하지 마세요. 단가는 1쌍 = 2개로 환산한 개당 가격입니다.' }));
     body.appendChild(h('div', { class: 'cmp-hint', text: '빨간 표시는 개당 가격이 쿠팡과 같거나 쿠팡보다 싼 경우입니다(비교견적은 쿠팡보다 비싸야 합니다). 장바구니 화면을 캡처해 견적서로 쓰세요.' }));
     body.appendChild(h('div', { class: 'cmp-btns', style: 'margin-top:6px' },
       h('a', { class: 'cmp-btn', href: CART_URL.cp, target: '_blank', rel: 'noopener', text: '쿠팡 장바구니' }),
@@ -2062,20 +2656,16 @@
           },
         }));
         foot.appendChild(h('button', { class: 'cmp-btn cmp-primary', text: '물품구입비 서류 만들기(hwpx)', onclick: () => showDocForm() }));
-        if (s.site !== 'done' || s.restock) {
-          foot.appendChild(h('button', { class: 'cmp-btn cmp-success', text: '이어서 진행', onclick: () => {
-            closeModal();
-            const s2 = loadState();
-            if (s2 && s2.restock) { s2.auto = true; saveState(s2); }
-            gotoSearch(loadState());
-          } }));
+        if (!allLanesDone(s) || anyRestock) {
+          foot.appendChild(h('button', { class: 'cmp-btn cmp-success', text: '이어서 진행', onclick: () => { closeModal(); resumeAll(); } }));
         }
-        if (pickCount && !s.restock) {
+        if (pickCount && !anyRestock) {
           foot.appendChild(h('button', { class: 'cmp-btn cmp-success', text: '11번가·G마켓 다시 담기(' + pickCount + '건)', title: '기록해 둔 상품 주소와 옵션으로 장바구니를 다시 채웁니다. 구매·결제는 하지 않습니다', onclick: () => { closeModal(); startRestock(false); } }));
           if (staleCount && staleCount < pickCount) {
             foot.appendChild(h('button', { class: 'cmp-btn cmp-success', text: '수량 바뀐 것만 다시 담기(' + staleCount + '건)', onclick: () => { closeModal(); startRestock(true); } }));
           }
         }
+        foot.appendChild(parallelSwitch());
         foot.appendChild(h('button', { class: 'cmp-btn cmp-danger', text: '기록 지우기(초기화)', onclick: () => { confirming = true; drawFoot(); } }));
         foot.appendChild(h('button', { class: 'cmp-btn', text: '닫기', onclick: closeModal }));
         foot.appendChild(copyMsg);
@@ -2108,6 +2698,10 @@
       const state = loadState();
 
       if (pg.kind === 'cp-cart') {
+        if (ui.cartReadHref !== location.href) {
+          ui.cartReadHref = location.href;
+          (async () => { let v = null, c = null; for (let i = 0; i < 25; i++) { if (!v) v = readVendorNow(); if (state && !c) c = readCartNow('cp', false); if (v && (c || !state)) return; await sleep(1000); } })();
+        }
         dock.appendChild(h('div', { class: 'cmp-cartbar' },
           state && state.items.length ? h('button', { class: 'cmp-capfab', text: '수량 변경 반영', title: '쿠팡 장바구니에서 바꾼 수량을 비교견적 기록에 반영합니다', onclick: syncFromCoupang }) : null,
           h('button', { class: 'cmp-capfab', text: '견적서 캡처', onclick: () => capStart('cp') }),
@@ -2145,6 +2739,13 @@
             if (active) { uiPref.collapsed = false; saveUi(); renderAll(); } else showSummary();
           },
         }));
+        const li = pg.site && state ? buildLaneInfo(state, pg.site) : null;
+        if (li) { li.classList.add('cmp-lanebar'); dock.appendChild(li); }
+      }
+      // 장바구니 화면을 열면 전체 할인금액(쿠폰 등)과 쿠팡 사업자 정보를 읽어 둔다
+      if (/-cart$/.test(pg.kind) && state && ui.cartReadHref !== location.href) {
+        ui.cartReadHref = location.href;
+        (async () => { for (let i = 0; i < 25; i++) { if (readCartNow(pg.site, false)) return; await sleep(1000); } })();
       }
     } catch (e) {
       try {
@@ -2152,6 +2753,46 @@
         dock.appendChild(h('div', { class: 'cmp-msg cmp-err', style: 'display:block;position:fixed;right:12px;bottom:12px;z-index:2147483600', text: '비교견적 도우미 오류: ' + errMsg(e) }));
       } catch (e2) { /* 포기 */ }
     }
+  }
+
+  // 두 사이트를 동시에 진행할 때 "다른 창" 상황을 보여 주는 상자. 보여 줄 내용이 없으면 null
+  function buildLaneInfo(state, lane) {
+    if (!state || !state.runs || (lane !== 'st' && lane !== 'gm')) return null;
+    const oth = otherLane(lane);
+    const mr = state.runs[lane];
+    const or = state.runs[oth];
+    const n = state.items.length;
+    const rows = [];
+    if (mr.status === 'done') rows.push(h('div', { class: 'cmp-lrow' }, h('b', { text: SITE_NAME[lane] + ' 진행이 끝났습니다.' })));
+    if (or.status === 'run') {
+      const pr = laneProgressText(or, n);
+      if (laneAlive(or)) {
+        rows.push(h('div', { class: 'cmp-lrow', text: '다른 창: ' + SITE_NAME[oth] + ' ' + pr + ' 진행 중' }));
+      } else {
+        rows.push(h('div', { class: 'cmp-lrow' }, h('span', { text: SITE_NAME[oth] + ' 창이 보이지 않습니다 (' + pr + ').' }),
+          h('button', { class: 'cmp-btn cmp-small cmp-primary', text: SITE_NAME[oth] + ' 창 열기', onclick: () => {
+            const so = loadState(oth);
+            if (!so) return;
+            const u = laneResumeUrl(so);
+            if (!u) return;
+            const ro = so.runs[oth];
+            ro.hb = Date.now();
+            writeJson(RUNKEY[oth], ro);
+            if (!openLaneWindow(oth, u)) { ro.hb = 0; writeJson(RUNKEY[oth], ro); capToast('창이 열리지 않았습니다. 브라우저의 팝업 허용을 확인하세요', 'err'); }
+          } })));
+      }
+      if (mr.status === 'run') {
+        rows.push(h('div', { class: 'cmp-lrow cmp-sub', text: '크롬은 가려진 창을 느리게 하므로 두 창을 나란히 놓아 둘 다 보이게 하세요. 한쪽이 멈춰도 다른 쪽은 계속 진행됩니다.' }));
+      }
+    } else if (or.status === 'done' && mr.status === 'done') {
+      rows.push(h('div', { class: 'cmp-lrow' }, h('span', { text: '두 사이트 모두 끝났습니다. 요약은 마지막으로 끝난 창에서 열립니다.' }),
+        h('button', { class: 'cmp-btn cmp-small cmp-primary', text: '요약 보기', onclick: () => showSummary() })));
+    } else if (or.status === 'done' && mr.status === 'run') {
+      rows.push(h('div', { class: 'cmp-lrow', text: SITE_NAME[oth] + '은(는) 이미 끝났습니다.' }));
+    }
+    if (!rows.length) return null;
+    const box = h('div', { id: 'cmp-laneinfo', class: 'cmp-laneinfo' }, rows);
+    return box;
   }
 
   function renderPanel(dock, state, pg, isSearch) {
@@ -2182,6 +2823,9 @@
           h('span', { id: 'cmp-auto-detail', class: 'cmp-autodetail' + (ui.autoWarn ? ' cmp-autowarn' : ''), text: ui.autoDetail || '' })),
         h('button', { class: 'cmp-btn cmp-stop', text: '자동 멈춤', onclick: stopAuto })));
     }
+    ui.sawActive = true;
+    const li = buildLaneInfo(state, pg.site);
+    if (li) panel.appendChild(li);
     panel.appendChild(h('div', { class: 'cmp-name cmp-clamp2', text: item.name + (item.option ? ' (' + item.option + ')' : '') }));
     panel.appendChild(h('div', { class: 'cmp-meta', text:
       '필요 ' + packText(item.needUnits, item.packUnit) + ' (' + packText(item.packN, item.packUnit) + ' × ' + item.qty + ') · 쿠팡 ' + fmt(item.cpTotal) + '원 · ' + perLabel(item.packUnit) + ' ' + (item.cpUnitPrice ? fmtP(item.cpUnitPrice) + '원' : '-') }));
@@ -3576,7 +4220,16 @@
   function saveDocPrefs(F) {
     try {
       const o = {};
-      DOC_PREF_KEYS.forEach((k) => { if (typeof F[k] === 'string') o[k] = F[k]; });
+      const old = loadDocPrefs();
+      DOC_PREF_KEYS.forEach((k) => {
+        if (k === 'vendor') {
+          // 지출처는 사용자가 직접 고친 값만 기억한다(쿠팡 하단에서 읽은 값·기본값은 매번 새로 채움)
+          if (F.vendorTouched && typeof F.vendor === 'string') o.vendor = F.vendor;
+          else if (typeof old.vendor === 'string' && old.vendor && old.vendor !== DEFAULT_VENDOR) o.vendor = old.vendor;
+          return;
+        }
+        if (typeof F[k] === 'string') o[k] = F[k];
+      });
       GM_setValue(DOCKEY, JSON.stringify(o));
     } catch (e) { /* 무시 */ }
   }
@@ -3675,6 +4328,11 @@
     const prefs = loadDocPrefs();
     const now = new Date();
     const pv = (k, d) => (typeof prefs[k] === 'string' ? prefs[k] : d);
+    // 지출처: 직접 고쳐 둔 값 > 쿠팡 하단에서 읽은 값 > 기본값
+    const vRec = loadVendor();
+    const vendorInit = (typeof prefs.vendor === 'string' && prefs.vendor && prefs.vendor !== DEFAULT_VENDOR)
+      ? { value: prefs.vendor, label: '이전에 직접 고친 값입니다' }
+      : (vRec ? { value: vendorLine(vRec), label: '쿠팡 사이트 하단 사업자 정보에서 자동으로 채웠습니다. 고치면 다음에도 그 값을 씁니다' } : { value: DEFAULT_VENDOR, label: '기본값입니다. 쿠팡 장바구니 화면을 열면 사이트 하단에서 읽어 채웁니다' });
 
     // ---- 값 (F) ----
     const F = {
@@ -3682,7 +4340,7 @@
       docNo: pv('docNo', defaultDocNo(now)), docDate: fmtDocDate(now),
       title: pv('title', '물품구입비'), biz: pv('biz', '장애인자립생활지원사업'), intro: '', content: '',
       when: pv('when', ''), place: pv('place', ''), target: pv('target', ''),
-      vendor: pv('vendor', DEFAULT_VENDOR), payDate: fmtKorDate(addDaysDate(now, 1)), payMethod: pv('payMethod', '카드결제'),
+      vendor: vendorInit.value, vendorTouched: false, payDate: fmtKorDate(addDaysDate(now, 1)), payMethod: pv('payMethod', '카드결제'),
       gwan: pv('gwan', ''), hang: pv('hang', ''), mok: pv('mok', ''), semok: pv('semok', ''), source: pv('source', '보조금'),
       ap1: pv('ap1', ''), ap2: pv('ap2', ''), ap3: pv('ap3', ''), attach: '',
       survDate: '', surveyor: pv('surveyor', ''), checker: pv('checker', ''),
@@ -3707,7 +4365,10 @@
     });
     const shipInit = (site) => s.items.reduce((a, it) => a + (it[site] && !it[site].skipped ? shipNumOf(it[site].shipping) : 0), 0);
     const ship = { cp: 0, st: shipInit('st'), gm: shipInit('gm') };
+    const disc = { cp: (s.cartDiscount && s.cartDiscount.cp) || 0, st: (s.cartDiscount && s.cartDiscount.st) || 0, gm: (s.cartDiscount && s.cartDiscount.gm) || 0 };
     const shipIn = {};
+    const discIn = {};
+    const netEls = {};
     const sumOf = (key) => rows.reduce((a, r) => a + (num(r[key]) || 0), 0);
     const totEls = {};
     const msg = h('div', { class: 'cmp-msg', style: 'flex:1 1 100%' });
@@ -3724,12 +4385,15 @@
       if (auto.contractDate) setF('contractDate', pd ? fmtDocDate(pd) : '');
       if (auto.dueDate) setF('dueDate', pd ? fmtDocDate(addDaysDate(pd, 3)) : '');
       if (auto.inspectDate) setF('inspectDate', F.dueDate);
-      if (auto.amount) setF('amount', String(sumOf('cp') + (num(ship.cp) || 0)));
+      if (auto.amount) setF('amount', String(sumOf('cp') + (num(ship.cp) || 0) - (num(disc.cp) || 0)));
       if (auto.attach) {
         setF('attach', attachmentLines({ survey: F.incSurvey, quotes: F.incQuote ? capSites.length : 0, inspection: F.incInsp }).join('\n'));
       }
       Object.keys(sections).forEach((k) => { sections[k].style.opacity = F[k] ? '' : '.45'; });
-      ['cp', 'st', 'gm'].forEach((k) => { if (totEls[k]) totEls[k].textContent = fmt(sumOf(k)) + '원'; });
+      ['cp', 'st', 'gm'].forEach((k) => {
+        if (totEls[k]) totEls[k].textContent = fmt(sumOf(k)) + '원';
+        if (netEls[k]) netEls[k].textContent = fmt(sumOf(k) + (num(ship[k]) || 0) - (num(disc[k]) || 0)) + '원';
+      });
     };
     let prefTimer = 0;
     const onEdit = () => {
@@ -3747,11 +4411,12 @@
       inp.value = F[key];
       inp.addEventListener('input', () => {
         F[key] = inp.value;
+        if (key === 'vendor') F.vendorTouched = true;
         if (Object.prototype.hasOwnProperty.call(auto, key)) auto[key] = false;
         onEdit();
       });
       E[key] = inp;
-      return h('label', { class: 'cmp-f' + (opts.wide ? ' cmp-w2' : '') }, h('span', { text: label }), inp);
+      return h('label', { class: 'cmp-f' + (opts.wide ? ' cmp-w2' : '') }, h('span', { text: label }), inp, opts.hint ? h('span', { class: 'cmp-sub', text: opts.hint }) : null);
     };
     const selectField = (key, label, values) => {
       const sel = h('select', { 'aria-label': label }, values.map((v) => h('option', { value: v, text: v })));
@@ -3788,7 +4453,7 @@
       field('intro', '첫 문장(제목·사업 문구에 맞춰 자동으로 만들어지며, 고치면 더는 바뀌지 않습니다)', { wide: true, area: true, rows: 2 }),
       field('content', '내용', { wide: true }),
       field('when', '일시'), field('place', '장소'), field('target', '대상', { wide: true }),
-      field('vendor', '지출처', { wide: true }),
+      field('vendor', '지출처', { wide: true, hint: vendorInit.label }),
       field('payDate', '지출일'), field('payMethod', '지출방법'),
       field('gwan', '예산과목 관'), field('hang', '예산과목 항'), field('mok', '예산과목 목'), field('semok', '예산과목 세목'),
       selectField('source', '재원', ['보조금', '자부담']),
@@ -3803,7 +4468,7 @@
 
     body.appendChild(section('incInsp', '물품검수조서', [
       field('contractName', '계약건명(제목을 따라갑니다)', { wide: true }),
-      field('supplier', '납품자'), field('amount', '계약금액(쿠팡 합계 + 쿠팡 배송비)', { type: 'number' }),
+      field('supplier', '납품자'), field('amount', '계약금액(쿠팡 합계 + 쿠팡 배송비)', { type: 'number', hint: '장바구니 할인이 있으면 전체 할인금액을 뺀 값입니다' }),
       field('contractDate', '계약체결일(지출일)'), field('dueDate', '납품기한(+3일)'),
       field('inspectDate', '검수일(납품기한)'), field('invPlace', '검수장소'),
       field('inspector', '검수자'), field('witness', '입회자'),
@@ -3854,6 +4519,9 @@
     const sumRow = h('tr', { class: 'cmp-sum' }, h('td', { text: '합계', colspan: '5' }));
     ['cp', 'st', 'gm'].forEach((k) => { totEls[k] = h('b', { text: '' }); sumRow.appendChild(h('td', { class: 'cmp-r' }, totEls[k])); });
     tbody.appendChild(sumRow);
+    const netRow = h('tr', { class: 'cmp-sum' }, h('td', { text: '합계(배송비 더하고 전체 할인금액 뺌)', colspan: '5' }));
+    ['cp', 'st', 'gm'].forEach((k) => { netEls[k] = h('b', { text: '' }); netRow.appendChild(h('td', { class: 'cmp-r' }, netEls[k])); });
+    tbody.appendChild(netRow);
     body.appendChild(h('div', { class: 'cmp-fsec', text: '품목 (서류에 들어갈 값을 고칠 수 있습니다)' }));
     body.appendChild(h('div', { style: 'overflow-x:auto' }, h('table', { class: 'cmp-table cmp-itbl' },
       h('thead', null, h('tr', null, ['품명', '규격', '단위', '수량', '단가', '쿠팡 금액', '11번가 금액', 'G마켓 금액'].map((t) => h('th', { text: t })))), tbody)));
@@ -3872,6 +4540,20 @@
     });
     body.appendChild(shipGrid);
     body.appendChild(h('div', { class: 'cmp-hint', text: '11번가·G마켓은 담은 상품에 기록된 배송비("3,000원")를 더한 값이고 "무료"는 0입니다. 같은 판매자 배송비가 겹쳤다면 고쳐 주세요.' }));
+
+    // ---- 전체 할인금액(장바구니 쿠폰 등) ----
+    body.appendChild(h('div', { class: 'cmp-fsec', text: '장바구니 할인 (전체 할인금액, 원, 없으면 0)' }));
+    const discGrid = h('div', { class: 'cmp-fgrid', style: 'grid-template-columns:repeat(3,1fr)' });
+    [['cp', '쿠팡'], ['st', '11번가'], ['gm', 'G마켓']].forEach(([k, label]) => {
+      const inp = h('input', { type: 'number', value: String(disc[k]) });
+      inp.setAttribute('min', '0');
+      inp.setAttribute('aria-label', label + ' 장바구니 할인');
+      inp.addEventListener('input', () => { disc[k] = inp.value; onEdit(); });
+      discIn[k] = inp;
+      discGrid.appendChild(h('label', { class: 'cmp-f' }, h('span', { text: label }), inp));
+    });
+    body.appendChild(discGrid);
+    body.appendChild(h('div', { class: 'cmp-hint', text: '요약표의 "전체 할인금액"과 같은 값입니다. 0보다 크면 산출기초조사서 표에 "장바구니 할인" 행이 들어가고, 업체별 합계·기안 금액·결정가격은 품목 합계에서 이 금액을 뺀 값이 됩니다.' }));
 
     derive();
 
@@ -3899,6 +4581,7 @@
         },
         items,
         shipping: { cp: num(ship.cp) || 0, st: num(ship.st) || 0, gm: num(ship.gm) || 0 },
+        discount: { cp: Math.max(0, num(disc.cp) || 0), st: Math.max(0, num(disc.st) || 0), gm: Math.max(0, num(disc.gm) || 0) },
         survey: { include: !!F.incSurvey, vendors: [F.v1, F.v2, F.v3].map((x) => String(x || '').trim()), date: F.survDate.trim(), surveyor: F.surveyor.trim(), checker: F.checker.trim(), decision: F.decision.trim() },
         quotes: [],
         inspection: {
@@ -3968,8 +4651,30 @@
     setInterval(() => {
       try {
         if (!document.getElementById('cmp-root') || location.href !== ui.lastHref) renderAll();
+        laneTick();
       } catch (e) { /* 무시 */ }
     }, 1000);
+  }
+
+  // 1초마다: 하트비트(이 창이 살아 있다는 표시), 다른 창 상황 갱신, 두 사이트가 모두 끝났을 때 마지막으로 끝난 창에서 요약 열기
+  function laneTick() {
+    const lane = pageLane();
+    if (!lane) return;
+    const now = Date.now();
+    if (now - (ui.lastHb || 0) > 4000) { ui.lastHb = now; touchHb(lane); }
+    const s = loadState(lane);
+    if (!s) return;
+    const box = document.getElementById('cmp-laneinfo');
+    const fresh = buildLaneInfo(s, lane);
+    if (box && fresh) { if (box.classList.contains('cmp-lanebar')) fresh.classList.add('cmp-lanebar'); box.replaceWith(fresh); }
+    else if (!!box !== !!fresh) renderAll();
+    const oth = otherLane(lane);
+    const both = s.runs[lane].status === 'done' && s.runs[oth].status === 'done';
+    if (!both) { ui.sumHandled = false; return; }
+    if (!ui.sumHandled && ui.sawActive) {
+      ui.sumHandled = true;
+      if ((s.runs[lane].doneAt || 0) >= (s.runs[oth].doneAt || 0)) showSummary();
+    }
   }
 
   installAlertHook(); // 사이트 스크립트보다 먼저(document-start) 실행되어야 한다
