@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         쿠팡 비교견적 도우미
 // @namespace    https://handscil01-afk.github.io/Sungmo/
-// @version      3.2.1
+// @version      3.2.2
 // @description  쿠팡 장바구니 물품을 11번가·G마켓에서 개당 가격으로 비교해, 쿠팡보다 비싼 비교견적용 상품을 장바구니에 담습니다
 // @match        https://cart.coupang.com/*
 // @match        https://search.11st.co.kr/*
@@ -20,7 +20,7 @@
 // @connect      *
 // @require      https://handscil01-afk.github.io/Sungmo/coupang-compare/vendor/html-to-image.js
 // @require      https://handscil01-afk.github.io/Sungmo/coupang-compare/hwpx-builder.js
-// @run-at       document-idle
+// @run-at       document-start
 // @updateURL    https://handscil01-afk.github.io/Sungmo/coupang-compare/coupang-compare.user.js
 // @downloadURL  https://handscil01-afk.github.io/Sungmo/coupang-compare/coupang-compare.user.js
 // ==/UserScript==
@@ -615,11 +615,20 @@
   }
 
   function addStyle(css) {
-    if (typeof GM_addStyle === 'function') return GM_addStyle(css);
-    const st = document.createElement('style');
-    st.textContent = css;
-    (document.head || document.documentElement).appendChild(st);
-    return st;
+    const attach = () => {
+      if (typeof GM_addStyle === 'function') return GM_addStyle(css);
+      const st = document.createElement('style');
+      st.textContent = css;
+      (document.head || document.documentElement).appendChild(st);
+      return st;
+    };
+    // 페이지 로드 초기(document-start)에 문서가 아직 없으면 문서가 만들어진 뒤에 붙인다
+    if (!document.documentElement) {
+      const later = () => { try { attach(); } catch (e) { /* 무시 */ } };
+      document.addEventListener('DOMContentLoaded', later, { once: true });
+      return null;
+    }
+    return attach();
   }
 
   function copyText(text) {
@@ -1436,9 +1445,35 @@
       return /검색\s*결과가?\s*(가\s*)?없|일치하는\s*(상품|결과)(이|가)?\s*없|검색\s*결과\s*0\s*건|검색된\s*상품이\s*없/.test(t);
     } catch (e) { return false; }
   }
+  // ------------------------------------------------------------------
+  // 사이트 알림(alert) 가로채기: 자동 진행 중 사이트가 "판매되지 않는 상품입니다" 같은 알림 창을 띄우면 페이지가 멈추므로,
+  // 창은 띄우지 않고 글만 기록해 판매 중지·담기 실패 판단에 쓴다. 자동 진행 중이 아니면 건드리지 않는다.
+  // ------------------------------------------------------------------
+  const siteAlerts = [];
+  const DEAD_ALERT_RE = /판매되지\s*않|판매\s*중지|판매가\s*중지|잘못된\s*상품|존재하지\s*않|삭제된|판매\s*종료|판매\s*기간|상품이\s*없|조회.*없/;
+  const ADD_FAIL_RE = /선택|품절|재고|초과|불가|오류|실패|수량|구매할\s*수\s*없|판매\s*(중지|종료)|판매되지\s*않/;
+  function installAlertHook() {
+    try {
+      if (!/(^|\.)(11st\.co\.kr|gmarket\.co\.kr)$/.test(location.hostname)) return;
+      const st = loadState();
+      if (!st || !st.auto) return;
+      PW.alert = function (m) { siteAlerts.push({ t: Date.now(), msg: String(m == null ? '' : m) }); if (siteAlerts.length > 30) siteAlerts.shift(); };
+      PW.confirm = function (m) { siteAlerts.push({ t: Date.now(), msg: String(m == null ? '' : m), confirm: true }); return false; }; // 확인 창은 '취소'로 답해 화면에 머문다
+    } catch (e) { /* 무시 */ }
+  }
+  // 상품 주소에서 사이트·상품 번호만 뽑아 같은 상품인지 비교한다
+  function productKey(url) {
+    const t = String(url || '');
+    let m = t.match(/11st\.co\.kr\/products\/(\d+)/);
+    if (m) return 'st:' + m[1];
+    m = t.match(/gmarket\.co\.kr\/.*goodscode=(\d+)/i);
+    if (m) return 'gm:' + m[1];
+    return t.split('#')[0];
+  }
   // 판매 종료·품절·없는 상품 화면인가 (장바구니 버튼도 옵션도 없을 때만 확인)
   function productGone() {
     try {
+      if (siteAlerts.some((a) => DEAD_ALERT_RE.test(a.msg))) return true;
       const t = ((document.body && document.body.innerText) || '').slice(0, 30000);
       return /품절|판매\s*종료|판매\s*중지|판매가\s*종료|존재하지\s*않|삭제된\s*상품|페이지를\s*찾을\s*수\s*없|판매\s*기간이\s*종료/.test(t);
     } catch (e) { return false; }
@@ -2344,6 +2379,10 @@
     const pc0 = state.pendingCandidate && state.pendingCandidate.url === canon ? state.pendingCandidate : null;
     const ps = { packN: null, packUnit: item.packUnit, from: '', manual: false };
     const rsPick = isRestockSame(state) && item[site] && !item[site].skipped ? item[site] : null; // 다시 담기 중이면 전에 담은 기록
+    // 이 화면에서 열려야 하는 상품: 다시 담기는 기록해 둔 상품, 일반 자동 진행은 방금 고른 후보
+    const pcExp = state.pendingCandidate && state.pendingCandidate.site === site && state.pendingCandidate.idx === state.idx ? state.pendingCandidate : null;
+    const expUrl = rsPick ? rsPick.url : (state.auto && pcExp ? pcExp.url : '');
+    const expKey = expUrl ? productKey(expUrl) : '';
     let ackSig = '';
     let busy = false;
     let adding = false;
@@ -2529,6 +2568,10 @@
       const it = s.items[s.idx];
       const L = calc();
       if (!L.inputs.length && api.hasOptionSelectors()) { setMsg('옵션을 먼저 고르세요', 'warn'); return false; }
+      if (expKey && productKey(api.canon()) !== expKey && (isRestockSame(s) || s.auto)) {
+        setMsg('담으려던 상품이 아닌 다른 상품 화면이라 담지 않습니다. "이 상품 건너뛰기" 또는 "요약 보기"를 누르세요', 'err');
+        return false;
+      }
       const warns = [];
       if (L.qty !== L.need) warns.push('수량이 ' + L.qty + '개입니다(필요 ' + L.need + '묶음)');
       if (!isRestockSame(s) && L.unitPrice != null && cpu && L.unitPrice <= cpu + 1e-9) warns.push(perLabel(item.packUnit) + ' 가격이 쿠팡 이하입니다(비교견적은 쿠팡보다 비싸야 합니다)');
@@ -2569,9 +2612,26 @@
       const notes = [];
       if (click) {
         adding = true;
+        const clickT = Date.now();
         btn.click();
         notes.push('기록하고 장바구니 버튼을 눌렀습니다. 담겼는지 사이트 화면에서 확인하세요. 잠시 뒤 다음 상품으로 넘어갑니다.');
-        setTimeout(() => { try { advance(); } catch (e) { adding = false; } }, 1500);
+        setTimeout(() => {
+          try {
+            // 담기 버튼을 누른 직후 사이트가 "옵션을 선택해 주세요" 같은 알림을 띄웠으면 성공으로 보지 않는다
+            const bad = siteAlerts.find((a) => a.t >= clickT && !a.confirm && ADD_FAIL_RE.test(a.msg));
+            if (bad) {
+              adding = false;
+              const s3 = loadState();
+              if (s3) { s3.adding = null; saveState(s3); }
+              const why = '사이트 안내: ' + bad.msg.slice(0, 60);
+              if (s3 && s3.auto && !(isRestockSame(s3) && /옵션|선택/.test(bad.msg))) { autoProdFail(why); return; }
+              autoDetail(why + ' - 옵션과 수량을 확인한 뒤 "장바구니 담고 다음 →"을 다시 누르세요', true);
+              setMsg(why + ' - 옵션과 수량을 확인한 뒤 다시 누르세요', 'warn');
+              return;
+            }
+            advance();
+          } catch (e) { adding = false; }
+        }, 1500);
       } else {
         notes.push('기록했습니다.');
       }
@@ -2615,14 +2675,15 @@
       h('button', { class: 'cmp-btn', text: '요약 보기', onclick: guard(showSummary) })));
 
     // ---- 자동 진행(자동으로 전부 담기): 옵션·수량을 맞춘 뒤 조건이 맞으면 담고, 아니면 이 상품을 버리고 같은 검색의 다음 후보로 ----
-    const autoProdFail = (reason) => {
+    const autoProdFail = (reason, badUrl) => {
       const s = loadState();
       if (!s || !s.auto) return;
       const it = s.items[s.idx];
       if (!it) return;
       if (isRestockSame(s)) { autoDetail('이 상품은 다시 담을 수 없어 비슷한 상품을 찾습니다 (' + reason + ')', true); restockReplace(s, reason); return; }
       const tr = it.tried[s.site];
-      if (tr.indexOf(canon) < 0) tr.push(canon);
+      const bad = badUrl || canon;
+      if (tr.indexOf(bad) < 0) tr.push(bad);
       autoDetail('이 상품은 쓰지 않습니다 (' + reason + ')', true);
       if (tr.length < AUTO_MAX_TRIES) {
         saveState(s);
@@ -2632,6 +2693,15 @@
       autoFailSkip(s, '자동으로 맞는 상품을 찾지 못함 (' + reason + ')');
     };
     const autoProductFlow = async (tok) => {
+      // 지금 열린 상품이 담으려던 상품과 다르면(알림 뒤 사이트가 이전 화면으로 돌려보내는 경우 등) 담지 않고 처리한다
+      if (expKey && productKey(canon) !== expKey) {
+        autoDetail('열린 상품이 예상과 달라 담지 않습니다', true);
+        setMsg('담으려던 상품이 열리지 않고 다른 상품 화면으로 이동했습니다', 'warn');
+        const sx = loadState();
+        if (isRestockSame(sx)) restockReplace(sx, '상품 페이지가 열리지 않고 다른 상품 화면으로 이동함');
+        else autoProdFail('고른 상품이 열리지 않음', expUrl);
+        return;
+      }
       autoDetail('상품 페이지를 기다리는 중…');
       const ready = await autoWait(() => ((api.addBtn() || api.optionUiExists()) ? 'ok' : (productGone() ? 'gone' : null)), tok);
       if (!ready) return;
@@ -3211,8 +3281,8 @@
     });
   }
   // 늦게 불러오는(lazy) 이미지가 로드되도록 영역을 위에서 아래로 훑어 내려간다
-  async function capLoadLazy(target) {
-    const r = pageRectOf(target);
+  async function capLoadLazy(target, sel) {
+    const r = sel ? { y: sel.y, h: sel.h } : pageRectOf(target); // 저장할 영역만 훑는다
     const step = Math.max(300, Math.floor(window.innerHeight * 0.8));
     let n = 0;
     for (let y = r.y; y < r.y + r.h && n < 40; y += step, n++) {
@@ -3224,10 +3294,18 @@
   }
   const restoreAttr = (el, name, v) => { if (v == null) el.removeAttribute(name); else el.setAttribute(name, v); };
   // 영역 안의 이미지(img, 배경 그림)를 data 주소로 바꾼다. 원래대로 돌리는 함수들을 restores에 쌓는다. 못 받은 개수를 돌려준다
-  async function capInlineImages(target, restores) {
+  async function capInlineImages(target, restores, sel) {
+    // 저장할 영역(sel) 안(위아래 150px 여유)에 있는 이미지만 내려받는다. 영역 밖(추천 상품 등)은 받지 않아 빠르다
+    const inSel = (el) => {
+      if (!sel) return true;
+      try {
+        const r = pageRectOf(el);
+        return r.y < sel.y + sel.h + 150 && r.y + r.h > sel.y - 150 && r.x < sel.x + sel.w + 150 && r.x + r.w > sel.x - 150;
+      } catch (e) { return true; }
+    };
     const imgRecs = [];
     $$('img', target).forEach((img) => {
-      if (img.closest('#cmp-root')) return;
+      if (img.closest('#cmp-root') || !inSel(img)) return;
       const url = capAbsUrl(img.currentSrc || img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-original') || '');
       if (url) imgRecs.push({ img, url });
     });
@@ -3235,7 +3313,7 @@
     const re = /url\((['"]?)(.*?)\1\)/g;
     $$('*', target).slice(0, 4000).forEach((el) => {
       try {
-        if (el.closest('#cmp-root')) return;
+        if (el.closest('#cmp-root') || !inSel(el)) return;
         const bg = getComputedStyle(el).backgroundImage;
         if (!bg || bg === 'none' || bg.indexOf('url(') < 0) return;
         const urls = [];
@@ -3378,8 +3456,8 @@
       capEditorShow(false);
       capToast('화면을 불러오는 중…', 'info', true);
       const root = await capFindRoot(sel);
-      await capLoadLazy(root);
-      const failed = await capInlineImages(root, restores);
+      await capLoadLazy(root, sel);
+      const failed = await capInlineImages(root, restores, sel);
       scrollNow(0, 0);
       capFlattenSticky(root, restores);
       await sleep(250);
@@ -3894,6 +3972,7 @@
     }, 1000);
   }
 
+  installAlertHook(); // 사이트 스크립트보다 먼저(document-start) 실행되어야 한다
   if (document.body) init();
   else window.addEventListener('DOMContentLoaded', init);
 })();
