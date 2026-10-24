@@ -1,0 +1,16 @@
+{
+ "name": "가을운동회 점수판",
+ "short_name": "운동회 점수판",
+ "description": "개인전·단체전 점수를 여러 담당자가 함께 입력하고 순위와 승점을 바로 보는 운동회 점수판",
+ "scope": "./",
+ "display": "fullscreen",
+ "display_override": ["fullscreen", "standalone"],
+ "background_color": "#f4f5f8",
+ "theme_color": "#1f2a44",
+ "lang": "ko",
+ "icons": [
+  { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+  { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+  { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+ ]
+}
