@@ -154,7 +154,8 @@ function teamView(ev){
   cur += `</div>`;
   const nx = `<div class="card"><h2>다음 경기</h2>
     <div class="nextline"><span class="who">${teamBadge('blue')}${b.next?esc(pname(b.next)):'-'}</span><span class="sub">vs</span><span class="who">${teamBadge('red')}${r.next?esc(pname(r.next)):'-'}</span></div>
-    <div class="row" style="margin-top:14px"><button class="btn wide" data-a="listSheet">📋 전체 명단 · 기록 보기</button></div></div>`;
+    ${editable?`<div class="row nowrap" style="margin-top:14px"><button class="btn grow" data-a="callPlayers" data-v="now">📣 지금 선수 다시 부르기</button><button class="btn grow" data-a="callPlayers" data-v="next">📣 다음 선수 부르기</button></div>`:''}
+    <div class="row" style="margin-top:10px"><button class="btn wide" data-a="listSheet">📋 전체 명단 · 기록 보기</button></div></div>`;
   return h + `<div class="cols two"><div>${cur}</div><div>${nx}${recent}</div></div>`;
 }
 function playerBox(ev, team, id, picked, editable){
@@ -204,7 +205,7 @@ let pickTeam = 'blue';
 function pickSheet(){
   const ev = UI.ev, ord = orderFor(ev, pickTeam), pl = plays(ev, pickTeam), u = upNext(ev, pickTeam);
   return `<h2 class="row">${teamBadge(pickTeam)} ${esc(teamName(pickTeam))} 선수 바꾸기</h2>
-    <p class="sub">빠진 사람이 있을 때 이번 대결에 나올 사람을 직접 고릅니다. 저장하면 다시 순서대로 돌아갑니다.</p>
+    <p class="sub">빠진 사람이 있을 때 이번 대결에 나올 사람을 직접 고릅니다. 다른 심판 기기와 안내판에도 바로 반영되고, 결과를 저장하면 다시 순서대로 돌아갑니다.</p>
     <div class="list olist">${ord.map((id,i) => `<div class="item tap ${id===u.cur?'cur':''}" data-a="setPick" data-v="${id}"><span class="no">${i+1}</span><span class="name">${esc(pname(id))}</span>${pl[id]?`<span class="tag ok">${pl[id]}회 출전</span>`:''}${id===u.cur?'<span class="tag dark">지금</span>':''}</div>`).join('')}</div>
     <div class="row" style="margin-top:12px"><button class="btn grow" data-a="setPick" data-v="">순서대로 (자동)</button><button class="btn primary grow" data-a="closeSheet">닫기</button></div>`;
 }
@@ -268,7 +269,8 @@ function saveMatch(ev, winner, extra={}){
   }
   put(['main','matches',id], { event:ev, winner, blueId, redId, blueName: blueId?pname(blueId):null, redName: redId?pname(redId):null,
     by:UI.me, at:now(), deleted:false, ...extra });
-  delete UI.pick[ev];
+  const pk = (D.calls[ev]||{}).pick;
+  if(pk && (pk.blue || pk.red)) put(['main','calls',ev], { pick:{ blue:null, red:null } });
   const label = winner==='draw' ? '무승부' : `${teamName(winner)} 승`;
   toast(`${label} 저장했습니다.`, '되돌리기', () => put(['main','matches',id], { event:ev, deleted:true, editedBy:UI.me, editedAt:now() }));
 }
@@ -300,7 +302,13 @@ Object.assign(ACT, {
     toast('기록을 지웠습니다.', '되돌리기', () => put(['main','indiv',id], { event:ev, deleted:false })); closeSheet(); },
   win: (el, v) => { saveMatch(UI.ev, v); },
   pickSheet: (el, v) => { pickTeam = v; openSheet(pickSheet); return false; },
-  setPick: (el, v) => { const ev=UI.ev; (UI.pick[ev] ||= {})[pickTeam] = v || undefined; closeSheet(); },
+  setPick: (el, v) => { const ev=UI.ev; if(!can.record(ev)) return denied();
+    put(['main','calls',ev], { pick:{ [pickTeam]: v || null } }); closeSheet(); },
+  callPlayers: (el, v) => { const ev=UI.ev; if(!can.record(ev)) return denied();
+    const b = upNext(ev,'blue'), r = upNext(ev,'red'), k = v==='next' ? 'next' : 'cur';
+    if(!b[k] || !r[k]){ toast('부를 선수가 없습니다.'); return false; }
+    put(['main','calls',ev], { call:{ at:now(), kind:v, blue:b[k], red:r[k], by:UI.me } });
+    toast(`안내판에 ${pname(b[k])} · ${pname(r[k])} 선수를 불렀습니다.`); return false; },
   listSheet: (el, v) => { listTab = v || (TEAM[UI.ev].mode==='round' ? 'rec' : 'order'); openSheet(listSheet); return false; },
   listTab: (el, v) => { listTab = v; drawSheet(); return false; },
   editMatch: (el, v) => { openSheet(() => matchSheet(v)); return false; },

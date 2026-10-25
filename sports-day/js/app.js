@@ -23,7 +23,7 @@ function render(){
   let tabs = '', body = '', nav = '', shell = 'shell', head = header(r), corner = '';
   if(r.role==='master'){
     if(UI.mtab==='game'){ const list = Object.keys(EVENTS); fixEv(list); tabs = eventTabs(list); body = masterGame(); }
-    else if(UI.mtab==='board') body = boardView();
+    else if(UI.mtab==='board') body = boardControl() + `<div class="row" style="margin-bottom:14px"><button class="btn primary wide" data-a="boardPreview">📺 안내판 화면 미리 보기 (소리 없이)</button></div>` + boardView();
     else if(UI.mtab==='people') body = peopleView();
     else body = settingsView();
     nav = `<nav class="bottom">${[['game','🏁','경기 진행'],['board','📊','현황판'],['people','👥','접속자·역할'],['settings','⚙️','명단·설정']]
@@ -35,9 +35,13 @@ function render(){
   } else if(r.role==='coach'){
     fixEv(ORDER_EVENTS); tabs = eventTabs(ORDER_EVENTS); body = coachView(r.team);
   } else if(r.role==='board'){
-    shell = 'shell boardshell'; head = ''; body = boardView();
+    shell = 'shell boardshell'; head = ''; body = boardScreen();
     corner = `<button class="cornerbtn" data-a="menu" aria-label="메뉴">${ICON.menu}</button>`;
   } else body = waitView();
+  if(UI.preview && r.role==='master'){
+    shell = 'shell boardshell'; head = ''; tabs = ''; nav = ''; body = boardScreen();
+    corner = `<button class="btn primary previewexit" data-a="boardPreview">미리 보기 끝내기</button>`;
+  }
   const err = D.error ? `<div class="note">${esc(D.error)}</div>` : '';
   app.innerHTML = `<div class="${shell}"><div class="stick">${head}${tabs}</div><main>${r.role==='wait'?installBanner():''}${err}${body}</main>${nav}${corner}</div>`;
   if(keep){ const el = document.getElementById(keep.id); if(el){ el.focus(); try{ el.setSelectionRange(keep.s, keep.e); }catch(e){} } }
@@ -153,9 +157,9 @@ let renderQueued = false, renderDeferred = false;
 const typing = () => { const ae = document.activeElement; return !!ae && (ae.tagName==='TEXTAREA' || ae.tagName==='INPUT') && ae.type!=='checkbox'; };
 function queueRender(){
   if(renderQueued) return; renderQueued = true;
-  requestAnimationFrame(() => { renderQueued = false; if(typing() || $('#dlg').classList.contains('open')){ renderDeferred = true; return; } render(); });
+  requestAnimationFrame(() => { renderQueued = false; if(typing() || DRAG.active || $('#dlg').classList.contains('open')){ renderDeferred = true; return; } render(); });
 }
-function flushDeferred(){ if(renderDeferred && !typing()){ renderDeferred = false; render(); } }
+function flushDeferred(){ if(renderDeferred && !typing() && !DRAG.active){ renderDeferred = false; render(); } }
 document.addEventListener('focusout', () => setTimeout(flushDeferred, 50));
 
 function onErr(e){
@@ -171,9 +175,10 @@ function masterSubs(){
   masterUnsubs.push(store.onCol(['main','masters'], l => { D.masters = Object.fromEntries(l.map(x => [x.id, x])); queueRender(); }, onErr));
 }
 function subscribe(){
-  const col = k => (l, p) => { D[k] = l; D.pending[k] = p; queueRender(); };
-  const map = k => (l, p) => { D[k] = Object.fromEntries(l.map(x => [x.id, x])); D.pending[k] = p; queueRender(); };
-  store.onDoc(['config'], (d, p) => { D.config = d || {}; D.pending.config = p ? 1 : 0; queueRender(); }, onErr);
+  const col = k => (l, p) => { D[k] = l; D.pending[k] = p; D.loaded[k] = true; queueRender(); };
+  const map = k => (l, p) => { D[k] = Object.fromEntries(l.map(x => [x.id, x])); D.pending[k] = p; D.loaded[k] = true; queueRender(); };
+  store.onDoc(['config'], (d, p) => { D.config = d || {}; D.pending.config = p ? 1 : 0; D.loaded.config = true; queueRender(); }, onErr);
+  store.onCol(['main','calls'], map('calls'), onErr);
   store.onCol(['main','indiv'], col('indiv'), onErr);
   store.onCol(['main','matches'], col('matches'), onErr);
   store.onCol(['main','orders'], map('orders'), onErr);

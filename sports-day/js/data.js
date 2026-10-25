@@ -1,7 +1,7 @@
 'use strict';
 /* ===================== 상태 ===================== */
 const D = {
-  config:{}, indiv:[], matches:[], orders:{}, roles:{}, devices:[], masters:{},
+  config:{}, indiv:[], matches:[], orders:{}, calls:{}, roles:{}, devices:[], masters:{},
   amMaster:false, pending:{}, loaded:{}, error:'', fatal:'',
 };
 const UI = {
@@ -12,7 +12,7 @@ const UI = {
   round: { archery:'main', freeball:'main', tuho:'main' },
   lanes: ls.get('udh5_lanes2', { archery:[], freeball:[], tuho:[] }),
   q:'', filter:'all',
-  pick:{}, rosterText:'', runTimes:{},
+  rosterText:'', runTimes:{},
   watch:{ running:false, start:0, acc:0 },
 };
 let store = null;
@@ -82,7 +82,8 @@ function upNext(ev, team){
   const c = plays(ev, team);
   const q = orderFor(ev, team).map((id,i) => ({ id, i, n:c[id]||0 })).sort((a,b) => a.n-b.n || a.i-b.i);
   if(!q.length) return { cur:null, next:null };
-  const pick = (UI.pick[ev]||{})[team];
+  // 심판이 '선수 바꾸기'로 고른 사람 (모든 기기가 같이 봄)
+  const pick = ((D.calls[ev]||{}).pick||{})[team];
   const cur = (pick && q.some(x => x.id===pick)) ? pick : q[0].id;
   const rest = q.filter(x => x.id!==cur);
   return { cur, next: rest.length ? rest[0].id : cur, picked: cur!==q[0].id };
@@ -118,6 +119,9 @@ function guard(p){
 }
 function denied(){ toast('이 작업을 할 권한이 없습니다.'); return Promise.resolve(false); }
 const put = (p, obj, merge=true) => guard(store.put(p, obj, merge));
+const boardCfg = () => ({ mode:'auto', sound:true, flash:true, chime:true, callVoice:true, ...(D.config.board||{}) });
+const DEFAULT_PHRASES = ['잠시 후 다음 경기가 시작됩니다.', '선수들은 경기장으로 모여 주세요.', '점심시간입니다. 맛있게 드세요.', '시상식을 시작합니다. 모두 본부석 앞으로 모여 주세요.'];
+const phrases = () => Array.isArray(D.config.phrases) ? D.config.phrases : DEFAULT_PHRASES;
 const setConfig = obj => can.master() ? put(['config'], obj) : denied();
 
 function shortUA(){
