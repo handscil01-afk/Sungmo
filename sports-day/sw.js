@@ -1,6 +1,9 @@
-const CACHE = 'sports-day-v1';
+const CACHE = 'sports-day-v2';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png',
-  './vendor/firebase-app.js', './vendor/firebase-firestore.js'];
+  './css/app.css',
+  './js/config.js', './js/util.js', './js/store.js', './js/data.js', './js/shell.js',
+  './js/view-referee.js', './js/view-coach.js', './js/view-board.js', './js/view-master.js', './js/app.js',
+  './vendor/firebase-app.js', './vendor/firebase-firestore.js', './vendor/firebase-auth.js'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {
@@ -12,11 +15,9 @@ self.addEventListener('fetch', e => {
       .catch(() => caches.match('./index.html').then(r => r || caches.match('./'))));
     return;
   }
-  // 같은 주소의 파일만 저장해 둠 (파이어베이스 서버 통신은 건드리지 않음)
+  // 앱 파일(css·js)은 인터넷이 되면 새 파일을 먼저 받고, 안 되면 저장해 둔 파일을 씀 (화면과 버전이 어긋나지 않게)
   if (url.origin === location.origin) {
-    e.respondWith(caches.match(req).then(hit => {
-      const net = fetch(req).then(r => { if (r && r.ok) { const cp = r.clone(); caches.open(CACHE).then(c => c.put(req, cp)); } return r; }).catch(() => hit);
-      return hit || net;
-    }));
+    e.respondWith(fetch(req).then(r => { if (r && r.ok) { const cp = r.clone(); caches.open(CACHE).then(c => c.put(req, cp)); } return r; })
+      .catch(() => caches.match(req, { ignoreSearch: true })));
   }
 });

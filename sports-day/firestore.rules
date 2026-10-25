@@ -1,0 +1,70 @@
+rules_version = '2';
+// 가을운동회 점수판 (sports-day) Firestore 규칙
+// 파이어베이스 콘솔 → Firestore Database → 규칙 탭에 그대로 붙여 넣고 게시합니다.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function open() { return request.time < timestamp.date(2026, 11, 7); }
+    function isMaster() {
+      return signedIn() && exists(/databases/$(database)/documents/undonghoe5/main/masters/$(request.auth.uid));
+    }
+    function hasRole() {
+      return signedIn() && exists(/databases/$(database)/documents/undonghoe5/main/roles/$(request.auth.uid));
+    }
+    function myRole() {
+      return get(/databases/$(database)/documents/undonghoe5/main/roles/$(request.auth.uid)).data;
+    }
+    function refereeOf(ev) { return hasRole() && myRole().role == 'referee' && ev in myRole().events; }
+    function coachOf(team) { return hasRole() && myRole().role == 'coach' && myRole().team == team; }
+    // 기록의 종목을 다른 종목으로 바꿔치기하지 못하게 함
+    function sameEvent() { return resource == null || resource.data.event == request.resource.data.event; }
+
+    // 마스터 비밀번호: 콘솔에서만 넣고 아무도 읽을 수 없음
+    match /undonghoe5/secret { allow read, write: if false; }
+
+    // 명단·팀 이름·점수 설정: 마스터만 바꿈
+    match /undonghoe5/config {
+      allow read: if signedIn();
+      allow write: if open() && isMaster();
+    }
+    // 마스터 기기 목록: 비밀번호가 맞거나, 이미 마스터인 기기가 다른 기기에 권한을 줄 때만 만들 수 있음
+    match /undonghoe5/main/masters/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isMaster());
+      allow create: if open() && signedIn() && (isMaster()
+        || (request.auth.uid == uid && request.resource.data.pw == get(/databases/$(database)/documents/undonghoe5/secret).data.masterPw));
+      allow update, delete: if open() && isMaster();
+    }
+    // 기기별 역할(감독·심판·안내판): 마스터만 정함
+    match /undonghoe5/main/roles/{uid} {
+      allow read: if signedIn();
+      allow write: if open() && isMaster();
+    }
+    // 접속한 기기: 자기 기기 정보만 씀 (마스터는 지울 수 있음)
+    match /undonghoe5/main/devices/{uid} {
+      allow read: if signedIn();
+      allow write: if open() && signedIn() && (request.auth.uid == uid || isMaster());
+    }
+    // 개인전·단체전 기록: 마스터 또는 그 종목을 맡은 심판만
+    match /undonghoe5/main/indiv/{id} {
+      allow read: if signedIn();
+      allow create, update: if open() && sameEvent() && id.matches(request.resource.data.event + '_.*')
+        && (isMaster() || refereeOf(request.resource.data.event));
+    }
+    match /undonghoe5/main/matches/{id} {
+      allow read: if signedIn();
+      allow create, update: if open() && sameEvent() && id.matches(request.resource.data.event + '_.*')
+        && (isMaster() || refereeOf(request.resource.data.event));
+    }
+    // 단체전 출전 순서: 마스터 또는 그 팀 감독만
+    match /undonghoe5/main/orders/{id} {
+      allow read: if signedIn();
+      allow write: if open() && id == request.resource.data.event + '_' + request.resource.data.team
+        && (isMaster() || coachOf(request.resource.data.team));
+    }
+    // 안내판 선수 호출: 마스터 또는 그 종목을 맡은 심판만
+    match /undonghoe5/main/calls/{ev} {
+      allow read: if signedIn();
+      allow write: if open() && (isMaster() || refereeOf(ev));
+    }
+  }
+}

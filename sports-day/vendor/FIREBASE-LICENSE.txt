@@ -1,4 +1,4 @@
-Firebase JavaScript SDK (firebase-app.js, firebase-firestore.js — 모듈 빌드)
+Firebase JavaScript SDK (firebase-app.js, firebase-firestore.js, firebase-auth.js, firebase-database.js — 모듈 빌드)
 Version 10.12.2 — https://github.com/firebase/firebase-js-sdk
 
 Copyright Google LLC
@@ -15,5 +15,5 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-변경 사항: firebase-firestore.js 안의 firebase-app.js 가져오기 주소를
+변경 사항: firebase-firestore.js·firebase-auth.js·firebase-database.js 안의 firebase-app.js 가져오기 주소를
 같은 폴더(./firebase-app.js)로 바꾸고, 소스맵 주석을 뺐습니다.
