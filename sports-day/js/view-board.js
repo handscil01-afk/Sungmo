@@ -112,7 +112,7 @@ function runFx(){
   if(fx.kind==='test'){ if(sound) SND.dingdong(); toast('안내판 소리 시험'); }
   else if(fx.kind==='call' || fx.kind==='autocall'){
     let c = fx.call;
-    if(fx.kind==='autocall'){ const b = upNext(fx.ev,'blue'), r = upNext(fx.ev,'red'); c = b.next && r.next ? { kind:'next', blue:b.next, red:r.next } : null; }
+    if(fx.kind==='autocall'){ const pa = prepAhead(), b = upcoming(fx.ev,'blue',pa), r = upcoming(fx.ev,'red',pa); c = b && r ? { kind:'next', blue:b, red:r } : null; }
     if(c){
       BOARD.callFx = { ev:fx.ev, kind:c.kind, blue:c.blue, red:c.red, start:now() };
       if(sound){ const d = SND.dingdong(); if(cfg.callVoice) setTimeout(() => SND.speak(callText(c.blue, c.red, c.kind)), d*1000+200); }
@@ -177,13 +177,16 @@ function boardTeam(ev){
   const b = upNext(ev,'blue'), r = upNext(ev,'red');
   // 위쪽 호출 띠: 심판이 부른 선수(30초) 또는 다음 선수
   const fx = BOARD.callFx && BOARD.callFx.ev===ev && now()-BOARD.callFx.start < CALL_MS ? BOARD.callFx : null;
-  const cb = fx ? fx.blue : b.next, cr = fx ? fx.red : r.next, kind = fx ? fx.kind : 'next';
+  const pa = prepAhead(), pb = upcoming(ev,'blue',pa), pr = upcoming(ev,'red',pa);
+  const cb = fx ? fx.blue : pb, cr = fx ? fx.red : pr, kind = fx ? fx.kind : 'next';
   const call = cb && cr ? `<div class="callbar ${kind==='now'?'now':''}"${fx ? flashAttr(fx.start) : ''}>
       <div class="cl">${kind==='now' ? '📣 지금 나와 주세요' : '📣 준비해 주세요'}</div>
       <div class="cp">${teamBadge('blue',true)}<b>${esc(pname(cb))}</b></div><div class="cp">${teamBadge('red',true)}<b>${esc(pname(cr))}</b></div></div>` : '';
   const ord = tm => orderFor(ev, tm);
   const bp = (tm, id) => `<div class="bp ${tm}"><div class="lbl">${esc(teamName(tm))}${id?` ${ord(tm).indexOf(id)+1}번`:''}</div><div class="nm">${id?esc(pname(id)):'-'}</div></div>`;
-  return call + head + `<div class="bdlabel">지금 경기</div><div class="bdvs">${bp('blue', b.cur)}<div class="vsm">VS</div>${bp('red', r.cur)}</div>` + foot;
+  // 다다음 선수를 부르는 경우, 그 사이의 다음 경기도 작게 보여 줌
+  const nextLine = pa > 1 && b.next && r.next ? `<span class="bdnext">다음 경기 ${teamBadge('blue')} ${esc(pname(b.next))} · ${teamBadge('red')} ${esc(pname(r.next))}</span>` : '';
+  return call + head + `<div class="bdlabel">지금 경기${nextLine}</div><div class="bdvs">${bp('blue', b.cur)}<div class="vsm">VS</div>${bp('red', r.cur)}</div>` + foot;
 }
 function boardIndiv(){
   const ps = people();
@@ -235,7 +238,10 @@ function boardControl(){
   return `<div class="cols half"><div class="card"><h2>📺 안내판 제어</h2>
       <h3 style="margin-top:0">보여 줄 화면</h3>
       <div class="chips">${modes.map(([k,l]) => `<button class="chip ${cfg.mode===k?'on':''}" data-a="bmode" data-v="${k}">${esc(l)}</button>`).join('')}</div>
-      <p class="sub">자동으로 두면 가장 최근에 기록이 들어온 종목을 띄웁니다. 단체전 결과가 나오면 위아래로 승패를 보여 준 뒤 다음 선수를 부릅니다.</p>
+      <p class="sub">자동으로 두면 가장 최근에 기록이 들어온 종목을 띄웁니다. 단체전 결과가 나오면 위아래로 승패를 보여 준 뒤 준비할 선수를 부릅니다.</p>
+      <h3>📣 "준비해 주세요"로 부를 선수</h3>
+      <div class="chips">${[1,2,3].map(k => `<button class="chip ${prepAhead()===k?'on':''}" data-a="bprep" data-v="${k}">${AHEAD_LABEL[k]} 선수</button>`).join('')}</div>
+      <p class="sub">예: '다다음 선수'로 두면 지금 경기 중에 그다음 경기까지 끝난 뒤 나갈 선수를 미리 부릅니다.</p>
       <div class="list">${sw('sound','🔔 띵동 소리','선수 호출·결과·안내방송 때 안내판에서 소리를 냅니다.')}
         ${sw('callVoice','🗣 호출할 때 이름 읽기','띵동 뒤에 "청팀 ○○○, 홍팀 ○○○ 선수 준비해 주세요"라고 읽어 줍니다.')}
         ${sw('chime','🎵 안내방송 차임벨','문자 안내방송 앞에 딩동댕동 소리를 냅니다.')}
@@ -291,6 +297,7 @@ Object.assign(ACT, {
   bdDismiss: () => { if(BOARD.overlay) finishFx(); return false; },
   bdSound: () => { SND.unlock(); SND.dingdong(); },
   bmode: (el, v) => { setConfig({ board:{ mode:v } }); return false; },
+  bprep: (el, v) => { setConfig({ board:{ prepAhead:+v } }); toast(`안내판이 ${AHEAD_LABEL[+v]} 선수를 준비 호출합니다.`); return false; },
   awStart: () => { setConfig({ board:{ mode:'awards' }, awards:{ step:-1 } }); },
   awStep: (el, v) => { const n = Math.max(-1, Math.min(awardSteps().length-1, awardsStep() + (+v))); setConfig({ board:{ mode:'awards' }, awards:{ step:n } }); },
   awEnd: () => { setConfig({ board:{ mode:'auto' }, awards:{ step:-1 } }); },

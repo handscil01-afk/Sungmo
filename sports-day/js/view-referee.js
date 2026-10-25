@@ -147,10 +147,11 @@ function pcard(ev, team, u, editable){
   return editable && id ? `<button class="pcard ${team}" data-a="pickSheet" data-v="${team}">${inner}</button>` : `<div class="pcard ${team}">${inner}</div>`;
 }
 function callSheet(){
-  const ev = UI.ev, b = upNext(ev,'blue'), r = upNext(ev,'red');
-  return `<h2>📣 안내판으로 부르기</h2>
-    <button class="btn huge wide" data-a="callPlayers" data-v="now" style="width:100%;margin-bottom:10px">지금 선수 다시 부르기<br><small>${esc(b.cur?pname(b.cur):'-')} · ${esc(r.cur?pname(r.cur):'-')}</small></button>
-    <button class="btn huge wide" data-a="callPlayers" data-v="next" style="width:100%;margin-bottom:10px">다음 선수 부르기<br><small>${esc(b.next?pname(b.next):'-')} · ${esc(r.next?pname(r.next):'-')}</small></button>
+  const ev = UI.ev, pa = prepAhead();
+  const row = k => { const b = upcoming(ev,'blue',k), r = upcoming(ev,'red',k);
+    return `<button class="btn huge wide ${k===pa?'primary':''}" data-a="callPlayers" data-v="${k}" style="width:100%;margin-bottom:10px">${k ? `${AHEAD_LABEL[k]} 선수 부르기${k===pa?' (준비 호출)':''}` : '지금 선수 다시 부르기'}<br><small>${esc(b?pname(b):'-')} · ${esc(r?pname(r):'-')}</small></button>`; };
+  return `<h2>📣 안내판으로 부르기</h2>${[0,1,2].map(row).join('')}
+    <p class="sub">결과를 저장하면 안내판이 ${AHEAD_LABEL[pa]} 선수에게 "준비해 주세요"를 자동으로 띄웁니다. 몇 번째 뒤를 부를지는 마스터가 안내판 메뉴에서 바꿉니다.</p>
     <button class="btn wide" data-a="closeSheet">닫기</button>`;
 }
 function winTag(w){
@@ -302,10 +303,10 @@ Object.assign(ACT, {
   setPick: (el, v) => { const ev=UI.ev; if(!can.record(ev)) return denied();
     put(['main','calls',ev], { pick:{ [pickTeam]: v || null } }); closeSheet(); },
   callPlayers: (el, v) => { const ev=UI.ev; if(!can.record(ev)) return denied();
-    const b = upNext(ev,'blue'), r = upNext(ev,'red'), k = v==='next' ? 'next' : 'cur';
-    if(!b[k] || !r[k]){ toast('부를 선수가 없습니다.'); return false; }
-    put(['main','calls',ev], { call:{ at:now(), kind:v, blue:b[k], red:r[k], by:UI.me } }); closeSheet();
-    toast(`안내판에 ${pname(b[k])} · ${pname(r[k])} 선수를 불렀습니다.`); return false; },
+    const k = v==='now' ? 0 : v==='next' ? 1 : (+v || 0), b = upcoming(ev,'blue',k), r = upcoming(ev,'red',k);
+    if(!b || !r){ toast('부를 선수가 없습니다.'); return false; }
+    put(['main','calls',ev], { call:{ at:now(), kind: k ? 'next' : 'now', blue:b, red:r, by:UI.me } }); closeSheet();
+    toast(`안내판에 ${pname(b)} · ${pname(r)} 선수를 불렀습니다.`); return false; },
   listSheet: (el, v) => { listTab = v || (TEAM[UI.ev].mode==='round' ? 'rec' : 'order'); openSheet(listSheet); return false; },
   listTab: (el, v) => { listTab = v; drawSheet(); return false; },
   editMatch: (el, v) => { openSheet(() => matchSheet(v)); return false; },

@@ -94,6 +94,20 @@ function upNext(ev, team){
   return { cur, next: rest.length ? rest[0].id : cur, picked: cur!==q[0].id };
 }
 
+// 지금 선수에서 k번째 뒤에 나올 사람 (0 지금, 1 다음, 2 다다음…). 경기를 차례로 치른다고 셈해서, 팀원이 적으면 처음으로 돌아감
+function upcoming(ev, team, k){
+  const u = upNext(ev, team); if(!u.cur) return null;
+  if(k<=0) return u.cur;
+  const ord = orderFor(ev, team), c = { ...plays(ev, team) };
+  let cand = ord.filter(id => !isAbsent(id)); if(!cand.length) cand = ord;
+  let id = u.cur; c[id] = (c[id]||0) + 1;
+  for(let j = 0; j < k; j++){
+    id = cand.slice().sort((a,b) => (c[a]||0) - (c[b]||0) || ord.indexOf(a) - ord.indexOf(b))[0];
+    c[id] = (c[id]||0) + 1;
+  }
+  return id;
+}
+
 /* ===================== 역할·권한 =====================
    한 기기에 여러 역할: coach(감독 팀), events(심판 종목), helpers(기록 도우미 종목), timers(계시원 종목), board(안내판), cast(방송 권한) */
 const TIME_EVENTS = Object.keys(TEAM).filter(k => TEAM[k].mode==='time');
@@ -148,7 +162,10 @@ function guard(p){
 }
 function denied(){ toast('이 작업을 할 권한이 없습니다.'); return Promise.resolve(false); }
 const put = (p, obj, merge=true) => guard(store.put(p, obj, merge));
-const boardCfg = () => ({ mode:'auto', sound:true, flash:true, chime:true, callVoice:true, ...(D.config.board||{}) });
+const boardCfg = () => ({ mode:'auto', sound:true, flash:true, chime:true, callVoice:true, prepAhead:2, ...(D.config.board||{}) });
+// 안내판 '준비해 주세요'로 부를 선수: 지금 선수 뒤 몇 번째인지 (1 다음, 2 다다음, 3 세 번째 뒤)
+const prepAhead = () => Math.max(1, Math.min(3, +boardCfg().prepAhead || 2));
+const AHEAD_LABEL = ['지금', '다음', '다다음', '세 번째 뒤'];
 const DEFAULT_PHRASES = ['잠시 후 다음 경기가 시작됩니다.', '선수들은 경기장으로 모여 주세요.', '점심시간입니다. 맛있게 드세요.', '시상식을 시작합니다. 모두 본부석 앞으로 모여 주세요.'];
 const phrases = () => Array.isArray(D.config.phrases) ? D.config.phrases : DEFAULT_PHRASES;
 const setConfig = obj => can.master() ? put(['config'], obj) : denied();

@@ -583,3 +583,7 @@ body:not(.has-nav) #radio .dock{height:calc(70px + env(safe-area-inset-bottom));
   .dk.msg .lb,.dk.cast .lb{display:none}
   .dk.msg,.dk.cast{padding:0 12px}
 }
+
+.bdlabel{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.bdnext{font-size:clamp(18px,2.8vh,28px);color:var(--ink);font-weight:800;display:inline-flex;align-items:center;gap:8px;background:var(--card);border:2px solid var(--line);border-radius:12px;padding:2px 12px}
+.bdnext .tb{width:28px;height:28px;font-size:16px}
