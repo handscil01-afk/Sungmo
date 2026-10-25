@@ -1,13 +1,15 @@
 'use strict';
 /* ===================== 상태 ===================== */
 const D = {
-  config:{}, indiv:[], matches:[], orders:{}, calls:{}, roles:{}, devices:[], masters:{},
+  config:{}, indiv:[], matches:[], orders:{}, calls:{}, roles:{}, presets:{}, absent:{}, msgs:[], devices:[], masters:{},
   amMaster:false, pending:{}, loaded:{}, error:'', fatal:'',
 };
 const UI = {
   me: idStore.get('udh5_me', ''),
   mtab: ls.get('udh5_mtab', 'game'),          // 마스터 아래 메뉴
   ev: ls.get('udh5_ev', 'tuho'),              // 고른 종목 탭
+  stab: ls.get('udh5_stab', ''),             // 여러 역할을 가진 기기의 역할 탭 (coach / ev:종목 / timer:종목)
+  coachEv: ls.get('udh5_cev', 'gymball'),     // 감독 화면에서 고른 단체전 종목
   sub: {},                                    // 종목별 보조 화면 (단체전: play/order, 개인전: enter/rank)
   round: { archery:'main', freeball:'main', tuho:'main' },
   lanes: ls.get('udh5_lanes2', { archery:[], freeball:[], tuho:[] }),
@@ -30,6 +32,7 @@ function people(){
 const person = id => { const v=(D.config.people||{})[id]; return v ? { id, ...v } : null; };
 const pname = id => person(id)?.name || '(삭제된 사람)';
 const teamOf = id => person(id)?.team || '';
+const isAbsent = id => !!(D.absent[id] && D.absent[id].absent);
 const teamBadge = (t, big) => t ? `<span class="tb ${t}${big?' big':''}" title="${esc(teamName(t))}">${esc(teamShort(t))}</span>` : `<span class="tb none${big?' big':''}">?</span>`;
 
 /* ===================== 개인전 ===================== */
@@ -80,7 +83,9 @@ function plays(ev, team){
 // 출전 횟수가 가장 적은 사람 중 순서가 빠른 사람이 지금 선수, 그다음이 다음 선수
 function upNext(ev, team){
   const c = plays(ev, team);
-  const q = orderFor(ev, team).map((id,i) => ({ id, i, n:c[id]||0 })).sort((a,b) => a.n-b.n || a.i-b.i);
+  let q = orderFor(ev, team).map((id,i) => ({ id, i, n:c[id]||0 })).sort((a,b) => a.n-b.n || a.i-b.i);
+  // 불참으로 표시한 사람은 건너뜀 (모두 불참이면 그대로)
+  if(q.some(x => !isAbsent(x.id))) q = q.filter(x => !isAbsent(x.id));
   if(!q.length) return { cur:null, next:null };
   // 심판이 '선수 바꾸기'로 고른 사람 (모든 기기가 같이 봄)
   const pick = ((D.calls[ev]||{}).pick||{})[team];
@@ -89,24 +94,48 @@ function upNext(ev, team){
   return { cur, next: rest.length ? rest[0].id : cur, picked: cur!==q[0].id };
 }
 
-/* ===================== 역할·권한 ===================== */
+/* ===================== 역할·권한 =====================
+   한 기기에 여러 역할: coach(감독 팀), events(심판 종목), helpers(기록 도우미 종목), timers(계시원 종목), board(안내판), cast(방송 권한) */
+const TIME_EVENTS = Object.keys(TEAM).filter(k => TEAM[k].mode==='time');
+function normRole(r){
+  const o = { coach:'', events:[], helpers:[], timers:[], board:false, cast:false, preset:'', name:'' };
+  if(!r) return o;
+  o.coach = r.coach || (r.role==='coach' ? (r.team||'') : '');
+  o.events = (r.events||[]).filter(e => EVENTS[e]);
+  o.helpers = (r.helpers||[]).filter(e => EVENTS[e]);
+  o.timers = (r.timers||[]).filter(e => TIME_EVENTS.includes(e));
+  o.board = !!r.board || r.role==='board';
+  o.cast = !!r.cast; o.preset = r.preset||''; o.name = r.name||'';
+  return o;
+}
+const hasDuty = r => !!(r.coach || r.events.length || r.helpers.length || r.timers.length);
 function myRole(){
-  if(D.amMaster) return { role:'master' };
-  const r = store && D.roles[store.uid];
-  return r && ROLE_INFO[r.role] && r.role!=='master' ? r : { role:'wait' };
+  if(D.amMaster) return { ...normRole(null), role:'master' };
+  const r = normRole(store && D.roles[store.uid]);
+  r.role = r.board ? 'board' : hasDuty(r) ? 'staff' : 'wait';
+  return r;
 }
-function refEvents(r = myRole()){ return r.role==='referee' ? (r.events||[]).filter(e => EVENTS[e]) : []; }
-function roleLabel(r){
-  if(!r) return ROLE_INFO.wait.label;
-  if(r.role==='referee'){ const es = refEvents(r); return es.length ? es.map(e=>EVENTS[e].name).join('·')+' 심판' : '심판(종목 없음)'; }
-  if(r.role==='coach') return teamName(r.team)+' 감독';
-  return ROLE_INFO[r.role]?.label || ROLE_INFO.wait.label;
+// 점수를 입력할 수 있는 종목 (심판 + 기록 도우미)
+function refEvents(r = myRole()){ return [...new Set([...r.events, ...r.helpers])]; }
+function roleParts(r){
+  const n = es => es.map(e => EVENTS[e].name).join('·'), out = [];
+  if(r.role==='master') return [{ icon:'👑', text:'마스터' }];
+  if(r.coach) out.push({ icon:'📋', text:`${teamName(r.coach)} 감독` });
+  if(r.events.length) out.push({ icon:'🚩', text:`${n(r.events)} 심판` });
+  if(r.helpers.length) out.push({ icon:'✏️', text:`${n(r.helpers)} 기록 도우미` });
+  if(r.timers.length) out.push({ icon:'⏱', text:`${n(r.timers)} 계시원` });
+  if(r.board) out.push({ icon:'📺', text:'안내판' });
+  return out;
 }
+function roleLabel(r){ const p = roleParts(r); return p.length ? p.map(x => x.text).join(' · ') : ROLE_INFO.wait.label; }
+const roleIcon = r => (roleParts(r)[0] || { icon:'⏳' }).icon;
 // 화면에서도 서버 규칙(firestore.rules)과 같은 기준으로 한 번 더 확인함
 const can = {
   master: () => D.amMaster,
   record: ev => D.amMaster || refEvents().includes(ev),
-  order: team => D.amMaster || (myRole().role==='coach' && myRole().team===team),
+  order: team => D.amMaster || myRole().coach===team,
+  time: ev => D.amMaster || myRole().timers.includes(ev) || refEvents().includes(ev),
+  staff: () => D.amMaster || hasDuty(myRole()),
 };
 
 /* ===================== 쓰기 ===================== */

@@ -178,7 +178,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 
 /* ---------- 아래 메뉴 (마스터) ---------- */
 .bottom{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--card);border-top:2px solid var(--line2);
-  display:grid;grid-template-columns:repeat(4,1fr);padding-bottom:env(safe-area-inset-bottom)}
+  display:grid;grid-template-columns:repeat(5,1fr);padding-bottom:env(safe-area-inset-bottom)}
 .bottom button{border:0;background:none;padding:8px 4px 10px;font-size:15px;font-weight:800;color:var(--sub);display:flex;flex-direction:column;align-items:center;gap:2px;min-height:64px}
 .bottom button b{font-size:24px;line-height:1}
 .bottom button.on{color:var(--ink);background:var(--bg);box-shadow:inset 0 4px 0 var(--ink)}
@@ -244,7 +244,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .handle.off{font-size:20px;color:var(--ok);cursor:default}
 .xbtn{border:2px solid var(--line);background:var(--card);border-radius:10px;width:44px;height:44px;font-weight:900;color:var(--sub);flex:none}
 .dragging{opacity:.3}
-.ghost{position:fixed;left:0;top:0;z-index:90;pointer-events:none;box-shadow:0 12px 30px rgba(0,0,0,.35);transform-origin:0 0;opacity:.95;border-color:var(--ink)!important}
+.dragghost{position:fixed;left:0;top:0;z-index:90;pointer-events:none;box-shadow:0 12px 30px rgba(0,0,0,.35);transform-origin:0 0;opacity:.95;border-color:var(--ink)!important}
 .dropline{height:6px;border-radius:3px;background:var(--blue);margin:2px 4px}
 .dz-empty{padding:16px 8px}
 .phr{display:inline-flex;align-items:center}
@@ -353,3 +353,75 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 @media (max-width:600px){ .ptt{width:66px;height:66px} .ptt .ic{font-size:24px} .ptt .lb{font-size:12px} }
 .caststrip{background:#c2410c;color:#fff;border-radius:16px;padding:12px 18px;font-size:clamp(24px,4.4vh,44px);font-weight:900;border:4px solid #000}
 .caststrip[data-flash]{animation:flashbar 1s step-end 60}
+
+/* ---------- 여러 역할 · 담당자 고르기 ---------- */
+.tabs.inline{background:none;border:0;padding:0 0 12px;flex-wrap:nowrap}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.pbtn{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;border:3px solid var(--line2);background:var(--card);border-radius:14px;padding:12px 14px;min-height:64px}
+.pbtn b{font-size:19px;font-weight:900}
+.pbtn span{font-size:14px;color:var(--sub);font-weight:700}
+.pbtn:active{background:var(--bg);border-color:var(--ink)}
+.list .item.done{opacity:.55}
+.list .item.cur{background:#fff6cc;border-radius:12px}
+.ptt.msg{background:#0f766e}
+.watch.big{font-size:clamp(64px,16vw,110px)}
+@media (max-width:420px){ .bottom button{font-size:13px} }
+
+/* ---------- 안내 창 (시간 안내 · 문자 · 긴급) ---------- */
+#notice{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;background:rgba(5,7,12,.7);padding:16px}
+#notice.open{display:flex}
+#notice .nbox{background:#fff;border-radius:22px;border:6px solid #ffd400;max-width:560px;width:100%;padding:22px 20px;text-align:center;box-shadow:0 12px 40px rgba(0,0,0,.5)}
+#notice.msg .nbox{border-color:#0f766e}
+#notice.sos{background:rgba(160,0,20,.85);animation:sosbg 1s step-end infinite}
+#notice.sos .nbox{border-color:#d10f2f}
+#notice .nic{font-size:64px;line-height:1}
+#notice .nt{font-size:clamp(26px,6vw,40px);font-weight:900;line-height:1.25;margin:10px 0;word-break:keep-all}
+#notice .nm{font-size:22px;font-weight:800;color:var(--sub);margin-bottom:10px;word-break:keep-all}
+#notice .nfrom{font-size:16px;color:var(--sub);font-weight:700;margin-bottom:14px}
+#notice .btn{width:100%}
+@keyframes sosbg{ 0%{background:rgba(160,0,20,.85)} 50%{background:rgba(5,7,12,.8)} }
+
+/* ---------- 안내판: 일정 남은 시간 · 시상식 ---------- */
+.schedstrip{background:#1f2937;color:#fff;border-radius:16px;padding:10px 18px;font-size:clamp(22px,4vh,40px);font-weight:900;border:4px solid #ffd400}
+.schedstrip b{color:#ffd400}
+.schedstrip span{font-size:.7em;opacity:.85}
+.award{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.5vh;text-align:center;border-radius:28px;border:8px solid #e5b800;background:#fffbe6;min-height:calc(100vh - 60px);padding:3vh 3vw}
+.award .aev{font-size:clamp(30px,6vh,64px);font-weight:900}
+.award .aic{font-size:clamp(80px,18vh,200px);line-height:1}
+.award .at{font-size:clamp(48px,11vh,120px);font-weight:900;line-height:1.05}
+.award .asub{font-size:clamp(24px,4vh,40px);font-weight:800;color:var(--sub)}
+.award .aname{display:flex;align-items:center;gap:16px;font-size:clamp(48px,11vh,120px);font-weight:900;line-height:1.1}
+.award .aname .tb.big{width:clamp(56px,10vh,100px);height:clamp(56px,10vh,100px);font-size:clamp(30px,6vh,56px)}
+.award .apt{font-size:.45em;color:var(--sub)}
+.award .ascore{display:flex;align-items:center;gap:18px;font-size:clamp(56px,12vh,130px);font-weight:900}
+.award.team.blue{background:var(--blue);color:#fff;border-color:#ffd400}
+.award.team.red{background:var(--red);color:#fff;border-color:#ffd400}
+.award.r1{border-color:#e5b800} .award.r2{border-color:#9ca3af;background:#f3f4f6} .award.r3{border-color:#b45309;background:#fff1e6}
+.award[data-flash]{animation:flashframe 1s step-end 6}
+
+/* ---------- 결과 보고서 ---------- */
+.reportbar{position:sticky;top:0;z-index:20;display:flex;gap:10px;align-items:center;background:var(--top);padding:10px 14px}
+.report{background:#fff;color:#000;max-width:900px;margin:16px auto;padding:28px 32px;border-radius:12px;font-size:15px;line-height:1.5}
+.report h1{font-size:28px;margin:0 0 4px;text-align:center}
+.report h2{font-size:20px;margin:24px 0 8px;border-bottom:2px solid #000;padding-bottom:4px}
+.report h3{font-size:17px;margin:16px 0 6px}
+.report h3 small{font-weight:600;color:#555;font-size:13px}
+.report .rmeta{text-align:center;color:#333;margin:0 0 10px}
+.report .rbig{font-size:19px}
+.report .rt{width:100%;border-collapse:collapse;font-size:14px;margin:6px 0 10px}
+.report .rt th,.report .rt td{border:1px solid #999;padding:5px 8px;text-align:left;color:#000}
+.report .rt th{background:#eee;font-size:13px}
+.report .rt td.num{text-align:right}
+.report .rt tr.podium td{font-weight:700}
+.report .rt tr.sum td{font-weight:900;background:#f5f5f5}
+.report .warnp{color:#8f4500;font-weight:700;margin:4px 0}
+.report .rfoot{margin-top:24px;color:#555;font-size:12px;text-align:right}
+@media print{
+  @page{ size:A4; margin:14mm }
+  html,body{background:#fff}
+  .noprint,#radio,#toast,#notice,#sheet,#dlg{display:none!important}
+  .report{margin:0;padding:0;max-width:none;border-radius:0;font-size:12px}
+  .report h2{break-after:avoid} .report .rt{break-inside:auto} .report .rt tr{break-inside:avoid}
+}
+/* 무전기 버튼이 있는 기기: 넓은 화면에서는 오른쪽을 비워 버튼이 내용을 가리지 않게 함 */
+@media (min-width:700px){ body.has-radio main{padding-right:110px} body.has-radio .tabs{padding-right:110px} }

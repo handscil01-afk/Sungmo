@@ -7,8 +7,10 @@ const MAX_TALK_MS = 60000;
 const RADIO = { on: ls.get('udh5_radio_on', true), lock:{ radio:null, cast:null }, listen:{ radio:null, cast:null },
   rtMaster:null, rtMasters:null, rtRoles:null, err:'' };
 const TALK = { kind:null, phase:null, tid:null, seq:0, pressed:false, timer:0, maxTimer:0, data:null };
-const radioRoleOK = () => { const r = myRole().role; return r==='master' || r==='coach' || r==='referee'; };
+const radioRoleOK = () => D.amMaster || hasDuty(myRole());
 const castOK = () => D.amMaster || !!myRole().cast;
+// Realtime Database 규칙이 보는 역할 이름: 감독 > 심판(심판·기록 도우미·계시원) > 안내판
+const rtRoleOf = r => r.coach ? 'coach' : (r.events.length || r.helpers.length || r.timers.length) ? 'referee' : r.board ? 'board' : '';
 
 /* ---------- μ-law 변환 ---------- */
 function muEnc(s){
@@ -110,7 +112,7 @@ function rtSyncSoon(){ clearTimeout(rtSyncTimer); rtSyncTimer = setTimeout(rtSyn
 function rtSync(){
   if(!RT || !D.amMaster || !RADIO.rtMaster || !D.loaded.roles || RADIO.rtRoles==null) return;
   const want = {};
-  Object.entries(D.roles).forEach(([id, r]) => { if(r && ['referee','coach','board'].includes(r.role)) want[id] = { role:r.role, cast:!!r.cast }; });
+  Object.entries(D.roles).forEach(([id, raw]) => { const r = normRole(raw), role = rtRoleOf(r); if(role) want[id] = { role, cast:r.cast }; });
   const have = RADIO.rtRoles || {};
   Object.keys(want).forEach(id => { const h = have[id]; if(!h || h.role!==want[id].role || !!h.cast!==want[id].cast) RT.setRole(id, want[id]).catch(()=>{}); });
   Object.keys(have).forEach(id => { if(!want[id]) RT.setRole(id, null).catch(()=>{}); });
@@ -132,8 +134,8 @@ async function rtMasterLogout(){ try{ const rt = await getRT(); await rt.setMast
 function radioReady(){
   if(!RT) return false;
   if(D.amMaster) return !!RADIO.rtMaster;
-  const h = (RADIO.rtRoles||{})[store.uid];
-  return !!h && h.role===myRole().role;
+  const h = (RADIO.rtRoles||{})[store.uid], me = myRole();
+  return !!h && h.role===rtRoleOf(me) && !!h.cast===!!me.cast;
 }
 
 /* ---------- 누르고 말하기 ---------- */
@@ -185,9 +187,10 @@ async function pttUp(){
 function radioSetup(){
   const box = $('#radio');
   box.innerHTML = `<div class="rxchips"></div>
+    <button class="ptt msg hidden" data-a="msgSheet" aria-label="문자 무전·긴급 호출"><span class="ic">💬</span><span class="lb">문자</span></button>
     <button class="ptt cast hidden" data-kind="cast" aria-label="안내방송: 누르고 있는 동안 안내판 스피커로 방송"><span class="ic">📢</span><span class="lb">방송</span></button>
     <button class="ptt hidden" data-kind="radio" aria-label="무전기: 누르고 있는 동안 말하기"><span class="ic">🎙</span><span class="lb">무전</span></button>`;
-  box.querySelectorAll('.ptt').forEach(b => {
+  box.querySelectorAll('.ptt[data-kind]').forEach(b => {
     b.addEventListener('pointerdown', e => { e.preventDefault(); try{ b.setPointerCapture(e.pointerId); }catch(x){} pttDown(b.dataset.kind); });
     ['pointerup','pointercancel','lostpointercapture'].forEach(t => b.addEventListener(t, () => { if(TALK.kind===b.dataset.kind || TALK.pressed) pttUp(); }));
     b.addEventListener('contextmenu', e => e.preventDefault());
@@ -210,6 +213,8 @@ function radioRender(){
     b.className = cls; b.querySelector('.ic').textContent = ic; b.querySelector('.lb').textContent = lb;
   };
   set('radio', showRadio); set('cast', showCast);
+  box.querySelector('.ptt.msg').classList.toggle('hidden', !(ok && can.staff()));
+  document.body.classList.toggle('has-radio', !!(ok && (showRadio || showCast || can.staff())) && !boardOn());
   let chips = '';
   if(ok){
     const L = RADIO.lock.radio, C = RADIO.lock.cast;

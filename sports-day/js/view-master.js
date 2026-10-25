@@ -1,54 +1,5 @@
 'use strict';
-/* ===================== 마스터: 접속자·역할, 명단·설정 ===================== */
-
-const ONLINE_MS = 5*60*1000;
-function deviceRole(id){ return D.masters[id] ? { role:'master' } : (D.roles[id] && ROLE_INFO[D.roles[id].role] ? D.roles[id] : { role:'wait' }); }
-function peopleView(){
-  const list = D.devices.slice().sort((a,b) => {
-    const wa = deviceRole(a.id).role==='wait', wb = deviceRole(b.id).role==='wait';
-    return (wb-wa) || String(a.name||'').localeCompare(String(b.name||''),'ko');
-  });
-  const waiting = list.filter(d => deviceRole(d.id).role==='wait').length;
-  const rows = list.map(d => {
-    const r = deviceRole(d.id), on = d.seenAt && now()-d.seenAt < ONLINE_MS, me = store && d.id===store.uid;
-    return `<div class="item tap" data-a="roleSheet" data-v="${d.id}">
-      <span class="tag ${on?'ok':''}" title="${on?'접속 중':'연결 끊김'}">${on?'● 접속':'○ '+ago(d.seenAt)}</span>
-      <span class="name">${esc(d.name||'(이름 없음)')}${me?' <span class="tag dark">이 기기</span>':''}<span class="sub">${esc(d.ua||'')}${on?'':' · 마지막 '+hm(d.seenAt)}</span></span>
-      <span class="tag ${r.role==='wait'?'warn':r.role==='master'?'dark':r.role==='coach'?(r.team==='red'?'red':'blue'):''}">${ROLE_INFO[r.role].icon} ${esc(roleLabel(r))}</span></div>`;
-  }).join('');
-  return `<div class="card"><div class="row"><h2 class="grow h2" style="margin:0">접속한 기기 ${list.length}대</h2>${waiting?`<span class="tag warn">역할 대기 ${waiting}</span>`:''}</div>
-      <p class="sub">각 기기에서 이름을 적고 들어오면 여기에 나타납니다. 줄을 누르면 역할을 정할 수 있고, 정하는 즉시 그 기기의 화면이 바뀝니다.</p>
-      <div class="list">${rows || '<div class="empty">아직 접속한 기기가 없습니다.</div>'}</div></div>
-    <div class="card"><h2>역할마다 보이는 화면</h2>
-      <div class="list">
-        <div class="item"><span class="tag">📋 감독</span><span class="name"><span class="sub">자기 팀의 단체전 출전 순서를 정하고, 상대 팀 순서와 지금 경기를 봅니다.</span></span></div>
-        <div class="item"><span class="tag">🚩 심판</span><span class="name"><span class="sub">맡은 종목만 보입니다. 단체전은 지금·다음 선수와 승패 입력, 개인전은 가나다순 명단과 점수 입력입니다.</span></span></div>
-        <div class="item"><span class="tag">📺 안내판</span><span class="name"><span class="sub">가로로 세워 둔 태블릿에 현황판을 크게 띄웁니다.</span></span></div>
-      </div></div>`;
-}
-let roleDraft = { id:null, events:[] };
-function roleSheet(){
-  const id = roleDraft.id, d = D.devices.find(x => x.id===id) || { id, name: id===store.uid ? UI.me : '' };
-  const r = deviceRole(id), me = id===store.uid;
-  const evChips = Object.keys(EVENTS).map(ev => `<button class="chip ${roleDraft.events.includes(ev)?'on':''}" data-a="rdEv" data-v="${ev}">${EVENTS[ev].icon} ${esc(EVENTS[ev].name)}</button>`).join('');
-  const isM = r.role==='master';
-  return `<h2>${esc(d.name||'(이름 없음)')} <span class="sub">${esc(d.ua||'')}</span></h2>
-    <p>지금 역할: <b>${ROLE_INFO[r.role].icon} ${esc(roleLabel(r))}</b></p>
-    ${isM && !DEMO ? '<div class="note">마스터 권한이 있는 기기입니다. 다른 역할을 주려면 먼저 마스터 권한을 빼 주세요.</div>' : ''}
-    <div class="card"><h2>감독</h2><div class="row nowrap">
-      <button class="btn blue grow" data-a="setRole" data-v="coach" data-t="blue">${esc(teamName('blue'))} 감독</button>
-      <button class="btn red grow" data-a="setRole" data-v="coach" data-t="red">${esc(teamName('red'))} 감독</button></div></div>
-    <div class="card"><h2>심판 <span class="sub">맡을 종목을 고르세요 (여러 개 가능)</span></h2>
-      <div class="chips">${evChips}</div>
-      <div style="height:10px"></div><button class="btn primary wide" data-a="setRole" data-v="referee" ${roleDraft.events.length?'':'disabled'}>고른 종목의 심판으로 정하기</button></div>
-    <div class="card"><div class="row"><button class="btn grow" data-a="setRole" data-v="board">📺 안내판으로 정하기</button><button class="btn grow" data-a="setRole" data-v="wait">⏳ 역할 없애기</button></div></div>
-    ${r.role==='coach' || r.role==='referee' ? `<div class="card"><div class="row"><span class="grow"><b>📢 안내판 음성 방송 권한</b> ${r.cast?'<span class="tag ok">있음</span>':'<span class="tag">없음</span>'}<span class="sub" style="display:block">주면 이 기기에도 방송 버튼이 생겨 안내판 스피커로 말할 수 있습니다.</span></span>
-      <button class="btn" data-a="setCast" data-v="${r.cast?'0':'1'}">${r.cast?'권한 빼기':'권한 주기'}</button></div></div>` : ''}
-    ${DEMO && me ? '' : `<div class="card"><h2>그 밖의 일</h2><div class="row">
-      ${isM ? (me ? '' : `<button class="btn danger grow" data-a="revokeMaster">👑 마스터 권한 빼기</button>`) : `<button class="btn grow" data-a="grantMaster">👑 마스터 권한 주기</button>`}
-      ${me ? '' : '<button class="btn danger grow" data-a="removeDevice">목록에서 지우기</button>'}</div></div>`}
-    <button class="btn wide" data-a="closeSheet">닫기</button>`;
-}
+/* ===================== 마스터: 명단·설정 · 결과 보고서 · 시험 기록 초기화 ===================== */
 
 /* ---------- 명단·설정 ---------- */
 function settingsView(){
@@ -70,8 +21,12 @@ function settingsView(){
     <div class="row" style="margin-bottom:12px"><span class="grow">투호 2m 미만</span><div class="seg"><button class="${s.tuhoShort===0?'on':''}" data-a="setS" data-k="tuhoShort" data-v="0">0점</button><button class="${s.tuhoShort===5?'on':''}" data-a="setS" data-k="tuhoShort" data-v="5">5점</button></div></div>
     <div class="row"><span class="grow">후리볼 파울</span><div class="seg"><button class="${s.foul===1?'on':''}" data-a="setS" data-k="foul" data-v="1">1점</button><button class="${s.foul===1.5?'on':''}" data-a="setS" data-k="foul" data-v="1.5">1.5점</button></div></div>
     <p class="sub">바꾸면 이미 입력한 기록의 점수도 자동으로 다시 계산됩니다.</p></div>
-  <div class="card"><h2>결과 내려받기</h2>
-    <div class="row"><button class="btn grow" data-a="csv" data-v="indiv">개인전 기록 (엑셀용 CSV)</button><button class="btn grow" data-a="csv" data-v="team">단체전 기록 (엑셀용 CSV)</button></div></div>
+  <div class="card"><h2>결과 보고서 · 내려받기</h2>
+    <button class="btn primary wide" data-a="report">🖨 결과 보고서 보기 (인쇄·PDF 저장)</button>
+    <div class="row" style="margin-top:10px"><button class="btn grow" data-a="csv" data-v="indiv">개인전 기록 (엑셀용 CSV)</button><button class="btn grow" data-a="csv" data-v="team">단체전 기록 (엑셀용 CSV)</button></div></div>
+  <div class="card"><h2>🧹 시험 기록 초기화</h2>
+    <p class="sub">운동회 전에 시험해 본 점수·승패·호출·안내·불참 표시·문자 무전을 한 번에 지웁니다. 명단, 팀, 담당자 명단, 역할, 일정은 그대로 남습니다.</p>
+    <button class="btn danger wide" data-a="resetAll">시험 기록 모두 지우기</button></div>
   </div><div>
   <div class="card"><div class="row"><h2 class="grow h2" style="margin:0">참여자 ${ps.length}명</h2><span class="tag blue">${esc(teamShort('blue'))} ${cnt.blue}</span><span class="tag red">${esc(teamShort('red'))} ${cnt.red}</span>${ps.length-cnt.red-cnt.blue?`<span class="tag warn">미정 ${ps.length-cnt.red-cnt.blue}</span>`:''}</div>
     <div class="list">${rows || '<div class="empty">아직 명단이 없습니다.</div>'}</div></div>
@@ -121,48 +76,7 @@ function csv(kind){
   document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
 
-// 연습 모드에서는 혼자 시험해 볼 수 있도록 자기 역할을 직접 정할 수 있음
-const canAssign = () => can.master() || DEMO;
 Object.assign(ACT, {
-  roleSheet: (el, v) => { const r = deviceRole(v); roleDraft = { id:v, events: r.role==='referee' ? [...(r.events||[])] : [] }; openSheet(roleSheet); return false; },
-  rdEv: (el, v) => { const a = roleDraft.events; a.includes(v) ? a.splice(a.indexOf(v),1) : a.push(v); drawSheet(); return false; },
-  setRole: async (el, v) => {
-    if(!canAssign()) return denied();
-    const id = roleDraft.id, d = D.devices.find(x => x.id===id), name = d?.name || (id===store.uid ? UI.me : '');
-    if(D.masters[id] && !DEMO){ toast('먼저 마스터 권한을 빼 주세요.'); return false; }
-    if(DEMO && D.masters[id] && !(await guard(store.del(['main','masters',id])))) return false;
-    let ok;
-    if(v==='wait') ok = await guard(store.del(['main','roles',id]));
-    else {
-      const role = { role:v, name, by:UI.me, at:now() };
-      if(v==='coach') role.team = el.dataset.t;
-      if(v==='referee') role.events = roleDraft.events.slice();
-      ok = await put(['main','roles',id], role, false);
-    }
-    if(ok){ closeSheet(); toast(`${name}: ${v==='wait' ? '역할을 없앴습니다.' : roleLabel(D.roles[id] || { role:v, team:el.dataset.t, events:roleDraft.events })+'(으)로 정했습니다.'}`); }
-  },
-  setCast: async (el, v) => {
-    if(!can.master()) return denied();
-    const id = roleDraft.id;
-    if(await put(['main','roles',id], { cast: v==='1' })) toast(v==='1' ? '방송 권한을 줬습니다.' : '방송 권한을 뺐습니다.');
-  },
-  grantMaster: async () => {
-    if(!can.master()) return denied();
-    const id = roleDraft.id, d = D.devices.find(x => x.id===id);
-    if(!(await ask(`${d?.name||''} 기기에 마스터 권한을 줄까요?\n모든 기록과 역할을 바꿀 수 있게 됩니다.`, '권한 주기'))) return false;
-    if(await put(['main','masters',id], { name:d?.name||'', by:UI.me, at:now() }, false)){ await guard(store.del(['main','roles',id])); closeSheet(); toast('마스터 권한을 줬습니다.'); }
-  },
-  revokeMaster: async () => {
-    if(!can.master()) return denied();
-    if(await guard(store.del(['main','masters',roleDraft.id]))){ closeSheet(); toast('마스터 권한을 뺐습니다.'); }
-  },
-  removeDevice: async () => {
-    if(!can.master()) return denied();
-    const id = roleDraft.id, d = D.devices.find(x => x.id===id);
-    if(!(await ask(`${d?.name||''} 기기를 목록에서 지울까요?\n그 기기는 다시 이름을 적고 들어와야 합니다.`, '지우기', true))) return false;
-    await guard(Promise.all([store.del(['main','roles',id]), store.del(['main','masters',id]), store.del(['main','devices',id])]));
-    closeSheet();
-  },
   saveTeamNames: () => {
     const b = $('#tnBlue').value.trim(), r = $('#tnRed').value.trim();
     if(!b || !r){ toast('두 팀 이름을 모두 적어 주세요.'); return false; }
@@ -182,4 +96,24 @@ Object.assign(ACT, {
   delP: async (el, v) => { const p = person(v); if(!(await ask(`${p?.name}을(를) 명단에서 지울까요?\n이미 입력한 기록은 그대로 남습니다.`,'지우기',true))) return false; setConfig({ people:{ [v]:{ deleted:true } } }); return false; },
   setS: (el, v) => { setConfig({ settings:{ [el.dataset.k]: parseFloat(v) } }); return false; },
   csv: (el, v) => { csv(v); return false; },
+  report: () => { UI.report = true; window.scrollTo(0,0); },
+  reportClose: () => { UI.report = false; },
+  print: () => { window.print(); return false; },
+  resetAll: async () => {
+    if(!can.master()) return denied();
+    const t = await askText('시험 기록을 모두 지웁니다. 되돌릴 수 없습니다.\n계속하려면 "초기화"라고 적어 주세요.', '', '지우기');
+    if(t==null) return false;
+    if(t.trim()!=='초기화'){ toast('"초기화"라고 적어야 지울 수 있습니다.'); return false; }
+    const orders = await ask('감독이 정한 출전 순서도 함께 지울까요?\n(취소를 누르면 순서는 남깁니다)', '순서도 지우기', true);
+    const by = { editedBy:UI.me, editedAt:now() }, jobs = [];
+    D.indiv.filter(r => !r.deleted).forEach(r => jobs.push(put(['main','indiv',r.id], { event:r.event, deleted:true, ...by })));
+    D.matches.filter(m => !m.deleted).forEach(m => jobs.push(put(['main','matches',m.id], { event:m.event, deleted:true, ...by })));
+    Object.keys(D.calls).forEach(ev => jobs.push(put(['main','calls',ev], { pick:{ blue:null, red:null }, call:null, times:null })));
+    Object.keys(D.absent).forEach(id => jobs.push(guard(store.del(['main','absent',id]))));
+    D.msgs.forEach(m => jobs.push(guard(store.del(['main','msgs',m.id]))));
+    if(orders) Object.values(D.orders).forEach(o => jobs.push(put(['main','orders',o.id], { event:o.event, team:o.team, list:[], by:UI.me, at:now() }, false)));
+    jobs.push(setConfig({ announce:{ cleared:true }, awards:{ step:-1 }, board:{ mode:'auto' } }));
+    const res = await Promise.all(jobs);
+    toast(`시험 기록을 지웠습니다. (${res.filter(Boolean).length}건)`);
+  },
 });

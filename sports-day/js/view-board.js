@@ -65,7 +65,7 @@ const BOARD = { init:false, seen:new Set(), lastCall:{}, annId:null, testAt:0, o
 // 지금 안내판에 띄울 화면: 마스터가 정한 것, 자동이면 가장 최근에 기록이 들어온 종목
 function boardTarget(){
   const m = boardCfg().mode || 'auto';
-  if(m==='indiv' || m==='summary') return { kind:m };
+  if(m==='indiv' || m==='summary' || m==='awards') return { kind:m };
   if(m.startsWith('team:') && TEAM[m.slice(5)]) return { kind:'team', ev:m.slice(5) };
   let best = { t:0, kind:'indiv' };
   D.matches.forEach(x => { const t = Math.max(x.at||0, x.editedAt||0); if(!x.deleted && TEAM[x.event] && t>best.t) best = { t, kind:'team', ev:x.event }; });
@@ -82,7 +82,7 @@ function boardTick(){
     if(!D.loaded.matches || !D.loaded.calls || !D.loaded.config) return;
     D.matches.forEach(m => BOARD.seen.add(m.id));
     Object.entries(D.calls).forEach(([ev, c]) => BOARD.lastCall[ev] = (c.call||{}).at||0);
-    BOARD.annId = ann.id || null; BOARD.testAt = cfg.testAt || 0;
+    BOARD.annId = ann.id || null; BOARD.testAt = cfg.testAt || 0; BOARD.awardStep = awardsStep();
     BOARD.init = true; return;
   }
   D.matches.slice().sort((a,b) => (a.at||0)-(b.at||0)).forEach(m => {
@@ -96,6 +96,8 @@ function boardTick(){
   });
   if(ann.id && ann.id!==BOARD.annId){ BOARD.annId = ann.id; if(ann.text && !ann.cleared) BOARD.queue.push({ kind:'ann', ann }); }
   if((cfg.testAt||0) > BOARD.testAt){ BOARD.testAt = cfg.testAt; BOARD.queue.push({ kind:'test' }); }
+  const st = awardsStep();
+  if(st!==BOARD.awardStep){ BOARD.awardStep = st; BOARD.awardAt = now(); if(st>=0 && cfg.mode==='awards') BOARD.queue.push({ kind:'award', step:st }); }
   runFx();
 }
 // 효과(소리·화면)는 하나씩 차례로: 결과 → 다음 선수 호출 → 안내방송 순서가 섞이지 않게 함
@@ -119,6 +121,10 @@ function runFx(){
   } else if(fx.kind==='ann'){
     BOARD.overlay = { kind:'ann', ann:fx.ann, start:now() }; dur = ANN_MS;
     if(sound){ const d = cfg.chime ? SND.chime() : 0; if(fx.ann.voice!==false) setTimeout(() => SND.speak(fx.ann.text), d*1000+300); }
+  } else if(fx.kind==='award'){
+    const s = awardSteps()[fx.step];
+    BOARD.awardAt = now(); dur = 4000;
+    if(sound && s){ const d = SND.fanfare(); if(cfg.callVoice) setTimeout(() => SND.speak(awardSpeech(s)), d*1000+300); dur = 7000; }
   } else if(fx.kind==='result'){
     BOARD.overlay = { kind:'result', m:fx.m, start:now() }; dur = RESULT_MS;
     if(sound) SND.fanfare();
@@ -149,11 +155,13 @@ function boardScreen(){
   const T = boardTarget(), ann = D.config.announce || {};
   const C = RADIO.lock.cast;
   const annStrip = (C ? `<div class="caststrip"${flashAttr(C.at || now(), 60000)}>📢 안내방송 중 · ${esc(C.name||'')}</div>` : '')
-    + (ann.text && !ann.cleared && (now()-(ann.at||0)) < 6*3600*1000 ? `<div class="annstrip"${flashAttr(ann.at)}>📢 ${esc(ann.text)}</div>` : '');
+    + (ann.text && !ann.cleared && (now()-(ann.at||0)) < 6*3600*1000 ? `<div class="annstrip"${flashAttr(ann.at)}>📢 ${esc(ann.text)}</div>` : '')
+    + (T.kind==='awards' ? '' : boardScheduleStrip());
   let body;
   if(T.kind!=='indiv') BOARD.person = null;
   if(T.kind==='team') body = boardTeam(T.ev);
   else if(T.kind==='summary') body = `<div class="bdhead"><h1>📊 종합 현황</h1></div>${boardView()}`;
+  else if(T.kind==='awards') body = boardAwards();
   else body = boardIndiv();
   const cfg = boardCfg();
   const soundHint = boardOn() && cfg.sound && !SND.ready() ? `<button class="soundhint" data-a="bdSound">🔈 화면을 한 번 눌러 소리를 켜 주세요</button>` : '';
@@ -185,7 +193,7 @@ function boardIndiv(){
   const cell = (ev, p) => { const r = rec(ev,'main',p.id); return r ? `<td class="num"><b>${totalOf(ev, r.throws)}</b></td>` : '<td class="num dash">–</td>'; };
   const ncol = ps.length > 36 ? 3 : ps.length > 14 ? 2 : 1, per = Math.ceil(ps.length / ncol) || 1;
   const tables = Array.from({ length:ncol }, (_,c) => ps.slice(c*per, (c+1)*per)).map(chunk => `<table class="itab"><thead><tr><th>이름</th>${evs.map(ev => `<th class="num">${INDIV[ev].icon} ${esc(INDIV[ev].name)}</th>`).join('')}</tr></thead>
-    <tbody>${chunk.map(p => `<tr class="tap" data-a="bdPerson" data-v="${p.id}"><td><span class="row nowrap" style="gap:8px">${teamBadge(p.team)}<b>${esc(p.name)}</b></span></td>${evs.map(ev => cell(ev, p)).join('')}</tr>`).join('')}</tbody></table>`).join('');
+    <tbody>${chunk.map(p => `<tr class="tap" data-a="bdPerson" data-v="${p.id}"><td><span class="row nowrap" style="gap:8px">${teamBadge(p.team)}<b>${esc(p.name)}</b>${isAbsent(p.id)?' <span class="tag red">불참</span>':''}</span></td>${evs.map(ev => cell(ev, p)).join('')}</tr>`).join('')}</tbody></table>`).join('');
   return `<div class="bdhead"><span class="bic">🎯</span><h1>개인전 기록</h1><span class="bsub">이름을 누르면 크게 볼 수 있습니다</span></div>
     ${ps.length ? `<div class="ilist" style="grid-template-columns:repeat(${ncol},1fr)">${tables}</div>` : '<div class="card empty">명단이 아직 없습니다.</div>'}`;
 }
@@ -221,7 +229,7 @@ function boardOverlay(){
 let annDraft = '';
 function boardControl(){
   const cfg = boardCfg(), ann = D.config.announce || {};
-  const modes = [['auto','🔄 자동'], ['indiv','🎯 개인전 명단'], ['summary','📊 종합 현황'], ...ORDER_EVENTS.concat(['tug']).map(k => ['team:'+k, TEAM[k].icon+' '+TEAM[k].name])];
+  const modes = [['auto','🔄 자동'], ['indiv','🎯 개인전 명단'], ['summary','📊 종합 현황'], ['awards','🏆 시상식'], ...ORDER_EVENTS.concat(['tug']).map(k => ['team:'+k, TEAM[k].icon+' '+TEAM[k].name])];
   const sw = (k, label, sub) => `<div class="item"><span class="name">${label}<span class="sub">${sub}</span></span><label class="switch"><input type="checkbox" data-ch="bcfg" data-k="${k}" ${cfg[k]?'checked':''}><span></span></label></div>`;
   const live = ann.text && !ann.cleared;
   return `<div class="cols half"><div class="card"><h2>📺 안내판 제어</h2>
@@ -240,7 +248,42 @@ function boardControl(){
       <div class="chips" style="margin:10px 0">${phrases().map((t,i) => `<span class="phr"><button class="chip" data-a="annPick" data-v="${i}">${esc(t)}</button><button class="phx" data-a="annDelPhrase" data-v="${i}" aria-label="문구 지우기">✕</button></span>`).join('')}</div>
       <div class="row"><button class="btn primary grow" data-a="annSend" data-v="voice">📢 띄우고 읽어 주기</button><button class="btn grow" data-a="annSend" data-v="text">글자만 띄우기</button></div>
       <div style="height:8px"></div><button class="btn small wide" data-a="annSavePhrase">입력한 내용을 자주 쓰는 문구로 저장</button>
-      <p class="sub">안내판에 15초 동안 화면 가득 띄운 뒤, 내릴 때까지 위쪽 띠로 계속 보여 줍니다.</p></div></div>`;
+      <p class="sub">안내판에 15초 동안 화면 가득 띄운 뒤, 내릴 때까지 위쪽 띠로 계속 보여 줍니다.</p></div></div>${awardsControl()}`;
+}
+function awardsControl(){
+  const steps = awardSteps(), i = awardsStep(), on = boardCfg().mode==='awards';
+  return `<div class="card"><h2>🏆 시상식</h2>
+    <p class="sub">안내판을 시상식 화면으로 바꾸고, 개인전 종목별 3등 → 2등 → 1등, 마지막에 종합 우승 순서로 한 단계씩 발표합니다. 발표할 때마다 팡파르와 함께 이름을 읽어 줍니다.</p>
+    <div class="row">${on ? '' : '<button class="btn primary grow" data-a="awStart">🏆 시상식 화면으로 바꾸기</button>'}
+      ${on ? `<button class="btn grow" data-a="awStep" data-v="-1" ${i<0?'disabled':''}>◀ 이전</button><button class="btn primary grow" data-a="awStep" data-v="1" ${i>=steps.length-1?'disabled':''}>다음 발표 ▶</button><button class="btn" data-a="awEnd">끝내기</button>` : ''}</div>
+    <div class="list" style="margin-top:10px">${steps.map((s,k) => `<div class="item ${k===i?'cur':''} ${k<i?'done':''}"><span class="no tag">${k+1}</span><span class="name">${esc(awardLabel(s))}<span class="sub">${s.kind==='team' ? `${esc(teamName('blue'))} ${s.tot.blue} : ${s.tot.red} ${esc(teamName('red'))}` : s.winners.map(x => esc(x.p.name)+' '+x.total+'점').join(', ')}</span></span>${k===i?'<span class="tag dark">지금 발표</span>':''}</div>`).join('')}</div></div>`;
+}
+
+/* ---------- 시상식 ---------- */
+function awardSteps(){
+  const st = [];
+  Object.entries(INDIV).forEach(([ev]) => { const { list } = standings(ev); [3,2,1].forEach(rk => { const w = list.filter(x => x.rank===rk); if(w.length) st.push({ kind:'indiv', ev, rank:rk, winners:w }); }); });
+  st.push({ kind:'team', tot: totalPoints() });
+  return st;
+}
+const awardsStep = () => { const a = D.config.awards; return a && typeof a.step==='number' ? a.step : -1; };
+const awardLabel = s => s.kind==='team' ? '종합 우승 발표' : `${INDIV[s.ev].name} ${s.rank}등`;
+function awardSpeech(s){
+  if(s.kind==='team'){ const t = s.tot; return t.blue===t.red ? `종합 결과, ${t.blue} 대 ${t.red} 무승부입니다.` : `종합 우승, ${teamName(t.blue>t.red?'blue':'red')}입니다. 축하합니다.`; }
+  return `${INDIV[s.ev].name} ${s.rank}등, ${s.winners.map(x => `${teamName(x.p.team)} ${x.p.name}`).join(', ')}. 축하합니다.`;
+}
+function boardAwards(){
+  const steps = awardSteps(), i = awardsStep();
+  if(i < 0 || i >= steps.length) return `<div class="award idle"><div class="aic">🏆</div><div class="at">시상식</div><div class="asub">잠시 후 시상을 시작합니다</div></div>`;
+  const s = steps[i], fx = flashAttr(BOARD.awardAt, 6000);
+  if(s.kind==='team'){
+    const t = s.tot, w = t.blue===t.red ? '' : (t.blue>t.red ? 'blue' : 'red');
+    return `<div class="award team ${w}"${fx}><div class="aic">🏆</div><div class="at">${w ? `종합 우승 ${esc(teamName(w))}` : '종합 결과 무승부'}</div>
+      <div class="ascore">${teamBadge('blue',true)} ${t.blue} : ${t.red} ${teamBadge('red',true)}</div></div>`;
+  }
+  const E = INDIV[s.ev], medal = { 1:'🥇', 2:'🥈', 3:'🥉' }[s.rank];
+  return `<div class="award r${s.rank}"${fx}><div class="aev">${E.icon} ${esc(E.name)}</div><div class="aic">${medal}</div><div class="at">${s.rank}등</div>
+    ${s.winners.map(x => `<div class="aname">${teamBadge(x.p.team,true)} ${esc(x.p.name)} <span class="apt">${x.total}점</span></div>`).join('')}</div>`;
 }
 
 Object.assign(ACT, {
@@ -248,6 +291,9 @@ Object.assign(ACT, {
   bdDismiss: () => { if(BOARD.overlay) finishFx(); return false; },
   bdSound: () => { SND.unlock(); SND.dingdong(); },
   bmode: (el, v) => { setConfig({ board:{ mode:v } }); return false; },
+  awStart: () => { setConfig({ board:{ mode:'awards' }, awards:{ step:-1 } }); },
+  awStep: (el, v) => { const n = Math.max(-1, Math.min(awardSteps().length-1, awardsStep() + (+v))); setConfig({ board:{ mode:'awards' }, awards:{ step:n } }); },
+  awEnd: () => { setConfig({ board:{ mode:'auto' }, awards:{ step:-1 } }); },
   btest: () => { setConfig({ board:{ testAt:now() } }); toast('안내판에서 띵동 소리가 나는지 확인해 주세요.'); return false; },
   annPick: (el, v) => { annDraft = phrases()[+v] || ''; },
   annSend: (el, v) => {
@@ -266,4 +312,4 @@ Object.assign(ACT, {
 document.addEventListener('change', e => { const el = e.target; if(el.dataset.ch==='bcfg') setConfig({ board:{ [el.dataset.k]: el.checked } }); });
 document.addEventListener('input', e => { if(e.target.dataset.in==='ann') annDraft = e.target.value; });
 // 호출 띠·깜빡임이 끝나는 시각에 맞춰 화면을 다시 그림
-setInterval(() => { if(boardOn() && (BOARD.callFx || (D.config.announce||{}).text)) queueRender(); }, 5000);
+setInterval(() => { if(boardOn() && (BOARD.callFx || (D.config.announce||{}).text || schedule().length || boardCfg().mode==='awards')) queueRender(); }, 5000);

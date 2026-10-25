@@ -8,16 +8,34 @@ function syncPill(){
   return `<span class="pill">저장됨</span>`;
 }
 function header(r){
-  return `<header class="top"><span class="rolechip ${r.role}">${ROLE_INFO[r.role].icon} ${esc(roleLabel(r))}</span>
+  return `<header class="top"><span class="rolechip ${r.role}">${esc(roleIcon(r))} ${esc(roleLabel(r))}</span>
     <span class="me grow">${esc(UI.me)}</span>${syncPill()}${fsButton()}<button class="hbtn" data-a="menu" aria-label="메뉴">${ICON.menu}</button></header>`;
 }
 function fixEv(list){ if(!list.includes(UI.ev)) UI.ev = list[0]; }
+// 여러 역할을 가진 기기: 역할마다 탭 하나 (감독 / 맡은 종목 / 계시)
+function staffTabs(r){
+  const t = [];
+  if(r.coach) t.push({ k:'coach', icon:'📋', label:`${teamName(r.coach)} 감독`, color: r.coach==='blue' ? '#0044d1' : '#cf0a2c' });
+  refEvents(r).forEach(ev => t.push({ k:'ev:'+ev, icon:EVENTS[ev].icon, label:EVENTS[ev].name + (r.events.includes(ev) ? '' : ' 기록'), color:EVENTS[ev].color }));
+  r.timers.forEach(ev => t.push({ k:'timer:'+ev, icon:'⏱', label:`${EVENTS[ev].name} 계시`, color:'#111827' }));
+  return t;
+}
+function staffBody(r){
+  if(UI.stab==='coach'){
+    if(!ORDER_EVENTS.includes(UI.coachEv)) UI.coachEv = ORDER_EVENTS[0];
+    UI.ev = UI.coachEv;
+    return eventTabs(ORDER_EVENTS, 'cev', UI.coachEv, true) + coachView(r.coach);
+  }
+  const ev = UI.stab.split(':')[1]; UI.ev = ev;
+  return UI.stab.startsWith('timer:') ? timerView(ev) : eventView(ev);
+}
 
 function render(){
   const app = $('#app');
   if(D.fatal){ app.innerHTML = fatalView(); return; }
   if(!store){ app.innerHTML = '<div class="gate"><h1>불러오는 중…</h1></div>'; return; }
   if(!UI.me){ app.innerHTML = gateView(); return; }
+  if(UI.report && D.amMaster){ app.innerHTML = reportView(); radioRender(); return; }
   const ae = document.activeElement, keep = ae && ae.id ? { id:ae.id, s:ae.selectionStart, e:ae.selectionEnd } : null;
   const r = myRole();
   let tabs = '', body = '', nav = '', shell = 'shell', head = header(r), corner = '';
@@ -25,15 +43,15 @@ function render(){
     if(UI.mtab==='game'){ const list = Object.keys(EVENTS); fixEv(list); tabs = eventTabs(list); body = masterGame(); }
     else if(UI.mtab==='board') body = boardControl() + `<div class="row" style="margin-bottom:14px"><button class="btn primary wide" data-a="boardPreview">📺 안내판 화면 미리 보기 (소리 없이)</button></div>` + boardView();
     else if(UI.mtab==='people') body = peopleView();
+    else if(UI.mtab==='sched') body = schedView();
     else body = settingsView();
-    nav = `<nav class="bottom">${[['game','🏁','경기 진행'],['board','📊','현황판'],['people','👥','접속자·역할'],['settings','⚙️','명단·설정']]
+    nav = `<nav class="bottom">${[['game','🏁','경기'],['board','📊','안내판'],['sched','⏰','일정·알림'],['people','👥','역할'],['settings','⚙️','명단·설정']]
       .map(([k,i,l]) => `<button class="${UI.mtab===k?'on':''}" data-a="mtab" data-v="${k}"><b>${i}</b>${l}</button>`).join('')}</nav>`;
-  } else if(r.role==='referee'){
-    const list = refEvents(r);
-    if(!list.length) body = waitView('맡은 종목이 아직 없습니다', '마스터에게 맡을 종목을 정해 달라고 알려 주세요.');
-    else { fixEv(list); tabs = eventTabs(list); body = eventView(UI.ev); }
-  } else if(r.role==='coach'){
-    fixEv(ORDER_EVENTS); tabs = eventTabs(ORDER_EVENTS); body = coachView(r.team);
+  } else if(r.role==='staff'){
+    const st = staffTabs(r);
+    if(!st.some(t => t.k===UI.stab)) UI.stab = st[0].k;
+    if(st.length>1) tabs = `<div class="tabs">${st.map(t => `<button class="evtab ${t.k===UI.stab?'on':''}" style="--ev:${t.color}" data-a="stab" data-v="${t.k}"><span class="ic">${t.icon}</span>${esc(t.label)}</button>`).join('')}</div>`;
+    body = staffBody(r);
   } else if(r.role==='board'){
     shell = 'shell boardshell'; head = ''; body = boardScreen();
     corner = `<button class="cornerbtn" data-a="menu" aria-label="메뉴">${ICON.menu}</button>`;
@@ -63,9 +81,10 @@ function gateView(){
     ${installBanner()}
     <div class="logo">🏅</div>
     <h1>가을운동회 점수판</h1>
-    <p class="sub">이름을 적고 들어오면 마스터가 역할(감독·심판·안내판)을 정해 줍니다. 기록마다 이 이름이 함께 남습니다.</p>
     ${DEMO?`<div class="note">연습 모드입니다. 이 브라우저에만 저장됩니다. 마스터 비밀번호는 ${DEMO_MASTER_PW}입니다.</div>`:''}
-    <div class="card">
+    ${presetPicker()}
+    <div class="card"><h2>${presetList().length ? '✍️ 그 밖에: 이름 적고 들어오기' : '이름 적고 들어오기'}</h2>
+      <p class="sub">이름을 적고 들어오면 마스터가 역할을 정해 줍니다. 기록마다 이 이름이 함께 남습니다.</p>
       <input id="meInput" placeholder="이름 (예: 박진해)" autocomplete="off">
       <div style="height:12px"></div>
       <button class="btn primary wide" data-a="setMe">들어가기</button>
@@ -79,6 +98,7 @@ function waitView(title='역할을 기다리는 중입니다', msg='마스터에
     <div class="row" style="justify-content:center;margin-top:16px">
       ${DEMO?'<button class="btn primary" data-a="demoRole">연습: 역할 직접 고르기</button>':''}
       <button class="btn" data-a="masterLogin">👑 마스터로 들어가기</button><button class="btn" data-a="rename">이름 바꾸기</button></div></div>
+    ${presetPicker()}
     ${boardView()}`;
 }
 function fatalView(){
@@ -88,9 +108,12 @@ function fatalView(){
 function menuSheet(){
   const r = myRole();
   return `<h2>메뉴</h2>
-    <p>이 기기: <b>${esc(UI.me)}</b> · ${ROLE_INFO[r.role].icon} ${esc(roleLabel(r))}</p>
+    <p>이 기기: <b>${esc(UI.me)}</b> · ${esc(roleIcon(r))} ${esc(roleLabel(r))}</p>
     <div class="list menu">
       <div class="item tap" data-a="rename"><span class="name">✏️ 이름 바꾸기</span></div>
+      ${r.role!=='board' ? '<div class="item tap" data-a="schedSheet"><span class="name">📅 진행 일정<span class="sub">오늘 일정과 남은 시간을 봅니다.</span></span></div>' : ''}
+      ${can.staff() ? '<div class="item tap" data-a="msgSheet"><span class="name">💬 문자 무전 · 🚨 긴급 호출</span></div><div class="item tap" data-a="attSheet"><span class="name">👥 출석 체크<span class="sub">오지 않은 선수를 불참으로 표시합니다.</span></span></div>' : ''}
+      ${r.role!=='master' && r.role!=='wait' ? '<div class="item tap" data-a="leaveRole"><span class="name">🔄 담당 다시 고르기<span class="sub">지금 역할에서 나가고 담당자를 다시 고릅니다.</span></span></div>' : ''}
       ${r.role==='master' ? '<div class="item tap" data-a="masterLogout"><span class="name">👑 마스터에서 나가기<span class="sub">이 기기의 마스터 권한을 뺍니다.</span></span></div>'
         : '<div class="item tap" data-a="masterLogin"><span class="name">👑 마스터로 들어가기<span class="sub">마스터 비밀번호가 필요합니다.</span></span></div>'}
       ${DEMO ? '<div class="item tap" data-a="demoRole"><span class="name">🧪 연습: 역할 직접 고르기</span></div><div class="item tap" data-a="demoReset"><span class="name">🗑 연습 기록 모두 지우기</span></div>' : ''}
@@ -128,6 +151,8 @@ Object.assign(ACT, {
   rename: async () => { const n = await askText('이 기기를 쓰는 사람 이름', UI.me); if(n && n.trim()){ UI.me = n.trim(); idStore.set('udh5_me', UI.me); touchDevice(); } },
   ev: (el, v) => { UI.ev = v; UI.q = ''; ls.set('udh5_ev', v); window.scrollTo(0,0); },
   mtab: (el, v) => { UI.mtab = v; ls.set('udh5_mtab', v); window.scrollTo(0,0); },
+  stab: (el, v) => { UI.stab = v; UI.q = ''; ls.set('udh5_stab', v); window.scrollTo(0,0); },
+  cev: (el, v) => { UI.coachEv = v; ls.set('udh5_cev', v); },
   menu: () => { openSheet(menuSheet); return false; },
   closeSheet: () => { closeSheet(); return false; },
   masterLogin: async () => { await masterLogin(); },
@@ -191,6 +216,9 @@ function subscribe(){
   store.onCol(['main','matches'], col('matches'), onErr);
   store.onCol(['main','orders'], map('orders'), onErr);
   store.onCol(['main','roles'], map('roles'), onErr);
+  store.onCol(['main','presets'], map('presets'), onErr);
+  store.onCol(['main','absent'], map('absent'), onErr);
+  store.onQuery(['main','msgs'], 'at', '>', now() - 15*60000, (l) => { D.msgs = l; processMsgs(); queueRender(); }, onErr);
   store.onDoc(['main','masters',store.uid], (d, p) => {
     const was = D.amMaster;
     // 서버가 비밀번호를 확인하기 전(대기 중)에는 마스터로 보지 않음

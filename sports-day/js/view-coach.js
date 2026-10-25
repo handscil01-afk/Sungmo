@@ -20,7 +20,7 @@ function poolCard(ev, team){
   return `<div class="card"><div class="row"><h2 class="grow row h2" style="margin:0">${teamBadge(team)} 아직 배치하지 않은 팀원</h2><span class="tag">${pool.length}명</span></div>
     <p class="sub">누르면 순서 맨 뒤에 들어가고, 끌어다 놓으면 놓은 자리에 들어갑니다.</p>
     <div class="dropzone pool" data-zone="pool" data-t="${team}">
-      ${pool.map(id => `<button class="pchip" data-drag="pool" data-id="${id}" data-a="oadd" data-t="${team}" data-v="${id}">${esc(pname(id))}${pl[id]?` <span class="tag ok">✓${pl[id]}</span>`:''}</button>`).join('')
+      ${pool.map(id => `<button class="pchip" data-drag="pool" data-id="${id}" data-a="oadd" data-t="${team}" data-v="${id}">${esc(pname(id))}${pl[id]?` <span class="tag ok">✓${pl[id]}</span>`:''}${isAbsent(id)?' <span class="tag red">불참</span>':''}</button>`).join('')
         || '<div class="empty" style="padding:10px">모두 배치했습니다.</div>'}
     </div>
     ${pool.length && saved.length ? '<p class="sub" style="margin:8px 0 0">배치하지 않은 팀원은 경기 때 순서 맨 뒤에 가나다순으로 자동으로 붙습니다.</p>' : ''}</div>`;
@@ -32,7 +32,7 @@ function orderListCard(ev, team){
     return `<div class="orow ${id===u.cur?'cur':''} ${locked?'done':''}" data-oid="${id}">
       ${locked ? '<span class="handle off" title="경기를 마쳐 고정됨">✓</span>' : `<span class="handle" data-drag="order" data-id="${id}" aria-label="끌어서 옮기기">⠿</span>`}
       <span class="no">${i+1}</span><span class="name">${esc(pname(id))}</span>
-      ${id===u.cur?'<span class="tag dark">지금</span>':id===u.next?'<span class="tag warn">다음</span>':''}${locked?`<span class="tag ok">${pl[id]}회</span>`:''}
+      ${id===u.cur?'<span class="tag dark">지금</span>':id===u.next?'<span class="tag warn">다음</span>':''}${locked?`<span class="tag ok">${pl[id]}회</span>`:''}${isAbsent(id)?'<span class="tag red">불참</span>':''}
       ${locked ? '' : `<button class="xbtn" data-a="oremove" data-t="${team}" data-v="${id}" aria-label="순서에서 빼기">✕</button>`}</div>`;
   }).join('');
   return `<div class="card"><div class="row"><h2 class="grow row h2" style="margin:0">${teamBadge(team)} ${esc(teamName(team))} 출전 순서</h2><span class="tag">${saved.length}명</span></div>
@@ -45,7 +45,7 @@ function orderListCard(ev, team){
 function orderCard(ev, team){
   const ord = orderFor(ev, team), saved = orderSaved(ev, team), pl = plays(ev, team), u = upNext(ev, team);
   const rows = ord.map((id,i) => `<div class="item ${id===u.cur?'cur':''} ${pl[id]?'done':''}"><span class="no">${i+1}</span><span class="name">${esc(pname(id))}</span>
-      ${id===u.cur?'<span class="tag dark">지금</span>':id===u.next?'<span class="tag warn">다음</span>':''}${pl[id]?`<span class="tag ok">✓ ${pl[id]}회</span>`:''}${saved.includes(id)?'':'<span class="tag">자동</span>'}</div>`).join('');
+      ${id===u.cur?'<span class="tag dark">지금</span>':id===u.next?'<span class="tag warn">다음</span>':''}${pl[id]?`<span class="tag ok">✓ ${pl[id]}회</span>`:''}${saved.includes(id)?'':'<span class="tag">자동</span>'}${isAbsent(id)?'<span class="tag red">불참</span>':''}</div>`).join('');
   return `<div class="card"><div class="row"><h2 class="grow row h2" style="margin:0">${teamBadge(team)} ${esc(teamName(team))} 순서</h2><span class="tag">상대 팀 · 보기만</span></div>
     <div class="list olist" style="margin-top:8px">${rows || '<div class="empty">이 팀에 배정된 사람이 없습니다.</div>'}</div></div>`;
 }
@@ -67,7 +67,7 @@ document.addEventListener('pointermove', e => {
     if(Math.hypot(e.clientX-P.x, e.clientY-P.y) < 8) return;
     DRAG.active = true;
     const r = P.el.getBoundingClientRect();
-    const g = P.el.cloneNode(true); g.classList.add('ghost'); g.style.width = r.width+'px';
+    const g = P.el.cloneNode(true); g.classList.add('dragghost'); g.style.width = r.width+'px';
     P.dx = P.x - r.left; P.dy = P.y - r.top;
     document.body.appendChild(g); DRAG.ghost = g;
     P.el.classList.add('dragging');

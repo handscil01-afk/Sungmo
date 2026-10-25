@@ -10,7 +10,7 @@ function scoreline(t){
   return `<div class="scoreline">${teamBadge('blue')}<span class="n blue">${t.blue}</span><span class="c">:</span><span class="n red">${t.red}</span>${teamBadge('red')}</div>`;
 }
 // 종목 탭: 역할마다 볼 수 있는 종목만
-function eventTabs(list){
+function eventTabs(list, act='ev', cur=UI.ev, inline=false){
   if(list.length<2) return '';
   let html = '', grp = '';
   list.forEach(ev => {
@@ -19,9 +19,9 @@ function eventTabs(list){
     let badge;
     if(E.kind==='indiv'){ const ps = people(); badge = `${ps.filter(p => rec(ev,'main',p.id)).length}/${ps.length}`; }
     else { const t = tally(ev); badge = `${t.blue}:${t.red}`; }
-    html += `<button class="evtab ${ev===UI.ev?'on':''}" style="--ev:${E.color}" data-a="ev" data-v="${ev}"><span class="ic">${E.icon}</span>${esc(E.name)}<small>${badge}</small></button>`;
+    html += `<button class="evtab ${ev===cur?'on':''}" style="--ev:${E.color}" data-a="${act}" data-v="${ev}"><span class="ic">${E.icon}</span>${esc(E.name)}<small>${badge}</small></button>`;
   });
-  return `<div class="tabs">${html}</div>`;
+  return `<div class="tabs${inline?' inline':''}">${html}</div>`;
 }
 function eventView(ev){ return EVENTS[ev].kind==='indiv' ? indivView(ev) : teamView(ev); }
 
@@ -75,7 +75,7 @@ function pickRows(ev, round, editable){
   const rows = list.map(p => {
     const r = rec(ev, round, p.id);
     const st = editable && inLane.has(p.id) ? '<span class="tag warn">입력 중</span>'
-      : r ? `<span class="tag ok">✓ ${totalOf(ev,r.throws)}점</span>` : '<span class="tag">미입력</span>';
+      : r ? `<span class="tag ok">✓ ${totalOf(ev,r.throws)}점</span>` : isAbsent(p.id) ? '<span class="tag red">불참</span>' : '<span class="tag">미입력</span>';
     return `<div class="item tap" data-a="pick" data-v="${p.id}">${teamBadge(p.team)}<span class="name">${esc(p.name)}</span>${st}</div>`;
   }).join('');
   return rows || `<div class="empty">${ps.length ? '해당하는 사람이 없습니다.' : '명단이 비어 있습니다. 마스터가 명단을 먼저 넣어 주세요.'}</div>`;
@@ -140,13 +140,14 @@ function teamView(ev){
     <div class="vs">${playerBox(ev,'blue',b.cur,b.picked,editable)}<div class="vsmark">VS</div>${playerBox(ev,'red',r.cur,r.picked,editable)}</div>`;
   if(!editable) cur += '';
   else if(E.mode==='time'){
-    const rt = UI.runTimes[ev] || {};
-    cur += `<div class="watch" id="watch">0.00</div>
+    const rt = runTimesOf(ev), tm = (D.calls[ev]||{}).times || {};
+    cur += `${tm.blue!=null || tm.red!=null ? `<div class="okline" style="margin-top:12px">⏱ 계시원 ${esc(tm.by||'')}이(가) 보낸 기록이 아래 칸에 채워졌습니다. 확인한 뒤 저장해 주세요.</div>` : ''}
+      <div class="watch" id="watch">0.00</div>
       <div class="row nowrap"><button class="btn primary huge" data-a="watchToggle" id="watchBtn">시작</button><button class="btn" data-a="watchReset">초기화</button></div>
       <div class="row nowrap" style="margin-top:10px"><button class="btn blue grow" data-a="watchTo" data-v="blue">→ ${esc(teamShort('blue'))} 기록에 넣기</button><button class="btn red grow" data-a="watchTo" data-v="red">→ ${esc(teamShort('red'))} 기록에 넣기</button></div>
       <div class="row" style="margin-top:12px;justify-content:center">
-        <label class="row">${teamBadge('blue')}<input class="timein" id="rtBlue" inputmode="decimal" data-in="rt" data-t="blue" value="${esc(rt.blue??'')}" placeholder="초"></label>
-        <label class="row">${teamBadge('red')}<input class="timein" id="rtRed" inputmode="decimal" data-in="rt" data-t="red" value="${esc(rt.red??'')}" placeholder="초"></label>
+        <label class="row">${teamBadge('blue')}<input class="timein" id="rtBlue" inputmode="decimal" data-in="rt" data-t="blue" value="${esc(rt.blue)}" placeholder="초"></label>
+        <label class="row">${teamBadge('red')}<input class="timein" id="rtRed" inputmode="decimal" data-in="rt" data-t="red" value="${esc(rt.red)}" placeholder="초"></label>
       </div>
       <div class="row" style="margin-top:12px"><button class="btn ok huge" data-a="saveRun">기록 비교해서 저장</button></div>
       <p class="sub">편도로 뛰며 두 팀이 반대편 끝에서 번갈아 출발합니다. 초시계 대신 기록을 직접 적어도 됩니다.</p>`;
@@ -191,7 +192,7 @@ function listSheet(){
       const done = ord.filter(id => pl[id]).length;
       return `<div class="card"><div class="row"><h2 class="grow row h2" style="margin:0">${teamBadge(team)} ${esc(teamName(team))}</h2><span class="sub">${done}/${ord.length}명 출전</span></div>
         <div class="list olist">${ord.map((id,i) => `<div class="item ${id===u.cur?'cur':''} ${pl[id]?'done':''}"><span class="no">${i+1}</span><span class="name">${esc(pname(id))}</span>
-          ${id===u.cur?'<span class="tag dark">지금</span>':id===u.next?'<span class="tag warn">다음</span>':''}${pl[id]?`<span class="tag ok">✓ ${pl[id]}회</span>`:''}</div>`).join('') || '<div class="empty">팀원이 없습니다.</div>'}</div></div>`;
+          ${id===u.cur?'<span class="tag dark">지금</span>':id===u.next?'<span class="tag warn">다음</span>':''}${pl[id]?`<span class="tag ok">✓ ${pl[id]}회</span>`:''}${isAbsent(id)?'<span class="tag red">불참</span>':''}</div>`).join('') || '<div class="empty">팀원이 없습니다.</div>'}</div></div>`;
     }).join('')}</div>`;
   } else {
     const ms = matchesOf(ev).slice().reverse();
@@ -206,7 +207,7 @@ function pickSheet(){
   const ev = UI.ev, ord = orderFor(ev, pickTeam), pl = plays(ev, pickTeam), u = upNext(ev, pickTeam);
   return `<h2 class="row">${teamBadge(pickTeam)} ${esc(teamName(pickTeam))} 선수 바꾸기</h2>
     <p class="sub">빠진 사람이 있을 때 이번 대결에 나올 사람을 직접 고릅니다. 다른 심판 기기와 안내판에도 바로 반영되고, 결과를 저장하면 다시 순서대로 돌아갑니다.</p>
-    <div class="list olist">${ord.map((id,i) => `<div class="item tap ${id===u.cur?'cur':''}" data-a="setPick" data-v="${id}"><span class="no">${i+1}</span><span class="name">${esc(pname(id))}</span>${pl[id]?`<span class="tag ok">${pl[id]}회 출전</span>`:''}${id===u.cur?'<span class="tag dark">지금</span>':''}</div>`).join('')}</div>
+    <div class="list olist">${ord.map((id,i) => `<div class="item tap ${id===u.cur?'cur':''}" data-a="setPick" data-v="${id}"><span class="no">${i+1}</span><span class="name">${esc(pname(id))}</span>${pl[id]?`<span class="tag ok">${pl[id]}회 출전</span>`:''}${isAbsent(id)?'<span class="tag red">불참</span>':''}${id===u.cur?'<span class="tag dark">지금</span>':''}</div>`).join('')}</div>
     <div class="row" style="margin-top:12px"><button class="btn grow" data-a="setPick" data-v="">순서대로 (자동)</button><button class="btn primary grow" data-a="closeSheet">닫기</button></div>`;
 }
 function matchSheet(id){
@@ -326,7 +327,30 @@ Object.assign(ACT, {
   watchReset: () => { stopWatch(); UI.watch.acc=0; paintWatch(); return false; },
   watchTo: (el, v) => { stopWatch(); const val = Math.round(watchVal()*100)/100; if(!val){ toast('초시계 기록이 없습니다.'); return false; }
     (UI.runTimes[UI.ev] ||= {})[v] = val; UI.watch.acc=0; },
-  saveRun: () => { const ev=UI.ev, rt=UI.runTimes[ev]||{}, r=parseFloat(rt.red), b=parseFloat(rt.blue);
+  saveRun: () => { const ev=UI.ev, rt=runTimesOf(ev), r=parseFloat(rt.red), b=parseFloat(rt.blue);
     if(isNaN(r)||isNaN(b)){ toast('두 팀 기록을 모두 넣어 주세요.'); return false; }
-    saveMatch(ev, r<b?'red': b<r?'blue':'draw', { redTime:r, blueTime:b }); UI.runTimes[ev]={}; },
+    saveMatch(ev, r<b?'red': b<r?'blue':'draw', { redTime:r, blueTime:b }); UI.runTimes[ev]={};
+    if((D.calls[ev]||{}).times) put(['main','calls',ev], { times:null }); },
+  sendTime: (el, v) => { const ev=UI.ev; if(!can.time(ev)) return denied();
+    stopWatch(); const val = Math.round(watchVal()*100)/100; if(!val){ toast('초시계 기록이 없습니다.'); return false; }
+    put(['main','calls',ev], { times:{ [v]:val, by:UI.me, at:now() } }); UI.watch.acc = 0;
+    toast(`${teamName(v)} ${val.toFixed(2)}초를 심판 화면으로 보냈습니다.`); },
+  clearTimes: () => { const ev=UI.ev; if(!can.time(ev)) return denied(); put(['main','calls',ev], { times:null }); },
 });
+// 심판이 직접 적은 기록이 없으면 계시원이 보낸 기록을 씀
+function runTimesOf(ev){ const tm = (D.calls[ev]||{}).times || {}, rt = UI.runTimes[ev] || {}; return { blue: rt.blue ?? tm.blue ?? '', red: rt.red ?? tm.red ?? '' }; }
+
+/* ---------- 계시원 화면 ---------- */
+function timerView(ev){
+  const E = TEAM[ev], b = upNext(ev,'blue'), r = upNext(ev,'red'), tm = (D.calls[ev]||{}).times || {};
+  const row = t => `<div class="item">${teamBadge(t, true)}<span class="name">${esc(teamName(t))}</span><span class="score">${tm[t]!=null ? fmtSec(tm[t])+'초' : '-'}</span></div>`;
+  return evHead(ev, scoreline(tally(ev))) + `<div class="cols two"><div class="card"><h2>⏱ 계시 · ${matchesOf(ev).length+1}번째 대결</h2>
+      <div class="vs">${playerBox(ev,'blue',b.cur,b.picked,false)}<div class="vsmark">VS</div>${playerBox(ev,'red',r.cur,r.picked,false)}</div>
+      <div class="watch big" id="watch">0.00</div>
+      <div class="row nowrap"><button class="btn primary huge" data-a="watchToggle" id="watchBtn">시작</button><button class="btn" data-a="watchReset">초기화</button></div>
+      <div class="row nowrap" style="margin-top:12px"><button class="btn blue huge" data-a="sendTime" data-v="blue">→ ${esc(teamShort('blue'))} 기록 보내기</button><button class="btn red huge" data-a="sendTime" data-v="red">→ ${esc(teamShort('red'))} 기록 보내기</button></div></div>
+    <div class="card"><h2>심판에게 보낸 기록</h2><div class="list">${row('blue')}${row('red')}</div>
+      ${tm.by ? `<p class="sub">${esc(tm.by)} · ${hm(tm.at)}</p>` : ''}
+      <div class="row" style="margin-top:10px"><button class="btn wide" data-a="clearTimes">보낸 기록 지우기</button></div>
+      <p class="sub">보낸 기록은 심판 화면의 기록 칸에 바로 채워지고, 심판이 확인한 뒤 저장합니다. 저장하면 이 칸은 비워집니다.</p></div></div>`;
+}

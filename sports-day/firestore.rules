@@ -14,8 +14,21 @@ service cloud.firestore {
     function myRole() {
       return get(/databases/$(database)/documents/undonghoe5/main/roles/$(request.auth.uid)).data;
     }
-    function refereeOf(ev) { return hasRole() && myRole().role == 'referee' && ev in myRole().events; }
-    function coachOf(team) { return hasRole() && myRole().role == 'coach' && myRole().team == team; }
+    // 한 기기에 여러 역할: events(심판)·helpers(기록 도우미)·timers(계시원)·coach(감독 팀)
+    function refereeOf(ev) { return hasRole() && (ev in myRole().get('events', []) || ev in myRole().get('helpers', [])); }
+    function timerOf(ev) { return hasRole() && ev in myRole().get('timers', []); }
+    function coachOf(team) {
+      return hasRole() && (myRole().get('coach', '') == team || (myRole().get('role', '') == 'coach' && myRole().get('team', '') == team));
+    }
+    // 담당자 명단에서 이름을 골라 들어올 때: 자기 기기에, 명단에 적힌 역할 그대로만 쓸 수 있음
+    function presetOk(uid) {
+      let d = request.resource.data;
+      let p = get(/databases/$(database)/documents/undonghoe5/main/presets/$(d.preset)).data;
+      return signedIn() && request.auth.uid == uid
+        && d.keys().hasOnly(['preset', 'name', 'coach', 'events', 'helpers', 'timers', 'board', 'cast', 'at', 'by'])
+        && d.coach == p.coach && d.events == p.events && d.helpers == p.helpers
+        && d.timers == p.timers && d.board == p.board && d.cast == p.cast;
+    }
     // 기록의 종목을 다른 종목으로 바꿔치기하지 못하게 함
     function sameEvent() { return resource == null || resource.data.event == request.resource.data.event; }
 
@@ -34,8 +47,14 @@ service cloud.firestore {
         || (request.auth.uid == uid && request.resource.data.pw == get(/databases/$(database)/documents/undonghoe5/secret).data.masterPw));
       allow update, delete: if open() && isMaster();
     }
-    // 기기별 역할(감독·심판·안내판): 마스터만 정함
+    // 기기별 역할: 마스터가 정하거나, 담당자 명단에서 이름을 골라 들어옴
     match /undonghoe5/main/roles/{uid} {
+      allow read: if signedIn();
+      allow create, update: if open() && (isMaster() || presetOk(uid));
+      allow delete: if open() && (isMaster() || (signedIn() && request.auth.uid == uid));
+    }
+    // 담당자 명단(미리 정한 역할): 마스터만 바꿈
+    match /undonghoe5/main/presets/{id} {
       allow read: if signedIn();
       allow write: if open() && isMaster();
     }
@@ -44,7 +63,7 @@ service cloud.firestore {
       allow read: if signedIn();
       allow write: if open() && signedIn() && (request.auth.uid == uid || isMaster());
     }
-    // 개인전·단체전 기록: 마스터 또는 그 종목을 맡은 심판만
+    // 개인전·단체전 기록: 마스터 또는 그 종목을 맡은 심판·기록 도우미만
     match /undonghoe5/main/indiv/{id} {
       allow read: if signedIn();
       allow create, update: if open() && sameEvent() && id.matches(request.resource.data.event + '_.*')
@@ -61,10 +80,22 @@ service cloud.firestore {
       allow write: if open() && id == request.resource.data.event + '_' + request.resource.data.team
         && (isMaster() || coachOf(request.resource.data.team));
     }
-    // 안내판 선수 호출: 마스터 또는 그 종목을 맡은 심판만
+    // 안내판 선수 호출·계시 기록: 마스터, 그 종목 심판·기록 도우미·계시원
     match /undonghoe5/main/calls/{ev} {
       allow read: if signedIn();
-      allow write: if open() && (isMaster() || refereeOf(ev));
+      allow write: if open() && (isMaster() || refereeOf(ev) || timerOf(ev));
+    }
+    // 문자 무전·긴급 호출: 역할이 있는 기기만 자기 이름으로 보냄
+    match /undonghoe5/main/msgs/{id} {
+      allow read: if signedIn();
+      allow create: if open() && (isMaster() || hasRole()) && request.resource.data.uid == request.auth.uid
+        && request.resource.data.text is string && request.resource.data.text.size() <= 300;
+      allow update, delete: if open() && isMaster();
+    }
+    // 불참 표시: 마스터와 역할이 있는 진행요원
+    match /undonghoe5/main/absent/{pid} {
+      allow read: if signedIn();
+      allow write: if open() && (isMaster() || hasRole());
     }
   }
 }

@@ -31,6 +31,10 @@ async function firebaseStore(){
       s.forEach(d => { list.push({ id:d.id, ...d.data() }); if(d.metadata.hasPendingWrites) n++; });
       cb(list, n);
     }, err); },
+    // 조건에 맞는 문서만 구독 (예: 최근 15분 동안의 문자 무전)
+    onQuery(p, field, op, value, cb, err){ return F.onSnapshot(F.query(F.collection(db, ROOT, ...p), F.where(field, op, value)), s => {
+      const list=[]; s.forEach(d => list.push({ id:d.id, ...d.data() })); cb(list, 0);
+    }, err); },
     put(p, obj, merge=true){ return F.setDoc(F.doc(db, ROOT, ...p), obj, { merge }); },
     del(p){ return F.deleteDoc(F.doc(db, ROOT, ...p)); },
   };
@@ -68,6 +72,7 @@ function demoStore(){
     mode:'demo', uid:myUid,
     onDoc(p, cb){ return sub('doc', p, cb); },
     onCol(p, cb){ return sub('col', p, cb); },
+    onQuery(p, field, op, value, cb){ return sub('col', p, (l, n) => cb(l.filter(x => op==='>' ? x[field] > value : x[field]===value), n)); },
     put(p, obj, merge=true){
       // 서버 규칙 흉내: 마스터가 아니면 비밀번호가 맞아야 마스터 문서를 만들 수 있음
       if(p[1]==='masters' && !docs['main/masters/'+myUid] && obj.pw!==DEMO_MASTER_PW)
