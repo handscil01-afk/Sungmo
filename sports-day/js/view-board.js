@@ -57,7 +57,7 @@ const SND = {
     }catch(e){}
   },
 };
-document.addEventListener('pointerdown', () => { if(myRole().role==='board'){ const was = SND.ready(); SND.unlock(); if(!was) setTimeout(queueRender, 300); } }, true);
+document.addEventListener('pointerdown', () => { if(myRole().role==='board'){ const was = SND.ready(); SND.unlock(); if(!was) setTimeout(() => { queueRender(); touchDevice(); }, 400); } }, true);
 
 /* ===================== 안내판 ===================== */
 const RESULT_MS = 7000, CALL_MS = 30000, ANN_MS = 15000, FLASH_MS = 8000, PERSON_MS = 120000;

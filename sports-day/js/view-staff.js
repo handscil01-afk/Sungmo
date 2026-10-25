@@ -25,10 +25,11 @@ function peopleView(){
   const rows = list.map(d => {
     const r = deviceRole(d.id), on = d.seenAt && now()-d.seenAt < ONLINE_MS, me = store && d.id===store.uid;
     const ps = D.roles[d.id] && D.roles[d.id].preset && D.presets[D.roles[d.id].preset];
-    return `<div class="item tap" data-a="roleSheet" data-v="${d.id}">
+    return `<div class="item tap devrow" data-a="roleSheet" data-v="${d.id}">
       <span class="tag ${on?'ok':''}">${on?'● 접속':'○ '+ago(d.seenAt)}</span>
-      <span class="name">${esc(d.name||'(이름 없음)')}${me?' <span class="tag dark">이 기기</span>':''}<span class="sub">${esc(d.ua||'')}${ps?` · 📇 ${esc(ps.label)}`:''}${on?'':' · 마지막 '+hm(d.seenAt)}</span></span>
-      <span class="tag ${roleTagCls(r)}" style="white-space:normal;text-align:right;max-width:46%">${esc(roleIcon(r))} ${esc(roleLabel(r))}</span></div>`;
+      <span class="name">${esc(d.name||'(이름 없음)')}${me?' <span class="tag dark">이 기기</span>':''}
+        <span class="roleline ${roleTagCls(r)}">${esc(roleIcon(r))} ${esc(roleLabel(r))}</span>
+        <span class="sub">${esc(d.ua||'')}${ps?` · 📇 ${esc(ps.label)}`:''}${r.board && d.audio!=null ? (d.audio ? ' · 🔊 소리 켜짐' : ' · 🔇 소리 꺼짐') : ''}${on?'':' · 마지막 '+hm(d.seenAt)}</span></span></div>`;
   }).join('');
   const pl = presetList();
   const prow = p => { const use = presetUse(p.id);
@@ -52,6 +53,35 @@ function peopleView(){
         <div class="item"><span class="tag">📺 안내판</span><span class="name"><span class="sub">가로로 세워 둔 태블릿에 호출·결과·현황을 크게 띄웁니다.</span></span></div>
       </div></div>
   </div></div>`;
+}
+
+/* ---------- 같은 이름은 한 기기로 (이름으로 로그인하듯) ----------
+   같은 이름으로 다른 브라우저·앱에서 다시 들어오면, 가장 최근에 들어온 기기만 남기고 예전 기기는 지움.
+   새 기기에 역할이 없으면 예전 기기의 역할을 그대로 넘겨줌. 마스터 기기가 켜져 있을 때 자동으로 정리함 */
+let dedupeTimer = 0, dedupeBusy = false;
+function dedupeSoon(){ clearTimeout(dedupeTimer); dedupeTimer = setTimeout(dedupeDevices, 1500); }
+async function dedupeDevices(){
+  if(!D.amMaster || dedupeBusy || !D.loaded.masters) return;
+  const groups = {};
+  D.devices.forEach(d => { const n = String(d.name||'').trim(); if(n) (groups[n] ||= []).push(d); });
+  const jobs = [];
+  Object.values(groups).filter(g => g.length > 1).forEach(g => {
+    g.sort((a,b) => (b.joinAt||0) - (a.joinAt||0) || (b.seenAt||0) - (a.seenAt||0));
+    const keep = g[0];
+    g.slice(1).forEach(old => {
+      if(old.id===store.uid) return;                              // 지금 이 마스터 기기는 지우지 않음
+      if(D.masters[old.id] && !D.masters[keep.id]) return;        // 남은 마스터 권한을 없애지 않게
+      const oldRole = D.roles[old.id];
+      if(oldRole && !D.roles[keep.id] && !D.masters[keep.id])
+        jobs.push(store.put(['main','roles',keep.id], { preset:oldRole.preset||'', name:keep.name||'', ...pickRoleFields(oldRole), by:UI.me, at:now() }, false));
+      jobs.push(store.del(['main','roles',old.id]), store.del(['main','devices',old.id]));
+      if(D.masters[old.id]) jobs.push(store.del(['main','masters',old.id]));
+    });
+  });
+  if(!jobs.length) return;
+  dedupeBusy = true;
+  await Promise.all(jobs.map(p => p.catch(e => console.error(e))));
+  dedupeBusy = false;
 }
 
 /* ---------- 역할 고르기 (담당자 명단과 기기에 함께 씀) ---------- */
@@ -183,7 +213,7 @@ Object.assign(ACT, {
       name = await askText(`'${p.label}' 자리로 들어갑니다.\n이름을 적어 주세요.`, UI.me||'', '들어가기');
       if(!name || !name.trim()) return false; name = name.trim();
     } else if(!(await ask(`${p.label}\n(${roleLabel(asRole(p))})\n이 이름으로 들어갈까요?`, '들어가기'))) return false;
-    UI.me = name; idStore.set('udh5_me', name); touchDevice();
+    UI.me = name; idStore.set('udh5_me', name); touchDevice(true);
     if(await put(['main','roles',store.uid], { preset:v, name, ...pickRoleFields(p), at:now() }, false)) toast(`${name} 님, 들어왔습니다.`);
   },
   leaveRole: async () => {

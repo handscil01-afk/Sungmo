@@ -1,9 +1,10 @@
 'use strict';
 /* ===================== 무전기 · 음성 안내방송 =====================
-   누르고 있는 동안 마이크 소리를 0.2초씩 잘라 μ-law(전화 음질)로 줄여 보내고, 받는 쪽은 이어 붙여 재생함.
+   누르고 있는 동안 마이크 소리를 0.15초씩 잘라 μ-law(전화 음질)로 줄여 보내고, 받는 쪽은 이어 붙여 재생함.
    무전(radio): 8kHz, 마스터·감독·심판끼리 · 방송(cast): 16kHz, 안내판 스피커로만 */
 const RATE = { radio:8000, cast:16000 };
-const MAX_TALK_MS = 60000;
+const MAX_TALK_MS = 60000, CHUNK_SEC = 0.15, MIC_WARM_MS = 20000;
+const JITTER = 0.18, MAX_LAG = 0.7;   // 받는 쪽: 처음 0.18초 모아 재생, 0.7초 넘게 밀리면 밀린 조각을 버리고 따라잡음
 const RADIO = { on: ls.get('udh5_radio_on', true), lock:{ radio:null, cast:null }, listen:{ radio:null, cast:null },
   rtMaster:null, rtMasters:null, rtRoles:null, err:'' };
 const TALK = { kind:null, phase:null, tid:null, seq:0, pressed:false, timer:0, maxTimer:0, data:null };
@@ -26,13 +27,23 @@ const b64 = bytes => { let s = ''; for(let i = 0; i < bytes.length; i += 4096) s
 const unb64 = str => { const s = atob(str), a = new Uint8Array(s.length); for(let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return a; };
 
 /* ---------- 마이크 ---------- */
-const MIC = { stop:null };
-async function micStart(rate, onChunk){
+// 마이크는 말을 마친 뒤 20초 동안 켜 둠: 이어서 말할 때 마이크를 다시 여느라 늦어지지 않게
+const MIC = { stream:null, idle:0, stop:null };
+function getMic(){
+  clearTimeout(MIC.idle);
+  if(MIC.stream && MIC.stream.getAudioTracks().some(t => t.readyState==='live')) return Promise.resolve(MIC.stream);
+  return navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true, channelCount:1 } })
+    .then(st => (MIC.stream = st));
+}
+function micRelease(){
+  clearTimeout(MIC.idle);
+  MIC.idle = setTimeout(() => { if(MIC.stream && !MIC.stop){ MIC.stream.getTracks().forEach(t => t.stop()); MIC.stream = null; } }, MIC_WARM_MS);
+}
+function micStart(stream, rate, onChunk){
   const ctx = SND.ensure(); if(!ctx) throw new Error('no audio');
-  const stream = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true, channelCount:1 } });
-  const src = ctx.createMediaStreamSource(stream), node = ctx.createScriptProcessor(2048, 1, 1), sink = ctx.createGain();
+  const src = ctx.createMediaStreamSource(stream), node = ctx.createScriptProcessor(1024, 1, 1), sink = ctx.createGain();
   sink.gain.value = 0;
-  const ratio = ctx.sampleRate / rate, size = Math.round(rate * 0.2);
+  const ratio = ctx.sampleRate / rate, size = Math.round(rate * CHUNK_SEC);
   let phase = 0, acc = 0, n = 0, buf = new Uint8Array(size), bi = 0;
   node.onaudioprocess = e => {
     const x = e.inputBuffer.getChannelData(0);
@@ -46,8 +57,8 @@ async function micStart(rate, onChunk){
   MIC.stop = () => {
     if(bi) onChunk(buf.slice(0, bi));
     try{ node.disconnect(); src.disconnect(); sink.disconnect(); }catch(e){}
-    stream.getTracks().forEach(t => t.stop());
     MIC.stop = null;
+    micRelease();
   };
 }
 
@@ -61,12 +72,20 @@ function mkPlayer(rate){
       for(let i = 0; i < m; i++){ const p = i * rate / out, j = Math.floor(p), f = p - j; const a = MU[bytes[j]], b = MU[bytes[Math.min(j+1, n-1)]]; ch[i] = a + (b - a) * f; }
       const s = c.createBufferSource(); s.buffer = buf; s.connect(c.destination);
       const nowT = c.currentTime;
-      // 늦게 도착한 조각이 있으면 0.25초 여유를 두고 다시 이어 재생
-      const t = this.t < nowT + 0.02 ? Math.max(nowT + 0.25, this.startAt) : this.t;
+      // 끊겼다 다시 오면 잠깐 모았다가 재생, 너무 밀렸으면(차임벨 대기 중 제외) 이 조각을 버리고 따라잡음
+      if(this.t > nowT + MAX_LAG && this.t > this.startAt + MAX_LAG) return;
+      const t = this.t < nowT + 0.02 ? Math.max(nowT + JITTER, this.startAt) : this.t;
       s.start(t); this.t = t + buf.duration;
     } };
 }
-function stopListen(kind){ const L = RADIO.listen[kind]; if(L){ try{ L.off && L.off(); }catch(e){} RADIO.listen[kind] = null; } }
+function stopListen(kind){ RADIO.listen[kind] = null; }
+// 계속 열어 둔 음성 줄에서 조각이 오면, 지금 듣는 말하기 번호의 조각만 재생
+function onChunk(kind, c){
+  const L = RADIO.listen[kind];
+  if(!L || !c || c.t!==L.tid || c.u===store.uid || !c.d) return;
+  if(kind==='radio' && !shouldPlay('radio')) return;
+  try{ L.player.push(unb64(c.d)); }catch(e){}
+}
 function shouldPlay(kind){ return kind==='cast' ? boardOn() : (radioRoleOK() && RADIO.on && TALK.kind!=='radio'); }
 function onLockChange(kind, lock){
   RADIO.lock[kind] = lock;
@@ -80,7 +99,7 @@ function onLockChange(kind, lock){
       if(cfg.sound && SND.ready()){ const d = cfg.chime ? SND.chime() : 0; player.startAt = SND.ctx.currentTime + d + 0.3; }
       try{ speechSynthesis.cancel(); }catch(e){}
     }
-    RADIO.listen[kind] = { tid:lock.tid, player, off: RT.onChunks(kind, lock.tid, (seq, d) => { try{ player.push(unb64(d)); }catch(e){} }) };
+    RADIO.listen[kind] = { tid:lock.tid, player };
   }
   if(!lock && RADIO.listen[kind]){ const L = RADIO.listen[kind]; setTimeout(() => { if(RADIO.listen[kind]===L) stopListen(kind); }, 5000); }
   radioRender();
@@ -88,7 +107,7 @@ function onLockChange(kind, lock){
 }
 
 /* ---------- 구독 · 역할 옮겨 두기 ---------- */
-const radioSubs = { radio:null, cast:null, master:null, roles:null, masters:null };
+const radioSubs = { radio:null, cast:null, sradio:null, scast:null, master:null, roles:null, masters:null };
 let radioRetryAt = 0;
 function radioInit(){
   if(!store || !UI.me || D.fatal) return;
@@ -97,7 +116,14 @@ function radioInit(){
       if(!radioSubs.radio && now() > radioRetryAt){
         radioSubs.radio = rt.onLock('radio', l => onLockChange('radio', l), () => { radioSubs.radio = null; radioRetryAt = now()+8000; RADIO.lock.radio = null; radioRender(); });
       }
-    } else if(radioSubs.radio){ radioSubs.radio(); radioSubs.radio = null; RADIO.lock.radio = null; stopListen('radio'); }
+      if(!radioSubs.sradio && now() > radioRetryAt) radioSubs.sradio = rt.onStream('radio', c => onChunk('radio', c), () => { radioSubs.sradio = null; radioRetryAt = now()+8000; });
+    } else {
+      if(radioSubs.radio){ radioSubs.radio(); radioSubs.radio = null; RADIO.lock.radio = null; stopListen('radio'); }
+      if(radioSubs.sradio){ radioSubs.sradio(); radioSubs.sradio = null; }
+    }
+    // 방송 음성은 안내판만 받음
+    if(boardOn() && !radioSubs.scast) radioSubs.scast = rt.onStream('cast', c => onChunk('cast', c), () => { radioSubs.scast = null; });
+    if(!boardOn() && radioSubs.scast){ radioSubs.scast(); radioSubs.scast = null; }
     if(!radioSubs.cast) radioSubs.cast = rt.onLock('cast', l => onLockChange('cast', l), () => { radioSubs.cast = null; });
     if(!radioSubs.roles) radioSubs.roles = rt.onRoles(v => { RADIO.rtRoles = v; radioRetryAt = 0; rtSyncSoon(); radioInit(); radioRender(); });
     if(!radioSubs.master) radioSubs.master = rt.onMaster(store.uid, v => { RADIO.rtMaster = v; radioRetryAt = 0; rtSyncSoon(); radioInit(); radioRender(); });
@@ -138,6 +164,11 @@ function radioReady(){
   return !!h && h.role===rtRoleOf(me) && !!h.cast===!!me.cast;
 }
 
+// 소리를 켠 채 켜져 있는 안내판 수 (마스터 기기에서만 알 수 있음)
+function boardListeners(){
+  return D.devices.filter(d => d.seenAt && now()-d.seenAt < ONLINE_MS && d.audio===true && deviceRole(d.id).board).length;
+}
+
 /* ---------- 누르고 말하기 ---------- */
 async function pttDown(kind){
   if(TALK.kind) return;
@@ -148,17 +179,23 @@ async function pttDown(kind){
   TALK.data = { uid:store.uid, name:UI.me, tid:TALK.tid };
   radioRender();
   const fail = msg => { if(msg) toast(msg); if(navigator.vibrate) navigator.vibrate([60,40,60]); TALK.kind = null; TALK.phase = null; radioRender(); };
-  let rt; try{ rt = await getRT(); }catch(e){ return fail('무전기에 연결하지 못했습니다.'); }
+  // 마이크 켜기와 무전 잡기를 동시에 시작해서 '삑'까지 걸리는 시간을 줄임
+  const micP = getMic().then(st => ({ st }), err => ({ err }));
+  if(kind==='cast' && D.amMaster && boardListeners()===0) toast('소리를 켠 안내판이 없습니다. 안내판 화면을 한 번 눌러 소리를 켜 주세요.');
+  let rt; try{ rt = await getRT(); }catch(e){ micRelease(); return fail('무전기에 연결하지 못했습니다.'); }
   const res = await rt.acquire(kind, TALK.data);
   if(!res.ok){
+    micRelease();
     if(res.error) return fail(radioReady() ? '무전기 서버에 연결하지 못했습니다.' : (D.amMaster ? '무전기 권한을 먼저 확인해 주세요(🔒 버튼).' : '무전기 권한을 준비하는 중입니다. 마스터 기기가 켜져 있는지 확인해 주세요.'));
     return fail(`${res.lock && res.lock.name || '다른 사람'} 님이 ${kind==='cast' ? '방송' : '말하는'} 중입니다.`);
   }
-  const giveUp = async () => { await rt.release(kind); TALK.kind = null; TALK.phase = null; radioRender(); };
+  const giveUp = async () => { micRelease(); await rt.release(kind); TALK.kind = null; TALK.phase = null; radioRender(); };
   if(!TALK.pressed) return giveUp();
   try{
-    await rt.begin(kind, TALK.tid);
-    await micStart(RATE[kind], bytes => { rt.send(kind, TALK.tid, TALK.seq++, b64(bytes)); });
+    const m = await micP; if(m.err) throw m.err;
+    if(!TALK.pressed) return giveUp();
+    const tid = TALK.tid;
+    micStart(m.st, RATE[kind], bytes => { rt.send(kind, tid, TALK.seq++, b64(bytes)); });
   }catch(e){
     console.error(e); await giveUp();
     return fail(e && e.name==='NotAllowedError' ? '마이크 권한이 꺼져 있습니다. 브라우저(또는 휴대폰) 설정에서 마이크를 허용해 주세요.' : '마이크를 켜지 못했습니다.');
@@ -218,7 +255,10 @@ function radioRender(){
   let chips = '';
   if(ok){
     const L = RADIO.lock.radio, C = RADIO.lock.cast;
-    if(TALK.phase==='live') chips += `<div class="txbar">🔴 ${TALK.kind==='cast' ? '안내판으로 방송 중' : '무전 보내는 중'}<small>손을 떼면 끝납니다</small></div>`;
+    if(TALK.phase==='live'){
+      const nb = TALK.kind==='cast' && D.amMaster ? boardListeners() : -1;
+      chips += `<div class="txbar">🔴 ${TALK.kind==='cast' ? '안내판으로 방송 중' : '무전 보내는 중'}<small>${nb===0 ? '⚠ 소리를 켠 안내판이 없습니다' : nb>0 ? `안내판 ${nb}대 · 손을 떼면 끝납니다` : '손을 떼면 끝납니다'}</small></div>`;
+    }
     if(showRadio && L && L.uid!==store.uid) chips += `<div class="rxchip live">🎙 <b>${esc(L.name||'')}</b></div>`;
     if(C && C.uid!==store.uid && !boardOn() && (showRadio || showCast)) chips += `<div class="rxchip cast">📢 <b>${esc(C.name||'')}</b> 방송 중</div>`;
     if(showRadio && RADIO.on && SND.ctx && !SND.ready()) chips += `<button class="rxchip warn" data-a="rxUnlock">🔈 눌러서 소리 켜기</button>`;

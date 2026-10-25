@@ -425,3 +425,6 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 }
 /* 무전기 버튼이 있는 기기: 넓은 화면에서는 오른쪽을 비워 버튼이 내용을 가리지 않게 함 */
 @media (min-width:700px){ body.has-radio main{padding-right:110px} body.has-radio .tabs{padding-right:110px} }
+.devrow .name{white-space:normal}
+.roleline{display:block;font-size:16px;font-weight:800;margin-top:2px;color:var(--ink)}
+.roleline.blue{color:var(--blue-ink)} .roleline.red{color:var(--red-ink)} .roleline.warn{color:var(--warn)}

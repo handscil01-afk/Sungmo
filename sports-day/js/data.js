@@ -161,7 +161,12 @@ function shortUA(){
   return 'PC';
 }
 // 마스터의 접속자 목록에 보이도록 이 기기의 이름과 마지막 접속 시각을 남김
-function touchDevice(){
+// joined: 이름을 새로 정한 순간 (같은 이름의 예전 기기를 정리할 때 가장 최근에 들어온 기기를 남기려고)
+function touchDevice(joined){
   if(!store || !UI.me) return;
-  store.put(['main','devices',store.uid], { name:UI.me, seenAt:now(), ua:shortUA() }).catch(()=>{});
+  const d = { name:UI.me, seenAt:now(), ua:shortUA() };
+  if(joined) d.joinAt = now();
+  // 안내판은 소리가 켜져 있는지도 알려 줌 (방송할 때 듣는 안내판 수를 보여 주려고)
+  if(myRole().role==='board') d.audio = !!(SND.ready() && boardCfg().sound);
+  store.put(['main','devices',store.uid], d).catch(()=>{});
 }

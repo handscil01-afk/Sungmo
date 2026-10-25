@@ -33,6 +33,12 @@
               }
             }
           }
+        },
+        "s": {
+          "$k": {
+            ".write": "auth != null && (root.child('undonghoe5/masters/' + auth.uid).exists() || root.child('undonghoe5/roles/' + auth.uid + '/role').val() === 'referee' || root.child('undonghoe5/roles/' + auth.uid + '/role').val() === 'coach') && ((root.child('undonghoe5/radio/lock/uid').val() === auth.uid && newData.child('t').val() === root.child('undonghoe5/radio/lock/tid').val() && newData.child('u').val() === auth.uid) || (!newData.exists() && (data.child('u').val() === auth.uid || root.child('undonghoe5/masters/' + auth.uid).exists())))",
+            ".validate": "!newData.exists() || (newData.child('d').isString() && newData.child('d').val().length < 20000)"
+          }
         }
       },
       "cast": {
@@ -49,6 +55,12 @@
                 ".validate": "newData.isString() && newData.val().length < 20000"
               }
             }
+          }
+        },
+        "s": {
+          "$k": {
+            ".write": "auth != null && (root.child('undonghoe5/masters/' + auth.uid).exists() || root.child('undonghoe5/roles/' + auth.uid + '/cast').val() === true) && ((root.child('undonghoe5/cast/lock/uid').val() === auth.uid && newData.child('t').val() === root.child('undonghoe5/cast/lock/tid').val() && newData.child('u').val() === auth.uid) || (!newData.exists() && (data.child('u').val() === auth.uid || root.child('undonghoe5/masters/' + auth.uid).exists())))",
+            ".validate": "!newData.exists() || (newData.child('d').isString() && newData.child('d').val().length < 20000)"
           }
         }
       }

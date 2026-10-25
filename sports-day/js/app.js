@@ -66,7 +66,7 @@ function render(){
   drawSheet();
   paintWatch();
   radioInit(); radioRender();
-  if(D.amMaster) rtSyncSoon();
+  if(D.amMaster){ rtSyncSoon(); dedupeSoon(); }
 }
 function masterGame(){
   const ev = UI.ev;
@@ -147,8 +147,12 @@ async function masterLogin(){
   }
 }
 Object.assign(ACT, {
-  setMe: () => { const n = $('#meInput').value.trim(); if(!n){ toast('이름을 적어 주세요.'); return false; } UI.me = n; idStore.set('udh5_me', n); touchDevice(); },
-  rename: async () => { const n = await askText('이 기기를 쓰는 사람 이름', UI.me); if(n && n.trim()){ UI.me = n.trim(); idStore.set('udh5_me', UI.me); touchDevice(); } },
+  setMe: () => { const n = $('#meInput').value.trim(); if(!n){ toast('이름을 적어 주세요.'); return false; }
+    UI.me = n; idStore.set('udh5_me', n); touchDevice(true);
+    // 담당자 명단에 있는 이름이면 그 역할로 바로 들어감
+    const ps = presetList().find(p => !p.volunteer && String(p.label).trim()===n);
+    if(ps && !D.amMaster) put(['main','roles',store.uid], { preset:ps.id, name:n, ...pickRoleFields(ps), at:now() }, false).then(ok => ok && toast(`${n} 님, 들어왔습니다.`)); },
+  rename: async () => { const n = await askText('이 기기를 쓰는 사람 이름', UI.me); if(n && n.trim()){ UI.me = n.trim(); idStore.set('udh5_me', UI.me); touchDevice(true); } },
   ev: (el, v) => { UI.ev = v; UI.q = ''; ls.set('udh5_ev', v); window.scrollTo(0,0); },
   mtab: (el, v) => { UI.mtab = v; ls.set('udh5_mtab', v); window.scrollTo(0,0); },
   stab: (el, v) => { UI.stab = v; UI.q = ''; ls.set('udh5_stab', v); window.scrollTo(0,0); },
