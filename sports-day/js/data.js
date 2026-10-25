@@ -7,13 +7,14 @@ const D = {
 const UI = {
   me: idStore.get('udh5_me', ''),
   mtab: ls.get('udh5_mtab', 'game'),          // 마스터 아래 메뉴
+  btab: ls.get('udh5_btab', 'screen'),        // 마스터 안내판 메뉴의 위쪽 탭
   ev: ls.get('udh5_ev', 'tuho'),              // 고른 종목 탭
   stab: ls.get('udh5_stab', ''),             // 여러 역할을 가진 기기의 역할 탭 (coach / ev:종목 / timer:종목)
   coachEv: ls.get('udh5_cev', 'gymball'),     // 감독 화면에서 고른 단체전 종목
   sub: {},                                    // 종목별 보조 화면 (단체전: play/order, 개인전: enter/rank)
   round: { archery:'main', freeball:'main', tuho:'main' },
   lanes: ls.get('udh5_lanes2', { archery:[], freeball:[], tuho:[] }),
-  q:'', filter:'all', laneSel:{}, coachTab:'our', orderTab:'blue',
+  q:'', filter:'all', coachTab:'our', orderTab:'blue',
   rosterText:'', runTimes:{},
   watch:{ running:false, start:0, acc:0 },
 };
@@ -36,7 +37,7 @@ const isAbsent = id => !!(D.absent[id] && D.absent[id].absent);
 const teamBadge = (t, big) => t ? `<span class="tb ${t}${big?' big':''}" title="${esc(teamName(t))}">${esc(teamShort(t))}</span>` : `<span class="tb none${big?' big':''}">?</span>`;
 
 /* ===================== 개인전 ===================== */
-function optMap(ev){ const m={}; INDIV[ev].opts(settings()).forEach(([k,l,v]) => m[k]={l,v}); return m; }
+function optMap(ev){ const m={}, E=INDIV[ev]; [...(E.legacy ? E.legacy(settings()) : []), ...E.opts(settings())].forEach(([k,l,v]) => m[k]={l,v}); return m; }
 function totalOf(ev, throws){ const m=optMap(ev); return (throws||[]).reduce((s,k)=> s + (m[k]?.v ?? 0), 0); }
 const recId = (ev, round, pid) => `${ev}_${round}_${pid}`;
 function rec(ev, round, pid){ return D.indiv.find(r => r.id===recId(ev,round,pid) && !r.deleted && (r.throws||[]).length); }
@@ -94,18 +95,24 @@ function upNext(ev, team){
   return { cur, next: rest.length ? rest[0].id : cur, picked: cur!==q[0].id };
 }
 
-// 지금 선수에서 k번째 뒤에 나올 사람 (0 지금, 1 다음, 2 다다음…). 경기를 차례로 치른다고 셈해서, 팀원이 적으면 처음으로 돌아감
-function upcoming(ev, team, k){
-  const u = upNext(ev, team); if(!u.cur) return null;
-  if(k<=0) return u.cur;
-  const ord = orderFor(ev, team), c = { ...plays(ev, team) };
-  let cand = ord.filter(id => !isAbsent(id)); if(!cand.length) cand = ord;
-  let id = u.cur; c[id] = (c[id]||0) + 1;
-  for(let j = 0; j < k; j++){
-    id = cand.slice().sort((a,b) => (c[a]||0) - (c[b]||0) || ord.indexOf(a) - ord.indexOf(b))[0];
-    c[id] = (c[id]||0) + 1;
+// 앞으로 나올 순서 n명: [지금, 다음, 다다음…]. 경기를 차례로 치른다고 셈해서, 팀원이 적으면 처음으로 돌아감
+const candOf = (ev, team) => { const ord = orderFor(ev, team), c = ord.filter(id => !isAbsent(id)); return c.length ? c : ord; };
+function lineup(ev, team, n){
+  const u = upNext(ev, team); if(!u.cur) return [];
+  const ord = orderFor(ev, team), cand = candOf(ev, team), c = { ...plays(ev, team) };
+  const out = [u.cur]; c[u.cur] = (c[u.cur]||0) + 1;
+  while(out.length < n){
+    const id = cand.slice().sort((a,b) => (c[a]||0) - (c[b]||0) || ord.indexOf(a) - ord.indexOf(b))[0];
+    out.push(id); c[id] = (c[id]||0) + 1;
   }
-  return id;
+  return out;
+}
+// 지금 선수에서 k번째 뒤에 나올 사람 (0 지금, 1 다음, 2 다다음…)
+const upcoming = (ev, team, k) => lineup(ev, team, Math.max(0,k)+1)[Math.max(0,k)] || null;
+// 두 팀 모두 한 번씩 나오려면 남은 대결 수 (지금 대결 포함)
+function remainingMatches(ev){
+  const left = team => { const pl = plays(ev, team); return candOf(ev, team).filter(id => !pl[id]).length; };
+  return Math.max(left('blue'), left('red'));
 }
 
 /* ===================== 역할·권한 =====================

@@ -6,7 +6,7 @@ function coachView(team){
   const b = upNext(ev,'blue'), r = upNext(ev,'red');
   return `<div class="fit">
     ${eventTabs(ORDER_EVENTS, 'cev', UI.coachEv, true)}
-    <div class="infobar"><span class="sub">지금</span><span class="who">${teamBadge('blue')}<b>${b.cur?esc(pname(b.cur)):'-'}</b></span><span class="sub">vs</span><span class="who">${teamBadge('red')}<b>${r.cur?esc(pname(r.cur)):'-'}</b></span>
+    <div class="infobar coachinfo"><span class="sub">지금</span><b class="cn blue">${b.cur?esc(pname(b.cur)):'-'}</b><span class="sub">vs</span><b class="cn red">${r.cur?esc(pname(r.cur)):'-'}</b>
       <span class="grow"></span>${scoreline(tally(ev))}</div>
     <div class="seg sm coachseg"><button class="${tab!=='opp'?'on':''}" data-a="coachTab" data-v="our">우리 팀 순서 짜기</button><button class="${tab==='opp'?'on':''}" data-a="coachTab" data-v="opp">${esc(teamName(other))} 순서 보기</button></div>
     <div class="coachfit">${orderPanel(ev, team, tab!=='opp')}${oppPanel(ev, other, tab==='opp')}</div>

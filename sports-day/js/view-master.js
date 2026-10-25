@@ -18,7 +18,6 @@ function settingsView(){
     <textarea id="rosterText" data-in="roster" placeholder="홍길동 청&#10;김영희 홍&#10;이철수">${esc(UI.rosterText)}</textarea>
     <div style="height:10px"></div><button class="btn primary wide" data-a="addRoster">명단에 넣기</button></div>
   <div class="card"><h2>아직 정하지 못한 점수</h2>
-    <div class="row" style="margin-bottom:12px"><span class="grow">투호 2m 미만</span><div class="seg"><button class="${s.tuhoShort===0?'on':''}" data-a="setS" data-k="tuhoShort" data-v="0">0점</button><button class="${s.tuhoShort===5?'on':''}" data-a="setS" data-k="tuhoShort" data-v="5">5점</button></div></div>
     <div class="row"><span class="grow">후리볼 파울</span><div class="seg"><button class="${s.foul===1?'on':''}" data-a="setS" data-k="foul" data-v="1">1점</button><button class="${s.foul===1.5?'on':''}" data-a="setS" data-k="foul" data-v="1.5">1.5점</button></div></div>
     <p class="sub">바꾸면 이미 입력한 기록의 점수도 자동으로 다시 계산됩니다.</p></div>
   <div class="card"><h2>결과 보고서 · 내려받기</h2>

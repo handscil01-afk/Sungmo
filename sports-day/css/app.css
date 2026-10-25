@@ -587,3 +587,151 @@ body:not(.has-nav) #radio .dock{height:calc(70px + env(safe-area-inset-bottom));
 .bdlabel{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .bdnext{font-size:clamp(18px,2.8vh,28px);color:var(--ink);font-weight:800;display:inline-flex;align-items:center;gap:8px;background:var(--card);border:2px solid var(--line);border-radius:12px;padding:2px 12px}
 .bdnext .tb{width:28px;height:28px;font-size:16px}
+
+/* ===================== 5차: 더 촘촘한 한 화면 ===================== */
+/* 아래 메뉴·무전기 줄을 얇게 */
+body.has-nav{ --navh: calc(52px + env(safe-area-inset-bottom)) }
+body.has-radio{ --dockh: 58px }
+body.has-radio:not(.has-nav){ --dockh: calc(58px + env(safe-area-inset-bottom)) }
+.bottom{min-height:52px}
+.bottom button{min-height:50px;padding:3px 2px;font-size:13px;line-height:1.15}
+.bottom button b{font-size:19px}
+#radio .dock{height:58px;padding:6px 10px}
+body:not(.has-nav) #radio .dock{height:calc(58px + env(safe-area-inset-bottom));padding-bottom:calc(6px + env(safe-area-inset-bottom))}
+.dk{min-height:46px}
+
+/* 개인전: 두 사대를 함께 (세로 화면은 위아래, 가로 화면은 왼쪽·오른쪽) */
+.lanes{flex-direction:column;gap:8px}
+@media (min-width:700px) and (orientation:landscape), (min-width:1000px){ .lanes{flex-direction:row;gap:12px} }
+.lanebox,.lanebox.sel{display:flex;gap:6px;padding:8px;border-width:3px}
+.lanes.n1 .lanebox{gap:10px;padding:10px}
+.lanebox.empty{padding:0}
+.bigpick{flex-direction:row;gap:12px;min-height:60px}
+.bigpick .plus{font-size:40px}
+.bigpick b{font-size:22px}
+.bigpick span{font-size:14px}
+.lhead{gap:6px;min-height:40px}
+.lhead .ll{font-size:12px;font-weight:900;color:var(--sub);writing-mode:horizontal-tb;max-width:3.6em;line-height:1.1;flex:none}
+.lhead .tb{width:28px;height:28px;font-size:16px}
+.lhead .nm{font-size:22px}
+.lhead .total{font-size:26px;white-space:nowrap}
+.lhead .total small{font-size:15px;margin-left:1px}
+.lhead .xbtn{width:40px;height:40px}
+.seg.xs button{min-height:34px;padding:2px 8px;font-size:14px}
+.slotrow{display:flex;gap:6px;flex:none}
+.slotrow .slots{flex:1;margin:0;gap:5px}
+.lanebox .slot{min-height:42px;font-size:20px;font-weight:900;color:var(--sub);border-radius:10px}
+.lanebox .slot.filled{color:var(--ink);font:inherit;font-size:22px;font-weight:900}
+.lanebox .slot.next{border-color:var(--ink);border-style:solid;background:#fff6cc}
+.btn.undo{min-height:42px;padding:0 12px;font-size:20px;flex:none}
+.lanebox .opts{gap:6px;grid-auto-rows:1fr}
+.lanebox .opts.n4{grid-template-columns:repeat(4,1fr)}
+.lanebox .opts.n5{grid-template-columns:repeat(3,1fr)}
+.lanebox .opt{min-height:48px;padding:2px;border-radius:12px}
+.lanebox .opt b{font-size:clamp(24px,6.5vw,34px)}
+.lanebox .opt span{font-size:14px;line-height:1.1}
+.lanebox .savebtn{flex:none;min-height:48px;font-size:18px}
+.lanes.n1 .opt{min-height:64px} .lanes.n1 .slot{min-height:54px} .lanes.n1 .savebtn{min-height:56px}
+
+/* 단체전: 위쪽 지금 대결은 알맞은 크기로, 아래쪽 대기 순서는 남은 칸을 다 씀 */
+.duel{flex:none;min-height:0;grid-template-columns:1fr auto 1fr;gap:6px}
+.duel .vsm{font-size:16px}
+.pcard{padding:8px 6px;gap:2px;border-width:4px;border-radius:16px;min-height:86px}
+.pcard .lbl{font-size:14px}
+.pcard .nm{font-size:clamp(26px,8vw,40px)}
+.pcard .nm small{font-size:.4em;color:var(--sub)}
+.duel.small .pcard .nm{font-size:clamp(22px,6.5vw,34px)}
+.winrow{gap:8px}
+.winrow .btn.huge{min-height:clamp(60px,9vh,84px);font-size:clamp(20px,5.6vw,30px);padding:6px}
+.winrow .drawbtn{flex:0 0 auto;min-width:74px;font-size:17px!important;background:var(--card)}
+.queue{flex:1;min-height:96px;display:flex;flex-direction:column;background:var(--card);border:2px solid var(--line);border-radius:14px;padding:6px 8px;gap:4px}
+.qhead{display:flex;align-items:center;gap:8px;flex:none}
+.qhead b{font-size:17px;font-weight:900}
+.qhead .tag{font-size:14px}
+.qhead .btn.small{min-height:38px;padding:4px 10px}
+.qcols,.qrow{display:grid;grid-template-columns:44px 1fr 1fr;gap:6px;align-items:center}
+.qcols{flex:none;font-size:13px;font-weight:900;color:var(--sub);padding:0 2px}
+.qcols .qb,.qcols .qr{display:flex;align-items:center;gap:4px;background:none;padding:0}
+.qcols .tb{width:20px;height:20px;font-size:12px}
+.qlist{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+.qrow{position:relative;flex:none;min-height:40px}
+.qrow .qn{font-size:14px;font-weight:900;color:var(--sub);text-align:center}
+.qrow .qb,.qrow .qr{font-size:20px;font-weight:900;border-radius:10px;padding:5px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qrow .qb{background:var(--blue-soft);color:var(--blue-ink)}
+.qrow .qr{background:var(--red-soft);color:var(--red-ink)}
+.qrow:first-child .qn{color:var(--ink)}
+.qrow.prep .qb,.qrow.prep .qr{box-shadow:inset 0 0 0 3px #e0a800}
+.qrow .qt{position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:12px;font-weight:900;background:#ffd400;color:#000;border-radius:999px;padding:1px 7px}
+.qrow.extra .qb,.qrow.extra .qr{background:var(--bg);color:var(--sub)}
+.qsep{font-size:13px;font-weight:800;color:var(--sub);text-align:center;padding:4px 0;border-top:2px dashed var(--line)}
+.watchrow .btn.huge{min-height:56px}
+.watchrow .watch{font-size:clamp(34px,10vw,56px)}
+.fit>.btn.huge{min-height:clamp(54px,8vh,80px)}
+
+/* 출전 명단 창: 청팀·홍팀 나란히 */
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.pcol{min-width:0;border:2px solid var(--line);border-radius:14px;padding:6px;background:var(--card)}
+.pcol.blue{border-color:var(--blue)} .pcol.red{border-color:var(--red)}
+.phead{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:2px 2px 6px}
+.phead b{font-size:18px;font-weight:900}
+.phead .sub{font-size:13px;margin-left:auto}
+.pair .olist .item{min-height:44px;padding:4px 4px;gap:6px}
+.pair .olist .no{width:26px;height:26px;font-size:14px;border-radius:8px}
+.pair .olist .name{font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.pair .tag{font-size:12px;padding:2px 6px}
+
+/* 마스터 안내판 메뉴: 위쪽 탭 */
+.bctl{max-width:900px}
+.btabs{display:flex;width:100%;margin-bottom:12px;position:sticky;top:-12px;z-index:5}
+.btabs button{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 2px;font-size:13px;line-height:1.15;min-height:54px}
+.btabs button b{font-size:20px}
+.lhead .ll{font-size:13px;max-width:none;background:var(--bg);border-radius:8px;padding:3px 6px;color:var(--ink)}
+.distbtn{flex:none;border:2px solid var(--ink);background:#fff6cc;border-radius:10px;min-height:40px;padding:0 8px;font:inherit;font-weight:900;font-size:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.distbtn small{font-size:10px;color:var(--sub);font-weight:800}
+.bctl .card{padding:12px 14px;margin-bottom:10px}
+.bctl .card h2{font-size:19px;margin:0 0 8px}
+.bctl .chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px}
+.bctl .chip{min-height:42px;padding:4px 10px;font-size:15px;border-radius:12px;white-space:normal;line-height:1.15}
+.bctl .phr{display:flex}
+.bctl .phr .chip{flex:1;text-align:left}
+.bctl .chips:has(.phr){grid-template-columns:1fr}
+.bctl .sub{font-size:14px}
+.tsplit{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px}
+.tmain{flex:none;display:flex;flex-direction:column;gap:10px}
+.qhead b{white-space:nowrap}
+@media (max-width:380px){ .qhead .tag{font-size:12px;padding:3px 7px} }
+
+/* 키가 낮은 화면 (휴대폰 가로): 머리줄·무전기 줄·아래 메뉴를 더 얇게 */
+@media (max-height:560px) and (orientation:landscape){
+  .top{min-height:44px;padding:3px 10px}
+  .top .hbtn{width:36px;height:36px}
+  .evpick{min-height:36px;padding:2px 10px}
+  body.has-nav{ --navh: calc(40px + env(safe-area-inset-bottom)) }
+  body.has-radio{ --dockh: 48px }
+  body.has-radio:not(.has-nav){ --dockh: calc(48px + env(safe-area-inset-bottom)) }
+  .bottom{min-height:40px}
+  .bottom button{min-height:38px;flex-direction:row;gap:4px;font-size:14px}
+  .bottom button b{font-size:17px}
+  #radio .dock{height:48px;padding:4px 10px}
+  body:not(.has-nav) #radio .dock{height:calc(48px + env(safe-area-inset-bottom))}
+  .dk{min-height:38px}
+  main.fitmain{padding:6px 10px}
+  .fit{gap:6px}
+  .infobar{min-height:40px;padding:3px 10px}
+  .infobar .btn.small{min-height:34px}
+  .seg.sm button{min-height:32px}
+  .lanebox,.lanebox.sel{gap:4px;padding:6px}
+  .lhead{min-height:34px} .lhead .xbtn{width:34px;height:34px} .distbtn{min-height:34px}
+  .lanebox .slot{min-height:32px} .btn.undo{min-height:32px}
+  .lanebox .opt{min-height:36px}
+  .lanebox .savebtn{min-height:38px}
+  .tsplit{flex-direction:row}
+  .tmain{flex:1;min-width:0;min-height:0}
+  .tsplit>.queue{flex:1;min-width:0}
+  .pcard{min-height:70px}
+  .winrow .btn.huge{min-height:56px}
+}
+.infobar .sub{white-space:nowrap}
+.coachinfo{gap:6px}
+.coachinfo .cn{font-size:19px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.coachinfo .cn.blue{color:var(--blue-ink)} .coachinfo .cn.red{color:var(--red-ink)}

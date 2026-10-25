@@ -24,29 +24,27 @@ function lanesOf(ev){
 function indivView(ev){
   const E = INDIV[ev], round = UI.round[ev]||'main', ps = people();
   const done = ps.filter(p => rec(ev, round, p.id)).length, pct = ps.length ? Math.round(done/ps.length*100) : 0;
-  const lanes = lanesOf(ev), sel = Math.min(UI.laneSel[ev]||0, E.lanes-1);
   const info = `<div class="infobar"><div class="grow"><b>${round==='final'?'결승':'본경기'} ${done}/${ps.length}명</b><div class="progress"><i style="width:${pct}%"></i></div></div>
     <div class="seg sm"><button class="${round==='main'?'on':''}" data-a="round" data-v="main">본경기</button><button class="${round==='final'?'on':''}" data-a="round" data-v="final">결승</button></div>
     <button class="btn small" data-a="indivList">📋<span class="bl"> 명단·순위</span></button></div>`;
-  const tabs = E.lanes>1 ? `<div class="lanetabs">${lanes.map((L,i) => `<button class="lanetab ${i===sel?'on':''}" data-a="laneSel" data-v="${i}">
-      <small>${esc(LANE_LABELS[ev][i])}</small><b>${L ? esc(pname(L.pid)) : '선수 고르기'}</b><span>${L ? `${totalOf(ev,L.throws)}점 · ${L.throws.length}/${E.count}` : '비어 있음'}</span></button>`).join('')}</div>` : '';
-  return `<div class="fit">${info}${tabs}<div class="lanes">${lanes.map((L,i) => laneBox(ev, E, L, i, i===sel)).join('')}</div></div>`;
+  // 사대(칸)가 둘이면 세로 화면에서는 위아래, 가로 화면에서는 왼쪽·오른쪽에 함께 둠
+  return `<div class="fit">${info}<div class="lanes n${E.lanes}">${lanesOf(ev).map((L,i) => laneBox(ev, E, L, i)).join('')}</div></div>`;
 }
-function laneBox(ev, E, L, i, sel){
+function laneBox(ev, E, L, i){
   const label = (LANE_LABELS[ev]||[])[i] || '';
-  if(!L) return `<div class="lanebox empty ${sel?'sel':''}"><button class="bigpick" data-a="pickFor" data-v="${i}"><span class="plus">＋</span><b>${esc(label)} 선수 고르기</b><span>안 한 사람부터 보여 줍니다</span></button></div>`;
+  if(!L) return `<div class="lanebox empty"><button class="bigpick" data-a="pickFor" data-v="${i}"><span class="plus">＋</span><b>${esc(label)}</b><span>눌러서 선수 고르기 (안 한 사람부터)</span></button></div>`;
   const t = totalOf(ev, L.throws), m = optMap(ev), opts = E.opts(settings()), full = L.throws.length >= E.count;
   const slots = Array.from({ length:E.count }, (_,k) => { const key = L.throws[k];
-    return key!=null ? `<button class="slot filled" data-a="unslot" data-i="${i}" data-k="${k}"><span class="p">${m[key]?.v ?? 0}</span><span class="l">${esc(m[key]?.l||'')}</span></button>`
-      : `<div class="slot"><span class="n">${k+1}</span></div>`; }).join('');
-  return `<div class="lanebox ${sel?'sel':''}">
-    <div class="lhead">${teamBadge(teamOf(L.pid), true)}<button class="nm" data-a="pickFor" data-v="${i}">${esc(pname(L.pid))} <small>▾</small></button>
-      ${L.round==='final'?'<span class="tag warn">결승</span>':''}${L.existing?'<span class="tag warn">수정</span>':''}<span class="total">${t}점</span>
-      <button class="xbtn" data-a="dropLane" data-i="${i}" aria-label="빼기">✕</button></div>
-    ${ev==='archery' ? `<div class="row nowrap"><span class="sub">거리</span><div class="seg sm"><button class="${L.dist==='2.5'?'on':''}" data-a="dist" data-i="${i}" data-v="2.5">2.5m</button><button class="${L.dist==='3'?'on':''}" data-a="dist" data-i="${i}" data-v="3">3m</button></div></div>` : ''}
-    <div class="slots">${slots}</div>
-    <div class="opts n${opts.length}">${opts.map(([k,l,v]) => `<button class="opt" data-a="throw" data-i="${i}" data-k="${k}" ${full?'disabled':''}><b>${v}</b><span>${esc(l)}</span></button>`).join('')}</div>
-    <div class="lacts"><button class="btn" data-a="undoThrow" data-i="${i}" ${L.throws.length?'':'disabled'}>↩ 한 칸 지우기</button><button class="btn ${full?'ok':'primary'} grow" data-a="saveLane" data-i="${i}">${L.existing?'수정 저장':'저장'} (${L.throws.length}/${E.count})</button></div>
+    return key!=null ? `<button class="slot filled" data-a="unslot" data-i="${i}" data-k="${k}" aria-label="${k+1}번째 지우기">${m[key]?.v ?? 0}</button>`
+      : `<div class="slot ${k===L.throws.length?'next':''}">${k+1}</div>`; }).join('');
+  return `<div class="lanebox">
+    <div class="lhead"><span class="ll">${esc(label.split(' ')[0])}</span>${teamBadge(teamOf(L.pid))}<button class="nm" data-a="pickFor" data-v="${i}">${esc(pname(L.pid))}<small> ▾</small></button>
+      ${L.round==='final'?'<span class="tag warn">결승</span>':''}${L.existing?'<span class="tag warn">수정</span>':''}
+      ${ev==='archery' ? `<button class="distbtn" data-a="dist" data-i="${i}" data-v="${L.dist==='3'?'2.5':'3'}" aria-label="거리 바꾸기"><small>거리</small>${L.dist==='3'?'3':'2.5'}m</button>` : ''}
+      <span class="total">${t}<small>점</small></span><button class="xbtn" data-a="dropLane" data-i="${i}" aria-label="빼기">✕</button></div>
+    <div class="slotrow"><div class="slots">${slots}</div><button class="btn undo" data-a="undoThrow" data-i="${i}" ${L.throws.length?'':'disabled'} aria-label="한 칸 지우기">↩</button></div>
+    <div class="opts n${opts.length}">${opts.map(([k,l,v]) => `<button class="opt" data-a="throw" data-i="${i}" data-k="${k}" ${full?'disabled':''}><b>${v}</b>${l!==v+'점'?`<span>${esc(l)}</span>`:''}</button>`).join('')}</div>
+    <button class="btn ${full?'ok':'primary'} savebtn" data-a="saveLane" data-i="${i}">${L.existing?'수정 저장':'저장'} (${L.throws.length}/${E.count})</button>
   </div>`;
 }
 // 선수 고르기 창: 안 한 사람 먼저 / 가나다 / 팀별
@@ -56,7 +54,8 @@ function indivPickRows(){
   const inLane = new Map(lanesOf(ev).map((L,i) => [L && L.pid, i]).filter(x => x[0]));
   let list = people().filter(p => !q || p.name.includes(q));
   const tOrd = p => p.team==='blue' ? 0 : p.team==='red' ? 1 : 2;
-  if(PK.sort==='todo') list.sort((a,b) => (!!rec(ev,round,a.id) - !!rec(ev,round,b.id)) || (isAbsent(a.id) - isAbsent(b.id)) || byName(a,b));
+  // 안 한 사람 먼저: 다른 칸에서 입력 중인 사람과 불참자는 뒤로
+  if(PK.sort==='todo') list.sort((a,b) => (inLane.has(a.id) - inLane.has(b.id)) || (!!rec(ev,round,a.id) - !!rec(ev,round,b.id)) || (isAbsent(a.id) - isAbsent(b.id)) || byName(a,b));
   else if(PK.sort==='team') list.sort((a,b) => tOrd(a)-tOrd(b) || byName(a,b));
   return list.map(p => {
     const r = rec(ev, round, p.id), li = inLane.get(p.id);
@@ -114,37 +113,54 @@ function recSheet(ev, pid){
   return `<h2 class="row">${teamBadge(teamOf(pid))} ${esc(pname(pid))} · ${esc(E.name)}</h2>${part('main')}${part('final')}<button class="btn wide" data-a="closeSheet">닫기</button>`;
 }
 
-/* ---------- 단체전: 지금 경기 한 화면 (선수 카드를 누르면 선수 고르기) ---------- */
+/* ---------- 단체전: 위쪽에 지금 대결, 아래쪽에 대기 순서 ---------- */
 function teamView(ev){
   const E = TEAM[ev], t = tally(ev), editable = can.record(ev), n = matchesOf(ev).length + 1;
   const info = `<div class="infobar"><b>${E.mode==='round' ? `${n}판째` : `${n}번째 대결`}</b>${scoreline(t)}<span class="grow"></span>
     ${D.amMaster && ORDER_EVENTS.includes(ev) ? '<button class="btn small" data-a="sub" data-v="order">✏️<span class="bl"> 순서</span></button>' : ''}
     <button class="btn small" data-a="listSheet">📋<span class="bl"> 기록</span></button></div>`;
-  const winBtns = editable ? `<div class="winrow"><button class="btn blue huge" data-a="win" data-v="blue">${esc(teamName('blue'))} 승</button><button class="btn red huge" data-a="win" data-v="red">${esc(teamName('red'))} 승</button></div>
-    <button class="btn small wide" data-a="win" data-v="draw">무승부</button>` : '';
-  if(E.mode==='round') return `<div class="fit">${info}<div class="roundbig"><b>${n}판째</b><span class="sub">${esc(E.hint)}${t.draw?` · 무승부 ${t.draw}판`:''}</span></div>${winBtns}</div>`;
-  const b = upNext(ev,'blue'), r = upNext(ev,'red'), small = E.mode==='time';
-  const duel = `<div class="duel ${small?'small':''}">${pcard(ev,'blue',b,editable)}<div class="vsm">VS</div>${pcard(ev,'red',r,editable)}</div>`;
-  const next = `<div class="nextbar"><span class="sub">다음</span><span class="who">${teamBadge('blue')}<b>${b.next?esc(pname(b.next)):'-'}</b></span><span class="sub">vs</span><span class="who">${teamBadge('red')}<b>${r.next?esc(pname(r.next)):'-'}</b></span>
-    <span class="grow"></span>${editable?'<button class="btn small" data-a="callSheet">📣<span class="bl"> 부르기</span></button>':''}</div>`;
-  if(!editable) return `<div class="fit">${info}${duel}${next}</div>`;
-  if(E.mode==='time'){
+  if(E.mode==='round'){
+    const winBtns = editable ? `<div class="winrow"><button class="btn blue huge" data-a="win" data-v="blue">${esc(teamName('blue'))} 승</button><button class="btn huge drawbtn" data-a="win" data-v="draw">무승부</button><button class="btn red huge" data-a="win" data-v="red">${esc(teamName('red'))} 승</button></div>` : '';
+    return `<div class="fit">${info}<div class="roundbig"><b>${n}판째</b><span class="sub">${esc(E.hint)}${t.draw?` · 무승부 ${t.draw}판`:''}</span></div>${winBtns}</div>`;
+  }
+  const b = upNext(ev,'blue'), r = upNext(ev,'red');
+  const duel = `<div class="duel">${pcard(ev,'blue',b,editable)}<div class="vsm">VS</div>${pcard(ev,'red',r,editable)}</div>`;
+  if(E.mode==='time' && editable){
     const rt = runTimesOf(ev), tm = (D.calls[ev]||{}).times || {};
     const tin = (team, id) => `<div class="tcell">${teamBadge(team)}<input class="timein" id="${id}" inputmode="decimal" data-in="rt" data-t="${team}" value="${esc(rt[team])}" placeholder="초"><button class="btn small ${team}" data-a="watchTo" data-v="${team}">⏱ 넣기</button></div>`;
-    return `<div class="fit">${info}${duel}
+    return `<div class="fit">${info}<div class="tsplit"><div class="tmain">${duel}
       <div class="watchrow"><div class="watch" id="watch">0.00</div><button class="btn primary huge" data-a="watchToggle" id="watchBtn">시작</button><button class="btn" data-a="watchReset" aria-label="초기화">↺</button></div>
       <div class="timesrow">${tin('blue','rtBlue')}${tin('red','rtRed')}</div>
       ${tm.blue!=null || tm.red!=null ? `<div class="sub">⏱ 계시원 ${esc(tm.by||'')}이(가) 보낸 기록이 채워졌습니다. 확인 뒤 저장하세요.</div>` : ''}
-      <button class="btn ok huge" data-a="saveRun">기록 비교해서 저장</button>${next}</div>`;
+      <button class="btn ok huge" data-a="saveRun">기록 비교해서 저장</button></div>${queueBox(ev, editable)}</div></div>`;
   }
-  return `<div class="fit">${info}${duel}${next}${winBtns}</div>`;
+  const winBtns = editable && E.mode==='duel' ? `<div class="winrow"><button class="btn blue huge" data-a="win" data-v="blue">${esc(teamName('blue'))} 승</button><button class="btn huge drawbtn" data-a="win" data-v="draw">무승부</button><button class="btn red huge" data-a="win" data-v="red">${esc(teamName('red'))} 승</button></div>` : '';
+  // 휴대폰을 가로로 들면 왼쪽에 지금 대결, 오른쪽에 대기 순서
+  return `<div class="fit">${info}<div class="tsplit"><div class="tmain">${duel}${winBtns}</div>${queueBox(ev, editable)}</div></div>`;
 }
+// 지금 선수 카드: 이름은 보통 세 글자라 왼쪽(청)·오른쪽(홍)에 나란히 둠
 function pcard(ev, team, u, editable){
   const id = u.cur, ord = orderFor(ev, team), pl = plays(ev, team);
-  const inner = `<span class="lbl">${esc(teamName(team))} ${id ? (ord.indexOf(id)+1)+'번' : ''}</span>
-    <span class="nm">${id ? esc(pname(id)) : '팀원 없음'}</span>
-    <span class="hint">${id && pl[id] ? `${pl[id]+1}번째 출전 · ` : ''}${u.picked ? '직접 고름 · ' : ''}${editable && id ? '눌러서 바꾸기' : ''}</span>`;
+  const inner = `<span class="lbl">${esc(teamName(team))} ${id ? (ord.indexOf(id)+1)+'번' : ''}${id && pl[id] ? ` · ${pl[id]+1}회째` : ''}</span>
+    <span class="nm">${id ? esc(pname(id)) : '팀원 없음'}${editable && id ? '<small> ▾</small>' : ''}</span>
+    ${u.picked ? '<span class="hint">직접 고름</span>' : ''}`;
   return editable && id ? `<button class="pcard ${team}" data-a="pickSheet" data-v="${team}">${inner}</button>` : `<div class="pcard ${team}">${inner}</div>`;
+}
+// 대기 순서: 다음 대결부터 청·홍을 한 줄에 나란히. 모두 한 번씩 나온 뒤의 순서는 흐리게
+function queueBox(ev, editable){
+  const left = remainingMatches(ev), pa = prepAhead(), n0 = matchesOf(ev).length + 1;
+  const rows = Math.min(40, Math.max(left - 1, pa, 3));
+  const B = lineup(ev, 'blue', rows+1), R = lineup(ev, 'red', rows+1);
+  let html = '';
+  for(let k = 1; k <= rows; k++){
+    if(k===left && left>0) html += '<div class="qsep">여기부터는 모두 한 번씩 나온 뒤 다시 나오는 순서입니다</div>';
+    html += `<div class="qrow ${k>=left?'extra':''} ${k===pa?'prep':''}"><span class="qn">${k===1?'다음':n0+k}</span>
+      <span class="qb">${esc(B[k]?pname(B[k]):'-')}</span><span class="qr">${esc(R[k]?pname(R[k]):'-')}</span>${k===pa?'<span class="qt">📣 준비</span>':''}</div>`;
+  }
+  return `<div class="queue"><div class="qhead"><b>대기 순서</b><span class="tag ${left>1?'dark':''}">${left>0 ? `남은 대결 ${left}팀 (지금 포함)` : '모두 한 번씩 나왔습니다'}</span><span class="grow"></span>
+      ${editable?'<button class="btn small" data-a="callSheet">📣<span class="bl"> 부르기</span></button>':''}</div>
+    <div class="qcols"><span></span><span class="qb">${teamBadge('blue')} ${esc(teamName('blue'))}</span><span class="qr">${teamBadge('red')} ${esc(teamName('red'))}</span></div>
+    <div class="qlist">${html}</div></div>`;
 }
 function callSheet(){
   const ev = UI.ev, pa = prepAhead();
@@ -169,12 +185,13 @@ function listSheet(){
   const ev = UI.ev, E = TEAM[ev];
   let body;
   if(listTab==='order' && E.mode!=='round'){
-    body = `<div class="cols half">${TEAM_KEYS.map(team => {
+    // 이름이 짧아서 휴대폰에서도 청팀·홍팀을 왼쪽·오른쪽에 나란히 보여 줌
+    body = `<div class="pair">${TEAM_KEYS.map(team => {
       const u = upNext(ev, team), pl = plays(ev, team), ord = orderFor(ev, team);
       const done = ord.filter(id => pl[id]).length;
-      return `<div class="card"><div class="row"><h2 class="grow row h2" style="margin:0">${teamBadge(team)} ${esc(teamName(team))}</h2><span class="sub">${done}/${ord.length}명 출전</span></div>
+      return `<div class="pcol ${team}"><div class="phead">${teamBadge(team)}<b>${esc(teamName(team))}</b><span class="sub">${done}/${ord.length}명 출전</span></div>
         <div class="list olist">${ord.map((id,i) => `<div class="item ${id===u.cur?'cur':''} ${pl[id]?'done':''}"><span class="no">${i+1}</span><span class="name">${esc(pname(id))}</span>
-          ${id===u.cur?'<span class="tag dark">지금</span>':id===u.next?'<span class="tag warn">다음</span>':''}${pl[id]?`<span class="tag ok">✓ ${pl[id]}회</span>`:''}${isAbsent(id)?'<span class="tag red">불참</span>':''}</div>`).join('') || '<div class="empty">팀원이 없습니다.</div>'}</div></div>`;
+          ${id===u.cur?'<span class="tag dark">지금</span>':id===u.next?'<span class="tag warn">다음</span>':''}${pl[id]?`<span class="tag ok">✓${pl[id]>1?pl[id]:''}</span>`:''}${isAbsent(id)?'<span class="tag red">불참</span>':''}</div>`).join('') || '<div class="empty">팀원이 없습니다.</div>'}</div></div>`;
     }).join('')}</div>`;
   } else {
     const ms = matchesOf(ev).slice().reverse();
@@ -224,13 +241,13 @@ function stopWatch(){ const w=UI.watch; if(w.running){ w.acc += performance.now(
 
 /* ---------- 저장 ---------- */
 const saveLanes = () => ls.set('udh5_lanes2', UI.lanes);
-// i번째 칸(왼쪽·오른쪽 사대)에 선수를 넣음. 이미 다른 칸에 있으면 그 칸을 보여 줌
+// i번째 칸(왼쪽·오른쪽 사대)에 선수를 넣음. 이미 다른 칸에 있으면 알려 주기만 함
 function addLane(ev, pid, i){
   const lanes = lanesOf(ev), at = lanes.findIndex(L => L && L.pid===pid);
-  if(at>=0){ UI.laneSel[ev] = at; return; }
+  if(at>=0){ if(at!==i) toast(`${pname(pid)}은(는) ${LANE_LABELS[ev][at]}에서 입력 중입니다.`); return; }
   const round = UI.round[ev]||'main', r = rec(ev, round, pid);
   lanes[i] = { pid, round, throws: r ? [...r.throws] : [], dist: r?.dist || '2.5', existing: !!r };
-  UI.laneSel[ev] = i; saveLanes();
+  saveLanes();
 }
 async function saveLane(ev, i){
   if(!can.record(ev)) return denied();
@@ -268,8 +285,7 @@ function saveMatch(ev, winner, extra={}){
 Object.assign(ACT, {
   sub: (el, v) => { UI.sub[UI.ev] = v; },
   round: (el, v) => { const ev=UI.ev; if(lanesOf(ev).some(Boolean)){ toast('입력 중인 사람을 먼저 저장하거나 빼 주세요.'); return false; } UI.round[ev]=v; },
-  laneSel: (el, v) => { UI.laneSel[UI.ev] = +v; },
-  pickFor: (el, v) => { if(!can.record(UI.ev)) return denied(); PK.ev = UI.ev; PK.lane = +v; PK.q = ''; UI.laneSel[UI.ev] = +v; openSheet(indivPickSheet); render(); return false; },
+  pickFor: (el, v) => { if(!can.record(UI.ev)) return denied(); PK.ev = UI.ev; PK.lane = +v; PK.q = ''; openSheet(indivPickSheet); render(); return false; },
   pkSort: (el, v) => { PK.sort = v; drawSheet(); return false; },
   pickPerson: async (el, v) => {
     const ev = PK.ev, i = PK.lane, L = lanesOf(ev)[i];

@@ -59,7 +59,7 @@ function render(){
       fixEv(Object.keys(EVENTS)); const E = EVENTS[UI.ev];
       picker = pickerBtn(E.icon, E.name, E.color); body = masterGame(); fit = true;
     }
-    else if(UI.mtab==='board') body = boardControl() + `<div class="row" style="margin-bottom:14px"><button class="btn primary wide" data-a="boardPreview">📺 안내판 화면 미리 보기 (소리 없이)</button></div>` + boardView();
+    else if(UI.mtab==='board') body = boardControl();
     else if(UI.mtab==='people') body = peopleView();
     else if(UI.mtab==='sched') body = schedView();
     else body = settingsView();

@@ -230,31 +230,45 @@ function boardOverlay(){
 
 /* ===================== 마스터: 안내판 제어 · 문자 안내방송 ===================== */
 let annDraft = '';
+const BTABS = [['screen','📺','화면'], ['sound','🔔','소리'], ['ann','📢','안내방송'], ['awards','🏆','시상식'], ['summary','📊','현황']];
+// 안내판 메뉴: 위쪽 탭으로 나눠서 한 번에 한 가지만 보여 줌
 function boardControl(){
-  const cfg = boardCfg(), ann = D.config.announce || {};
+  if(!BTABS.some(t => t[0]===UI.btab)) UI.btab = 'screen';
+  const tabs = `<div class="seg btabs">${BTABS.map(([k,i,l]) => `<button class="${UI.btab===k?'on':''}" data-a="btab" data-v="${k}"><b>${i}</b>${l}</button>`).join('')}</div>`;
+  const body = { screen: bcScreen, sound: bcSound, ann: bcAnn, awards: awardsControl, summary: boardView }[UI.btab]();
+  return `<div class="bctl">${tabs}${body}</div>`;
+}
+function bcScreen(){
+  const cfg = boardCfg();
   const modes = [['auto','🔄 자동'], ['indiv','🎯 개인전 명단'], ['summary','📊 종합 현황'], ['awards','🏆 시상식'], ...ORDER_EVENTS.concat(['tug']).map(k => ['team:'+k, TEAM[k].icon+' '+TEAM[k].name])];
-  const sw = (k, label, sub) => `<div class="item"><span class="name">${label}<span class="sub">${sub}</span></span><label class="switch"><input type="checkbox" data-ch="bcfg" data-k="${k}" ${cfg[k]?'checked':''}><span></span></label></div>`;
-  const live = ann.text && !ann.cleared;
-  return `<div class="cols half"><div class="card"><h2>📺 안내판 제어</h2>
-      <h3 style="margin-top:0">보여 줄 화면</h3>
+  return `<div class="card"><h2>보여 줄 화면</h2>
       <div class="chips">${modes.map(([k,l]) => `<button class="chip ${cfg.mode===k?'on':''}" data-a="bmode" data-v="${k}">${esc(l)}</button>`).join('')}</div>
-      <p class="sub">자동으로 두면 가장 최근에 기록이 들어온 종목을 띄웁니다. 단체전 결과가 나오면 위아래로 승패를 보여 준 뒤 준비할 선수를 부릅니다.</p>
-      <h3>📣 "준비해 주세요"로 부를 선수</h3>
+      <p class="sub">자동으로 두면 가장 최근에 기록이 들어온 종목을 띄웁니다. 단체전 결과가 나오면 위아래로 승패를 보여 준 뒤 준비할 선수를 부릅니다.</p></div>
+    <div class="card"><h2>📣 "준비해 주세요"로 부를 선수</h2>
       <div class="chips">${[1,2,3].map(k => `<button class="chip ${prepAhead()===k?'on':''}" data-a="bprep" data-v="${k}">${AHEAD_LABEL[k]} 선수</button>`).join('')}</div>
-      <p class="sub">예: '다다음 선수'로 두면 지금 경기 중에 그다음 경기까지 끝난 뒤 나갈 선수를 미리 부릅니다.</p>
-      <div class="list">${sw('sound','🔔 띵동 소리','선수 호출·결과·안내방송 때 안내판에서 소리를 냅니다.')}
+      <p class="sub">예: '다다음 선수'로 두면 지금 경기 중에 그다음 경기까지 끝난 뒤 나갈 선수를 미리 부릅니다.</p></div>
+    <button class="btn primary wide" data-a="boardPreview">📺 안내판 화면 미리 보기 (소리 없이)</button>`;
+}
+function bcSound(){
+  const cfg = boardCfg();
+  const sw = (k, label, sub) => `<div class="item"><span class="name">${label}<span class="sub">${sub}</span></span><label class="switch"><input type="checkbox" data-ch="bcfg" data-k="${k}" ${cfg[k]?'checked':''}><span></span></label></div>`;
+  return `<div class="card"><div class="list">${sw('sound','🔔 띵동 소리','선수 호출·결과·안내방송 때 안내판에서 소리를 냅니다.')}
         ${sw('callVoice','🗣 호출할 때 이름 읽기','띵동 뒤에 "청팀 ○○○, 홍팀 ○○○ 선수 준비해 주세요"라고 읽어 줍니다.')}
-        ${sw('chime','🎵 안내방송 차임벨','문자 안내방송 앞에 딩동댕동 소리를 냅니다.')}
-        ${sw('flash','⚡ 깜빡임','호출·결과·안내 때 화면 테두리와 글씨를 깜빡여 눈에 띄게 합니다.')}</div>
+        ${sw('chime','🎵 안내방송 차임벨','문자·음성 안내방송 앞에 딩동댕동 소리를 냅니다.')}
+        ${sw('flash','⚡ 깜빡임','호출·결과·안내 때 화면 테두리와 글씨를 깜빡여 농인 참가자도 알아보게 합니다.')}</div>
       <div style="height:10px"></div><button class="btn wide" data-a="btest">🔔 안내판 소리 시험</button>
-      <p class="sub">안내판 태블릿은 처음 켤 때 화면을 한 번 눌러야 소리가 납니다.</p></div>
-    <div class="card"><h2>📢 문자 안내방송</h2>
+      <p class="sub">안내판 태블릿은 처음 켤 때 화면을 한 번 눌러야 소리가 납니다.</p></div>`;
+}
+function bcAnn(){
+  const ann = D.config.announce || {}, live = ann.text && !ann.cleared;
+  return `<div class="card">
       ${live ? `<div class="okline">지금 띄운 안내: ${esc(ann.text)}</div><button class="btn danger wide" data-a="annClear">안내 내리기</button><div style="height:12px"></div>` : ''}
-      <textarea id="annText" data-in="ann" placeholder="안내판에 크게 띄우고 읽어 줄 내용" style="min-height:110px">${esc(annDraft)}</textarea>
-      <div class="chips" style="margin:10px 0">${phrases().map((t,i) => `<span class="phr"><button class="chip" data-a="annPick" data-v="${i}">${esc(t)}</button><button class="phx" data-a="annDelPhrase" data-v="${i}" aria-label="문구 지우기">✕</button></span>`).join('')}</div>
-      <div class="row"><button class="btn primary grow" data-a="annSend" data-v="voice">📢 띄우고 읽어 주기</button><button class="btn grow" data-a="annSend" data-v="text">글자만 띄우기</button></div>
+      <textarea id="annText" data-in="ann" placeholder="안내판에 크게 띄우고 읽어 줄 내용" style="min-height:96px">${esc(annDraft)}</textarea>
+      <div class="row" style="margin-top:10px"><button class="btn primary grow" data-a="annSend" data-v="voice">📢 띄우고 읽어 주기</button><button class="btn grow" data-a="annSend" data-v="text">글자만 띄우기</button></div>
+      <h3>자주 쓰는 문구</h3>
+      <div class="chips">${phrases().map((t,i) => `<span class="phr"><button class="chip" data-a="annPick" data-v="${i}">${esc(t)}</button><button class="phx" data-a="annDelPhrase" data-v="${i}" aria-label="문구 지우기">✕</button></span>`).join('')}</div>
       <div style="height:8px"></div><button class="btn small wide" data-a="annSavePhrase">입력한 내용을 자주 쓰는 문구로 저장</button>
-      <p class="sub">안내판에 15초 동안 화면 가득 띄운 뒤, 내릴 때까지 위쪽 띠로 계속 보여 줍니다.</p></div></div>${awardsControl()}`;
+      <p class="sub">안내판에 15초 동안 화면 가득 띄운 뒤, 내릴 때까지 위쪽 띠로 계속 보여 줍니다. 목소리로 방송하려면 아래 📢 방송 버튼을 누른 채 말하면 됩니다.</p></div>`;
 }
 function awardsControl(){
   const steps = awardSteps(), i = awardsStep(), on = boardCfg().mode==='awards';
@@ -296,6 +310,7 @@ Object.assign(ACT, {
   bdPerson: (el, v) => { BOARD.person = v || null; BOARD.personAt = now(); },
   bdDismiss: () => { if(BOARD.overlay) finishFx(); return false; },
   bdSound: () => { SND.unlock(); SND.dingdong(); },
+  btab: (el, v) => { UI.btab = v; ls.set('udh5_btab', v); $('main') && ($('main').scrollTop = 0); },
   bmode: (el, v) => { setConfig({ board:{ mode:v } }); return false; },
   bprep: (el, v) => { setConfig({ board:{ prepAhead:+v } }); toast(`안내판이 ${AHEAD_LABEL[+v]} 선수를 준비 호출합니다.`); return false; },
   awStart: () => { setConfig({ board:{ mode:'awards' }, awards:{ step:-1 } }); },
