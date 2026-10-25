@@ -60,3 +60,12 @@ const askText = (msg, v, ok='저장') => dialog({ msg, input: v||'', ok });
 
 /* 버튼 동작 모음: data-a="이름" 을 누르면 ACT.이름(el, v) 실행. false를 돌려주면 화면을 다시 그리지 않음 */
 const ACT = {};
+
+/* 메뉴 화면 안의 위쪽 탭: 한 번에 한 가지만 보여 줘서 안에 무엇이 있는지 바로 알 수 있게 함
+   tabs: [[키, 아이콘, 이름, 작은 글씨(선택)], …] */
+const ITAB = ls.get('udh5_itab', {});
+function innerTabs(key, tabs){
+  if(!tabs.some(t => t[0]===ITAB[key])) ITAB[key] = tabs[0][0];
+  return `<div class="seg btabs">${tabs.map(([k,i,l,b]) => `<button class="${ITAB[key]===k?'on':''}" data-a="itab" data-k="${key}" data-v="${k}"><b>${i}</b><span>${l}${b!=null&&b!==''?` <small>${b}</small>`:''}</span></button>`).join('')}</div>`;
+}
+ACT.itab = (el, v) => { ITAB[el.dataset.k] = v; ls.set('udh5_itab', ITAB); const m = document.querySelector('main'); if(m) m.scrollTop = 0; };

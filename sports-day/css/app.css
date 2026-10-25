@@ -547,24 +547,7 @@ button.pcard:active{filter:brightness(.94)}
 .dropzone.pool.strip .pchip{flex:none;touch-action:pan-x}
 .box{flex:1;min-height:0;overflow-y:auto}
 
-/* 무전기 줄 (아래쪽) */
-#radio{left:0;right:0;top:auto;bottom:var(--navh);display:none;flex-direction:column;align-items:stretch;gap:0}
-#radio.on{display:block}
-#radio .dock{display:flex;gap:8px;padding:8px 10px;background:var(--top);height:70px;box-sizing:border-box}
-body:not(.has-nav) #radio .dock{height:calc(70px + env(safe-area-inset-bottom));padding-bottom:calc(8px + env(safe-area-inset-bottom))}
-.dk{border:0;border-radius:14px;min-height:54px;display:flex;align-items:center;justify-content:center;gap:6px;font-weight:900;font-size:16px;color:#fff;padding:0 14px;
-  touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;white-space:nowrap;overflow:hidden}
-.dk .ic{font-size:22px;line-height:1;pointer-events:none}
-.dk .lb{pointer-events:none;overflow:hidden;text-overflow:ellipsis}
-.dk.msg{background:#0f766e;flex:none}
-.dk.cast{background:#c2410c;flex:none}
-.dk.talk{background:#2b3240;flex:1;font-size:18px;border:2px solid #556070}
-.dk.live{background:#d10f2f!important;animation:rxpulse .9s ease-in-out infinite}
-.dk.wait{background:#8a6d00!important}
-.dk.rx{background:#ffd400!important;color:#000;animation:rxpulse 1s ease-in-out infinite}
-.dk.busy{background:#6b7280!important}
-.dk.dim{opacity:.55}
-#radio .rxchips{position:absolute;right:10px;bottom:100%;margin-bottom:8px}
+
 
 .infobar{flex-wrap:nowrap}
 .infobar b{white-space:nowrap}
@@ -580,8 +563,6 @@ body:not(.has-nav) #radio .dock{height:calc(70px + env(safe-area-inset-bottom));
 @media (max-width:440px){
   .top .rcn{display:none}
   .rolechip{padding:6px 9px}
-  .dk.msg .lb,.dk.cast .lb{display:none}
-  .dk.msg,.dk.cast{padding:0 12px}
 }
 
 .bdlabel{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
@@ -596,9 +577,6 @@ body.has-radio:not(.has-nav){ --dockh: calc(58px + env(safe-area-inset-bottom)) 
 .bottom{min-height:52px}
 .bottom button{min-height:50px;padding:3px 2px;font-size:13px;line-height:1.15}
 .bottom button b{font-size:19px}
-#radio .dock{height:58px;padding:6px 10px}
-body:not(.has-nav) #radio .dock{height:calc(58px + env(safe-area-inset-bottom));padding-bottom:calc(6px + env(safe-area-inset-bottom))}
-.dk{min-height:46px}
 
 /* 개인전: 두 사대를 함께 (세로 화면은 위아래, 가로 화면은 왼쪽·오른쪽) */
 .lanes{flex-direction:column;gap:8px}
@@ -712,9 +690,6 @@ body:not(.has-nav) #radio .dock{height:calc(58px + env(safe-area-inset-bottom));
   .bottom{min-height:40px}
   .bottom button{min-height:38px;flex-direction:row;gap:4px;font-size:14px}
   .bottom button b{font-size:17px}
-  #radio .dock{height:48px;padding:4px 10px}
-  body:not(.has-nav) #radio .dock{height:calc(48px + env(safe-area-inset-bottom))}
-  .dk{min-height:38px}
   main.fitmain{padding:6px 10px}
   .fit{gap:6px}
   .infobar{min-height:40px;padding:3px 10px}
@@ -735,3 +710,74 @@ body:not(.has-nav) #radio .dock{height:calc(58px + env(safe-area-inset-bottom));
 .coachinfo{gap:6px}
 .coachinfo .cn{font-size:19px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .coachinfo .cn.blue{color:var(--blue-ink)} .coachinfo .cn.red{color:var(--red-ink)}
+
+/* ===================== 무전기: 머리줄 버튼 + 가운데 창 ===================== */
+#radio{position:fixed;inset:0;z-index:58;display:block;pointer-events:none;top:0;right:0;left:0;bottom:0;flex-direction:initial;align-items:initial}
+#radio>*{pointer-events:none}
+#radio .rxchips{position:fixed;left:50%;top:calc(60px + env(safe-area-inset-top));transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;max-width:94vw;margin:0}
+#radio .rxchips>*{pointer-events:auto}
+.rxchip{text-align:center}
+.wkbtn{position:relative}
+.wkbtn .ic{font-size:20px;line-height:1}
+.wkbtn.rx{background:#ffd400!important;animation:rxpulse 1s ease-in-out infinite}
+.wkbtn.live{background:#d10f2f!important;animation:rxpulse .9s ease-in-out infinite}
+.wkbtn.dim{opacity:.6}
+.wkbg{position:fixed;inset:0;background:rgba(5,7,12,.6);display:none;align-items:center;justify-content:center;padding:16px;pointer-events:auto}
+.wkbg.open{display:flex}
+.wk{background:var(--top);color:#fff;border-radius:24px;width:100%;max-width:420px;max-height:calc(100dvh - 32px);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.5);border:2px solid #2b3240;overflow:hidden}
+.wktop{display:flex;align-items:center;gap:8px;padding:10px;flex:none}
+.wktabs{flex:1;display:flex;background:#1b212c;border-color:#3a4352}
+.wktabs button{flex:1;color:#e5e7eb;min-height:44px;font-size:15px;padding:4px 6px}
+.wktabs button+button{border-left-color:#3a4352}
+.wktabs button.on{background:#fff;color:#000}
+.wktabs button:disabled{opacity:.5}
+.wkx{flex:none;width:44px;height:44px;border-radius:12px;border:2px solid #3a4352;background:#1b212c;color:#fff;font-size:20px;font-weight:900}
+.wkptt{display:flex;flex-direction:column;align-items:center;gap:14px;padding:6px 16px 20px}
+.wkstat{font-size:15px;font-weight:800;text-align:center;min-height:1.3em}
+.wkstat .ok{color:#4ade80} .wkstat .bad{color:#fca5a5}
+.wkbig{width:min(66vw,250px);aspect-ratio:1;border-radius:50%;border:6px solid #556070;background:radial-gradient(circle at 50% 35%,#3a4456,#1b212c);color:#fff;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font:inherit;touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
+  box-shadow:0 10px 30px rgba(0,0,0,.45),inset 0 2px 0 rgba(255,255,255,.12);transition:transform .08s}
+.wkbig>*{pointer-events:none}
+.wkbig .ic{font-size:64px;line-height:1}
+.wkbig .lb{font-size:24px;font-weight:900;max-width:85%;text-align:center;line-height:1.15;word-break:keep-all}
+.wkbig .hint{font-size:13px;font-weight:700;opacity:.85;max-width:80%;text-align:center}
+.wkbig.cast{border-color:#c2410c;background:radial-gradient(circle at 50% 35%,#7c2d12,#2a1408)}
+.wkbig:active{transform:scale(.97)}
+.wkbig.live{background:radial-gradient(circle at 50% 35%,#ff3b55,#a50a24);border-color:#fff;transform:scale(1.04);animation:rxpulse .9s ease-in-out infinite}
+.wkbig.wait{background:radial-gradient(circle at 50% 35%,#b08a00,#5c4800);border-color:#ffd400}
+.wkbig.rx{background:radial-gradient(circle at 50% 35%,#ffe24d,#d4a800);color:#000;border-color:#000;animation:rxpulse 1s ease-in-out infinite}
+.wkbig.busy{background:#4b5563;border-color:#6b7280}
+.wkbig.dim{opacity:.55}
+.wkfoot{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;min-height:1em}
+.wkopt{display:flex;align-items:center;gap:8px;font-weight:800;font-size:15px}
+.wkopt input{width:22px;height:22px;margin:0}
+.wkmsg{background:var(--card);color:var(--ink);padding:14px;overflow-y:auto;border-radius:18px 18px 0 0;flex:1;min-height:0}
+@media (max-height:560px) and (orientation:landscape){
+  .wk{max-width:640px} .wkptt{flex-direction:row;flex-wrap:wrap;justify-content:center;padding-bottom:12px}
+  .wkbig{width:min(38vh,170px)} .wkbig .ic{font-size:40px} .wkbig .lb{font-size:19px}
+  #radio .rxchips{top:calc(48px + env(safe-area-inset-top))}
+}
+#radio .wkbg.open{pointer-events:auto}
+
+/* 출전 순서 짜기: 위쪽 순서(번호), 아래쪽 넣을 팀원(가나다순, 왼쪽부터 빈틈없이) */
+.cpanel{gap:6px}
+.cpanel .box{flex:1;min-height:90px}
+.cpanel .orow{min-height:46px;padding:2px 6px 2px 2px;gap:8px}
+.cpanel .orow .handle{width:40px;height:40px;font-size:22px}
+.cpanel .orow .no{width:30px;height:30px}
+.cpanel .orow .name{font-size:18px}
+.cpanel .orow .xbtn{width:38px;height:38px}
+.pooltitle{border-top:2px solid var(--line);padding-top:6px}
+.cpanel .dropzone.pool{flex:none;max-height:34vh;overflow-y:auto;display:flex;flex-wrap:wrap;justify-content:flex-start;align-content:flex-start;gap:6px;padding:6px;background:var(--bg);border-radius:12px;min-height:56px}
+.cpanel .dropzone.pool .pchip{min-height:42px;padding:4px 12px;font-size:17px;border-radius:10px;flex:none}
+.cpanel .psub{font-size:13px;flex:none}
+.dz-empty{font-size:15px;padding:14px 8px}
+.rxchip{width:max-content;max-width:92vw;white-space:nowrap}
+.wkmsg .btn{white-space:nowrap;flex:none}
+.wkbtn{background:#15402b}
+.prow{gap:8px;flex-wrap:nowrap;min-height:52px}
+.prow .name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:18px}
+.prow .seg.sm button{padding:4px 9px;min-height:38px}
+.ibtn{flex:none;width:40px;height:40px;border:2px solid var(--line2);background:var(--card);border-radius:10px;font-size:17px;display:flex;align-items:center;justify-content:center}
+.ibtn.danger{border-color:var(--red)}

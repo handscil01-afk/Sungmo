@@ -5,31 +5,34 @@
 function settingsView(){
   const ps = people(), s = settings();
   const cnt = { red:ps.filter(p => p.team==='red').length, blue:ps.filter(p => p.team==='blue').length };
-  const rows = ps.map(p => `<div class="item" style="flex-wrap:wrap">${teamBadge(p.team)}<span class="name">${esc(p.name)}</span>
-      <div class="seg"><button class="${p.team==='blue'?'on blue':''}" data-a="setTeam" data-v="${p.id}" data-t="blue">${esc(teamShort('blue'))}</button><button class="${p.team==='red'?'on red':''}" data-a="setTeam" data-v="${p.id}" data-t="red">${esc(teamShort('red'))}</button><button class="${!p.team?'on':''}" data-a="setTeam" data-v="${p.id}" data-t="">미정</button></div>
-      <button class="btn small" data-a="renameP" data-v="${p.id}">이름</button><button class="btn small danger" data-a="delP" data-v="${p.id}">삭제</button></div>`).join('');
-  return `<div class="cols half"><div>
-  <div class="card"><h2>팀 이름</h2>
-    <div class="row nowrap">${teamBadge('blue')}<input id="tnBlue" value="${esc(teamName('blue'))}" autocomplete="off">${teamBadge('red')}<input id="tnRed" value="${esc(teamName('red'))}" autocomplete="off"></div>
-    <div style="height:10px"></div><button class="btn wide" data-a="saveTeamNames">팀 이름 저장</button>
-    <p class="sub">화면에는 팀 이름의 첫 글자(${esc(teamShort('blue'))}·${esc(teamShort('red'))})가 팀 표시로 쓰입니다. ${esc(teamShort('blue'))}은 동그라미, ${esc(teamShort('red'))}은 네모 모양입니다.</p></div>
-  <div class="card"><h2>명단 붙여넣기</h2>
-    <p class="sub">한 줄에 한 명씩 적습니다. 이름 뒤에 띄어 쓰고 <b>청</b>이나 <b>홍</b>(또는 청팀·홍팀·파랑·빨강)을 적으면 팀도 함께 정해집니다.</p>
-    <textarea id="rosterText" data-in="roster" placeholder="홍길동 청&#10;김영희 홍&#10;이철수">${esc(UI.rosterText)}</textarea>
-    <div style="height:10px"></div><button class="btn primary wide" data-a="addRoster">명단에 넣기</button></div>
-  <div class="card"><h2>아직 정하지 못한 점수</h2>
-    <div class="row"><span class="grow">후리볼 파울</span><div class="seg"><button class="${s.foul===1?'on':''}" data-a="setS" data-k="foul" data-v="1">1점</button><button class="${s.foul===1.5?'on':''}" data-a="setS" data-k="foul" data-v="1.5">1.5점</button></div></div>
-    <p class="sub">바꾸면 이미 입력한 기록의 점수도 자동으로 다시 계산됩니다.</p></div>
-  <div class="card"><h2>결과 보고서 · 내려받기</h2>
-    <button class="btn primary wide" data-a="report">🖨 결과 보고서 보기 (인쇄·PDF 저장)</button>
-    <div class="row" style="margin-top:10px"><button class="btn grow" data-a="csv" data-v="indiv">개인전 기록 (엑셀용 CSV)</button><button class="btn grow" data-a="csv" data-v="team">단체전 기록 (엑셀용 CSV)</button></div></div>
-  <div class="card"><h2>🧹 시험 기록 초기화</h2>
-    <p class="sub">운동회 전에 시험해 본 점수·승패·호출·안내·불참 표시·문자 무전을 한 번에 지웁니다. 명단, 팀, 담당자 명단, 역할, 일정은 그대로 남습니다.</p>
-    <button class="btn danger wide" data-a="resetAll">시험 기록 모두 지우기</button></div>
-  </div><div>
-  <div class="card"><div class="row"><h2 class="grow h2" style="margin:0">참여자 ${ps.length}명</h2><span class="tag blue">${esc(teamShort('blue'))} ${cnt.blue}</span><span class="tag red">${esc(teamShort('red'))} ${cnt.red}</span>${ps.length-cnt.red-cnt.blue?`<span class="tag warn">미정 ${ps.length-cnt.red-cnt.blue}</span>`:''}</div>
-    <div class="list">${rows || '<div class="empty">아직 명단이 없습니다.</div>'}</div></div>
-  </div></div>`;
+  const rows = ps.map(p => `<div class="item prow">${teamBadge(p.team)}<span class="name">${esc(p.name)}</span>
+      <div class="seg sm"><button class="${p.team==='blue'?'on blue':''}" data-a="setTeam" data-v="${p.id}" data-t="blue">${esc(teamShort('blue'))}</button><button class="${p.team==='red'?'on red':''}" data-a="setTeam" data-v="${p.id}" data-t="red">${esc(teamShort('red'))}</button><button class="${!p.team?'on':''}" data-a="setTeam" data-v="${p.id}" data-t="">미정</button></div>
+      <button class="ibtn" data-a="renameP" data-v="${p.id}" aria-label="이름 고치기">✏️</button><button class="ibtn danger" data-a="delP" data-v="${p.id}" aria-label="삭제">🗑</button></div>`).join('');
+  const und = ps.length-cnt.red-cnt.blue;
+  const tabs = innerTabs('settings', [['list','👥','명단', ps.length], ['add','➕','명단 넣기'], ['team','🏷','팀·점수'], ['report','🖨','보고서'], ['reset','🧹','초기화']]);
+  const body = {
+    list: () => `<div class="card"><div class="row"><h2 class="grow h2" style="margin:0">참여자 ${ps.length}명</h2><span class="tag blue">${esc(teamShort('blue'))} ${cnt.blue}</span><span class="tag red">${esc(teamShort('red'))} ${cnt.red}</span>${und?`<span class="tag warn">미정 ${und}</span>`:''}</div>
+      <p class="sub">팀을 바로 바꿀 수 있습니다. 새로 넣을 사람은 '명단 넣기' 탭에서 붙여 넣습니다.</p>
+      <div class="list">${rows || '<div class="empty">아직 명단이 없습니다. \'명단 넣기\' 탭에서 넣어 주세요.</div>'}</div></div>`,
+    add: () => `<div class="card"><h2>명단 붙여넣기</h2>
+      <p class="sub">한 줄에 한 명씩 적습니다. 이름 뒤에 띄어 쓰고 <b>청</b>이나 <b>홍</b>(또는 청팀·홍팀·파랑·빨강)을 적으면 팀도 함께 정해집니다.</p>
+      <textarea id="rosterText" data-in="roster" placeholder="홍길동 청&#10;김영희 홍&#10;이철수">${esc(UI.rosterText)}</textarea>
+      <div style="height:10px"></div><button class="btn primary wide" data-a="addRoster">명단에 넣기</button></div>`,
+    team: () => `<div class="card"><h2>팀 이름</h2>
+      <div class="row nowrap">${teamBadge('blue')}<input id="tnBlue" value="${esc(teamName('blue'))}" autocomplete="off">${teamBadge('red')}<input id="tnRed" value="${esc(teamName('red'))}" autocomplete="off"></div>
+      <div style="height:10px"></div><button class="btn wide" data-a="saveTeamNames">팀 이름 저장</button>
+      <p class="sub">화면에는 팀 이름의 첫 글자(${esc(teamShort('blue'))}·${esc(teamShort('red'))})가 팀 표시로 쓰입니다. ${esc(teamShort('blue'))}은 동그라미, ${esc(teamShort('red'))}은 네모 모양입니다.</p></div>
+    <div class="card"><h2>아직 정하지 못한 점수</h2>
+      <div class="row"><span class="grow">후리볼 파울</span><div class="seg"><button class="${s.foul===1?'on':''}" data-a="setS" data-k="foul" data-v="1">1점</button><button class="${s.foul===1.5?'on':''}" data-a="setS" data-k="foul" data-v="1.5">1.5점</button></div></div>
+      <p class="sub">바꾸면 이미 입력한 기록의 점수도 자동으로 다시 계산됩니다.</p></div>`,
+    report: () => `<div class="card"><h2>결과 보고서 · 내려받기</h2>
+      <button class="btn primary wide" data-a="report">🖨 결과 보고서 보기 (인쇄·PDF 저장)</button>
+      <div class="row" style="margin-top:10px"><button class="btn grow" data-a="csv" data-v="indiv">개인전 기록 (엑셀용 CSV)</button><button class="btn grow" data-a="csv" data-v="team">단체전 기록 (엑셀용 CSV)</button></div></div>`,
+    reset: () => `<div class="card"><h2>🧹 시험 기록 초기화</h2>
+      <p class="sub">운동회 전에 시험해 본 점수·승패·호출·안내·불참 표시·문자 무전을 한 번에 지웁니다. 명단, 팀, 담당자 명단, 역할, 일정은 그대로 남습니다.</p>
+      <button class="btn danger wide" data-a="resetAll">시험 기록 모두 지우기</button></div>`,
+  }[ITAB.settings]();
+  return `<div class="bctl">${tabs}${body}</div>`;
 }
 
 function parseRoster(text){

@@ -7,7 +7,6 @@ const D = {
 const UI = {
   me: idStore.get('udh5_me', ''),
   mtab: ls.get('udh5_mtab', 'game'),          // 마스터 아래 메뉴
-  btab: ls.get('udh5_btab', 'screen'),        // 마스터 안내판 메뉴의 위쪽 탭
   ev: ls.get('udh5_ev', 'tuho'),              // 고른 종목 탭
   stab: ls.get('udh5_stab', ''),             // 여러 역할을 가진 기기의 역할 탭 (coach / ev:종목 / timer:종목)
   coachEv: ls.get('udh5_cev', 'gymball'),     // 감독 화면에서 고른 단체전 종목

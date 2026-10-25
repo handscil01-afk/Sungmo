@@ -10,7 +10,7 @@ function syncPill(){
 // 머리줄: 이름 · (지금 화면 고르기 버튼) · 저장 상태 · 메뉴. 종목 탭 줄을 따로 두지 않아 화면을 넓게 씀
 function header(r, picker=''){
   return `<header class="top"><button class="rolechip ${r.role}" data-a="menu" title="${esc(UI.me)}">${esc(roleIcon(r))}<span class="rcn"> ${esc(UI.me)}</span></button>${picker}
-    <span class="grow"></span>${syncPill()}${fsButton()}<button class="hbtn" data-a="menu" aria-label="메뉴">${ICON.menu}</button></header>`;
+    <span class="grow"></span>${syncPill()}${fsButton()}${radioHeadBtn()}<button class="hbtn" data-a="menu" aria-label="메뉴">${ICON.menu}</button></header>`;
 }
 function pickerBtn(icon, label, color, open=true){
   return `<button class="evpick ${open?'':'still'}" style="--ev:${color}" ${open?'data-a="evSheet"':''}><span>${icon}</span><b>${esc(label)}</b>${open?'<i>▾</i>':''}</button>`;
@@ -245,7 +245,7 @@ function subscribe(){
   store.onCol(['main','roles'], map('roles'), onErr);
   store.onCol(['main','presets'], map('presets'), onErr);
   store.onCol(['main','absent'], map('absent'), onErr);
-  store.onQuery(['main','msgs'], 'at', '>', now() - 15*60000, (l) => { D.msgs = l; processMsgs(); queueRender(); }, onErr);
+  store.onQuery(['main','msgs'], 'at', '>', now() - 15*60000, (l) => { D.msgs = l; processMsgs(); queueRender(); if((document.activeElement||{}).id!=='msgText') wkMsgDraw(); }, onErr);
   store.onDoc(['main','masters',store.uid], (d, p) => {
     const was = D.amMaster;
     // 서버가 비밀번호를 확인하기 전(대기 중)에는 마스터로 보지 않음

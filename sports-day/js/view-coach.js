@@ -33,16 +33,17 @@ function orderPanel(ev, team, sel){
       ${id===u.cur?'<span class="tag dark">지금</span>':id===u.next?'<span class="tag warn">다음</span>':''}${locked?`<span class="tag ok">${pl[id]}회</span>`:''}${isAbsent(id)?'<span class="tag red">불참</span>':''}
       ${locked ? '' : `<button class="xbtn" data-a="oremove" data-t="${team}" data-v="${id}" aria-label="순서에서 빼기">✕</button>`}</div>`;
   }).join('');
+  // 위쪽: 정한 출전 순서(번호), 아래쪽: 아직 넣지 않은 팀원(가나다순, 왼쪽부터 빈틈없이)
   return `<div class="cpanel ${sel?'sel':''}">
-    <div class="ptitle">${teamBadge(team)} <b>넣을 팀원</b><span class="sub">누르면 맨 뒤 · 아래로 끌면 원하는 자리</span></div>
-    <div class="dropzone pool strip" data-zone="pool" data-t="${team}">
-      ${pool.map(id => `<button class="pchip" data-drag="pool" data-id="${id}" data-a="oadd" data-t="${team}" data-v="${id}">${esc(pname(id))}${pl[id]?` <span class="tag ok">✓${pl[id]}</span>`:''}${isAbsent(id)?' <span class="tag red">불참</span>':''}</button>`).join('')
-        || '<span class="sub" style="padding:8px">모두 배치했습니다.</span>'}
-    </div>
-    <div class="ptitle"><b>${esc(teamName(team))} 출전 순서</b><span class="tag">${saved.length}명</span><span class="grow"></span>
+    <div class="ptitle">${teamBadge(team)} <b>${esc(teamName(team))} 출전 순서</b><span class="tag">${saved.length}/${members(team).length}명</span><span class="grow"></span>
       ${saved.length ? `<button class="btn small" data-a="ocopy" data-t="${team}">다른 종목에도</button><button class="btn small danger" data-a="oclear" data-t="${team}">비우기</button>` : ''}</div>
-    <div class="dropzone order box" data-zone="order" data-t="${team}">${rows || '<div class="empty dz-empty">위의 팀원을 눌러서 또는 끌어다 놓아서 순서를 정해 주세요.</div>'}</div>
-    ${pool.length && saved.length ? '<div class="sub">넣지 않은 팀원은 경기 때 맨 뒤에 가나다순으로 붙습니다. ✓는 이미 뛴 선수(고정)입니다.</div>' : ''}
+    <div class="dropzone order box" data-zone="order" data-t="${team}">${rows || '<div class="empty dz-empty">아래 팀원을 누르면 차례대로 번호가 붙어 여기에 들어옵니다. 끌어다 놓으면 원하는 자리에 넣습니다.</div>'}</div>
+    <div class="ptitle pooltitle"><b>넣을 팀원</b><span class="sub">가나다순 · 누르면 맨 뒤에 추가</span></div>
+    <div class="dropzone pool" data-zone="pool" data-t="${team}">
+      ${pool.map(id => `<button class="pchip" data-drag="pool" data-id="${id}" data-a="oadd" data-t="${team}" data-v="${id}">${esc(pname(id))}${pl[id]?` <span class="tag ok">✓${pl[id]}</span>`:''}${isAbsent(id)?' <span class="tag red">불참</span>':''}</button>`).join('')
+        || '<span class="sub" style="padding:6px">모두 넣었습니다.</span>'}
+    </div>
+    ${pool.length && saved.length ? '<div class="sub psub">넣지 않은 팀원은 경기 때 맨 뒤에 가나다순으로 붙습니다.</div>' : ''}
   </div>`;
 }
 // 상대 팀 순서 (보기만)

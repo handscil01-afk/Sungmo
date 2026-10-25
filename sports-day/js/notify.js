@@ -98,17 +98,19 @@ function sendMsg(text, to, kind='msg'){
     .then(ok => { if(ok) toast(kind==='sos' ? '긴급 호출을 보냈습니다.' : `${whoLabel(to)}에게 보냈습니다.`); return ok; });
 }
 let msgTo = 'staff', msgDraft = '';
-function msgSheet(){
+// 문자 무전 내용: 아래 창(메뉴)과 무전 창의 '문자' 탭에서 함께 씀
+function msgBody(){
   const recent = D.msgs.slice().sort((a,b) => (b.at||0)-(a.at||0)).slice(0, 8);
-  return `<h2>💬 문자 무전</h2>
-    <p class="sub">누르면 바로 보냅니다. 받는 사람 기기에는 소리·진동과 함께 안내 창이 뜹니다.</p>
+  return `<p class="sub" style="margin-top:0">누르면 바로 보냅니다. 받는 사람 기기에는 소리·진동과 함께 안내 창이 뜹니다.</p>
     <div class="chips" style="margin-bottom:10px">${WHO.map(([k,l]) => `<button class="chip ${msgTo===k?'on':''}" data-a="msgTo" data-v="${k}">${esc(l)}</button>`).join('')}</div>
     <div class="pgrid">${MSG_PHRASES.map((p,i) => `<button class="pbtn" data-a="msgPhrase" data-v="${i}"><b>${esc(p)}</b></button>`).join('')}</div>
     <div class="row nowrap" style="margin-top:12px"><input id="msgText" data-in="msg" placeholder="직접 적어서 보내기" value="${esc(msgDraft)}" autocomplete="off"><button class="btn primary" data-a="msgSend">보내기</button></div>
     <button class="btn danger huge wide" data-a="sosSend" style="margin-top:14px;width:100%">🚨 긴급 호출</button>
     <h3>최근 15분</h3>
-    <div class="list">${recent.map(m => `<div class="item"><span class="tag ${m.kind==='sos'?'red':''}">${m.kind==='sos'?'🚨':'💬'} ${hm(m.at)}</span><span class="name">${esc(m.text||'긴급 호출')}<span class="sub">${esc(m.name||'')} → ${esc(m.kind==='sos'?'모든 진행요원':whoLabel(m.to))}</span></span></div>`).join('') || '<div class="empty">아직 주고받은 문자가 없습니다.</div>'}</div>
-    <button class="btn wide" data-a="closeSheet" style="margin-top:12px">닫기</button>`;
+    <div class="list">${recent.map(m => `<div class="item"><span class="tag ${m.kind==='sos'?'red':''}">${m.kind==='sos'?'🚨':'💬'} ${hm(m.at)}</span><span class="name">${esc(m.text||'긴급 호출')}<span class="sub">${esc(m.name||'')} → ${esc(m.kind==='sos'?'모든 진행요원':whoLabel(m.to))}</span></span></div>`).join('') || '<div class="empty">아직 주고받은 문자가 없습니다.</div>'}</div>`;
+}
+function msgSheet(){
+  return `<h2>💬 문자 무전</h2>${msgBody()}<button class="btn wide" data-a="closeSheet" style="margin-top:12px">닫기</button>`;
 }
 function scheduleSheet(){
   const t = now(), items = schedule().slice().sort((a,b) => a.ts-b.ts);
@@ -123,23 +125,25 @@ let SD = null, instTo = 'staff', instDraft = '';
 function schedView(){
   const t = now(), items = schedule().slice().sort((a,b) => a.ts-b.ts);
   const whoChips = (cur, act) => `<div class="chips">${WHO.map(([k,l]) => `<button class="chip ${cur===k?'on':''}" data-a="${act}" data-v="${k}">${esc(l)}</button>`).join('')}</div>`;
-  return `<div class="cols half"><div>
-    <div class="card"><h2>⏱ 바로 타이머</h2>
+  const left = items.filter(it => it.ts >= t).length;
+  const tabs = innerTabs('sched', [['list','📅','진행 일정', left], ['timer','⏱','바로 타이머'], ['now','📨','바로 알림']]);
+  const body = {
+    list: () => `<div class="card"><div class="row"><h2 class="grow h2" style="margin:0">📅 진행 일정</h2><button class="btn small primary" data-a="schedNew">＋ 일정 추가</button></div>
+      <p class="sub">정한 시각 전에 알림 시점마다 받을 사람의 기기에 "○○까지 5분 남았습니다" 안내 창이 뜹니다. 제목은 '점심시간 끝', '개인전 연습 마감'처럼 적어 주세요.</p>
+      <div class="list">${items.map(it => `<div class="item tap ${it.ts < t ? 'done' : ''}" data-a="schedEdit" data-v="${it.id}"><span class="tag ${it.ts < t ? '' : 'dark'}">${hm(it.ts)}</span>
+        <span class="name">${esc(it.title)}<span class="sub">${esc(whoLabel(it.who))} · ${(it.warns||[]).length ? (it.warns||[]).slice().sort((a,b)=>b-a).join('·')+'분 전' : '정각만'}${it.board?' · 📺':''}</span></span><span class="tag">${leftText(it.ts-t)}</span></div>`).join('') || '<div class="empty">아직 일정이 없습니다.</div>'}</div></div>`,
+    timer: () => `<div class="card"><h2>⏱ 바로 타이머</h2>
       <input id="qtTitle" data-in="qtTitle" value="${esc(QT.title)}" placeholder="무엇이 끝나나요? (예: 개인전 연습 마감)" autocomplete="off">
       <h3>몇 분 뒤</h3><div class="chips">${[1,3,5,10,15,20,30,60].map(m => `<button class="chip ${QT.min===m?'on':''}" data-a="qtMin" data-v="${m}">${m}분</button>`).join('')}</div>
       <h3>받는 사람</h3>${whoChips(QT.who, 'qtWho')}
       <div class="item"><span class="name">📺 안내판에도 띄우기<span class="sub">안내판 위쪽에 남은 시간을 보여 주고, 알림 때 읽어 줍니다.</span></span><button class="btn small ${QT.board?'ok':''}" data-a="qtBoard">${QT.board?'켬':'끔'}</button></div>
       <button class="btn primary wide" data-a="qtStart" style="margin-top:10px">타이머 시작</button>
-      <p class="sub">10분·5분·3분·1분 전 가운데 남은 시간보다 짧은 때마다, 그리고 끝나는 순간에 안내 창이 뜹니다.</p></div>
-    <div class="card"><h2>📨 지금 바로 알림 보내기</h2>
-      ${whoChips(instTo, 'instTo')}
-      <div class="row nowrap" style="margin-top:10px"><input id="instText" data-in="inst" value="${esc(instDraft)}" placeholder="예: 오후 경기는 10분 늦게 시작합니다." autocomplete="off"><button class="btn primary" data-a="instSend">보내기</button></div></div>
-    </div><div>
-    <div class="card"><div class="row"><h2 class="grow h2" style="margin:0">📅 진행 일정</h2><button class="btn small primary" data-a="schedNew">＋ 일정 추가</button></div>
-      <p class="sub">정한 시각 전에 알림 시점마다 받을 사람의 기기에 "○○까지 5분 남았습니다" 안내 창이 뜹니다. 제목은 '점심시간 끝', '개인전 연습 마감'처럼 적어 주세요.</p>
-      <div class="list">${items.map(it => `<div class="item tap ${it.ts < t ? 'done' : ''}" data-a="schedEdit" data-v="${it.id}"><span class="tag ${it.ts < t ? '' : 'dark'}">${hm(it.ts)}</span>
-        <span class="name">${esc(it.title)}<span class="sub">${esc(whoLabel(it.who))} · ${(it.warns||[]).length ? (it.warns||[]).slice().sort((a,b)=>b-a).join('·')+'분 전' : '정각만'}${it.board?' · 📺':''}</span></span><span class="tag">${leftText(it.ts-t)}</span></div>`).join('') || '<div class="empty">아직 일정이 없습니다.</div>'}</div></div>
-  </div></div>`;
+      <p class="sub">10분·5분·3분·1분 전 가운데 남은 시간보다 짧은 때마다, 그리고 끝나는 순간에 안내 창이 뜹니다. 시작한 타이머는 '진행 일정' 탭에 보입니다.</p></div>`,
+    now: () => `<div class="card"><h2>📨 지금 바로 알림 보내기</h2>
+      <h3 style="margin-top:0">받는 사람</h3>${whoChips(instTo, 'instTo')}
+      <div class="row nowrap" style="margin-top:10px"><input id="instText" data-in="inst" value="${esc(instDraft)}" placeholder="예: 오후 경기는 10분 늦게 시작합니다." autocomplete="off"><button class="btn primary" data-a="instSend">보내기</button></div></div>`,
+  }[ITAB.sched]();
+  return `<div class="bctl">${tabs}${body}</div>`;
 }
 function schedSheet(){
   return `<h2>${SD.id && schedule().some(x => x.id===SD.id) ? '일정 고치기' : '일정 추가'}</h2>
@@ -156,9 +160,9 @@ function tsFromTime(hhmm){ const [h,m] = String(hhmm).split(':').map(Number); if
 Object.assign(ACT, {
   ntcOk: () => { clearInterval(nalarm); showNotice(); return false; },
   msgSheet: () => { if(!can.staff()) return false; openSheet(msgSheet); return false; },
-  msgTo: (el, v) => { msgTo = v; drawSheet(); return false; },
+  msgTo: (el, v) => { msgTo = v; drawSheet(); wkMsgDraw(); return false; },
   msgPhrase: (el, v) => { sendMsg(MSG_PHRASES[+v], msgTo); return false; },
-  msgSend: async () => { if(await sendMsg(msgDraft, msgTo)){ msgDraft = ''; drawSheet(); } return false; },
+  msgSend: async () => { if(await sendMsg(msgDraft, msgTo)){ msgDraft = ''; drawSheet(); wkMsgDraw(); } return false; },
   sosSend: async () => {
     if(!(await ask('긴급 호출을 보낼까요?\n모든 진행요원 화면에 경고 창이 뜨고 소리가 울립니다.', '긴급 호출', true))) return false;
     const note = await askText('무슨 일인지 짧게 적어 주세요. (비워 두어도 됩니다)', '', '보내기');

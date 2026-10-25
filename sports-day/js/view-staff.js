@@ -35,24 +35,25 @@ function peopleView(){
   const prow = p => { const use = presetUse(p.id);
     return `<div class="item tap" data-a="presetEdit" data-v="${p.id}"><span class="tag">${p.volunteer?'🙋 봉사자':'👤 담당자'}</span>
       <span class="name">${esc(p.label||'')}<span class="sub">${esc(roleLabel(asRole(p)))}${p.cast?' · 📢 방송':''}</span></span><span class="tag ${use?'ok':''}">${use}대 사용</span></div>`; };
-  return `<div class="cols half"><div>
-    <div class="card"><div class="row"><h2 class="grow h2" style="margin:0">접속한 기기 ${list.length}대</h2>${waiting?`<span class="tag warn">역할 대기 ${waiting}</span>`:''}</div>
+  const tabs = innerTabs('people', [['dev','📱','접속 기기', list.length], ['preset','📇','담당자 명단', pl.length], ['help','❓','역할 안내']]);
+  const body = {
+    dev: () => `<div class="card"><div class="row"><h2 class="grow h2" style="margin:0">접속한 기기 ${list.length}대</h2>${waiting?`<span class="tag warn">역할 대기 ${waiting}</span>`:''}</div>
       <p class="sub">줄을 누르면 역할을 정할 수 있습니다. 한 기기에 감독·심판·기록 도우미·계시원을 함께 줄 수 있고, 정하는 즉시 그 기기의 화면이 바뀝니다.</p>
-      <div class="list">${rows || '<div class="empty">아직 접속한 기기가 없습니다.</div>'}</div></div>
-    </div><div>
-    <div class="card"><h2>📇 담당자 명단 <span class="sub">미리 정한 역할</span></h2>
+      <div class="list">${rows || '<div class="empty">아직 접속한 기기가 없습니다.</div>'}</div></div>`,
+    preset: () => `<div class="card"><h2>📇 담당자 명단 <span class="sub">미리 정한 역할</span></h2>
       <p class="sub">이름과 맡을 역할을 미리 등록해 두면, 각 기기 첫 화면에서 이름만 골라 바로 들어옵니다. <b>봉사자 자리</b>는 여러 명이 같은 자리를 고르고 각자 이름을 적고 들어옵니다.</p>
-      <div class="list">${pl.map(prow).join('') || '<div class="empty">아직 등록한 담당자가 없습니다.</div>'}</div>
-      <div class="row" style="margin-top:12px"><button class="btn primary grow" data-a="presetNew" data-v="">＋ 담당자 추가</button><button class="btn grow" data-a="presetNew" data-v="vol">＋ 봉사자 자리 추가</button></div></div>
-    <div class="card"><h2>역할마다 보이는 화면</h2>
+      <div class="row" style="margin-bottom:12px"><button class="btn primary grow" data-a="presetNew" data-v="">＋ 담당자 추가</button><button class="btn grow" data-a="presetNew" data-v="vol">＋ 봉사자 자리 추가</button></div>
+      <div class="list">${pl.map(prow).join('') || '<div class="empty">아직 등록한 담당자가 없습니다.</div>'}</div></div>`,
+    help: () => `<div class="card"><h2>역할마다 보이는 화면</h2>
       <div class="list">
-        <div class="item"><span class="tag">📋 감독</span><span class="name"><span class="sub">자기 팀 단체전 출전 순서를 끌어다 놓아 정하고, 상대 팀 순서와 지금 경기를 봅니다.</span></span></div>
-        <div class="item"><span class="tag">🚩 심판</span><span class="name"><span class="sub">맡은 종목만 보입니다. 단체전은 지금·다음 선수와 승패, 개인전은 가나다순 명단과 점수 입력입니다.</span></span></div>
+        <div class="item"><span class="tag">📋 감독</span><span class="name"><span class="sub">자기 팀 단체전 출전 순서를 정하고, 상대 팀 순서와 지금 경기를 봅니다.</span></span></div>
+        <div class="item"><span class="tag">🚩 심판</span><span class="name"><span class="sub">맡은 종목만 보입니다. 단체전은 지금 대결과 대기 순서, 승패 입력이고, 개인전은 두 사대 점수 입력입니다.</span></span></div>
         <div class="item"><span class="tag">✏️ 기록 도우미</span><span class="name"><span class="sub">맡은 종목의 점수를 심판과 똑같이 입력합니다.</span></span></div>
         <div class="item"><span class="tag">⏱ 계시원</span><span class="name"><span class="sub">큰 초시계로 시간을 재서 심판 화면으로 보냅니다. 심판이 확인한 뒤 저장합니다.</span></span></div>
         <div class="item"><span class="tag">📺 안내판</span><span class="name"><span class="sub">가로로 세워 둔 태블릿에 호출·결과·현황을 크게 띄웁니다.</span></span></div>
-      </div></div>
-  </div></div>`;
+      </div></div>`,
+  }[ITAB.people]();
+  return `<div class="bctl">${tabs}${body}</div>`;
 }
 
 /* ---------- 같은 이름은 한 기기로 (이름으로 로그인하듯) ----------

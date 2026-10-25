@@ -1,5 +1,5 @@
-const CACHE = 'sports-day-v9';
-const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png',
+const CACHE = 'sports-day-v10';
+const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './roger.wav',
   './css/app.css',
   './js/config.js', './js/util.js', './js/store.js', './js/data.js', './js/shell.js',
   './js/view-referee.js', './js/view-coach.js', './js/view-board.js', './js/rt.js', './js/radio.js', './js/notify.js', './js/view-staff.js', './js/view-report.js', './js/view-master.js', './js/app.js',

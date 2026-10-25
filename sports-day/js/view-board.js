@@ -35,6 +35,24 @@ const SND = {
     this.ensure();
     if(!this.unlocked && 'speechSynthesis' in window){ try{ const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); }catch(e){} }
     this.unlocked = true;
+    this.loadRoger();
+  },
+  // 무전 시작 효과음(로저 비프음, 약 0.16초): 미리 불러 두고, 아직 못 불러왔으면 비슷한 '삑'으로 대신함
+  rogerBuf:null, rogerLoading:false,
+  loadRoger(){
+    const c = this.ctx; if(!c || this.rogerBuf || this.rogerLoading) return;
+    this.rogerLoading = true;
+    fetch('roger.wav').then(r => r.arrayBuffer()).then(a => new Promise((res, rej) => c.decodeAudioData(a, res, rej)))
+      .then(b => { this.rogerBuf = b; }).catch(() => { this.rogerLoading = false; });
+  },
+  // 재생하고, 지금부터 소리가 끝날 때까지 걸리는 시간(초)을 돌려줌
+  roger(){
+    const c = this.ensure(); if(!c) return 0;
+    this.loadRoger();
+    if(!this.rogerBuf){ const t = c.currentTime + 0.02; this.tone(1950, t, 0.12, 0.5); return 0.16; }
+    const s = c.createBufferSource(), g = c.createGain(); s.buffer = this.rogerBuf; g.gain.value = 0.9;
+    s.connect(g).connect(c.destination); s.start(c.currentTime + 0.01);
+    return this.rogerBuf.duration + 0.01;
   },
   tone(freq, t0, dur, vol=0.45){
     const c = this.ctx, o = c.createOscillator(), g = c.createGain(), o2 = c.createOscillator(), g2 = c.createGain();
@@ -233,10 +251,8 @@ let annDraft = '';
 const BTABS = [['screen','📺','화면'], ['sound','🔔','소리'], ['ann','📢','안내방송'], ['awards','🏆','시상식'], ['summary','📊','현황']];
 // 안내판 메뉴: 위쪽 탭으로 나눠서 한 번에 한 가지만 보여 줌
 function boardControl(){
-  if(!BTABS.some(t => t[0]===UI.btab)) UI.btab = 'screen';
-  const tabs = `<div class="seg btabs">${BTABS.map(([k,i,l]) => `<button class="${UI.btab===k?'on':''}" data-a="btab" data-v="${k}"><b>${i}</b>${l}</button>`).join('')}</div>`;
-  const body = { screen: bcScreen, sound: bcSound, ann: bcAnn, awards: awardsControl, summary: boardView }[UI.btab]();
-  return `<div class="bctl">${tabs}${body}</div>`;
+  const tabs = innerTabs('board', BTABS);
+  return `<div class="bctl">${tabs}${{ screen: bcScreen, sound: bcSound, ann: bcAnn, awards: awardsControl, summary: boardView }[ITAB.board]()}</div>`;
 }
 function bcScreen(){
   const cfg = boardCfg();
@@ -310,7 +326,6 @@ Object.assign(ACT, {
   bdPerson: (el, v) => { BOARD.person = v || null; BOARD.personAt = now(); },
   bdDismiss: () => { if(BOARD.overlay) finishFx(); return false; },
   bdSound: () => { SND.unlock(); SND.dingdong(); },
-  btab: (el, v) => { UI.btab = v; ls.set('udh5_btab', v); $('main') && ($('main').scrollTop = 0); },
   bmode: (el, v) => { setConfig({ board:{ mode:v } }); return false; },
   bprep: (el, v) => { setConfig({ board:{ prepAhead:+v } }); toast(`안내판이 ${AHEAD_LABEL[+v]} 선수를 준비 호출합니다.`); return false; },
   awStart: () => { setConfig({ board:{ mode:'awards' }, awards:{ step:-1 } }); },
