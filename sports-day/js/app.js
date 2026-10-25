@@ -2,45 +2,63 @@
 /* ===================== 화면 그리기 ===================== */
 function syncPill(){
   const p = Object.values(D.pending).reduce((s,v) => s+(v||0), 0);
-  if(store?.mode==='demo') return `<span class="pill demo">연습 모드</span>`;
+  if(store?.mode==='demo') return `<span class="pill demo">연습</span>`;
   if(!online()) return `<span class="pill off">오프라인${p?` · 대기 ${p}`:''}</span>`;
   if(p) return `<span class="pill wait">올리는 중 ${p}</span>`;
-  return `<span class="pill">저장됨</span>`;
+  return `<span class="pill ok" title="저장됨">●</span>`;
 }
-function header(r){
-  return `<header class="top"><span class="rolechip ${r.role}">${esc(roleIcon(r))} ${esc(roleLabel(r))}</span>
-    <span class="me grow">${esc(UI.me)}</span>${syncPill()}${fsButton()}<button class="hbtn" data-a="menu" aria-label="메뉴">${ICON.menu}</button></header>`;
+// 머리줄: 이름 · (지금 화면 고르기 버튼) · 저장 상태 · 메뉴. 종목 탭 줄을 따로 두지 않아 화면을 넓게 씀
+function header(r, picker=''){
+  return `<header class="top"><button class="rolechip ${r.role}" data-a="menu" title="${esc(UI.me)}">${esc(roleIcon(r))}<span class="rcn"> ${esc(UI.me)}</span></button>${picker}
+    <span class="grow"></span>${syncPill()}${fsButton()}<button class="hbtn" data-a="menu" aria-label="메뉴">${ICON.menu}</button></header>`;
+}
+function pickerBtn(icon, label, color, open=true){
+  return `<button class="evpick ${open?'':'still'}" style="--ev:${color}" ${open?'data-a="evSheet"':''}><span>${icon}</span><b>${esc(label)}</b>${open?'<i>▾</i>':''}</button>`;
 }
 function fixEv(list){ if(!list.includes(UI.ev)) UI.ev = list[0]; }
-// 여러 역할을 가진 기기: 역할마다 탭 하나 (감독 / 맡은 종목 / 계시)
+// 여러 역할을 가진 기기: 역할마다 하나씩 (감독 / 맡은 종목 / 계시)
 function staffTabs(r){
   const t = [];
   if(r.coach) t.push({ k:'coach', icon:'📋', label:`${teamName(r.coach)} 감독`, color: r.coach==='blue' ? '#0044d1' : '#cf0a2c' });
-  refEvents(r).forEach(ev => t.push({ k:'ev:'+ev, icon:EVENTS[ev].icon, label:EVENTS[ev].name + (r.events.includes(ev) ? '' : ' 기록'), color:EVENTS[ev].color }));
-  r.timers.forEach(ev => t.push({ k:'timer:'+ev, icon:'⏱', label:`${EVENTS[ev].name} 계시`, color:'#111827' }));
+  refEvents(r).forEach(ev => t.push({ k:'ev:'+ev, icon:EVENTS[ev].icon, label:EVENTS[ev].name + (r.events.includes(ev) ? '' : ' 기록'), color:EVENTS[ev].color, ev }));
+  r.timers.forEach(ev => t.push({ k:'timer:'+ev, icon:'⏱', label:`${EVENTS[ev].name} 계시`, color:'#111827', ev }));
   return t;
 }
 function staffBody(r){
   if(UI.stab==='coach'){
     if(!ORDER_EVENTS.includes(UI.coachEv)) UI.coachEv = ORDER_EVENTS[0];
     UI.ev = UI.coachEv;
-    return eventTabs(ORDER_EVENTS, 'cev', UI.coachEv, true) + coachView(r.coach);
+    return coachView(r.coach);
   }
   const ev = UI.stab.split(':')[1]; UI.ev = ev;
   return UI.stab.startsWith('timer:') ? timerView(ev) : eventView(ev);
+}
+// 화면 고르기 창: 마스터는 모든 종목, 진행요원은 맡은 일
+function evSheet(){
+  const r = myRole();
+  const btn = (k, icon, label, badge, color, on) => `<button class="evbtn ${on?'on':''}" style="--ev:${color}" data-a="evPick" data-v="${k}"><span class="ic">${icon}</span><b>${esc(label)}</b>${badge?`<small>${esc(badge)}</small>`:''}</button>`;
+  let body;
+  if(r.role==='master'){
+    const grp = kind => Object.keys(EVENTS).filter(k => EVENTS[k].kind===kind).map(k => btn(k, EVENTS[k].icon, EVENTS[k].name, evBadge(k), EVENTS[k].color, k===UI.ev)).join('');
+    body = `<h3 style="margin-top:0">개인전</h3><div class="evgrid">${grp('indiv')}</div><h3>단체전</h3><div class="evgrid">${grp('team')}</div>`;
+  } else body = `<div class="evgrid">${staffTabs(r).map(t => btn(t.k, t.icon, t.label, t.ev ? evBadge(t.ev) : '', t.color, t.k===UI.stab)).join('')}</div>`;
+  return `<h2>화면 고르기</h2>${body}<button class="btn wide" data-a="closeSheet" style="margin-top:14px">닫기</button>`;
 }
 
 function render(){
   const app = $('#app');
   if(D.fatal){ app.innerHTML = fatalView(); return; }
   if(!store){ app.innerHTML = '<div class="gate"><h1>불러오는 중…</h1></div>'; return; }
-  if(!UI.me){ app.innerHTML = gateView(); return; }
-  if(UI.report && D.amMaster){ app.innerHTML = reportView(); radioRender(); return; }
+  if(!UI.me){ app.innerHTML = gateView(); setBodyMode(false); return; }
+  if(UI.report && D.amMaster){ app.innerHTML = reportView(); setBodyMode(false); radioRender(); return; }
   const ae = document.activeElement, keep = ae && ae.id ? { id:ae.id, s:ae.selectionStart, e:ae.selectionEnd } : null;
   const r = myRole();
-  let tabs = '', body = '', nav = '', shell = 'shell', head = header(r), corner = '';
+  let body = '', nav = '', shell = 'shell', picker = '', corner = '', fit = false, head;
   if(r.role==='master'){
-    if(UI.mtab==='game'){ const list = Object.keys(EVENTS); fixEv(list); tabs = eventTabs(list); body = masterGame(); }
+    if(UI.mtab==='game'){
+      fixEv(Object.keys(EVENTS)); const E = EVENTS[UI.ev];
+      picker = pickerBtn(E.icon, E.name, E.color); body = masterGame(); fit = true;
+    }
     else if(UI.mtab==='board') body = boardControl() + `<div class="row" style="margin-bottom:14px"><button class="btn primary wide" data-a="boardPreview">📺 안내판 화면 미리 보기 (소리 없이)</button></div>` + boardView();
     else if(UI.mtab==='people') body = peopleView();
     else if(UI.mtab==='sched') body = schedView();
@@ -50,30 +68,33 @@ function render(){
   } else if(r.role==='staff'){
     const st = staffTabs(r);
     if(!st.some(t => t.k===UI.stab)) UI.stab = st[0].k;
-    if(st.length>1) tabs = `<div class="tabs">${st.map(t => `<button class="evtab ${t.k===UI.stab?'on':''}" style="--ev:${t.color}" data-a="stab" data-v="${t.k}"><span class="ic">${t.icon}</span>${esc(t.label)}</button>`).join('')}</div>`;
-    body = staffBody(r);
+    const cur = st.find(t => t.k===UI.stab);
+    picker = pickerBtn(cur.icon, cur.label, cur.color, st.length>1);
+    body = staffBody(r); fit = true;
   } else if(r.role==='board'){
-    shell = 'shell boardshell'; head = ''; body = boardScreen();
+    shell = 'shell boardshell'; body = boardScreen();
     corner = `<button class="cornerbtn" data-a="menu" aria-label="메뉴">${ICON.menu}</button>`;
   } else body = waitView();
+  head = r.role==='board' ? '' : header(r, picker);
   if(UI.preview && r.role==='master'){
-    shell = 'shell boardshell'; head = ''; tabs = ''; nav = ''; body = boardScreen();
+    shell = 'shell boardshell'; head = ''; nav = ''; fit = false; body = boardScreen();
     corner = `<button class="btn primary previewexit" data-a="boardPreview">미리 보기 끝내기</button>`;
   }
   const err = D.error ? `<div class="note">${esc(D.error)}</div>` : '';
-  app.innerHTML = `<div class="${shell}"><div class="stick">${head}${tabs}</div><main>${r.role==='wait'?installBanner():''}${err}${body}</main>${nav}${corner}</div>`;
+  app.innerHTML = `<div class="${shell}">${head}<main class="${fit?'fitmain':''}">${r.role==='wait'?installBanner():''}${err}${body}</main>${nav}${corner}</div>`;
+  setBodyMode(!!nav);
   if(keep){ const el = document.getElementById(keep.id); if(el){ el.focus(); try{ el.setSelectionRange(keep.s, keep.e); }catch(e){} } }
   drawSheet();
   paintWatch();
   radioInit(); radioRender();
   if(D.amMaster){ rtSyncSoon(); dedupeSoon(); }
 }
+// 아래 메뉴(마스터)와 무전기 줄 높이만큼 화면을 비움
+function setBodyMode(hasNav){ document.body.classList.toggle('has-nav', hasNav); }
 function masterGame(){
   const ev = UI.ev;
-  if(!ORDER_EVENTS.includes(ev)) return eventView(ev);
-  const s = UI.sub[ev] || 'play';
-  return `<div class="row" style="margin-bottom:12px"><div class="seg"><button class="${s==='play'?'on':''}" data-a="sub" data-v="play">🚩 경기 진행</button><button class="${s==='order'?'on':''}" data-a="sub" data-v="order">📋 출전 순서</button></div></div>`
-    + (s==='order' ? orderBoth(ev) : eventView(ev));
+  if(ORDER_EVENTS.includes(ev) && UI.sub[ev]==='order') return orderBoth(ev);
+  return eventView(ev);
 }
 
 function gateView(){
@@ -156,6 +177,8 @@ Object.assign(ACT, {
   ev: (el, v) => { UI.ev = v; UI.q = ''; ls.set('udh5_ev', v); window.scrollTo(0,0); },
   mtab: (el, v) => { UI.mtab = v; ls.set('udh5_mtab', v); window.scrollTo(0,0); },
   stab: (el, v) => { UI.stab = v; UI.q = ''; ls.set('udh5_stab', v); window.scrollTo(0,0); },
+  evSheet: () => { openSheet(evSheet); return false; },
+  evPick: (el, v) => { closeSheet(); if(D.amMaster){ UI.ev = v; ls.set('udh5_ev', v); } else { UI.stab = v; ls.set('udh5_stab', v); } },
   cev: (el, v) => { UI.coachEv = v; ls.set('udh5_cev', v); },
   menu: () => { openSheet(menuSheet); return false; },
   closeSheet: () => { closeSheet(); return false; },
@@ -178,7 +201,7 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('input', e => {
   const el = e.target, k = el.dataset.in; if(!k) return;
-  if(k==='q'){ UI.q = el.value; const box = $('#pickRows'); if(box) box.innerHTML = pickRows(UI.ev, UI.round[UI.ev]||'main', can.record(UI.ev)); }
+  if(k==='pkq'){ PK.q = el.value; const box = $('#pkRows'); if(box) box.innerHTML = indivPickRows(); }
   else if(k==='roster') UI.rosterText = el.value;
   else if(k==='rt') (UI.runTimes[UI.ev] ||= {})[el.dataset.t] = el.value;
 });

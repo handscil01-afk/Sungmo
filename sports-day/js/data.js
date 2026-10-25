@@ -13,7 +13,7 @@ const UI = {
   sub: {},                                    // 종목별 보조 화면 (단체전: play/order, 개인전: enter/rank)
   round: { archery:'main', freeball:'main', tuho:'main' },
   lanes: ls.get('udh5_lanes2', { archery:[], freeball:[], tuho:[] }),
-  q:'', filter:'all',
+  q:'', filter:'all', laneSel:{}, coachTab:'our', orderTab:'blue',
   rosterText:'', runTimes:{},
   watch:{ running:false, start:0, acc:0 },
 };

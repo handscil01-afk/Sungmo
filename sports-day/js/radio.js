@@ -220,14 +220,16 @@ async function pttUp(){
   setTimeout(() => rt.dropTalk(kind, tid), 10000);
 }
 
-/* ---------- 화면 (오른쪽에 항상 떠 있는 버튼) ---------- */
+/* ---------- 화면: 아래쪽에 항상 있는 무전기 줄 (내용을 가리지 않음) ---------- */
 function radioSetup(){
   const box = $('#radio');
   box.innerHTML = `<div class="rxchips"></div>
-    <button class="ptt msg hidden" data-a="msgSheet" aria-label="문자 무전·긴급 호출"><span class="ic">💬</span><span class="lb">문자</span></button>
-    <button class="ptt cast hidden" data-kind="cast" aria-label="안내방송: 누르고 있는 동안 안내판 스피커로 방송"><span class="ic">📢</span><span class="lb">방송</span></button>
-    <button class="ptt hidden" data-kind="radio" aria-label="무전기: 누르고 있는 동안 말하기"><span class="ic">🎙</span><span class="lb">무전</span></button>`;
-  box.querySelectorAll('.ptt[data-kind]').forEach(b => {
+    <div class="dock">
+      <button class="dk msg hidden" data-a="msgSheet" aria-label="문자 무전·긴급 호출"><span class="ic">💬</span><span class="lb">문자</span></button>
+      <button class="dk cast hidden" data-kind="cast" aria-label="안내방송: 누르고 있는 동안 안내판 스피커로 방송"><span class="ic">📢</span><span class="lb">방송</span></button>
+      <button class="dk talk hidden" data-kind="radio" aria-label="무전기: 누르고 있는 동안 말하기"><span class="ic">🎙</span><span class="lb">누르고 말하기</span></button>
+    </div>`;
+  box.querySelectorAll('[data-kind]').forEach(b => {
     b.addEventListener('pointerdown', e => { e.preventDefault(); try{ b.setPointerCapture(e.pointerId); }catch(x){} pttDown(b.dataset.kind); });
     ['pointerup','pointercancel','lostpointercapture'].forEach(t => b.addEventListener(t, () => { if(TALK.kind===b.dataset.kind || TALK.pressed) pttUp(); }));
     b.addEventListener('contextmenu', e => e.preventDefault());
@@ -236,32 +238,33 @@ function radioSetup(){
 function radioRender(){
   const box = $('#radio'); if(!box) return;
   if(!box.firstChild) radioSetup();
-  const ok = !!store && !!UI.me && !D.fatal && !UI.preview;
-  const showRadio = ok && radioRoleOK(), showCast = ok && castOK();
+  const ok = !!store && !!UI.me && !D.fatal && !UI.preview && !UI.report;
+  const showRadio = ok && radioRoleOK(), showCast = ok && castOK(), showMsg = ok && can.staff();
   const set = (kind, show) => {
-    const b = box.querySelector(`.ptt[data-kind="${kind}"]`), L = RADIO.lock[kind];
+    const b = box.querySelector(`[data-kind="${kind}"]`), L = RADIO.lock[kind];
     b.classList.toggle('hidden', !show); if(!show) return;
     const mine = TALK.kind===kind, otherTalk = TALK.kind && !mine, busy = L && L.uid!==store.uid;
-    let cls = 'ptt' + (kind==='cast' ? ' cast' : ''), ic = kind==='cast' ? '📢' : '🎙', lb = kind==='cast' ? '방송' : '무전';
-    if(mine && TALK.phase==='live'){ cls += ' live'; lb = '말하는 중'; }
-    else if(mine){ cls += ' wait'; lb = '연결 중'; }
-    else if(busy){ cls += ' busy'; ic = '🔒'; lb = L.name || '사용 중'; }
+    let cls = 'dk ' + (kind==='cast' ? 'cast' : 'talk'), ic = kind==='cast' ? '📢' : '🎙', lb = kind==='cast' ? '방송' : '누르고 말하기';
+    if(mine && TALK.phase==='live'){ cls += ' live'; lb = kind==='cast' ? '방송 중' : '말하는 중 · 손을 떼면 끝'; }
+    else if(mine){ cls += ' wait'; lb = '연결 중…'; }
+    else if(busy){ cls += kind==='radio' ? ' rx' : ' busy'; ic = kind==='radio' ? '🔊' : '🔒'; lb = kind==='radio' ? `${L.name||''} 말하는 중` : `${L.name||''} 방송 중`; }
     else if(otherTalk || !radioReady()){ cls += ' dim'; }
     b.className = cls; b.querySelector('.ic').textContent = ic; b.querySelector('.lb').textContent = lb;
   };
   set('radio', showRadio); set('cast', showCast);
-  box.querySelector('.ptt.msg').classList.toggle('hidden', !(ok && can.staff()));
-  document.body.classList.toggle('has-radio', !!(ok && (showRadio || showCast || can.staff())) && !boardOn());
+  box.querySelector('.dk.msg').classList.toggle('hidden', !showMsg);
+  const dock = !!(showRadio || showCast || showMsg) && !boardOn();
+  box.classList.toggle('on', dock);
+  document.body.classList.toggle('has-radio', dock);
   let chips = '';
   if(ok){
-    const L = RADIO.lock.radio, C = RADIO.lock.cast;
+    const C = RADIO.lock.cast;
     if(TALK.phase==='live'){
       const nb = TALK.kind==='cast' && D.amMaster ? boardListeners() : -1;
       chips += `<div class="txbar">🔴 ${TALK.kind==='cast' ? '안내판으로 방송 중' : '무전 보내는 중'}<small>${nb===0 ? '⚠ 소리를 켠 안내판이 없습니다' : nb>0 ? `안내판 ${nb}대 · 손을 떼면 끝납니다` : '손을 떼면 끝납니다'}</small></div>`;
     }
-    if(showRadio && L && L.uid!==store.uid) chips += `<div class="rxchip live">🎙 <b>${esc(L.name||'')}</b></div>`;
-    if(C && C.uid!==store.uid && !boardOn() && (showRadio || showCast)) chips += `<div class="rxchip cast">📢 <b>${esc(C.name||'')}</b> 방송 중</div>`;
-    if(showRadio && RADIO.on && SND.ctx && !SND.ready()) chips += `<button class="rxchip warn" data-a="rxUnlock">🔈 눌러서 소리 켜기</button>`;
+    if(C && C.uid!==store.uid && !boardOn() && !showCast && showRadio) chips += `<div class="rxchip cast">📢 <b>${esc(C.name||'')}</b> 방송 중</div>`;
+    if(showRadio && RADIO.on && SND.ctx && !SND.ready()) chips += `<button class="rxchip warn" data-a="rxUnlock">🔈 눌러서 무전 소리 켜기</button>`;
     if((showRadio || showCast) && RT && !RT.st.connected) chips += `<div class="rxchip off">무전기 연결 끊김</div>`;
     if(D.amMaster && RT && RADIO.rtMaster===false) chips += `<button class="rxchip warn" data-a="rxMaster">🔒 무전기 권한 확인</button>`;
     if(showRadio && !RADIO.on) chips += `<div class="rxchip off">무전 소리 꺼짐</div>`;
