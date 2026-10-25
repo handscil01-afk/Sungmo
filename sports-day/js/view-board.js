@@ -100,7 +100,8 @@ function boardTick(){
 }
 // 효과(소리·화면)는 하나씩 차례로: 결과 → 다음 선수 호출 → 안내방송 순서가 섞이지 않게 함
 function runFx(){
-  if(BOARD.busy) return;
+  // 음성 안내방송 중에는 호출·결과 소리를 방송이 끝난 뒤로 미룸
+  if(BOARD.busy || RADIO.lock.cast) return;
   const fx = BOARD.queue.shift(); if(!fx) return;
   const cfg = boardCfg(), sound = cfg.sound && SND.ready();
   const voiceMs = cfg.callVoice && sound ? 5000 : 2200;
@@ -146,8 +147,9 @@ function flashAttr(start, dur=FLASH_MS){
 function boardScreen(){
   boardTick();
   const T = boardTarget(), ann = D.config.announce || {};
-  const annStrip = ann.text && !ann.cleared && (now()-(ann.at||0)) < 6*3600*1000
-    ? `<div class="annstrip"${flashAttr(ann.at)}>📢 ${esc(ann.text)}</div>` : '';
+  const C = RADIO.lock.cast;
+  const annStrip = (C ? `<div class="caststrip"${flashAttr(C.at || now(), 60000)}>📢 안내방송 중 · ${esc(C.name||'')}</div>` : '')
+    + (ann.text && !ann.cleared && (now()-(ann.at||0)) < 6*3600*1000 ? `<div class="annstrip"${flashAttr(ann.at)}>📢 ${esc(ann.text)}</div>` : '');
   let body;
   if(T.kind!=='indiv') BOARD.person = null;
   if(T.kind==='team') body = boardTeam(T.ev);

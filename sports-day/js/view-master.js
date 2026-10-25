@@ -42,6 +42,8 @@ function roleSheet(){
       <div class="chips">${evChips}</div>
       <div style="height:10px"></div><button class="btn primary wide" data-a="setRole" data-v="referee" ${roleDraft.events.length?'':'disabled'}>고른 종목의 심판으로 정하기</button></div>
     <div class="card"><div class="row"><button class="btn grow" data-a="setRole" data-v="board">📺 안내판으로 정하기</button><button class="btn grow" data-a="setRole" data-v="wait">⏳ 역할 없애기</button></div></div>
+    ${r.role==='coach' || r.role==='referee' ? `<div class="card"><div class="row"><span class="grow"><b>📢 안내판 음성 방송 권한</b> ${r.cast?'<span class="tag ok">있음</span>':'<span class="tag">없음</span>'}<span class="sub" style="display:block">주면 이 기기에도 방송 버튼이 생겨 안내판 스피커로 말할 수 있습니다.</span></span>
+      <button class="btn" data-a="setCast" data-v="${r.cast?'0':'1'}">${r.cast?'권한 빼기':'권한 주기'}</button></div></div>` : ''}
     ${DEMO && me ? '' : `<div class="card"><h2>그 밖의 일</h2><div class="row">
       ${isM ? (me ? '' : `<button class="btn danger grow" data-a="revokeMaster">👑 마스터 권한 빼기</button>`) : `<button class="btn grow" data-a="grantMaster">👑 마스터 권한 주기</button>`}
       ${me ? '' : '<button class="btn danger grow" data-a="removeDevice">목록에서 지우기</button>'}</div></div>`}
@@ -138,6 +140,11 @@ Object.assign(ACT, {
       ok = await put(['main','roles',id], role, false);
     }
     if(ok){ closeSheet(); toast(`${name}: ${v==='wait' ? '역할을 없앴습니다.' : roleLabel(D.roles[id] || { role:v, team:el.dataset.t, events:roleDraft.events })+'(으)로 정했습니다.'}`); }
+  },
+  setCast: async (el, v) => {
+    if(!can.master()) return denied();
+    const id = roleDraft.id;
+    if(await put(['main','roles',id], { cast: v==='1' })) toast(v==='1' ? '방송 권한을 줬습니다.' : '방송 권한을 뺐습니다.');
   },
   grantMaster: async () => {
     if(!can.master()) return denied();

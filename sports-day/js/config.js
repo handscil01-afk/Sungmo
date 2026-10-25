@@ -9,6 +9,8 @@ const FIREBASE_CONFIG = {
   appId: "1:431367162993:web:fa488b8e5d0acc98ffdfd0"
 };
 const ROOT = 'undonghoe5';
+// 무전기·음성 안내방송 중계용 Realtime Database (싱가포르)
+const RTDB_URL = 'https://handscil-sports-default-rtdb.asia-southeast1.firebasedatabase.app';
 // 주소 뒤에 ?demo=1 을 붙이면 이 기기에만 저장하는 연습 모드
 const DEMO = new URLSearchParams(location.search).has('demo');
 const DEMO_MASTER_PW = '0000';

@@ -23,7 +23,7 @@ async function firebaseStore(){
   catch(e){ db = F.getFirestore(app); }
   if(EMU) F.connectFirestoreEmulator(db, '127.0.0.1', 8181);
   return {
-    mode:'firebase', uid:user.uid, app,
+    mode:'firebase', uid:user.uid, app, emu:EMU,
     onDoc(p, cb, err){ return F.onSnapshot(F.doc(db, ROOT, ...p), {includeMetadataChanges:true},
       s => cb(s.exists() ? s.data() : null, s.metadata.hasPendingWrites), err); },
     onCol(p, cb, err){ return F.onSnapshot(F.collection(db, ROOT, ...p), {includeMetadataChanges:true}, s => {

@@ -1,9 +1,9 @@
-const CACHE = 'sports-day-v3';
+const CACHE = 'sports-day-v4';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png',
   './css/app.css',
   './js/config.js', './js/util.js', './js/store.js', './js/data.js', './js/shell.js',
-  './js/view-referee.js', './js/view-coach.js', './js/view-board.js', './js/view-master.js', './js/app.js',
-  './vendor/firebase-app.js', './vendor/firebase-firestore.js', './vendor/firebase-auth.js'];
+  './js/view-referee.js', './js/view-coach.js', './js/view-board.js', './js/rt.js', './js/radio.js', './js/view-master.js', './js/app.js',
+  './vendor/firebase-app.js', './vendor/firebase-firestore.js', './vendor/firebase-auth.js', './vendor/firebase-database.js'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {

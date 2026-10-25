@@ -327,3 +327,29 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .annstrip[data-flash]{animation:flashbar 1s step-end 8}
 .ovl .half[data-flash]{animation:flashframe 1s step-end 7}
 .ovl.ann[data-flash]{animation:flashann 1s step-end 15}
+
+/* ---------- 무전기 (오른쪽에 항상 떠 있음) ---------- */
+#radio{position:fixed;right:max(10px,env(safe-area-inset-right));top:40%;z-index:45;display:flex;flex-direction:column;align-items:flex-end;gap:10px;pointer-events:none}
+#radio>*,#radio .rxchips>*{pointer-events:auto}
+.rxchips{display:flex;flex-direction:column;align-items:flex-end;gap:8px;max-width:60vw}
+.rxchip{border:3px solid #000;background:#fff;color:#000;border-radius:14px;padding:8px 12px;font-weight:900;font-size:17px;box-shadow:0 4px 14px rgba(0,0,0,.25);text-align:right}
+.rxchip b{font-size:22px}
+.rxchip.live{background:#ffd400;animation:rxpulse 1s ease-in-out infinite}
+.rxchip.cast{background:#ffedd5;border-color:#c2410c}
+.rxchip.warn{background:#ffd400}
+.rxchip.off{background:#e5e7eb;color:#374151;border-color:#9ca3af;font-size:14px}
+.ptt{width:76px;height:76px;border-radius:50%;border:4px solid #fff;background:#0d1119;color:#fff;box-shadow:0 6px 18px rgba(0,0,0,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:0;
+  touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;transition:transform .1s}
+.ptt .ic{font-size:28px;line-height:1;pointer-events:none}
+.ptt .lb{font-size:13px;font-weight:900;max-width:66px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none}
+.ptt.cast{background:#c2410c}
+.ptt.wait{background:#8a6d00}
+.ptt.live{background:#d10f2f;transform:scale(1.15);animation:rxpulse .9s ease-in-out infinite}
+.ptt.busy{background:#6b7280}
+.ptt.dim{opacity:.55}
+.txbar{position:fixed;left:50%;top:max(10px,env(safe-area-inset-top));transform:translateX(-50%);z-index:96;background:#d10f2f;color:#fff;border:3px solid #fff;border-radius:16px;padding:10px 18px;font-weight:900;font-size:18px;box-shadow:0 6px 20px rgba(0,0,0,.4);width:max-content;max-width:94vw;text-align:center;line-height:1.25}
+.txbar small{display:block;font-size:14px;font-weight:800;opacity:.95}
+@keyframes rxpulse{ 0%,100%{box-shadow:0 0 0 0 rgba(209,15,47,.55)} 50%{box-shadow:0 0 0 12px rgba(209,15,47,0)} }
+@media (max-width:600px){ .ptt{width:66px;height:66px} .ptt .ic{font-size:24px} .ptt .lb{font-size:12px} }
+.caststrip{background:#c2410c;color:#fff;border-radius:16px;padding:12px 18px;font-size:clamp(24px,4.4vh,44px);font-weight:900;border:4px solid #000}
+.caststrip[data-flash]{animation:flashbar 1s step-end 60}

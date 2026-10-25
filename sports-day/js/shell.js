@@ -52,7 +52,7 @@ function installSheet(){
 }
 document.addEventListener('click', e => {
   if(!UI.me || !UIX.autoFS || FS.userExit || FS.on() || !FS.supported()) return;
-  if(e.target.closest && e.target.closest('[data-a="fs"], .banner, #sheet, #dlg, .switch')) return;
+  if(e.target.closest && e.target.closest('[data-a="fs"], .banner, #sheet, #dlg, .switch, #radio')) return;
   FS.enter();
 }, true);
 document.addEventListener('fullscreenchange', () => render());

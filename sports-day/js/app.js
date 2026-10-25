@@ -47,6 +47,8 @@ function render(){
   if(keep){ const el = document.getElementById(keep.id); if(el){ el.focus(); try{ el.setSelectionRange(keep.s, keep.e); }catch(e){} } }
   drawSheet();
   paintWatch();
+  radioInit(); radioRender();
+  if(D.amMaster) rtSyncSoon();
 }
 function masterGame(){
   const ev = UI.ev;
@@ -95,6 +97,10 @@ function menuSheet(){
       ${FS.supported() ? `<div class="item"><span class="name">자동 전체화면<span class="sub">화면을 처음 누르면 주소창 없이 전체화면으로 바꿉니다.</span></span><label class="switch"><input type="checkbox" data-ch="autofs" ${UIX.autoFS?'checked':''}><span></span></label></div>
         <div class="item tap" data-a="fs"><span class="name">${FS.on()?'↙ 전체화면 끝내기':'↗ 전체화면 켜기'}</span></div>` : ''}
       ${isStandalone() ? '' : '<div class="item tap" data-a="install"><span class="name">📲 홈 화면에 설치하기</span></div>'}
+      ${radioRoleOK() ? `<div class="item"><span class="name">🎙 무전 소리 듣기<span class="sub">끄면 다른 사람의 무전이 이 기기에서 나오지 않습니다. 말하기는 그대로 됩니다.</span></span><label class="switch"><input type="checkbox" data-a="rxToggle" ${RADIO.on?'checked':''}><span></span></label></div>` : ''}
+      ${radioRoleOK() || castOK() ? `<div class="item tap" data-a="micTest"><span class="name">🎤 마이크 미리 허용하기<span class="sub">처음 한 번 마이크 권한을 허용해 두면 당일에 바로 말할 수 있습니다.</span></span></div>
+        <div class="item"><span class="name">📡 무전기 연결<span class="sub">${!RT ? '불러오는 중' : RT.st.connected ? '연결됨' : '끊김'} · ${radioReady() ? '권한 확인됨' : '권한 확인 전'}${DEMO ? '' : ` · ${esc(RTDB_URL.replace('https://',''))}`}</span></span></div>` : ''}
+      ${D.amMaster && RT && RADIO.rtMaster===false ? '<div class="item tap" data-a="rxMaster"><span class="name">🔒 무전기 마스터 권한 확인<span class="sub">마스터 비밀번호를 한 번 더 입력합니다.</span></span></div>' : ''}
     </div>
     <p class="sub">저장 방식: ${store?.mode==='demo' ? '연습 모드(이 브라우저에만 저장)' : '파이어베이스(모든 기기 공유)'}. 인터넷이 끊겨도 입력은 계속할 수 있고, 다시 연결되면 자동으로 올라갑니다. 점수를 입력하는 동안에는 화면이 꺼지지 않게 해 둡니다.</p>
     <button class="btn primary wide" data-a="closeSheet">닫기</button>`;
@@ -109,7 +115,9 @@ async function masterLogin(){
     await store.put(['main','masters',store.uid], { pw, name:UI.me, at:now() }, false);
     // 확인이 끝나면 저장된 비밀번호는 지움
     await store.put(['main','masters',store.uid], { name:UI.me, at:now() }, false);
-    closeSheet(); toast('마스터로 들어왔습니다.');
+    closeSheet();
+    // 무전기·방송용 Realtime Database에도 같은 비밀번호로 마스터 권한을 확인
+    toast((await rtMasterLogin(pw)) ? '마스터로 들어왔습니다.' : '마스터로 들어왔습니다. 무전기 권한은 확인하지 못했습니다(Realtime Database 설정 확인).');
   }catch(e){
     console.error(e);
     toast(e && e.code==='permission-denied' ? '비밀번호가 맞지 않습니다.' : '들어가지 못했습니다: '+(e.message||e));
@@ -124,7 +132,7 @@ Object.assign(ACT, {
   closeSheet: () => { closeSheet(); return false; },
   masterLogin: async () => { await masterLogin(); },
   masterLogout: async () => { if(!(await ask('이 기기의 마스터 권한을 뺄까요?\n다시 들어오려면 비밀번호가 필요합니다.', '빼기', true))) return false;
-    await guard(store.del(['main','masters',store.uid])); closeSheet(); },
+    await rtMasterLogout(); await guard(store.del(['main','masters',store.uid])); closeSheet(); },
   demoRole: () => { if(!DEMO) return false; closeSheet(); ACT.roleSheet(null, store.uid); return false; },
   demoReset: async () => { if(DEMO && await ask('연습 기록을 모두 지울까요?', '지우기', true)){ store.reset(); closeSheet(); } },
   install: () => { installSheet(); return false; },
@@ -170,9 +178,9 @@ function onErr(e){
 let masterUnsubs = [];
 function masterSubs(){
   masterUnsubs.forEach(f => { try{ f && f(); }catch(e){} }); masterUnsubs = [];
-  if(!D.amMaster){ D.devices = []; D.masters = {}; return; }
+  if(!D.amMaster){ D.devices = []; D.masters = {}; D.loaded.masters = false; return; }
   masterUnsubs.push(store.onCol(['main','devices'], l => { D.devices = l; queueRender(); }, onErr));
-  masterUnsubs.push(store.onCol(['main','masters'], l => { D.masters = Object.fromEntries(l.map(x => [x.id, x])); queueRender(); }, onErr));
+  masterUnsubs.push(store.onCol(['main','masters'], l => { D.masters = Object.fromEntries(l.map(x => [x.id, x])); D.loaded.masters = true; queueRender(); }, onErr));
 }
 function subscribe(){
   const col = k => (l, p) => { D[k] = l; D.pending[k] = p; D.loaded[k] = true; queueRender(); };

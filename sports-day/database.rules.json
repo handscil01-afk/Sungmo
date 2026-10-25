@@ -1,0 +1,57 @@
+{
+  "rules": {
+    "undonghoe5": {
+      "secret": {
+        ".read": false,
+        ".write": false
+      },
+      "masters": {
+        ".read": "auth != null && root.child('undonghoe5/masters/' + auth.uid).exists()",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && (root.child('undonghoe5/masters/' + auth.uid).exists() || (auth.uid === $uid && newData.val() === root.child('undonghoe5/secret/masterPw').val()))"
+        }
+      },
+      "roles": {
+        ".read": "auth != null",
+        "$uid": {
+          ".write": "auth != null && root.child('undonghoe5/masters/' + auth.uid).exists()"
+        }
+      },
+      "radio": {
+        ".read": "auth != null && (root.child('undonghoe5/masters/' + auth.uid).exists() || root.child('undonghoe5/roles/' + auth.uid + '/role').val() === 'referee' || root.child('undonghoe5/roles/' + auth.uid + '/role').val() === 'coach')",
+        "lock": {
+          ".write": "auth != null && (root.child('undonghoe5/masters/' + auth.uid).exists() || root.child('undonghoe5/roles/' + auth.uid + '/role').val() === 'referee' || root.child('undonghoe5/roles/' + auth.uid + '/role').val() === 'coach') && (!data.exists() || data.child('uid').val() === auth.uid || now - data.child('at').val() > 10000 || root.child('undonghoe5/masters/' + auth.uid).exists())",
+          ".validate": "!newData.exists() || (newData.child('uid').val() === auth.uid && newData.child('at').isNumber() && newData.child('tid').isString())"
+        },
+        "talks": {
+          "$tid": {
+            ".write": "auth != null && (root.child('undonghoe5/masters/' + auth.uid).exists() || root.child('undonghoe5/roles/' + auth.uid + '/role').val() === 'referee' || root.child('undonghoe5/roles/' + auth.uid + '/role').val() === 'coach') && ((root.child('undonghoe5/radio/lock/uid').val() === auth.uid && root.child('undonghoe5/radio/lock/tid').val() === $tid) || (!newData.exists() && data.child('owner').val() === auth.uid))",
+            "c": {
+              "$seq": {
+                ".validate": "newData.isString() && newData.val().length < 20000"
+              }
+            }
+          }
+        }
+      },
+      "cast": {
+        ".read": "auth != null",
+        "lock": {
+          ".write": "auth != null && (root.child('undonghoe5/masters/' + auth.uid).exists() || root.child('undonghoe5/roles/' + auth.uid + '/cast').val() === true) && (!data.exists() || data.child('uid').val() === auth.uid || now - data.child('at').val() > 10000 || root.child('undonghoe5/masters/' + auth.uid).exists())",
+          ".validate": "!newData.exists() || (newData.child('uid').val() === auth.uid && newData.child('at').isNumber() && newData.child('tid').isString())"
+        },
+        "talks": {
+          "$tid": {
+            ".write": "auth != null && (root.child('undonghoe5/masters/' + auth.uid).exists() || root.child('undonghoe5/roles/' + auth.uid + '/cast').val() === true) && ((root.child('undonghoe5/cast/lock/uid').val() === auth.uid && root.child('undonghoe5/cast/lock/tid').val() === $tid) || (!newData.exists() && data.child('owner').val() === auth.uid))",
+            "c": {
+              "$seq": {
+                ".validate": "newData.isString() && newData.val().length < 20000"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
