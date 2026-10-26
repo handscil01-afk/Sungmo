@@ -3,22 +3,24 @@
 
 function boardView(){
   const tot = totalPoints();
-  const rows = Object.entries(TEAM).map(([k,E]) => { const t = tally(k);
-    return `<tr><td><span class="row nowrap" style="gap:8px"><span style="font-size:22px">${E.icon}</span><b>${esc(E.name)}</b></span></td><td class="num score" style="color:var(--blue)">${t.blue}</td><td class="num score" style="color:var(--red)">${t.red}</td><td class="num sub">${matchesOf(k).length}판</td></tr>`; }).join('');
+  // 이긴 판 수에 종목의 승점(기본 1)을 곱해서 보여 줌
+  const rows = Object.entries(TEAM).map(([k,E]) => { const t = tally(k), p = E.pts||1;
+    return `<tr><td><span class="row nowrap" style="gap:8px"><span style="font-size:22px">${E.icon}</span><b>${esc(E.name)}</b>${p>1 ? `<span class="sub">(이기면 ${p}점)</span>` : ''}</span></td><td class="num score" style="color:var(--blue)">${t.blue*p}</td><td class="num score" style="color:var(--red)">${t.red*p}</td><td class="num sub">${matchesOf(k).length}판</td></tr>`; }).join('');
   const indiv = Object.entries(INDIV).map(([k,E]) => {
     const { list, ties } = standings(k), top = list.filter(x => x.rank<=3);
     // 안내판에 연습 순위도 보이기 (마스터 설정): 연습 1·2의 1~3등을 작게
-    const prac = settings().showPracRank ? ['p1','p2'].map(rd => { const rs = roundStandings(k, rd).list.filter(x => x.rank<=3).slice(0,5);
-      return rs.length ? `<div class="prline"><b>${ROUNDS[rd]}</b>${rs.map(x => `<span><em>${x.rank}위</em> ${esc(x.p.name)} <i>${x.total}점</i></span>`).join('')}</div>` : ''; }).join('') : '';
-    return `<div class="card"><div class="row"><h2 class="grow h2" style="margin:0">${E.icon} ${esc(E.name)}</h2><span class="sub">${list.length}명 기록</span></div>
-      ${ties.filter(t => !t.resolved).map(t => `<div class="note" style="margin-top:10px">⚠ ${t.total}점 동점: ${t.names.map(esc).join(', ')} → 결승 필요</div>`).join('')}
-      ${top.length ? `<table><tbody>${top.map(x => `<tr><td class="rank">${x.rank}</td><td><b>${esc(x.p.name)}</b></td><td class="num"><span class="score">${x.total}점</span>${x.ftotal!=null?` <span class="sub">(결승 ${x.ftotal})</span>`:''}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">아직 본선 기록이 없습니다.</div>'}${prac ? `<div class="pracrank">${prac}</div>` : ''}</div>`;
+    const prac = settings().showPracRank && hasPrac(k) ? ['p1','p2'].map(rd => { const rs = roundStandings(k, rd).list.filter(x => x.rank<=3).slice(0,5);
+      return rs.length ? `<div class="prline"><b>${ROUNDS[rd]}</b>${rs.map(x => `<span><em>${x.rank}위</em> ${esc(x.p.name)} <i>${sc(k, x.total)}</i></span>`).join('')}</div>` : ''; }).join('') : '';
+    const wn = qList(k).length;
+    return `<div class="card"><div class="row"><h2 class="grow h2" style="margin:0">${E.icon} ${esc(E.name)}</h2><span class="tag ${wn?'dark':''}">대기 ${wn}명</span><span class="sub">${list.length}명 기록</span></div>
+      ${ties.filter(t => !t.resolved).map(t => `<div class="note" style="margin-top:10px">⚠ ${sc(k, t.total)} 동점: ${t.names.map(esc).join(', ')} → 결승 필요</div>`).join('')}
+      ${top.length ? `<table><tbody>${top.map(x => `<tr><td class="rank">${x.rank}</td><td><b>${esc(x.p.name)}</b></td><td class="num"><span class="score">${sc(k, x.total)}</span>${x.ftotal!=null?` <span class="sub">(결승 ${fmtNum(x.ftotal)})</span>`:''}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">아직 본선 기록이 없습니다.</div>'}${prac ? `<div class="pracrank">${prac}</div>` : ''}</div>`;
   }).join('');
   return `<div class="cols half">
     <div class="card"><h2>단체전 승점</h2>
       <div class="totals"><div class="tbox blue"><div class="t">${esc(teamName('blue'))}</div><div class="v">${tot.blue}</div></div><div class="tbox red"><div class="t">${esc(teamName('red'))}</div><div class="v">${tot.red}</div></div></div>
       <table style="margin-top:12px"><thead><tr><th>종목</th><th class="num">${esc(teamShort('blue'))}</th><th class="num">${esc(teamShort('red'))}</th><th class="num">진행</th></tr></thead><tbody>${rows}</tbody></table>
-      <p class="sub">한 판 이길 때마다 승점 1점입니다. 다른 기기에서 입력한 결과가 바로 반영됩니다.</p></div>
+      <p class="sub">${Object.values(TEAM).some(E => (E.pts||1)>1) ? '한 판 이길 때마다 종목별 승점이 올라갑니다.' : '한 판 이길 때마다 승점 1점입니다.'} 다른 기기에서 입력한 결과가 바로 반영됩니다.</p></div>
     <div><h2 style="margin:4px 2px 12px;font-size:20px">개인전 순위 (1~3등)</h2>${indiv}</div></div>`;
 }
 
@@ -192,7 +194,7 @@ function finishFx(){
   const done = BOARD.overlay;
   BOARD.overlay = null; BOARD.busy = false;
   // 결과를 보여 준 뒤에는 다음 선수를 부름 (뒤에 결과가 더 밀려 있으면 마지막 결과 뒤에만)
-  if(done && done.kind==='result' && TEAM[done.m.event].mode!=='round' && !BOARD.queue.some(f => f.kind==='result' && f.m.event===done.m.event))
+  if(done && done.kind==='result' && TEAM[done.m.event] && TEAM[done.m.event].mode!=='round' && !BOARD.queue.some(f => f.kind==='result' && f.m.event===done.m.event))
     BOARD.queue.unshift({ kind:'autocall', ev:done.m.event });
   queueRender(); runFx();
 }
@@ -223,7 +225,8 @@ function boardScreen(){
   else body = boardIndiv();
   const cfg = boardCfg();
   const soundHint = boardOn() && cfg.sound && !SND.ready() ? `<button class="soundhint" data-a="bdSound">🔈 화면을 한 번 눌러 소리를 켜 주세요</button>` : '';
-  return `<div class="bd">${annStrip}${body}</div>${boardOverlay()}${soundHint}`;
+  const fixed = T.kind==='team' && TEAM[T.ev] && TEAM[T.ev].mode==='duel' && teamOpt(T.ev).board;     // 과녁판 중계 화면은 한 화면에 고정
+  return `<div class="bd ${fixed?'bdfix':''}">${annStrip}${body}</div>${boardOverlay()}${soundHint}`;
 }
 function boardTeam(ev){
   const E = TEAM[ev], t = tally(ev), tot = totalPoints(), n = matchesOf(ev).length + 1;
@@ -247,56 +250,67 @@ function boardTeam(ev){
   const bp = (tm, id) => `<div class="bp ${tm}"><div class="lbl">${esc(teamName(tm))}${id?` ${ord(tm).indexOf(id)+1}번`:''}</div><div class="nm">${id?esc(pname(id)):'-'}</div></div>`;
   // 다다음 선수를 부르는 경우, 그 사이의 다음 경기도 작게 보여 줌
   const nextLine = pa > 1 && b.next && r.next ? `<span class="bdnext">다음 경기 ${teamBadge('blue')} ${esc(pname(b.next))} · ${teamBadge('red')} ${esc(pname(r.next))}</span>` : '';
-  return ccbar + call + head + `<div class="bdlabel">지금 경기${nextLine}</div><div class="bdvs">${bp('blue', b.cur)}<div class="vsm">VS</div>${bp('red', r.cur)}</div>` + foot;
+  // 과녁판 중계 종목: 지금 선수 옆(가로 화면) 또는 아래(세로 화면)에 과녁판을 크게 띄움
+  const duelHtml = `<div class="bdvs">${bp('blue', b.cur)}<div class="vsm">VS</div>${bp('red', r.cur)}</div>`;
+  const mid = teamOpt(ev).board ? `<div class="bdsplit">${duelHtml}${tgtBoardHtml(ev)}</div>` : duelHtml;
+  return ccbar + call + head + `<div class="bdlabel">지금 경기${nextLine}</div>` + mid + foot;
 }
 function boardIndiv(){
   const ps = people();
   if(BOARD.person && now()-BOARD.personAt < PERSON_MS && person(BOARD.person)) return boardPerson(BOARD.person);
   BOARD.person = null;
   const evs = Object.keys(INDIV);
-  // 종목마다 연1 · 연2 · 본선 (결승 기록이 있는 종목만 결승 칸을 더함)
-  const cols = evs.map(ev => ({ ev, rounds: ['p1','p2','main'].concat(D.indiv.some(r => r.event===ev && r.round==='final' && !r.deleted && (r.throws||[]).length) ? ['final'] : []) }));
+  if(!evs.length) return `<div class="bdhead"><span class="bic">🎯</span><h1>개인전 기록</h1></div><div class="card empty">켜져 있는 개인전 종목이 없습니다.</div>`;
+  // 종목마다 연1 · 연2 · 본선 (연습이 없는 종목은 본선만, 결승 기록이 있는 종목만 결승 칸을 더함)
+  const cols = evs.map(ev => ({ ev, rounds: (hasPrac(ev) ? ['p1','p2'] : []).concat(['main'], D.indiv.some(r => r.event===ev && r.round==='final' && !r.deleted && (r.throws||[]).length) ? ['final'] : []) }));
   const ncols = cols.reduce((n, c) => n + c.rounds.length, 0);
+  // 대기 줄이 있는 종목은 표 위에 '대기 n명'과 앞 세 명의 이름을 띄움
+  const waits = evs.filter(ev => qList(ev).length);
+  const wstrip = waits.length ? `<div class="bdwait">${waits.map(ev => { const q = qList(ev);
+    return `<span class="bw" style="--ev:${INDIV[ev].color}"><b>${INDIV[ev].icon} ${esc(INDIV[ev].name)} 대기 ${q.length}명</b><em>${q.slice(0,3).map(id => esc(pname(id))).join(' · ')}${q.length>3 ? ' …' : ''}</em></span>`; }).join('')}</div>` : '';
   // 16명까지는 표 하나, 그 위는 둘로 나눔 (폭이 좁은 화면은 표 하나로 길게)
   const ncol = ps.length <= 16 || window.innerWidth < 760 ? 1 : 2, per = Math.ceil(ps.length / ncol) || 1;
   // 가로 폭과 줄 수에 맞춰 글자 크기를 정함 (가로로 밀리거나 잘리지 않게)
   const W = Math.max(320, window.innerWidth - 32 - 14*(ncol-1)) / ncol, nf = Math.max(10, Math.min(26, Math.floor(W * 0.74 / ncols / 1.85)));
-  const cell = (ev, rd, p) => { const r = rec(ev, rd, p.id); return r ? `<td class="num ${rd}${rd==='p1'?' g':''}">${rd==='main'||rd==='final' ? `<b>${totalOf(ev, r.throws)}</b>` : totalOf(ev, r.throws)}</td>` : `<td class="num dash ${rd}${rd==='p1'?' g':''}">–</td>`; };
+  const cell = (ev, rd, p) => { const r = rec(ev, rd, p.id); return r ? `<td class="num ${rd}${rd==='p1'?' g':''}">${rd==='main'||rd==='final' ? `<b>${fmtNum(totalOf(ev, r.throws))}</b>` : fmtNum(totalOf(ev, r.throws))}</td>` : `<td class="num dash ${rd}${rd==='p1'?' g':''}">–</td>`; };
   const tables = Array.from({ length:ncol }, (_,c) => ps.slice(c*per, (c+1)*per)).map(chunk => `<table class="itab"><thead>
-      <tr><th rowspan="2" class="nmh">이름</th>${cols.map(c => `<th colspan="${c.rounds.length}" class="evh g" style="--ev:${INDIV[c.ev].color}">${INDIV[c.ev].icon} ${esc(INDIV[c.ev].name)}</th>`).join('')}</tr>
-      <tr>${cols.map(c => c.rounds.map((rd,k) => `<th class="num rdh${k===0?' g':''}">${ROUND_SHORT[rd]}</th>`).join('')).join('')}</tr></thead>
+      <tr><th rowspan="2" class="nmh">이름</th>${cols.map(c => { const E = INDIV[c.ev], wn = qList(c.ev).length;
+        return `<th colspan="${c.rounds.length}" class="evh g" style="--ev:${E.color}">${E.icon} ${esc(E.name)}${E.vunit && E.vunit!=='점' ? ` <small>(${esc(E.vunit)})</small>` : ''}${wn ? `<span class="bwn">대기 ${wn}명</span>` : ''}</th>`; }).join('')}</tr>
+      <tr>${cols.map((c, ci) => c.rounds.map((rd,k) => `<th class="num rdh${k===0?' g':''}">${ROUND_SHORT[rd]}</th>`).join('')).join('')}</tr></thead>
     <tbody>${chunk.map(p => `<tr class="tap" data-a="bdPerson" data-v="${p.id}"><td class="nmc"><b>${esc(p.name)}</b>${isAbsent(p.id)?' <span class="tag red">불참</span>':''}</td>${cols.map(c => c.rounds.map(rd => cell(c.ev, rd, p)).join('')).join('')}</tr>`).join('')}</tbody></table>`).join('');
-  return `<div class="bdhead"><span class="bic">🎯</span><h1>개인전 기록</h1><span class="bsub">이름을 누르면 크게 볼 수 있습니다</span></div>
-    ${ps.length ? `<div class="ilist" style="grid-template-columns:repeat(${ncol},1fr);--nf:${nf}px;--rowh:calc((100dvh - 190px - var(--sat) - var(--sab)) / ${per + 2.4})">${tables}</div>` : '<div class="card empty">명단이 아직 없습니다.</div>'}`;
+  return `<div class="bdhead"><span class="bic">🎯</span><h1>개인전 기록</h1><span class="bsub">이름을 누르면 크게 볼 수 있습니다</span></div>${wstrip}
+    ${ps.length ? `<div class="ilist" style="grid-template-columns:repeat(${ncol},1fr);--nf:${nf}px;--rowh:calc((100dvh - ${190 + (waits.length ? 70 : 0)}px - var(--sat) - var(--sab)) / ${per + 2.4})">${tables}</div>` : '<div class="card empty">명단이 아직 없습니다.</div>'}`;
 }
 function boardPerson(pid){
   const p = person(pid);
   const cards = Object.entries(INDIV).map(([ev,E]) => {
-    const R = recsOf(ev, pid), r = R.main, m = optMap(ev), st = standings(ev).list.find(x => x.p.id===pid), tot = x => totalOf(ev, x.throws);
-    const sub = ['p1','p2','final'].filter(k => R[k]).map(k => `<div class="pl">${ROUNDS[k]} <b>${tot(R[k])}점</b></div>`).join('');
+    const R = recsOf(ev, pid), r = R.main, st = standings(ev).list.find(x => x.p.id===pid), tot = x => totalOf(ev, x.throws);
+    const sub = ['p1','p2','final'].filter(k => R[k]).map(k => `<div class="pl">${ROUNDS[k]} <b>${sc(ev, tot(R[k]))}</b></div>`).join('');
     return `<div class="pcard" style="--ev:${E.color}"><div class="pe">${E.icon} ${esc(E.name)}</div>
-      ${r ? `<div class="pv">${tot(r)}<small>점</small></div><div class="pt">${(r.throws||[]).map(k => m[k]?.v ?? 0).join(' · ')}</div>
+      ${r ? `<div class="pv">${fmtNum(tot(r))}<small>${esc(E.vunit)}</small></div><div class="pt">${(r.throws||[]).map(k => fmtNum(throwVal(ev, k))).join(' · ')}</div>
         <div class="pr">본선 ${st ? `${st.rank}위` : ''}</div>` : '<div class="pv none">본선 아직</div>'}${sub ? `<div class="psub">${sub}</div>` : ''}</div>`;
   }).join('');
   return `<div class="pview tap" data-a="bdPerson" data-v="">
     <div class="pname"><b>${esc(p.name)}</b></div>
-    <div class="pcards">${cards}</div>
+    <div class="pcards" style="--pc:${Math.min(3, Object.keys(INDIV).length || 1)}">${cards}</div>
     <div class="pback">화면을 한 번 더 누르면 목록으로 돌아갑니다</div></div>`;
 }
 function boardOverlay(){
   const o = BOARD.overlay; if(!o) return '';
   if(o.kind==='ccall') return `<div class="ovl ccall ${o.c.team}" data-a="bdDismiss"${flashAttr(o.start)}><div class="lbl">${o.c.kind==='now' ? '📣 지금 나와 주세요' : '📣 준비해 주세요'}</div>
-    <div class="who"><span class="tn">${esc(teamName(o.c.team))}</span></div><div class="nm">${esc(pname(o.c.pid))}</div><div class="ovev2">${EVENTS[o.c.event].icon} ${esc(EVENTS[o.c.event].name)}</div></div>`;
+    <div class="who"><span class="tn">${esc(teamName(o.c.team))}</span></div><div class="nm">${esc(pname(o.c.pid))}</div><div class="ovev2">${EVENTS[o.c.event] ? `${EVENTS[o.c.event].icon} ${esc(EVENTS[o.c.event].name)}` : ''}</div></div>`;
   if(o.kind==='ann') return `<div class="ovl ann" data-a="bdDismiss"${flashAttr(o.start)}><div class="lbl">📢 안내</div><div class="txt">${esc(o.ann.text)}</div></div>`;
-  const m = o.m, E = TEAM[m.event];
+  const m = o.m, E = TEAM[m.event]; if(!E) return '';
+  // 대결 점수를 기록한 경우 '3 : 2' (왼쪽 청팀 · 오른쪽 홍팀)
+  const osc = scoreTxt(m) ? `<div class="osc">${teamBadge('blue',true)} ${scoreTxt(m)} ${teamBadge('red',true)}</div>` : '';
   const nm = tm => E.mode==='round' ? '' : esc(pname(tm==='blue' ? m.blueId : m.redId));
   const tm = tmk => E.mode==='time' ? `<div class="tm">${fmtSec(tmk==='blue' ? m.blueTime : m.redTime)}초</div>` : '';
   const head = `<div class="ovev">${E.icon} ${esc(E.name)}</div>`;
-  if(m.winner==='draw') return `<div class="ovl result" data-a="bdDismiss">${head}<div class="half draw"${flashAttr(o.start)}><div class="big">무승부</div></div>
+  if(m.winner==='draw') return `<div class="ovl result" data-a="bdDismiss">${head}<div class="half draw"${flashAttr(o.start)}><div class="big">무승부</div>${osc}</div>
     <div class="half draw2"><div class="pair">${teamBadge('blue',true)} ${nm('blue')} ${tm('blue')}<span class="vsm">·</span>${teamBadge('red',true)} ${nm('red')} ${tm('red')}</div></div></div>`;
   const w = m.winner, l = w==='blue' ? 'red' : 'blue';
   return `<div class="ovl result" data-a="bdDismiss">${head}
-    <div class="half win ${w}"${flashAttr(o.start)}><div class="big">🏆 ${esc(teamName(w))} 승리</div>${nm(w)?`<div class="nm">${nm(w)}</div>`:''}${tm(w)}</div>
+    <div class="half win ${w}"${flashAttr(o.start)}><div class="big">🏆 ${esc(teamName(w))} 승리</div>${nm(w)?`<div class="nm">${nm(w)}</div>`:''}${tm(w)}${osc}</div>
     <div class="half lose"><div class="big">${esc(teamName(l))} 패</div>${nm(l)?`<div class="nm">${nm(l)}</div>`:''}${tm(l)}</div></div>`;
 }
 
@@ -310,7 +324,7 @@ function boardControl(){
 }
 function bcScreen(){
   const cfg = boardCfg();
-  const modes = [['auto','🔄 자동'], ['indiv','🎯 개인전 명단'], ['summary','📊 종합 현황'], ['awards','🏆 시상식'], ...ORDER_EVENTS.concat(['tug']).map(k => ['team:'+k, TEAM[k].icon+' '+TEAM[k].name])];
+  const modes = [['auto','🔄 자동'], ['indiv','🎯 개인전 명단'], ['summary','📊 종합 현황'], ['awards','🏆 시상식'], ...Object.keys(TEAM).map(k => ['team:'+k, TEAM[k].icon+' '+TEAM[k].name])];
   return `<div class="card"><h2>보여 줄 화면</h2>
       <div class="chips">${modes.map(([k,l]) => `<button class="chip ${cfg.mode===k?'on':''}" data-a="bmode" data-v="${k}">${esc(l)}</button>`).join('')}</div>
       <p class="sub">자동으로 두면 가장 최근에 기록이 들어온 종목을 띄웁니다. 단체전 결과가 나오면 위아래로 승패를 보여 준 뒤 준비할 선수를 부릅니다.</p></div>
@@ -346,7 +360,7 @@ function awardsControl(){
     <p class="sub">안내판을 시상식 화면으로 바꾸고, 개인전 종목별 3등 → 2등 → 1등, 마지막에 종합 우승 순서로 한 단계씩 발표합니다. 발표할 때마다 팡파르와 함께 이름을 읽어 줍니다.</p>
     <div class="row">${on ? '' : '<button class="btn primary grow" data-a="awStart">🏆 시상식 화면으로 바꾸기</button>'}
       ${on ? `<button class="btn grow" data-a="awStep" data-v="-1" ${i<0?'disabled':''}>◀ 이전</button><button class="btn primary grow" data-a="awStep" data-v="1" ${i>=steps.length-1?'disabled':''}>다음 발표 ▶</button><button class="btn" data-a="awEnd">끝내기</button>` : ''}</div>
-    <div class="list" style="margin-top:10px">${steps.map((s,k) => `<div class="item ${k===i?'cur':''} ${k<i?'done':''}"><span class="no tag">${k+1}</span><span class="name">${esc(awardLabel(s))}<span class="sub">${s.kind==='team' ? `${esc(teamName('blue'))} ${s.tot.blue} : ${s.tot.red} ${esc(teamName('red'))}` : s.winners.map(x => esc(x.p.name)+' '+x.total+'점').join(', ')}</span></span>${k===i?'<span class="tag dark">지금 발표</span>':''}</div>`).join('')}</div></div>`;
+    <div class="list" style="margin-top:10px">${steps.map((s,k) => `<div class="item ${k===i?'cur':''} ${k<i?'done':''}"><span class="no tag">${k+1}</span><span class="name">${esc(awardLabel(s))}<span class="sub">${s.kind==='team' ? `${esc(teamName('blue'))} ${s.tot.blue} : ${s.tot.red} ${esc(teamName('red'))}` : s.winners.map(x => esc(x.p.name)+' '+sc(s.ev, x.total)).join(', ')}</span></span>${k===i?'<span class="tag dark">지금 발표</span>':''}</div>`).join('')}</div></div>`;
 }
 
 /* ---------- 시상식 ---------- */
@@ -373,7 +387,7 @@ function boardAwards(){
   }
   const E = INDIV[s.ev], medal = { 1:'🥇', 2:'🥈', 3:'🥉' }[s.rank];
   return `<div class="award r${s.rank}"${fx}><div class="aev">${E.icon} ${esc(E.name)}</div><div class="aic">${medal}</div><div class="at">${s.rank}등</div>
-    ${s.winners.map(x => `<div class="aname">${esc(x.p.name)} <span class="apt">${x.total}점</span></div>`).join('')}</div>`;
+    ${s.winners.map(x => `<div class="aname">${esc(x.p.name)} <span class="apt">${sc(s.ev, x.total)}</span></div>`).join('')}</div>`;
 }
 
 Object.assign(ACT, {

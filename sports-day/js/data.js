@@ -1,7 +1,7 @@
 'use strict';
 /* ===================== 상태 ===================== */
 const D = {
-  config:{}, indiv:[], matches:[], orders:{}, calls:{}, ccalls:{}, roles:{}, presets:{}, absent:{}, msgs:[], devices:[], masters:{},
+  config:{}, indiv:[], matches:[], orders:{}, calls:{}, ccalls:{}, roles:{}, presets:{}, absent:{}, msgs:[], devices:[], masters:{}, queues:{}, assets:{},
   amMaster:false, pending:{}, loaded:{}, error:'', fatal:'',
 };
 const UI = {
@@ -37,7 +37,25 @@ const teamBadge = (t, big) => t ? `<span class="tb ${t}${big?' big':''}" title="
 
 /* ===================== 개인전 ===================== */
 function optMap(ev){ const m={}, E=INDIV[ev]; [...(E.legacy ? E.legacy(settings()) : []), ...E.opts(settings())].forEach(([k,l,v]) => m[k]={l,v}); return m; }
-function totalOf(ev, throws){ const m=optMap(ev); return (throws||[]).reduce((s,k)=> s + (m[k]?.v ?? 0), 0); }
+const isNum = ev => !!INDIV[ev] && INDIV[ev].mode==='number';          // 숫자 직접 입력 종목
+const dirLow = ev => !!INDIV[ev] && INDIV[ev].dir==='low';             // 낮을수록 좋은 기록
+const hasPrac = ev => !!INDIV[ev] && INDIV[ev].prac!==false;           // 연습 회차가 있는 종목
+const roundKeys = ev => hasPrac(ev) ? ROUND_KEYS : ROUND_KEYS.filter(k => k!=='p1' && k!=='p2');
+// 한 번 던진 값: 단추 종목은 단추의 점수, 숫자 종목은 입력한 숫자
+function throwVal(ev, k){ if(isNum(ev)){ const v = Number(k); return isFinite(v) ? v : 0; } return optMap(ev)[k]?.v ?? 0; }
+const fmtNum = v => v==null||v===''||isNaN(v) ? '-' : (Number.isInteger(+v) ? String(+v) : String(Math.round(+v*1000)/1000));
+// 점수 뒤에 붙는 말(점·m 등)까지 붙인 글
+const sc = (ev, v) => `${fmtNum(v)}${(INDIV[ev] && INDIV[ev].vunit) ?? '점'}`;
+function totalOf(ev, throws){
+  if(isNum(ev)) return Math.round((throws||[]).reduce((s,k)=> s + throwVal(ev,k), 0)*1000)/1000;
+  const m=optMap(ev); return (throws||[]).reduce((s,k)=> s + (m[k]?.v ?? 0), 0);
+}
+// 순위 비교: 음수면 a가 더 좋은 기록. 값이 없으면(null) 가장 뒤
+function cmpBest(ev, a, b){
+  const an = a==null, bn = b==null;
+  if(an || bn) return an===bn ? 0 : (an ? 1 : -1);
+  return dirLow(ev) ? a-b : b-a;
+}
 const recId = (ev, round, pid) => `${ev}_${round}_${pid}`;
 function rec(ev, round, pid){ return D.indiv.find(r => r.id===recId(ev,round,pid) && !r.deleted && (r.throws||[]).length); }
 
@@ -45,7 +63,7 @@ function standings(ev){
   const main = people().map(p => ({ p, r: rec(ev,'main',p.id) })).filter(x => x.r)
     .map(x => ({ ...x, total: totalOf(ev, x.r.throws), fin: rec(ev,'final',x.p.id) }))
     .map(x => ({ ...x, ftotal: x.fin ? totalOf(ev, x.fin.throws) : null }));
-  main.sort((a,b) => b.total-a.total || ((b.ftotal??-1)-(a.ftotal??-1)) || byName(a.p,b.p));
+  main.sort((a,b) => cmpBest(ev,a.total,b.total) || cmpBest(ev,a.ftotal,b.ftotal) || byName(a.p,b.p));
   // 본선 기준 순위(동점 공동), 결승 기록이 있으면 그 안에서 다시 나눔
   let rank=0, prevKey=null;
   main.forEach((x,i) => { const key = x.total+'|'+(x.ftotal??''); if(key!==prevKey){ rank=i+1; prevKey=key; } x.rank=rank; });
@@ -61,11 +79,11 @@ function standings(ev){
   return { list: main, ties };
 }
 
-// 연습 1·2(또는 결승)만의 순위: 합계가 높은 순, 동점은 공동 순위
+// 연습 1·2(또는 결승)만의 순위: 좋은 기록 순, 동점은 공동 순위
 function roundStandings(ev, round){
   const list = people().map(p => ({ p, r: rec(ev, round, p.id) })).filter(x => x.r)
     .map(x => ({ ...x, total: totalOf(ev, x.r.throws) }));
-  list.sort((a,b) => b.total-a.total || byName(a.p,b.p));
+  list.sort((a,b) => cmpBest(ev,a.total,b.total) || byName(a.p,b.p));
   let rank = 0, prev = null;
   list.forEach((x,i) => { if(x.total!==prev){ rank = i+1; prev = x.total; } x.rank = rank; });
   return { list };
@@ -73,10 +91,25 @@ function roundStandings(ev, round){
 // 사람 한 명의 회차별 기록 {p1, p2, main, final}
 const recsOf = (ev, pid) => ({ p1: rec(ev,'p1',pid), p2: rec(ev,'p2',pid), main: rec(ev,'main',pid), final: rec(ev,'final',pid) });
 
+/* ---------- 개인전 대기 줄 (main/queues/{종목}) ---------- */
+// 지운 사람을 뺀 대기 순서
+function qList(ev){ const q = D.queues[ev]; return ((q && Array.isArray(q.list)) ? q.list : []).filter(id => { const p = person(id); return !!p && !p.deleted; }); }
+
 /* ===================== 단체전 ===================== */
 function matchesOf(ev){ return D.matches.filter(m => m.event===ev && !m.deleted).sort((a,b)=>(a.at||0)-(b.at||0)); }
 function tally(ev){ const t={red:0,blue:0,draw:0}; matchesOf(ev).forEach(m => { if(t[m.winner]!=null) t[m.winner]++; }); return t; }
-function totalPoints(){ const t={red:0,blue:0}; Object.keys(TEAM).forEach(ev => { const x=tally(ev); t.red+=x.red; t.blue+=x.blue; }); return t; }
+// 승점: 이긴 판 수에 종목의 승점(pts, 기본 1)을 곱해서 더함
+function totalPoints(){ const t={red:0,blue:0}; Object.keys(TEAM).forEach(ev => { const x=tally(ev), p=TEAM[ev].pts||1; t.red+=x.red*p; t.blue+=x.blue*p; }); return t; }
+// 종목별 설정: 과녁판 중계(board)·대결 점수 기록(score). 기본 종목은 마스터 설정(events.opt), 만든 종목은 자기 설정을 따름. 콩주머니만 과녁판이 기본으로 켜짐
+function teamOpt(ev){
+  const E = TEAM[ev]; if(!E) return { board:false, score:false };
+  if(E.custom) return { board: !!E.board && E.mode==='duel', score: !!E.score && E.mode!=='time' };
+  const o = (((D.config.events||{}).opt)||{})[ev] || {};
+  return { board: (o.board ?? (ev==='beanbag')) && E.mode==='duel', score: !!(o.score ?? false) && E.mode!=='time' };
+}
+// 과녁판 위에 찍은 표시 {list:[{t,x,y,n}], first}
+function marksOf(ev){ const m = (D.calls[ev]||{}).marks || {}; return { list: Array.isArray(m.list) ? m.list : [], first: m.first==='red' ? 'red' : 'blue', addN:m.addN||0, addAt:m.addAt||0, at:m.at||0 }; }
+const targetAsset = ev => (D.assets['target_'+ev] || {}).data || '';
 const members = team => people().filter(p => p.team===team).map(p => p.id);
 // 감독이 저장한 순서 (팀원만, 지운 사람 제외)
 function orderSaved(ev, team){
@@ -128,7 +161,6 @@ function remainingMatches(ev){
 
 /* ===================== 역할·권한 =====================
    한 기기에 여러 역할: coach(감독 팀), events(심판 종목), helpers(기록 도우미 종목), timers(계시원 종목), board(안내판), cast(방송 권한) */
-const TIME_EVENTS = Object.keys(TEAM).filter(k => TEAM[k].mode==='time');
 function normRole(r){
   const o = { coach:'', events:[], helpers:[], timers:[], board:false, cast:false, monitor:false, voice:false, preset:'', name:'' };
   if(!r) return o;
@@ -212,3 +244,5 @@ function touchDevice(joined){
   if(myRole().role==='board') d.audio = !!(SND.ready() && boardCfg().sound);
   store.put(['main','devices',store.uid], d).catch(()=>{});
 }
+
+rebuildEvents();   // 처음에는 기본 종목만 채움 (마스터 설정을 읽으면 app.js에서 다시 채움)

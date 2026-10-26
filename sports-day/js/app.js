@@ -28,11 +28,13 @@ function staffTabs(r){
 function staffBody(r){
   if(UI.stab==='mon') return progressView();
   if(UI.stab==='coach'){
+    if(!ORDER_EVENTS.length) return '<div class="card empty">순서를 정할 단체전 종목이 없습니다. 마스터가 종목을 켜면 여기에 나옵니다.</div>';
     if(!ORDER_EVENTS.includes(UI.coachEv)) UI.coachEv = ORDER_EVENTS[0];
     UI.ev = UI.coachEv;
     return coachView(r.coach);
   }
   const ev = UI.stab.split(':')[1]; UI.ev = ev;
+  if(!EVENTS[ev]) return '<div class="card empty">이 종목은 지금 꺼져 있습니다.</div>';
   return UI.stab.startsWith('timer:') ? timerView(ev) : eventView(ev);
 }
 // 화면 고르기 창: 마스터는 모든 종목, 진행요원은 맡은 일
@@ -42,7 +44,8 @@ function evSheet(){
   let body;
   if(r.role==='master'){
     const grp = kind => Object.keys(EVENTS).filter(k => EVENTS[k].kind===kind).map(k => btn(k, EVENTS[k].icon, EVENTS[k].name, evBadge(k), EVENTS[k].color, k===UI.ev)).join('');
-    body = `<h3 style="margin-top:0">개인전</h3><div class="evgrid">${grp('indiv')}</div><h3>단체전</h3><div class="evgrid">${grp('team')}</div>`;
+    const gi = grp('indiv'), gt = grp('team');
+    body = `${gi ? `<h3 style="margin-top:0">개인전</h3><div class="evgrid">${gi}</div>` : ''}${gt ? `<h3${gi ? '' : ' style="margin-top:0"'}>단체전</h3><div class="evgrid">${gt}</div>` : ''}`;
   } else body = `<div class="evgrid">${staffTabs(r).map(t => btn(t.k, t.icon, t.label, t.ev ? evBadge(t.ev) : '', t.color, t.k===UI.stab)).join('')}</div>`;
   return `<h2>화면 고르기</h2>${body}<button class="btn wide" data-a="closeSheet" style="margin-top:14px">닫기</button>`;
 }
@@ -66,7 +69,8 @@ function render(){
   if(r.role==='master'){
     if(UI.mtab==='game'){
       fixEv(Object.keys(EVENTS)); const E = EVENTS[UI.ev];
-      picker = pickerBtn(E.icon, E.name, E.color); body = masterGame(); fit = true;
+      if(E){ picker = pickerBtn(E.icon, E.name, E.color); body = masterGame(); fit = true; }
+      else body = '<div class="card empty">켜져 있는 종목이 없습니다. 명단·설정의 종목 탭에서 종목을 켜 주세요.</div>';
     }
     else if(UI.mtab==='board') body = boardControl();
     else if(UI.mtab==='people') body = peopleView();
@@ -94,7 +98,8 @@ function render(){
     <div class="row" style="margin-top:8px"><button class="btn small" data-a="rulesRecheck">게시했어요, 다시 확인</button></div></div>` : '';
   app.innerHTML = `<div class="${shell}">${head}<main class="${fit?'fitmain':''}">${r.role==='wait'?installBanner():''}${rulesWarn}${err}${body}</main>${nav}${corner}</div>`;
   setBodyMode(!!nav);
-  if(keep){ const el = document.getElementById(keep.id); if(el){ el.focus(); try{ el.setSelectionRange(keep.s, keep.e); }catch(e){} } }
+  if(UI.numFocus!=null){ const ne = document.getElementById('numIn'+UI.numFocus); UI.numFocus = null; if(ne && !ne.disabled) ne.focus(); }
+  else if(keep){ const el = document.getElementById(keep.id); if(el){ el.focus(); try{ el.setSelectionRange(keep.s, keep.e); }catch(e){} } }
   drawSheet();
   paintWatch();
   radioInit(); radioRender();
@@ -243,9 +248,9 @@ let renderQueued = false, renderDeferred = false;
 const typing = () => { const ae = document.activeElement; return !!ae && (ae.tagName==='TEXTAREA' || ae.tagName==='INPUT') && ae.type!=='checkbox'; };
 function queueRender(){
   if(renderQueued) return; renderQueued = true;
-  requestAnimationFrame(() => { renderQueued = false; if(typing() || DRAG.active || $('#dlg').classList.contains('open')){ renderDeferred = true; return; } render(); });
+  requestAnimationFrame(() => { renderQueued = false; if(typing() || DRAG.active || TG.drag || $('#dlg').classList.contains('open')){ renderDeferred = true; return; } render(); });
 }
-function flushDeferred(){ if(renderDeferred && !typing() && !DRAG.active){ renderDeferred = false; render(); } }
+function flushDeferred(){ if(renderDeferred && !typing() && !DRAG.active && !TG.drag){ renderDeferred = false; render(); } }
 document.addEventListener('focusout', () => setTimeout(flushDeferred, 50));
 
 function onErr(e){
@@ -263,10 +268,13 @@ function masterSubs(){
 function subscribe(){
   const col = k => (l, p) => { D[k] = l; D.pending[k] = p; D.loaded[k] = true; queueRender(); };
   const map = k => (l, p) => { D[k] = Object.fromEntries(l.map(x => [x.id, x])); D.pending[k] = p; D.loaded[k] = true; queueRender(); };
-  store.onDoc(['config'], (d, p) => { D.config = d || {}; D.pending.config = p ? 1 : 0; D.loaded.config = true; queueRender(); }, onErr);
+  store.onDoc(['config'], (d, p) => { D.config = d || {}; rebuildEvents(); D.pending.config = p ? 1 : 0; D.loaded.config = true; queueRender(); }, onErr);
   store.onCol(['main','calls'], map('calls'), onErr);
   // 감독 호출은 없어도 점수판이 돌아가야 하므로, 읽지 못해도 오류 띠는 띄우지 않음 (Firestore 규칙에 ccalls가 없을 때)
   store.onCol(['main','ccalls'], map('ccalls'), e => console.error(e));
+  // 대기 줄·과녁 사진은 없어도 점수판이 돌아가야 하므로, 읽지 못해도 오류 띠는 띄우지 않음 (Firestore 규칙이 예전 것일 때)
+  store.onCol(['main','queues'], map('queues'), e => console.error(e));
+  store.onCol(['main','assets'], map('assets'), e => console.error(e));
   store.onCol(['main','indiv'], col('indiv'), onErr);
   store.onCol(['main','matches'], col('matches'), onErr);
   store.onCol(['main','orders'], map('orders'), onErr);

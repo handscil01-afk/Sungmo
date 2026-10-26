@@ -19,14 +19,17 @@ const RULES_VER = 12;
 // 담당자 명단에서 역할을 고르다가 권한 오류가 나면: 서버 규칙을 아직 새 것으로 바꾸지 않은 경우가 많음
 const RULES_OLD_MSG = '서버 규칙이 아직 바뀌지 않아 이 역할로 들어갈 수 없습니다. 마스터에게 알려 주세요.';
 
-/* ===================== 종목 정의 ===================== */
+/* ===================== 종목 정의 =====================
+   INDIV_BASE·TEAM_BASE는 기본으로 들어 있는 종목. 화면에서 쓰는 INDIV·TEAM·EVENTS와 ORDER_EVENTS·TIME_EVENTS는
+   rebuildEvents()가 마스터 설정(D.config.events: 끄기 off, 새 종목 custom)에 맞춰 같은 객체·배열을 그대로 고쳐서 다시 채움 */
 // showPracRank: 안내판에 연습 순위도 보일지 / tugRounds: 줄다리기 계획 판 수(진행 현황의 남은 시간 계산용)
 const DEFAULT_SETTINGS = { tuhoShort: 0, foul: 1, showPracRank: true, tugRounds: 3 };
 // 개인전 회차: 연습 1·2, 본선(순위 기준), 결승(동점 가리기)
 const ROUNDS = { p1:'연습 1', p2:'연습 2', main:'본선', final:'결승' };
 const ROUND_SHORT = { p1:'연1', p2:'연2', main:'본선', final:'결승' };
 const ROUND_KEYS = ['p1','p2','main','final'];
-const INDIV = {
+// unit: 한 차례를 세는 말 / vunit: 점수(값) 뒤에 붙는 말 / prac: 연습 회차 / mode: buttons(점수 단추 합계)·number(숫자 직접 입력) / dir: high(높을수록)·low(낮을수록)
+const INDIV_BASE = {
   archery: { name:'양궁', icon:'🏹', color:'#6d28d9', lanes:2, count:5, unit:'발',
     hint:'과녁 5 · 배너 3 · 밖 0',
     opts: s => [['t','과녁',5],['b','배너',3],['o','배너 밖',0]] },
@@ -39,23 +42,69 @@ const INDIV = {
     // 예전(거리 칸) 기록을 읽을 때만 씀
     legacy: s => [['z0','2m 미만',s.tuhoShort],['z1','2~3.5m',10],['z2','3.5~5m',20],['z3','5~6.5m',30],['z4','6.5~8m',20],['z5','8~9.5m',10],['out','선 밖',0]] },
 };
-const TEAM = {
+// pts: 한 번 이길 때 얻는 승점 / board: 과녁판 중계(1:1 대결만) / score: 대결 점수도 기록 (기본 종목은 D.config.events.opt 에서 읽음)
+const TEAM_BASE = {
   gymball: { name:'짐볼 차기', icon:'⚽', color:'#15803d', mode:'duel', hint:'더 멀리 찬 사람이 이깁니다' },
   threeleg:{ name:'2인3각', icon:'👣', color:'#854d0e', mode:'duel', hint:'반환점을 돌아 먼저 들어온 조가 이깁니다' },
   beanbag: { name:'콩주머니', icon:'🎯', color:'#4d7c0f', mode:'duel', hint:'1인 5개씩 번갈아 던져 가운데에 가장 가까운 쪽이 이깁니다' },
   run:     { name:'줄 잡고 달리기', icon:'🏃', color:'#334155', mode:'time', hint:'기록(초)이 빠른 사람이 이깁니다' },
   tug:     { name:'줄다리기', icon:'🪢', color:'#c2410c', mode:'round', hint:'판마다 이긴 팀에 승점 1점' },
 };
-const EVENTS = {};
-Object.entries(INDIV).forEach(([k,v]) => EVENTS[k] = { ...v, kind:'indiv' });
-Object.entries(TEAM).forEach(([k,v]) => EVENTS[k] = { ...v, kind:'team' });
-// 감독이 출전 순서를 정하는 종목 (줄다리기는 판마다 여럿이 나와서 제외)
-const ORDER_EVENTS = Object.keys(TEAM).filter(k => TEAM[k].mode !== 'round');
+const LANE_LABELS_BASE = { tuho:['초록 투호','빨강 투호'], archery:['왼쪽 사대','오른쪽 사대'], freeball:['타석'] };
+// 화면에서 쓰는 살아 있는 종목표 (rebuildEvents가 채움)
+const INDIV = {}, TEAM = {}, EVENTS = {};
+const ORDER_EVENTS = [];      // 감독이 출전 순서를 정하는 종목 (줄다리기처럼 판마다 여럿이 나오는 종목은 제외)
+const TIME_EVENTS = [];       // 계시원이 시간을 재는 종목
+const LANE_LABELS = {};
 
 // 화면에는 청팀을 왼쪽(먼저), 홍팀을 오른쪽에 둠
 const TEAM_KEYS = ['blue','red'];
 const DEFAULT_TEAM_NAMES = { blue:'청팀', red:'홍팀' };
-const LANE_LABELS = { tuho:['초록 투호','빨강 투호'], archery:['왼쪽 사대','오른쪽 사대'], freeball:['타석'] };
+
+const clampInt = (v, lo, hi, d) => { v = parseInt(v, 10); return isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d; };
+const fillIndiv = v => ({ vunit:'점', prac:true, mode:'buttons', dir:'high', ...v });
+const fillTeam = v => ({ pts:1, ...v });
+// 마스터가 만든 개인전: opts 는 저장할 때 [{k,l,v}] (파이어스토어는 배열 안의 배열을 못 저장함)
+function buildCustomIndiv(d){
+  const num = d.mode==='number', low = d.dir==='low';
+  const opts = (Array.isArray(d.opts) ? d.opts : []).map(o => [String(o.k), String(o.l), Number(o.v)||0]);
+  return { name:String(d.name), icon:d.icon||'🎲', color:d.color||'#334155', lanes: d.lanes===2 ? 2 : 1, count:clampInt(d.count, 1, 10, num ? 1 : 5),
+    unit:'번', vunit: num ? String(d.unit||'') : '점',
+    hint: num ? `숫자를 직접 넣습니다. ${low ? '낮을수록' : '높을수록'} 좋은 기록입니다.` : (opts.map(o => `${o[1]} ${o[2]}`).join(' · ')),
+    opts: num ? (() => []) : (() => opts), prac:!!d.prac, mode: num ? 'number' : 'buttons', dir: low ? 'low' : 'high', custom:true };
+}
+function buildCustomTeam(d){
+  const mode = ['duel','time','round'].includes(d.tmode) ? d.tmode : 'duel', pts = clampInt(d.pts, 1, 5, 1);
+  const hint = { duel:'1:1로 겨뤄 이긴 쪽이 승점을 얻습니다.', time:'기록(초)이 빠른 쪽이 이깁니다.', round:'판마다 이긴 팀이 승점을 얻습니다.' }[mode] + (pts>1 ? ` 한 번 이기면 ${pts}점입니다.` : '');
+  return { name:String(d.name), icon:d.icon||'🎲', color:d.color||'#334155', mode, hint, pts, custom:true, board: mode==='duel' && !!d.board, score: mode!=='time' && !!d.score };
+}
+// 켜짐·꺼짐과 관계없이 모든 종목 (기본 + 마스터가 만든 것, 지운 것은 빼고): [{ key, kind, E, custom, off, def }]
+function allEventList(){
+  const cfg = (typeof D!=='undefined' && D.config && D.config.events) || {}, off = cfg.off || {}, out = [];
+  Object.entries(INDIV_BASE).forEach(([k,v]) => out.push({ key:k, kind:'indiv', E:fillIndiv(v), custom:false, off:!!off[k] }));
+  Object.entries(TEAM_BASE).forEach(([k,v]) => out.push({ key:k, kind:'team', E:fillTeam(v), custom:false, off:!!off[k] }));
+  Object.entries(cfg.custom || {}).filter(([,d]) => d && !d.deleted && d.name && (d.kind==='indiv' || d.kind==='team'))
+    .sort((a,b) => (a[1].at||0) - (b[1].at||0)).forEach(([k,d]) =>
+      out.push({ key:k, kind:d.kind, E: d.kind==='team' ? buildCustomTeam(d) : buildCustomIndiv(d), custom:true, off:!!off[k], def:d }));
+  return out;
+}
+// 같은 객체·배열을 그대로 고쳐서 채움: 다른 파일에서 INDIV·TEAM·EVENTS를 순회하면 꺼진 종목은 자동으로 빠짐
+function rebuildEvents(){
+  [INDIV, TEAM, EVENTS, LANE_LABELS].forEach(o => Object.keys(o).forEach(k => delete o[k]));
+  ORDER_EVENTS.length = 0; TIME_EVENTS.length = 0;
+  Object.entries(LANE_LABELS_BASE).forEach(([k,v]) => { LANE_LABELS[k] = v; });
+  allEventList().filter(x => !x.off).forEach(x => {
+    if(x.kind==='indiv'){
+      INDIV[x.key] = x.E; EVENTS[x.key] = { ...x.E, kind:'indiv' };
+      if(x.custom) LANE_LABELS[x.key] = x.E.lanes===2 ? ['왼쪽','오른쪽'] : ['타석'];
+    } else {
+      TEAM[x.key] = x.E; EVENTS[x.key] = { ...x.E, kind:'team' };
+      if(x.E.mode!=='round') ORDER_EVENTS.push(x.key);
+      if(x.E.mode==='time') TIME_EVENTS.push(x.key);
+    }
+  });
+  Object.keys(LANE_LABELS).forEach(k => { if(!INDIV[k]) delete LANE_LABELS[k]; });
+}
 
 const ROLE_INFO = {
   master:  { label:'마스터', icon:'👑' },

@@ -21,7 +21,7 @@ function progressData(){
     // 본선 기록을 처음 저장한 시각 (고친 시각이 아니라 원래 시각)
     const times = D.indiv.filter(r => r.event===ev && r.round==='main' && !r.deleted && (r.throws||[]).length && ids.has(r.personId)).map(r => r.at || 0);
     return { ev, kind:'indiv', done, total, rem: Math.max(0, total - done), unit: unitMs(times), n: times.length,
-      p1: ps.filter(p => rec(ev,'p1',p.id)).length, p2: ps.filter(p => rec(ev,'p2',p.id)).length };
+      prac: hasPrac(ev), p1: ps.filter(p => rec(ev,'p1',p.id)).length, p2: ps.filter(p => rec(ev,'p2',p.id)).length, wait: qList(ev).length };
   });
   const team = Object.keys(TEAM).map(ev => {
     const E = TEAM[ev], ms = matchesOf(ev), times = ms.map(m => m.at || 0);
@@ -68,7 +68,7 @@ function progressView(){
   const row = ({ e, a }) => {
     const E = EVENTS[e.ev], pct = e.total ? Math.min(100, Math.round(e.done / e.total * 100)) : 0;
     let main, sub = '';
-    if(e.kind === 'indiv'){ main = `본선 ${e.done}/${e.total}명`; sub = `연습 1 ${e.p1}명 · 연습 2 ${e.p2}명`; }
+    if(e.kind === 'indiv'){ main = `본선 ${e.done}/${e.total}명`; sub = `${e.prac ? `연습 1 ${e.p1}명 · 연습 2 ${e.p2}명 · ` : ''}대기 ${e.wait}명`; }
     else if(e.kind === 'round'){ main = `${e.done}/${e.total}판`; sub = e.rem ? `남은 판 ${e.rem}` : ''; }
     else { main = `${e.done}/${e.total}명 · 남은 대결 ${e.rem}`; }
     let eta;

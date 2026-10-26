@@ -101,6 +101,17 @@ service cloud.firestore {
         && request.resource.data.text is string && request.resource.data.text.size() <= 300;
       allow update, delete: if open() && isMaster();
     }
+    // 개인전 부스 대기열: 마스터 또는 그 종목 심판·기록 도우미. 지우기(초기화)는 마스터만
+    match /undonghoe5/main/queues/{ev} {
+      allow read: if signedIn();
+      allow create, update: if open() && ev == request.resource.data.event && (isMaster() || refereeOf(ev));
+      allow delete: if open() && isMaster();
+    }
+    // 과녁판 사진 등 큰 자료: 마스터만 올리고 지움
+    match /undonghoe5/main/assets/{id} {
+      allow read: if signedIn();
+      allow create, update, delete: if open() && isMaster();
+    }
     // 규칙 확인용 표식(버전): 마스터 기기가 접속할 때 한 번 씀. 쓸 수 없으면 서버 규칙이 예전 것이라는 뜻
     match /undonghoe5/main/meta/{id} {
       allow read: if signedIn();

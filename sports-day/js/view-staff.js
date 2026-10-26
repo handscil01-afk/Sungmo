@@ -10,7 +10,9 @@ const asRole = p => { const r = normRole(p); r.role = r.board ? 'board' : hasDut
 const roleTagCls = r => r.role==='wait' ? 'warn' : r.role==='master' ? 'dark' : r.coach ? (r.coach==='red' ? 'red' : 'blue') : '';
 // monitor는 켜져 있을 때만 넣음: 규칙을 아직 올리지 않은 서버에서도 예전 담당자 선택이 막히지 않게 (없으면 꺼짐으로 읽음)
 // 중계 모드(보이스오버용 간단 화면)는 monitor 값을 true 대신 'voice'로 저장함
-const pickRoleFields = r => { const n = normRole(r); return { coach:n.coach, events:n.events, helpers:n.helpers, timers:n.timers, board:n.board, cast:n.cast, ...(n.monitor ? { monitor: n.voice ? 'voice' : true } : {}) }; };
+// 꺼진 종목이 들어 있는 역할도 목록을 그대로 옮김 (담당자 명단과 달라지면 서버 규칙이 막으므로, 다시 켜면 돌아오게 데이터는 지키고 화면에서만 숨김)
+const pickRoleFields = r => { const n = normRole(r), raw = r || {}, keep = k => Array.isArray(raw[k]) ? [...raw[k]] : n[k];
+  return { coach:n.coach, events:keep('events'), helpers:keep('helpers'), timers:keep('timers'), board:n.board, cast:n.cast, ...(n.monitor ? { monitor: n.voice ? 'voice' : true } : {}) }; };
 function presetList(){
   return Object.entries(D.presets).map(([id,p]) => ({ id, ...p }))
     .sort((a,b) => (!!a.volunteer - !!b.volunteer) || String(a.label||'').localeCompare(String(b.label||''), 'ko'));
@@ -90,7 +92,12 @@ async function dedupeDevices(){
 
 /* ---------- 역할 고르기 (담당자 명단과 기기에 함께 씀) ---------- */
 let RD = null;
-function newDraft(src){ const n = normRole(src); return { ...pickRoleFields(src), monitor:!!n.monitor, voice:!!n.voice, events:[...n.events], helpers:[...n.helpers], timers:[...n.timers] }; }
+function newDraft(src){
+  const n = normRole(src), raw = src || {}, hide = (k, ok) => (Array.isArray(raw[k]) ? raw[k] : []).filter(e => !ok(e));
+  // hid: 지금 꺼져 있어 화면에 안 보이는 종목 (저장할 때 그대로 되돌려 넣음)
+  return { ...pickRoleFields(src), monitor:!!n.monitor, voice:!!n.voice, events:[...n.events], helpers:[...n.helpers], timers:[...n.timers],
+    hid:{ events:hide('events', e => EVENTS[e]), helpers:hide('helpers', e => EVENTS[e]), timers:hide('timers', e => TIME_EVENTS.includes(e)) } };
+}
 function roleEditor(){
   const chips = (k, list) => `<div class="chips">${list.map(ev => `<button class="chip ${RD[k].includes(ev)?'on':''}" data-a="rdTog" data-k="${k}" data-v="${ev}">${EVENTS[ev].icon} ${esc(EVENTS[ev].name)}</button>`).join('')}</div>`;
   const flag = (k, title, sub) => `<div class="item"><span class="name">${title}<span class="sub">${sub}</span></span><button class="btn small ${RD[k]?'ok':''}" data-a="rdFlag" data-k="${k}">${RD[k]?'켬':'끔'}</button></div>`;
@@ -101,7 +108,8 @@ function roleEditor(){
     <div class="card"><div class="list">${flag('monitor','🧭 운영 현황','센터장·사무국장 대행: 진행 현황을 보고 무전·문자만 씁니다.')}${RD.monitor ? flag('voice','중계 모드(보이스오버용 간단 화면)','그림 없이 큰 글자 단추만 있는 화면으로 바뀌고, 지금 상황을 글로 읽어 줍니다. 단체전 결과가 저장되면 보이스오버가 바로 읽어 줍니다.') : ''}${flag('board','📺 안내판','이 기기를 안내판 화면으로만 씁니다(다른 역할 화면은 숨겨집니다).')}${flag('cast','📢 음성 방송 권한','안내판 스피커로 말하는 방송 버튼이 생깁니다.')}</div></div>`;
 }
 const draftEmpty = () => !RD.coach && !RD.events.length && !RD.helpers.length && !RD.timers.length && !RD.board && !RD.monitor;
-const draftFields = () => ({ coach:RD.coach, events:RD.events.filter(e => EVENTS[e]), helpers:RD.helpers.filter(e => EVENTS[e]), timers:RD.timers.filter(e => TIME_EVENTS.includes(e)), board:!!RD.board, cast:!!RD.cast, monitor: RD.monitor ? (RD.voice ? 'voice' : true) : false });
+const draftFields = () => { const h = RD.hid || {}, add = (a, b) => [...a, ...(b||[]).filter(e => !a.includes(e))];
+  return { coach:RD.coach, events:add(RD.events.filter(e => EVENTS[e]), h.events), helpers:add(RD.helpers.filter(e => EVENTS[e]), h.helpers), timers:add(RD.timers.filter(e => TIME_EVENTS.includes(e)), h.timers), board:!!RD.board, cast:!!RD.cast, monitor: RD.monitor ? (RD.voice ? 'voice' : true) : false }; };
 
 function presetSheet(){
   return `<h2>${RD.id ? '담당자 고치기' : RD.volunteer ? '봉사자 자리 추가' : '담당자 추가'}</h2>

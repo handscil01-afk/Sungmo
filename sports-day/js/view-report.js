@@ -3,26 +3,28 @@
 function reportView(){
   const tot = totalPoints(), w = tot.blue===tot.red ? '' : (tot.blue>tot.red ? 'blue' : 'red');
   const d = new Date(), date = `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일`;
-  const teamRows = Object.entries(TEAM).map(([k,E]) => { const t = tally(k);
-    return `<tr><td>${E.icon} ${esc(E.name)}</td><td class="num">${t.blue}</td><td class="num">${t.red}</td><td class="num">${t.draw}</td><td class="num">${matchesOf(k).length}</td></tr>`; }).join('');
+  // 승점 = 이긴 판 수 x 종목의 승점(기본 1)
+  const teamRows = Object.entries(TEAM).map(([k,E]) => { const t = tally(k), p = E.pts||1;
+    return `<tr><td>${E.icon} ${esc(E.name)}${p>1 ? ` (이기면 ${p}점)` : ''}</td><td class="num">${t.blue*p}</td><td class="num">${t.red*p}</td><td class="num">${t.draw}</td><td class="num">${matchesOf(k).length}</td></tr>`; }).join('');
   const matchTables = Object.entries(TEAM).map(([k,E]) => {
     const ms = matchesOf(k); if(!ms.length) return '';
-    return `<h3>${E.icon} ${esc(E.name)}</h3><table class="rt"><thead><tr><th>순번</th>${E.mode==='round'?'':`<th>${esc(teamName('blue'))}</th><th>${esc(teamName('red'))}</th>`}<th>결과</th>${E.mode==='time'?'<th>기록(초)</th>':''}</tr></thead><tbody>
+    const hasSc = ms.some(m => m.blueScore!=null);
+    return `<h3>${E.icon} ${esc(E.name)}</h3><table class="rt"><thead><tr><th>순번</th>${E.mode==='round'?'':`<th>${esc(teamName('blue'))}</th><th>${esc(teamName('red'))}</th>`}<th>결과</th>${E.mode==='time'?'<th>기록(초)</th>':''}${hasSc?'<th>점수</th>':''}</tr></thead><tbody>
       ${ms.map((m,i) => `<tr><td class="num">${i+1}</td>${E.mode==='round'?'':`<td>${esc(m.blueId?pname(m.blueId):'-')}</td><td>${esc(m.redId?pname(m.redId):'-')}</td>`}
-        <td>${m.winner==='draw' ? '무승부' : esc(teamName(m.winner))+' 승'}</td>${E.mode==='time'?`<td>${fmtSec(m.blueTime)} / ${fmtSec(m.redTime)}</td>`:''}</tr>`).join('')}</tbody></table>`;
+        <td>${m.winner==='draw' ? '무승부' : esc(teamName(m.winner))+' 승'}</td>${E.mode==='time'?`<td>${fmtSec(m.blueTime)} / ${fmtSec(m.redTime)}</td>`:''}${hasSc?`<td class="num">${scoreTxt(m)}</td>`:''}</tr>`).join('')}</tbody></table>`;
   }).join('');
   const indivTables = Object.entries(INDIV).map(([k,E]) => {
-    const { list, ties } = standings(k), m = optMap(k);
-    const tot = (ev, r) => r ? totalOf(ev, r.throws) : '';
+    const { list, ties } = standings(k), pr = hasPrac(k), u = E.vunit && E.vunit!=='점' ? E.vunit : '';
+    const tot = (ev, r) => r ? fmtNum(totalOf(ev, r.throws)) : '';
     // 본선 기록이 없고 연습만 한 사람은 순위 없이 뒤에 붙임
     const ranked = new Set(list.map(x => x.p.id));
     const only = people().filter(p => !ranked.has(p.id) && (rec(k,'p1',p.id) || rec(k,'p2',p.id) || rec(k,'final',p.id)));
     const row = (p, rank, r, total, ftotal, podium) => `<tr class="${podium?'podium':''}"><td class="num">${rank}</td><td>${esc(p.name)}</td>
-          <td class="num">${tot(k, rec(k,'p1',p.id))}</td><td class="num">${tot(k, rec(k,'p2',p.id))}</td>
-          <td>${r ? (r.throws||[]).map(t => m[t]?.v ?? 0).join(' · ') + (r.dist?` (${r.dist}m)`:'') : ''}</td><td class="num"><b>${total ?? ''}</b></td><td class="num">${ftotal ?? ''}</td></tr>`;
+          ${pr ? `<td class="num">${tot(k, rec(k,'p1',p.id))}</td><td class="num">${tot(k, rec(k,'p2',p.id))}</td>` : ''}
+          <td>${r ? (r.throws||[]).map(t => fmtNum(throwVal(k, t))).join(' · ') + (r.dist?` (${r.dist}m)`:'') : ''}</td><td class="num"><b>${total==null ? '' : fmtNum(total)}</b></td><td class="num">${ftotal==null ? '' : fmtNum(ftotal)}</td></tr>`;
     return `<h3>${E.icon} ${esc(E.name)} <small>본선 ${list.length}명 기록</small></h3>
-      ${ties.filter(t => !t.resolved).map(t => `<p class="warnp">※ ${t.total}점 동점(${t.names.map(esc).join(', ')})은 결승 기록이 없어 순위를 가리지 못했습니다.</p>`).join('')}
-      ${list.length || only.length ? `<table class="rt"><thead><tr><th>순위</th><th>이름</th><th>연습 1</th><th>연습 2</th><th>본선 1~5회</th><th>본선 합계</th><th>결승</th></tr></thead><tbody>
+      ${ties.filter(t => !t.resolved).map(t => `<p class="warnp">※ ${sc(k, t.total)} 동점(${t.names.map(esc).join(', ')})은 결승 기록이 없어 순위를 가리지 못했습니다.</p>`).join('')}
+      ${list.length || only.length ? `<table class="rt"><thead><tr><th>순위</th><th>이름</th>${pr ? '<th>연습 1</th><th>연습 2</th>' : ''}<th>본선 1~${E.count}회</th><th>본선 합계${u ? `(${esc(u)})` : ''}</th><th>결승</th></tr></thead><tbody>
         ${list.map(x => row(x.p, x.rank, x.r, x.total, x.ftotal, x.rank<=3)).join('')}${only.map(p => row(p, '', null, null, tot(k, rec(k,'final',p.id)), false)).join('')}</tbody></table>` : '<p>기록이 없습니다.</p>'}`;
   }).join('');
   const absent = people().filter(p => isAbsent(p.id));

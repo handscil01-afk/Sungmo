@@ -9,7 +9,7 @@ function settingsView(){
       <div class="seg sm"><button class="${p.team==='blue'?'on blue':''}" data-a="setTeam" data-v="${p.id}" data-t="blue">${esc(teamShort('blue'))}</button><button class="${p.team==='red'?'on red':''}" data-a="setTeam" data-v="${p.id}" data-t="red">${esc(teamShort('red'))}</button><button class="${!p.team?'on':''}" data-a="setTeam" data-v="${p.id}" data-t="">미정</button></div>
       <button class="ibtn" data-a="renameP" data-v="${p.id}" aria-label="이름 고치기">✏️</button><button class="ibtn danger" data-a="delP" data-v="${p.id}" aria-label="삭제">🗑</button></div>`).join('');
   const und = ps.length-cnt.red-cnt.blue;
-  const tabs = innerTabs('settings', [['list','👥','명단', ps.length], ['add','➕','명단 넣기'], ['team','🏷','팀·점수'], ['report','🖨','보고서'], ['reset','🧹','초기화']]);
+  const tabs = innerTabs('settings', [['list','👥','명단', ps.length], ['add','➕','명단 넣기'], ['team','🏷','팀·점수'], ['events','🏅','종목'], ['report','🖨','보고서'], ['reset','🧹','초기화']]);
   const body = {
     list: () => `<div class="card"><div class="row"><h2 class="grow h2" style="margin:0">참여자 ${ps.length}명</h2><span class="tag blue">${esc(teamShort('blue'))} ${cnt.blue}</span><span class="tag red">${esc(teamShort('red'))} ${cnt.red}</span>${und?`<span class="tag warn">미정 ${und}</span>`:''}</div>
       <p class="sub">팀을 바로 바꿀 수 있습니다. 새로 넣을 사람은 '명단 넣기' 탭에서 붙여 넣습니다.</p>
@@ -29,11 +29,12 @@ function settingsView(){
       <div class="item"><span class="name">안내판에 연습 순위 보이기<span class="sub">켜면 안내판의 종합 현황에 연습 1·2의 1~3등도 함께 나옵니다. 연습 점수는 개인전 기록표에 항상 보입니다.</span></span><label class="switch"><input type="checkbox" data-ch="sets" data-k="showPracRank" ${s.showPracRank?'checked':''}><span></span></label></div></div>
     <div class="card"><h2>줄다리기 계획 판 수</h2>
       <div class="row"><span class="grow">진행 현황의 남은 시간 계산에 씁니다</span><div class="seg">${[1,3,5].map(n => `<button class="${s.tugRounds===n?'on':''}" data-a="setS" data-k="tugRounds" data-v="${n}">${n}판</button>`).join('')}</div></div></div>`,
+    events: eventsTab,
     report: () => `<div class="card"><h2>결과 보고서 · 내려받기</h2>
       <button class="btn primary wide" data-a="report">🖨 결과 보고서 보기 (인쇄·PDF 저장)</button>
       <div class="row" style="margin-top:10px"><button class="btn grow" data-a="csv" data-v="indiv">개인전 기록 (엑셀용 CSV)</button><button class="btn grow" data-a="csv" data-v="team">단체전 기록 (엑셀용 CSV)</button></div></div>`,
     reset: () => `<div class="card"><h2>🧹 시험 기록 초기화</h2>
-      <p class="sub">운동회 전에 시험해 본 점수·승패·호출(감독 호출 포함)·안내·불참 표시·문자 무전을 한 번에 지웁니다. 명단, 팀, 담당자 명단, 역할, 일정은 그대로 남습니다.</p>
+      <p class="sub">운동회 전에 시험해 본 점수·승패·호출(감독 호출 포함)·개인전 대기 줄·과녁판 표시·안내·불참 표시·문자 무전을 한 번에 지웁니다. 명단, 팀, 담당자 명단, 역할, 일정은 그대로 남습니다.</p>
       <button class="btn danger wide" data-a="resetAll">시험 기록 모두 지우기</button></div>`,
   }[ITAB.settings]();
   return `<div class="bctl">${tabs}${body}</div>`;
@@ -65,17 +66,18 @@ function csv(kind){
   const q = v => { const s=String(v??''); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
   const t = v => v ? new Date(v).toLocaleString('ko-KR') : '';
   if(kind==='indiv'){
-    rows.push(['종목','구분','이름','1회','2회','3회','4회','5회','합계','거리','입력자','입력 시각','수정자','수정 시각']);
-    Object.entries(INDIV).forEach(([ev,E]) => { const m = optMap(ev);
+    const maxN = Math.max(5, ...Object.values(INDIV).map(E => E.count));
+    rows.push(['종목','구분','이름',...Array.from({length:maxN}, (_,k) => `${k+1}회`),'합계','거리','입력자','입력 시각','수정자','수정 시각']);
+    Object.entries(INDIV).forEach(([ev,E]) => {
       D.indiv.filter(r => r.event===ev && !r.deleted && (r.throws||[]).length)
         .sort((x,y) => (ROUND_KEYS.indexOf(x.round) - ROUND_KEYS.indexOf(y.round)) || String(pname(x.personId)).localeCompare(String(pname(y.personId)), 'ko')).forEach(r => {
-        const pts = Array.from({length:5}, (_,k) => r.throws[k]!=null ? (m[r.throws[k]]?.v ?? 0) : '');
+        const pts = Array.from({length:maxN}, (_,k) => r.throws[k]!=null ? throwVal(ev, r.throws[k]) : '');
         rows.push([E.name, ROUNDS[r.round] || r.round, pname(r.personId), ...pts, totalOf(ev,r.throws), r.dist?r.dist+'m':'', r.by||'', t(r.at), r.editedBy||'', t(r.editedAt)]);
       }); });
   } else {
-    rows.push(['종목','순번',teamName('blue')+' 선수',teamName('red')+' 선수','결과',teamName('blue')+' 기록(초)',teamName('red')+' 기록(초)','입력자','입력 시각','수정자','수정 시각']);
+    rows.push(['종목','순번',teamName('blue')+' 선수',teamName('red')+' 선수','결과',teamName('blue')+' 기록(초)',teamName('red')+' 기록(초)',teamName('blue')+' 점수',teamName('red')+' 점수','입력자','입력 시각','수정자','수정 시각']);
     Object.entries(TEAM).forEach(([ev,E]) => matchesOf(ev).forEach((m,i) => rows.push([E.name, i+1, m.blueId?pname(m.blueId):'', m.redId?pname(m.redId):'',
-      m.winner==='draw' ? '무승부' : teamName(m.winner)+' 승', m.blueTime??'', m.redTime??'', m.by||'', t(m.at), m.editedBy||'', t(m.editedAt)])));
+      m.winner==='draw' ? '무승부' : teamName(m.winner)+' 승', m.blueTime??'', m.redTime??'', m.blueScore??'', m.redScore??'', m.by||'', t(m.at), m.editedBy||'', t(m.editedAt)])));
   }
   const blob = new Blob(['﻿'+rows.map(r => r.map(q).join(',')).join('\r\n')], {type:'text/csv;charset=utf-8'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
@@ -115,7 +117,8 @@ Object.assign(ACT, {
     const by = { editedBy:UI.me, editedAt:now() }, jobs = [];
     D.indiv.filter(r => !r.deleted).forEach(r => jobs.push(put(['main','indiv',r.id], { event:r.event, deleted:true, ...by })));
     D.matches.filter(m => !m.deleted).forEach(m => jobs.push(put(['main','matches',m.id], { event:m.event, deleted:true, ...by })));
-    Object.keys(D.calls).forEach(ev => jobs.push(put(['main','calls',ev], { pick:{ blue:null, red:null }, call:null, times:null })));
+    Object.keys(D.calls).forEach(ev => jobs.push(put(['main','calls',ev], { pick:{ blue:null, red:null }, call:null, times:null, marks:{ list:[], addN:0, addAt:0 } })));
+    Object.keys(D.queues).forEach(id => jobs.push(guard(store.del(['main','queues',id]))));
     Object.keys(D.absent).forEach(id => jobs.push(guard(store.del(['main','absent',id]))));
     Object.keys(D.ccalls).forEach(id => jobs.push(guard(store.del(['main','ccalls',id]))));
     D.msgs.forEach(m => jobs.push(guard(store.del(['main','msgs',m.id]))));

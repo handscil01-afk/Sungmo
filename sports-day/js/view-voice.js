@@ -11,18 +11,18 @@ const vstrip = s => String(s ?? '').replace(VSTRIP, '');
 // 중계 모드 기기인가: 마스터가 아니고, 운영 현황만 맡았고, 중계 모드를 켠 기기
 const voiceShellOn = r => r.role==='staff' && !!r.voice && monitorOnly(r);
 const voiceMode = () => !!store && !!UI.me && !D.fatal && !D.amMaster && voiceShellOn(myRole());
-// 대기 중인 사람 수: 대기 줄 기능이 생기면 여기서 숫자를 돌려줌 (지금은 null: 말하지 않음)
-function waitCount(ev){ return null; }
+// 대기 중인 사람 수 (개인전 부스의 대기 줄 길이)
+function waitCount(ev){ return qList(ev).length; }
 
 /* ---------- 읽어 줄 글 ---------- */
 const nameOf = (m, team) => { const id = team==='blue' ? m.blueId : m.redId; return id ? pname(id) : ((team==='blue' ? m.blueName : m.redName) || ''); };
 // 1~3등 문장. 같은 순위가 여럿이면 '공동 2등 A, B 20점'
-function rankText(st){
+function rankText(st, ev){
   const groups = [];
   st.list.filter(x => x.rank <= 3).forEach(x => { const g = groups.find(g => g.rank===x.rank); if(g) g.xs.push(x); else groups.push({ rank:x.rank, xs:[x] }); });
   return groups.map(g => g.xs.length > 1
-    ? `공동 ${g.rank}등 ${g.xs.map(x => x.p.name).join(', ')} ${g.xs[0].total}점`
-    : `${g.rank}등 ${g.xs[0].p.name} ${g.xs[0].total}점`).join(', ');
+    ? `공동 ${g.rank}등 ${g.xs.map(x => x.p.name).join(', ')} ${sc(ev, g.xs[0].total)}`
+    : `${g.rank}등 ${g.xs[0].p.name} ${sc(ev, g.xs[0].total)}`).join(', ');
 }
 const indivStarted = ev => D.indiv.some(r => r.event===ev && !r.deleted && (r.throws||[]).length);
 // 개인전 한 종목: 본선이 안 끝났으면 남은 사람 수, 끝났으면 1~3등과 동점·결승 결과. detail이면 끝나기 전에도 '현재 순위'를 함께 읽어 줌
@@ -33,16 +33,16 @@ function voiceIndiv(ev, detail){
   const out = [];
   if(!done){
     const w = waitCount(ev);
-    out.push(`${E.name}, 본선 ${left}명 남음.${w != null ? ` 대기 ${w}명.` : ''}`);
+    out.push(`${E.name}, 본선 ${left}명 남음${w ? `, 대기 ${w}명` : ''}.`);
   }
-  if(st.list.length && (done || detail)) out.push(`${E.name} ${done ? '' : '현재 순위 '}${rankText(st)}.`);
+  if(st.list.length && (done || detail)) out.push(`${E.name} ${done ? '' : '현재 순위 '}${rankText(st, ev)}.`);
   else if(detail && !done) out.push(`${E.name}, 아직 본선 기록이 없습니다.`);
   if(done){
     st.ties.forEach(t => {
-      if(!t.resolved) out.push(`결승 필요: ${t.names.join(', ')}, ${t.total}점 동점.`);
+      if(!t.resolved) out.push(`결승 필요: ${t.names.join(', ')}, ${sc(ev, t.total)} 동점.`);
       else {
         const fin = t.ids.map(id => st.list.find(x => x.p.id===id)).filter(Boolean).sort((a, b) => (b.ftotal ?? -1) - (a.ftotal ?? -1));
-        out.push(`결승 결과: ${fin.map(x => `${x.p.name} ${x.ftotal}점`).join(', ')}.`);
+        out.push(`결승 결과: ${fin.map(x => `${x.p.name} ${sc(ev, x.ftotal)}`).join(', ')}.`);
       }
     });
   }
@@ -61,9 +61,10 @@ const totalText = () => { const t = totalPoints(); return `전체 승점 ${teamN
 function lastResult(ev){
   const ms = matchesOf(ev), m = ms[ms.length - 1]; if(!m) return '';
   const round = TEAM[ev].mode === 'round', head = round ? '직전 판' : '직전 경기';
-  if(m.winner === 'draw') return `${head}: 무승부.`;
+  const pt = scoreTxt(m) ? `, 점수 ${fmtNum(m.blueScore)} 대 ${fmtNum(m.redScore)}` : '';
+  if(m.winner === 'draw') return `${head}: 무승부${pt}.`;
   const nm = round ? '' : nameOf(m, m.winner);
-  return `${head}: ${teamName(m.winner)}${nm ? ' ' + nm : ''} 승리.`;
+  return `${head}: ${teamName(m.winner)}${nm ? ' ' + nm : ''} 승리${pt}.`;
 }
 // 지금 경기 줄: 짝을 이루는 종목은 '청팀 ○○○ 대 홍팀 ○○○ 경기 중', 줄다리기는 'n판째'
 function voiceNowLine(ev){
@@ -154,6 +155,8 @@ function matchSpeech(m){
   let res;
   if(m.winner === 'draw') res = '무승부';
   else { const nm = round ? '' : nameOf(m, m.winner); res = `${teamName(m.winner)}${nm ? ' ' + nm : ''} 승리`; }
+  // 대결 점수를 기록한 경기는 '점수 3 대 2'를 먼저 읽고, 종목 누적은 '누적'으로 구분
+  if(scoreTxt(m)) return `${label}, ${res}, 점수 ${fmtNum(m.blueScore)} 대 ${fmtNum(m.redScore)}. 누적 ${teamName('blue')} ${t.blue}, ${teamName('red')} ${t.red}.`;
   return `${label}, ${res}. 점수 ${teamName('blue')} ${t.blue}, ${teamName('red')} ${t.red}.`;
 }
 function voiceTick(){
