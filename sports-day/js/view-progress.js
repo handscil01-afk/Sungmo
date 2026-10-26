@@ -62,37 +62,36 @@ function progressView(){
   const fin = L => L.some(x => x.a.st==='done') && L.every(x => x.a.st==='done' || x.a.st==='none');
   const iDone = fin(I), tDone = fin(T);
   const doneN = [...I, ...T].filter(x => x.a.st==='done').length, allN = I.length + T.length;
-  const grp = (label, sub, ms, calc, done) => `<div class="pgrp"><small>${label}</small>
+  const grp = (label, sub, ms, calc, done) => `<div class="pgrp"><small>${label} <em>${sub}</em></small>
       <b>${done ? '완료 ✓' : ms ? `약 ${minText(ms)}` : '계산 중'}</b>
-      <span>${done ? '' : ms ? `${hm(t + ms)}쯤 끝${calc ? ' · 일부 계산 중' : ''}` : '기록 2개부터 계산'}</span><em>${sub}</em></div>`;
+      <span>${done ? '' : ms ? `${hm(t + ms)}쯤 끝${calc ? ' · 일부 계산 중' : ''}` : '기록 2개부터 계산'}</span></div>`;
+  // 종목 하나: 윗줄은 이름과 남은 시간, 아랫줄은 진행 막대와 인원 (좁은 휴대폰 화면에서도 한 화면에 모두 들어가게 두 줄로)
   const row = ({ e, a }) => {
     const E = EVENTS[e.ev], pct = e.total ? Math.min(100, Math.round(e.done / e.total * 100)) : 0;
-    let main, sub = '';
-    if(e.kind === 'indiv'){ main = `본선 ${e.done}/${e.total}명`; sub = `${e.prac ? `연습 1 ${e.p1}명 · 연습 2 ${e.p2}명 · ` : ''}대기 ${e.wait}명`; }
-    else if(e.kind === 'round'){ main = `${e.done}/${e.total}판`; sub = e.rem ? `남은 판 ${e.rem}` : ''; }
-    else { main = `${e.done}/${e.total}명 · 남은 대결 ${e.rem}`; }
+    let main, sub = '', subFull = '';
+    if(e.kind === 'indiv'){ main = `본선 ${e.done}/${e.total}명`; sub = `${e.prac ? `연1 ${e.p1} · 연2 ${e.p2} · ` : ''}대기 ${e.wait}`; subFull = `${e.prac ? `연습 1 ${e.p1}명 · 연습 2 ${e.p2}명 · ` : ''}대기 ${e.wait}명`; }
+    else if(e.kind === 'round'){ main = `${e.done}/${e.total}판`; sub = e.rem ? `남은 판 ${e.rem}` : ''; subFull = sub; }
+    else { main = `${e.done}/${e.total}명`; sub = `남은 대결 ${e.rem}`; subFull = sub; }
     let eta;
     if(a.st === 'done') eta = '<span class="tag ok">완료 ✓</span>';
     else if(a.st === 'none') eta = '<span class="tag">명단 없음</span>';
-    else if(a.st === 'calc') eta = '<span class="tag">계산 중(기록 2개부터)</span>';
-    else eta = `<span class="tag dark">약 ${minText(a.ms)} 남음 · ${hm(a.end)}쯤 끝</span>${a.est ? ' <span class="sub">(다른 단체전 기준 추정)</span>' : ''}`;
+    else if(a.st === 'calc') eta = '<span class="tag">계산 중</span>';
+    else eta = `<span class="tag dark">약 ${minText(a.ms)} · ${hm(a.end)}쯤 끝</span>${a.est ? ' <span class="sub" title="다른 단체전 기준 추정">추정</span>' : ''}`;
     return `<div class="progcard ${a.st==='done'?'fin':''}" style="--ev:${E.color}">
-      <div class="pc-top"><span class="pc-ic">${E.icon}</span><b class="pc-nm">${esc(E.name)}</b><span class="pc-main">${esc(main)}</span></div>
-      <div class="progress"><i style="width:${pct}%;background:${E.color}"></i></div>
-      <div class="pc-sub">${sub ? `<span class="sub">${esc(sub)}</span>` : ''}<span class="pc-eta">${eta}</span></div></div>`;
+      <div class="pc-top"><span class="pc-ic">${E.icon}</span><b class="pc-nm">${esc(E.name)}</b><span class="pc-eta">${eta}</span></div>
+      <div class="pc-bar"><div class="progress"><i style="width:${pct}%;background:${E.color}"></i></div><span class="pc-main">${esc(main)}</span>${sub ? `<span class="pc-sub" title="${esc(subFull)}">${esc(sub)}</span>` : ''}</div></div>`;
   };
   return `<div class="prog">
-    <div class="card progsum"><div class="row"><h2 class="grow h2" style="margin:0">🧭 진행 현황</h2><span class="sub">${hm(t)} 기준 · 완료 ${doneN}/${allN} 종목</span></div>
-      <div class="pgrps">${grp('개인전', '세 종목 동시 진행', iMs, iCalc, iDone)}${grp('단체전', '종목을 차례로 진행', tMs, tCalc, tDone)}</div>
-      <p class="sub">남은 시간은 기록을 저장한 간격의 평균(15분보다 긴 간격은 쉬는 시간으로 보고 뺌)에 남은 사람·대결 수를 곱해 계산합니다. 30초마다 새로 계산합니다.</p></div>
-    <h3 class="progh">개인전</h3><div class="progrid">${I.map(row).join('')}</div>
-    <h3 class="progh">단체전</h3><div class="progrid">${T.map(row).join('')}</div>
+    <div class="card progsum"><div class="row"><h2 class="grow h2" style="margin:0">🧭 진행 현황</h2><span class="sub">${hm(t)} 기준 · 완료 ${doneN}/${allN} 종목</span>
+        <details class="pcalc"><summary aria-label="남은 시간 계산 방법">ⓘ</summary><p>남은 시간은 기록을 저장한 간격의 평균(15분보다 긴 간격은 쉬는 시간으로 보고 뺌)에 남은 사람·대결 수를 곱해 계산합니다. 30초마다 새로 계산합니다.</p></details></div>
+      <div class="pgrps">${grp('개인전', '세 종목 동시', iMs, iCalc, iDone)}${grp('단체전', '차례로 진행', tMs, tCalc, tDone)}</div></div>
+    <div class="progrid">${I.map(row).join('')}${T.map(row).join('')}</div>
   </div>`;
 }
 // 지금 이 기기에서 진행 현황 화면이 보이는지 (보일 때만 30초마다 다시 그림)
 function progressVisible(){
   if(document.visibilityState !== 'visible' || !store || !UI.me) return false;
-  if(D.amMaster) return UI.mtab === 'board' && ITAB.board === 'prog' && !UI.preview && !UI.report;
+  if(D.amMaster) return UI.mtab === 'board' && ITAB.board === 'status' && ITAB.boardStat === 'prog' && !UI.preview && !UI.report;
   const r = myRole();
   return r.role === 'staff' && UI.stab === 'mon';
 }

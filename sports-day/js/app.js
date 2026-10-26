@@ -85,13 +85,14 @@ function render(){
     picker = pickerBtn(cur.icon, cur.label, cur.color, st.length>1);
     body = staffBody(r); fit = UI.stab!=='mon';          // 진행 현황은 길어서 페이지 스크롤
   } else if(r.role==='board'){
-    shell = 'shell boardshell'; body = boardScreen();
+    shell = 'shell boardshell' + (bdPC() ? ' pcshell' : ''); body = boardScreen();
     corner = `<button class="cornerbtn" data-a="menu" aria-label="메뉴">${ICON.menu}</button>`;
-  } else body = waitView();
+  } else body = r.offDuty ? waitView('종목이 꺼져 있습니다', '맡은 종목이 지금 꺼져 있습니다. 마스터에게 역할을 확인해 주세요.') : waitView();
   head = r.role==='board' ? '' : header(r, picker);
   if(UI.preview && r.role==='master'){
-    shell = 'shell boardshell'; head = ''; nav = ''; fit = false; body = boardScreen();
-    corner = `<button class="btn primary previewexit" data-a="boardPreview">미리 보기 끝내기</button>`;
+    shell = 'shell boardshell' + (bdPC() ? ' pcshell' : ''); head = ''; nav = ''; fit = false; body = boardScreen();
+    // 미리 보기에서는 태블릿 / PC 화면을 바꿔 가며 볼 수 있음
+    corner = `<div class="previewexit"><div class="seg sm" role="group" aria-label="안내판 화면 종류">${[['tablet','태블릿'],['pc','PC']].map(([k,l]) => `<button class="${BDKIND===k?'on':''}" data-a="bdKind" data-v="${k}" aria-pressed="${BDKIND===k}">${l}</button>`).join('')}</div><button class="btn primary small" data-a="boardPreview">미리 보기 끝내기</button></div>`;
   }
   const err = D.error ? `<div class="note">${esc(D.error)}</div>` : '';
   const rulesWarn = D.amMaster && D.rulesOld && !UI.preview ? `<div class="note rulesold" role="alert"><b>서버 규칙이 예전 것입니다.</b> 파이어베이스 콘솔 Firestore 규칙에 새 firestore.rules를 붙여 넣고 게시해 주세요. 게시하기 전에는 담당자 명단의 운영 현황·감독 호출 등이 막힙니다.
@@ -103,6 +104,8 @@ function render(){
   drawSheet();
   paintWatch();
   radioInit(); radioRender();
+  innerTabsFix();
+  bdAfterRender();
   if(D.amMaster){ rtSyncSoon(); dedupeSoon(); rulesCheck(); }
 }
 /* 서버 규칙이 최신인지 확인 (마스터 기기, 접속할 때 한 번): main/meta/rules 문서를 쓸 수 있으면 최신 규칙
@@ -160,6 +163,8 @@ function menuSheet(){
     <p>이 기기: <b>${esc(UI.me)}</b> · ${esc(roleIcon(r))} ${esc(roleLabel(r))}</p>
     <div class="list menu">
       <div class="item tap" data-a="rename"><span class="name">✏️ 이름 바꾸기</span></div>
+      ${r.role==='board' ? `<div class="item col"><span class="name">🖥 안내판 화면 종류<span class="sub">태블릿은 지금 모양 그대로, PC·프로젝터는 모든 화면을 스크롤 없이 한 화면에 꼭 맞게 키워 보여 줍니다. 이 기기에만 적용됩니다.</span></span>
+        <div class="seg sm" role="group" aria-label="안내판 화면 종류">${[['tablet','태블릿'],['pc','PC·프로젝터']].map(([k,l]) => `<button class="${BDKIND===k?'on':''}" data-a="bdKind" data-v="${k}" aria-pressed="${BDKIND===k}">${l}</button>`).join('')}</div></div>` : ''}
       ${r.role!=='board' ? '<div class="item tap" data-a="schedSheet"><span class="name">📅 진행 일정<span class="sub">오늘 일정과 남은 시간을 봅니다.</span></span></div>' : ''}
       ${can.staff() ? '<div class="item tap" data-a="msgSheet"><span class="name">💬 문자 무전 · 🚨 긴급 호출</span></div>' : ''}
       ${can.abs() ? '<div class="item tap" data-a="attSheet"><span class="name">👥 출석 체크<span class="sub">오지 않은 선수를 불참으로 표시합니다.</span></span></div>' : ''}

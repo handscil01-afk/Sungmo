@@ -445,6 +445,7 @@ body.has-radio:not(.has-nav){ --dockh: calc(70px + var(--sab)) }
 .shell>.top{flex:none}
 .shell>main{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;max-width:none;width:100%;margin:0;padding:12px 14px 16px}
 .shell>main>*{max-width:1240px;margin-left:auto;margin-right:auto}
+.shell>main>.ovl{max-width:none;margin:0}   /* 화면 가득 뜨는 창은 폭 제한 없이 */
 .boardshell>main{padding:12px 16px 16px}
 main.fitmain{overflow:hidden;display:flex;flex-direction:column;padding:10px 12px}
 .fit{flex:1;min-height:0;width:100%;max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
@@ -680,7 +681,6 @@ body.has-radio:not(.has-nav){ --dockh: calc(58px + var(--sab)) }
 .bctl .chip{min-height:42px;padding:4px 10px;font-size:15px;border-radius:12px;white-space:normal;line-height:1.15}
 .bctl .phr{display:flex}
 .bctl .phr .chip{flex:1;text-align:left}
-.bctl .chips:has(.phr){grid-template-columns:1fr}
 .bctl .sub{font-size:14px}
 .tsplit{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px}
 .tmain{flex:none;display:flex;flex-direction:column;gap:10px}
@@ -716,7 +716,31 @@ body.has-radio:not(.has-nav){ --dockh: calc(58px + var(--sab)) }
   .tsplit>.queue{flex:1;min-width:0}
   .pcard{min-height:70px}
   .winrow .btn.huge{min-height:56px}
+  /* 줄 잡고 달리기처럼 시간을 재는 단체전 심판: 저장 단추까지 한 화면에 */
+  .tmain{gap:6px}
+  .tmain>.btn.huge{flex:none;min-height:44px;font-size:18px;border-radius:14px}
+  .tmain .watchrow{gap:8px} .tmain .watchrow .watch{font-size:clamp(28px,8vh,40px)} .tmain .watchrow .btn.huge{min-height:44px;min-width:96px;font-size:20px}
+  .tmain .duel .pcard{min-height:0;padding:4px 6px}
+  .tmain .tcell{padding:3px 6px} .tmain .tcell .timein{padding:3px 6px;font-size:18px} .tmain .tcell .btn.small{padding:3px 8px;min-height:34px}
+  .tmain .duel .pcard .nm{font-size:clamp(22px,7vh,30px)}
+  /* 계시원: 왼쪽에 선수와 초시계, 오른쪽에 시작·보내기 */
+  .timerfit{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr) auto;grid-template-areas:"info info" "duel start" "watch send" "watch next";gap:6px 10px}
+  .timerfit>.infobar{grid-area:info} .timerfit>.duel{grid-area:duel} .timerfit>.watch{grid-area:watch} .timerfit>.timerstart{grid-area:start} .timerfit>.winrow{grid-area:send;align-self:start} .timerfit>.nextbar{grid-area:next}
+  .timerfit .watch.huge{font-size:clamp(48px,22vh,96px)}
+  .timerfit .timerstart .btn.huge{min-height:52px;font-size:22px}
+  .timerfit .winrow .btn.huge{min-height:48px;font-size:18px}
+  .timerfit .nextbar{min-height:40px;padding:3px 10px}
+  .timerfit .duel.small{align-self:stretch}
+  /* 감독: 출전 순서와 넣을 팀원을 좌우로 나란히 */
+  .cpanel.sel{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr);gap:4px 10px;padding:6px 10px}
+  .cpanel>.ptitle:first-child{grid-column:1/-1}
+  .cpanel>.box{grid-column:1;grid-row:2/4;min-height:0;overflow-y:auto}
+  .cpanel>.pooltitle{grid-column:2;grid-row:2;border-top:0;padding-top:0}
+  .cpanel>.dropzone.pool{grid-column:2;grid-row:3;max-height:none;min-height:0}
+  .cpanel .psub{display:none}
+  .cpanel .orow{min-height:40px} .cpanel .orow .handle,.cpanel .orow .xbtn{width:34px;height:34px}
 }
+@media (min-width:900px) and (max-height:560px) and (orientation:landscape){ .cpanel{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr)} }
 .infobar .sub{white-space:nowrap}
 .coachinfo{gap:6px}
 .coachinfo .cn{font-size:19px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
@@ -1229,3 +1253,222 @@ body.has-nav .tsplit.tgt{--tgw:min(100%, max(220px, calc(100dvh - 552px)))}
 
 /* 안내판 과녁판: 멀리서도 번호가 보이게 표시를 크게 */
 .bdtg .tgtbox .mk{width:max(32px,9cqw);font-size:max(16px,5cqw);border-width:4px}
+
+/* ===================== 3단계(한눈에 보기): 안쪽 탭 줄 · 마스터 안내판 메뉴 · 진행 현황 ===================== */
+/* 안쪽 탭 줄: 탭이 많아도 줄바꿈 없이 한 줄로 두고, 넘치면 옆으로 밀어서 봄 (지금 탭은 항상 보이게 맞춰 줌) */
+.btabs{overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.btabs::-webkit-scrollbar{display:none}
+.btabs button{flex:1 0 auto;min-width:64px;padding:4px 10px;white-space:nowrap}
+.btabs button span{white-space:nowrap}
+.btabs button small{font-size:11px;font-weight:800;opacity:.8}
+.btabs.sub{position:static;top:auto;margin-bottom:8px}
+.btabs.sub button{flex-direction:row;justify-content:center;gap:6px;min-height:42px;font-size:15px}
+.btabs.sub button b{font-size:17px}
+.menu .item.col{flex-direction:column;align-items:stretch;gap:8px}
+.menu .item.col .name{white-space:normal}
+
+/* 화면·소리 탭 */
+.bctl .chips.modes,.bctl .chips.prep{grid-template-columns:repeat(3,1fr)}
+.bctl .chips.modes .chip,.bctl .chips.prep .chip{min-height:34px;font-size:14px;padding:2px 4px;text-align:center;line-height:1.15}
+.bctl .card p.sub{margin:6px 0 0;line-height:1.3}
+.swgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.swtile{display:flex;align-items:center;gap:8px;border:2px solid var(--line);border-radius:12px;padding:6px 8px;min-height:54px;font-weight:800;cursor:pointer}
+.swtile .name{flex:1;min-width:0;font-size:15px;font-weight:800;line-height:1.2}
+.swtile .name .sub{display:block;font-size:12px;font-weight:600;line-height:1.2;margin-top:2px}
+.swtile .switch{width:46px;height:28px}
+.swtile .switch span:before{width:22px;height:22px}
+.swtile .switch input:checked+span:before{transform:translateX(18px)}
+.bctl .twobtn{flex-wrap:nowrap;gap:8px}
+.bctl .twobtn .btn{min-height:46px;padding:6px 8px;font-size:16px}
+
+/* 안내방송 탭: 자주 쓰는 문구는 작은 칩으로 여러 줄에 흐르듯 */
+.livenote{display:flex;align-items:center;gap:8px;padding:8px 10px;font-size:15px;margin-bottom:8px}
+.livenote .grow{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.bctl h3{margin:12px 0 6px;font-size:15px}
+.phrbox{max-height:calc(100dvh - 470px);min-height:104px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.phrgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px}
+.bctl .phr{position:relative;display:flex;min-width:0}
+.bctl .phr .chip{flex:1;min-width:0;min-height:38px;padding:4px 28px 4px 10px;font-size:15px;line-height:1.2;text-align:left;border-radius:12px;white-space:normal}
+.bctl .phr .pt{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+.bctl .phx{position:absolute;right:3px;top:3px;width:24px;height:24px;min-height:0;padding:0;border:0;border-radius:50%;background:var(--bg);font-size:12px;line-height:1}
+
+/* 시상식 탭 */
+.awlist{max-height:calc(100dvh - 330px);overflow-y:auto;margin-top:8px;-webkit-overflow-scrolling:touch}
+.awlist .item{min-height:40px;padding:4px 6px;gap:8px}
+.awlist .item .name{font-size:16px}
+.awlist .item .name .sub{display:inline;font-size:13px;margin-left:6px}
+
+/* 현황 탭: 개인전 1~3등 · 단체전 승점 */
+.stgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+@media (min-width:640px){ .stgrid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} }
+.stgrid>.card{min-width:0}
+.bctl .stcard{padding:6px 12px;margin-bottom:0}
+.sthead{display:flex;align-items:center;gap:8px;margin-bottom:2px}
+.sthead b{font-size:17px;font-weight:900;flex:1;min-width:0}
+.sthead .tag{padding:2px 8px;font-size:13px}
+.strow{display:flex;align-items:center;gap:8px;min-height:26px;border-top:1px solid var(--bg)}
+.strow .rk{width:22px;text-align:center;font-weight:900;font-size:17px}
+.strow .nm{flex:1;min-width:0;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.strow .v{font-weight:900;font-size:17px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.stcard .empty{padding:6px;font-size:15px}
+.stcard .note{padding:4px 8px;font-size:13px;margin:2px 0}
+.bctl .stteam{padding:10px 12px}
+.stteam .totals{gap:8px}
+.stteam .tbox{padding:6px;border-radius:12px}
+.stteam .tbox .v{font-size:44px}
+.stteam .tbox .t{font-size:17px}
+.stteam table{margin-top:6px!important;font-size:16px}
+.stteam th,.stteam td{padding:4px 6px}
+.stteam .score{font-size:20px}
+.stteam td>.row span:first-child{font-size:20px!important}
+
+/* 진행 현황: 종목마다 두 줄 (이름·남은 시간 / 진행 막대·인원) */
+.prog .progsum{padding:10px 12px}
+.prog .progsum .pgrps{gap:8px;margin:6px 0 0}
+.prog .pgrp{padding:4px 10px;gap:0}
+.prog .pgrp b{font-size:21px;line-height:1.15}
+.prog .pgrp span{font-size:13px}
+.prog .progsum{position:relative}
+.prog .progsum .pcalc{position:relative;flex:none;font-size:13px;color:var(--sub)}
+.prog .progsum .pcalc summary{cursor:pointer;font-weight:900;font-size:18px;line-height:1;padding:2px 6px;list-style:none}
+.prog .progsum .pcalc summary::-webkit-details-marker{display:none}
+.prog .progsum .pcalc p{position:absolute;right:0;top:100%;z-index:6;width:min(280px,80vw);margin:4px 0 0;padding:8px 10px;background:#fff;border:2px solid var(--line);border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.2);color:var(--ink);font-size:13px;line-height:1.35}
+.prog .progrid{gap:5px}
+.prog .progcard{display:flex;flex-direction:column;gap:2px;padding:3px 10px;border-left-width:6px;border-radius:12px}
+.prog .pc-top{display:flex;align-items:center;flex-wrap:nowrap;gap:6px}
+.prog .pc-ic{font-size:18px;line-height:1}
+.prog .pc-nm{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.prog .pc-top .pc-eta{margin-left:auto;flex:none;font-size:13px;font-weight:800;white-space:nowrap;display:inline-flex;gap:4px;align-items:center}
+.prog .pc-top .pc-eta .tag{padding:0 8px;font-size:13px;line-height:22px;min-height:0}
+.prog .pc-top{min-height:24px;line-height:1.1}
+.prog .pc-bar{display:flex;align-items:center;gap:8px;line-height:1.15}
+.prog .pc-bar .progress{flex:1;min-width:40px;height:8px}
+.prog .pc-main{margin:0;font-size:13px;font-weight:900;white-space:nowrap;font-variant-numeric:tabular-nums}
+.prog .pc-sub{font-size:12px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto;font-weight:700}
+
+/* ===================== 3단계(한눈에 보기): PC·프로젝터 안내판 =====================
+   모든 글자는 기준 글자 크기 --fs 의 배수로 정함. --fs 는 board-pc.js 가 화면에 꼭 맞는 가장 큰 값으로 맞춤 */
+body.nocursor,body.nocursor *{cursor:none!important}
+.cornerbtn:hover{opacity:1}
+.previewexit{display:flex;align-items:center;gap:8px}
+.previewexit .seg{background:#fff}
+.previewexit .btn.small{min-height:42px}
+.shell.boardshell.pcshell>main{overflow:hidden;padding:max(10px,var(--sat)) max(14px,var(--sar)) max(10px,var(--sab)) max(14px,var(--sal))}
+.shell.pcshell>main>.bd{max-width:none;width:100%;margin:0}
+.bd.bdpc{--fs:22px;--lg:calc(var(--fs)*2.4);font-size:var(--fs);line-height:1.2;gap:calc(var(--fs)*.45);
+  height:calc(100vh - max(10px,var(--sat)) - max(10px,var(--sab)));height:calc(100dvh - max(10px,var(--sat)) - max(10px,var(--sab)));min-height:0;overflow:hidden}
+.bdpc .tb{width:calc(var(--fs)*1.25);height:calc(var(--fs)*1.25);font-size:calc(var(--fs)*.72)}
+.bdpc .tb.big{width:calc(var(--fs)*1.8);height:calc(var(--fs)*1.8);font-size:calc(var(--fs)*1.05)}
+.bdpc .annstrip,.bdpc .caststrip,.bdpc .schedstrip{flex:none;font-size:calc(var(--fs)*1.4);padding:.3em .7em;border-width:max(2px,calc(var(--fs)*.14));border-radius:.5em;line-height:1.2}
+.bdpc .bdhead{flex:none;gap:calc(var(--fs)*.4) calc(var(--fs)*.7)}
+.bdpc .bdhead h1{font-size:calc(var(--fs)*1.7)}
+.bdpc .bic{font-size:calc(var(--fs)*2)}
+.bdpc .bsub{font-size:calc(var(--fs)*.95)}
+.bdpc .bscore{gap:calc(var(--fs)*.4);padding:calc(var(--fs)*.1) calc(var(--fs)*.6);border-width:max(2px,calc(var(--fs)*.12));border-radius:calc(var(--fs)*.8)}
+.bdpc .bscore .n{font-size:calc(var(--fs)*2.6)}
+.bdpc .bscore .c{font-size:calc(var(--fs)*1.7)}
+.bdpc .callbar{flex:none;gap:calc(var(--fs)*.4) calc(var(--fs)*1.2);padding:calc(var(--fs)*.3) calc(var(--fs)*.9);border-width:max(3px,calc(var(--fs)*.16));border-radius:calc(var(--fs)*.9)}
+.bdpc .callbar .cl{font-size:calc(var(--fs)*1.7)}
+.bdpc .callbar .cp{font-size:calc(var(--fs)*2.4);gap:calc(var(--fs)*.4)}
+.bdpc .callbar .tb.big{width:calc(var(--fs)*2.2);height:calc(var(--fs)*2.2);font-size:calc(var(--fs)*1.3)}
+.bdpc .bdlabel{flex:none;font-size:calc(var(--fs)*1.05);margin:0;gap:calc(var(--fs)*.6)}
+.bdpc .bdnext{font-size:calc(var(--fs)*.9);border-width:2px;padding:0 calc(var(--fs)*.5);gap:calc(var(--fs)*.4)}
+.bdpc .bdnext .tb{width:calc(var(--fs)*1.2);height:calc(var(--fs)*1.2);font-size:calc(var(--fs)*.7)}
+.bdpc .bdvs{flex:1 1 0;min-height:0;gap:calc(var(--fs)*.6)}
+.bdpc .bdvs .vsm{font-size:calc(var(--fs)*2.2)}
+.bdpc .bp{border-width:max(3px,calc(var(--fs)*.18));border-radius:calc(var(--fs)*1);padding:calc(var(--fs)*.4);gap:calc(var(--fs)*.15);min-height:0}
+.bdpc .bp .lbl{font-size:calc(var(--fs)*1.6)}
+.bdpc .bp .nm{font-size:calc(var(--fs)*4.6)}
+.bdpc .bdfoot{flex:none;font-size:calc(var(--fs)*1.05);gap:calc(var(--fs)*.5);padding-top:calc(var(--fs)*.25);padding-bottom:calc(var(--fs)*.25);padding-left:calc(var(--fs)*.7);border-radius:calc(var(--fs)*.6)}
+.bdpc .bdfoot .tot{padding:0 calc(var(--fs)*.6);border-radius:calc(var(--fs)*.5)}
+/* 과녁판 중계 */
+.bdpc .bdsplit{padding:4px;gap:calc(var(--fs)*.6)}   /* 과녁 테두리(바깥 그림자)가 잘리지 않게 여백 */
+.bdpc .bdsplit .bp .nm{font-size:calc(var(--fs)*3.4)}
+.bdpc .bdsplit .bp .lbl{font-size:calc(var(--fs)*1.2)}
+.bdpc .bdsplit .bp{padding:calc(var(--fs)*.3)}
+.bdpc .tglegend{font-size:calc(var(--fs)*1.1);gap:calc(var(--fs)*.8)}
+.bdpc .bdtg{gap:calc(var(--fs)*.2)}
+/* 개인전 기록 표 */
+.bdpc .bdwait{flex:none;gap:calc(var(--fs)*.4)}
+.bdpc .bw{font-size:calc(var(--fs)*.9);border-width:max(2px,calc(var(--fs)*.1));padding:0 calc(var(--fs)*.6);border-radius:calc(var(--fs)*.6);gap:calc(var(--fs)*.5)}
+.bdpc .ilist{flex:1 1 0;min-height:0;align-items:stretch;gap:calc(var(--fs)*.5)}
+.bdpc .itab{height:100%;min-width:0;font-size:var(--fs);border-width:max(1.5px,calc(var(--fs)*.06));border-radius:calc(var(--fs)*.5)}
+.bdpc .itab th,.bdpc .itab td{height:auto;padding:calc(var(--fs)*.08) calc(var(--fs)*.25);line-height:1.15;border-bottom-width:1px}
+.bdpc .itab th.rdh{height:auto}
+.bdpc .itab th.nmh{width:25%}
+.bdpc .itab td.nmc .tag{font-size:.6em;padding:0 .4em}
+.bdpc .itab tr.blank td{border-bottom-color:transparent}
+/* 사람 크게 보기 */
+.bdpc .pview{flex:1 1 0;min-height:0;gap:calc(var(--fs)*.6);justify-content:space-evenly}
+.bdpc .pname{font-size:calc(var(--fs)*4.2);gap:calc(var(--fs)*.6)}
+.bdpc .pname .tb.big{width:calc(var(--fs)*3.2);height:calc(var(--fs)*3.2);font-size:calc(var(--fs)*1.8)}
+.bdpc .pcards{grid-template-columns:repeat(var(--pc,3),1fr);gap:calc(var(--fs)*.6)}
+.bdpc .pcard{border:max(3px,calc(var(--fs)*.16)) solid var(--ev);border-radius:calc(var(--fs)*1);padding:calc(var(--fs)*.4) calc(var(--fs)*.4);min-height:0;gap:calc(var(--fs)*.1)}
+.bdpc .pcard .pe{font-size:calc(var(--fs)*1.5)}
+.bdpc .pcard .pv{font-size:calc(var(--fs)*4)}
+.bdpc .pcard .pv.none{font-size:calc(var(--fs)*1.6);padding:calc(var(--fs)*.8) 0}
+.bdpc .pcard .pt{font-size:calc(var(--fs)*1.05)}
+.bdpc .pcard .pr{font-size:calc(var(--fs)*1.3);margin-top:0}
+.bdpc .pcard .psub{margin-top:calc(var(--fs)*.2);padding-top:calc(var(--fs)*.15)}
+.bdpc .pcard .pl{font-size:calc(var(--fs)*1)}
+.bdpc .pback{font-size:calc(var(--fs)*.85)}
+/* 종합 현황 */
+.bdpc .bdsum{flex:1 1 0;min-height:0;display:flex;flex-direction:column}
+.bdpc .bdsum .cols.half{flex:1 1 0;min-height:0;grid-template-columns:minmax(0,1fr) minmax(0,2.3fr);align-items:stretch;gap:calc(var(--fs)*.6)}
+.bdpc .bdsum .sumcards{flex:1 1 0;min-height:0;display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:minmax(0,1fr);gap:calc(var(--fs)*.4)}
+.bdpc .bdsum .sumcards>.card{min-height:0;min-width:0}
+.bdpc .bdsum .sumcards>.card:last-child:nth-child(odd){grid-column:1/-1}
+.bdpc .bdsum .cols.half>div:first-child>.card,.bdpc .bdsum .cols.half>.card{justify-content:flex-start}
+.bdpc .bdsum .cols.half>*{min-height:0;min-width:0}
+.bdpc .bdsum .cols.half>div:last-child{display:flex;flex-direction:column;gap:calc(var(--fs)*.4)}
+.bdpc .bdsum .cols.half>div:last-child>h2{font-size:calc(var(--fs)*1.2)!important;margin:0!important}
+.bdpc .bdsum .cols.half>div:last-child>.card{flex:1 1 0}
+.bdpc .bdsum .card{font-size:var(--fs);border-width:2px;border-radius:.6em;padding:.4em .6em;margin:0;display:flex;flex-direction:column;justify-content:center}
+.bdpc .bdsum .card>h2,.bdpc .bdsum .card .h2{font-size:1.2em;margin:0 0 .25em}
+.bdpc .bdsum .totals{gap:.5em}
+.bdpc .bdsum .tbox{padding:.25em;border-radius:.6em}
+.bdpc .bdsum .tbox .v{font-size:3em;line-height:1}
+.bdpc .bdsum .tbox .t{font-size:1.1em}
+.bdpc .bdsum table{font-size:1em;margin-top:.4em!important}
+.bdpc .bdsum th,.bdpc .bdsum td{padding:.12em .3em;border-bottom-width:1px}
+.bdpc .bdsum th{font-size:.7em}
+.bdpc .bdsum .score{font-size:1.3em}
+.bdpc .bdsum .rank{width:2em;font-size:1.2em}
+.bdpc .bdsum td span[style*="font-size:22px"]{font-size:1.3em!important}
+.bdpc .bdsum .sub,.bdpc .bdsum .tag{font-size:.7em}
+.bdpc .bdsum .prline{font-size:.75em;margin-top:.2em}
+.bdpc .bdsum .prline b{font-size:.8em}
+.bdpc .bdsum .pracrank{margin-top:.2em;padding-top:.1em}
+.bdpc .bdsum .empty{padding:.3em;font-size:.9em}
+.bdpc .bdsum .note{font-size:.8em;padding:.2em .5em;margin:.2em 0 0}
+/* 시상식 */
+.bdpc .award{flex:1 1 0;min-height:0;gap:calc(var(--fs)*.4);padding:calc(var(--fs)*.6);border-width:max(4px,calc(var(--fs)*.25));border-radius:calc(var(--fs)*1.4)}
+.bdpc .award .aev{font-size:calc(var(--fs)*2)}
+.bdpc .award .aic{font-size:calc(var(--fs)*5.5)}
+.bdpc .award .at{font-size:calc(var(--fs)*3.8)}
+.bdpc .award .asub{font-size:calc(var(--fs)*1.4)}
+.bdpc .award .aname{font-size:calc(var(--fs)*3.8);gap:calc(var(--fs)*.5)}
+.bdpc .award .aname .tb.big{width:calc(var(--fs)*2.8);height:calc(var(--fs)*2.8);font-size:calc(var(--fs)*1.6)}
+.bdpc .award .ascore{font-size:calc(var(--fs)*4);gap:calc(var(--fs)*.5)}
+/* 겹쳐 뜨는 화면 (결과 · 안내 · 감독 호출) */
+.ovl.bdpc{--fs:22px;font-size:var(--fs);line-height:1.2}
+.ovl.bdpc .ovev{font-size:calc(var(--fs)*1);padding:.15em .6em;border-radius:.5em}
+.ovl.bdpc .half{gap:calc(var(--fs)*.3);padding:calc(var(--fs)*.4) max(3vw,var(--sar)) calc(var(--fs)*.4) max(3vw,var(--sal))}
+.ovl.bdpc .half.win,.ovl.bdpc .half.draw{padding-top:max(calc(var(--fs)*.4),var(--sat))}
+.ovl.bdpc .half.lose,.ovl.bdpc .half.draw2{padding-bottom:max(calc(var(--fs)*.4),var(--sab))}
+.ovl.bdpc .big,.ovl.bdpc .nm,.ovl.bdpc .osc{line-height:1.3}   /* 줄 높이가 낮으면 큰 글자가 칸 밖으로 삐져나와 아래 칸에 가려짐 */
+.ovl.bdpc .big{font-size:calc(var(--fs)*4.4)}
+.ovl.bdpc .half.lose .big{font-size:calc(var(--fs)*2.8)}
+.ovl.bdpc .nm{font-size:calc(var(--fs)*3.6)}
+.ovl.bdpc .half.lose .nm{font-size:calc(var(--fs)*2.6)}
+.ovl.bdpc .tm{font-size:calc(var(--fs)*1.8)}
+.ovl.bdpc .pair{font-size:calc(var(--fs)*3);gap:calc(var(--fs)*.6)}
+.ovl.bdpc .osc{font-size:calc(var(--fs)*3);gap:calc(var(--fs)*.5)}
+.ovl.bdpc .osc .tb.big{width:calc(var(--fs)*2);height:calc(var(--fs)*2);font-size:calc(var(--fs)*1.2)}
+.ovl.ann.bdpc{border-width:max(6px,calc(var(--fs)*.3))}
+.ovl.ann.bdpc .lbl{font-size:calc(var(--fs)*1.8)}
+.ovl.ann.bdpc .txt{font-size:calc(var(--fs)*3.8)}
+.ovl.ccall.bdpc .lbl{font-size:calc(var(--fs)*2.2)}
+.ovl.ccall.bdpc .who{font-size:calc(var(--fs)*1.8)}
+.ovl.ccall.bdpc .nm{font-size:calc(var(--fs)*5.4)}
+.ovl.ccall.bdpc .ovev2{font-size:calc(var(--fs)*1.2)}

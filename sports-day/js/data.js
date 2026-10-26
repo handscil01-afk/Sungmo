@@ -178,8 +178,10 @@ const hasDuty = r => !!(r.coach || r.events.length || r.helpers.length || r.time
 const monitorOnly = r => !!r.monitor && !(r.coach || r.events.length || r.helpers.length || r.timers.length);
 function myRole(){
   if(D.amMaster) return { ...normRole(null), role:'master' };
-  const r = normRole(store && D.roles[store.uid]);
+  const raw = store && D.roles[store.uid], r = normRole(raw);
   r.role = r.board ? 'board' : hasDuty(r) ? 'staff' : 'wait';
+  // 맡은 종목이 모두 꺼져 있어서 할 일이 없는 기기 (역할 대기와 다른 안내를 보여 주려고)
+  r.offDuty = r.role==='wait' && !!raw && ['events','helpers','timers'].some(k => Array.isArray(raw[k]) && raw[k].length > 0);
   return r;
 }
 // 점수를 입력할 수 있는 종목 (심판 + 기록 도우미)

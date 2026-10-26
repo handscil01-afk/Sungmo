@@ -1,28 +1,42 @@
 'use strict';
 /* ===================== 현황판 (요약) ===================== */
 
-function boardView(){
+// 단체전 승점 카드 (compact: 휴대폰의 현황 탭처럼 좁은 화면에서 촘촘하게)
+function teamCard(compact){
   const tot = totalPoints();
   // 이긴 판 수에 종목의 승점(기본 1)을 곱해서 보여 줌
   const rows = Object.entries(TEAM).map(([k,E]) => { const t = tally(k), p = E.pts||1;
     return `<tr><td><span class="row nowrap" style="gap:8px"><span style="font-size:22px">${E.icon}</span><b>${esc(E.name)}</b>${p>1 ? `<span class="sub">(이기면 ${p}점)</span>` : ''}</span></td><td class="num score" style="color:var(--blue)">${t.blue*p}</td><td class="num score" style="color:var(--red)">${t.red*p}</td><td class="num sub">${matchesOf(k).length}판</td></tr>`; }).join('');
-  const indiv = Object.entries(INDIV).map(([k,E]) => {
-    const { list, ties } = standings(k), top = list.filter(x => x.rank<=3);
-    // 안내판에 연습 순위도 보이기 (마스터 설정): 연습 1·2의 1~3등을 작게
-    const prac = settings().showPracRank && hasPrac(k) ? ['p1','p2'].map(rd => { const rs = roundStandings(k, rd).list.filter(x => x.rank<=3).slice(0,5);
-      return rs.length ? `<div class="prline"><b>${ROUNDS[rd]}</b>${rs.map(x => `<span><em>${x.rank}위</em> ${esc(x.p.name)} <i>${sc(k, x.total)}</i></span>`).join('')}</div>` : ''; }).join('') : '';
-    const wn = qList(k).length;
-    return `<div class="card"><div class="row"><h2 class="grow h2" style="margin:0">${E.icon} ${esc(E.name)}</h2><span class="tag ${wn?'dark':''}">대기 ${wn}명</span><span class="sub">${list.length}명 기록</span></div>
-      ${ties.filter(t => !t.resolved).map(t => `<div class="note" style="margin-top:10px">⚠ ${sc(k, t.total)} 동점: ${t.names.map(esc).join(', ')} → 결승 필요</div>`).join('')}
-      ${top.length ? `<table><tbody>${top.map(x => `<tr><td class="rank">${x.rank}</td><td><b>${esc(x.p.name)}</b></td><td class="num"><span class="score">${sc(k, x.total)}</span>${x.ftotal!=null?` <span class="sub">(결승 ${fmtNum(x.ftotal)})</span>`:''}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">아직 본선 기록이 없습니다.</div>'}${prac ? `<div class="pracrank">${prac}</div>` : ''}</div>`;
-  }).join('');
-  return `<div class="cols half">
-    <div class="card"><h2>단체전 승점</h2>
+  return `<div class="card${compact?' stcard stteam':''}"><h2>단체전 승점</h2>
       <div class="totals"><div class="tbox blue"><div class="t">${esc(teamName('blue'))}</div><div class="v">${tot.blue}</div></div><div class="tbox red"><div class="t">${esc(teamName('red'))}</div><div class="v">${tot.red}</div></div></div>
       <table style="margin-top:12px"><thead><tr><th>종목</th><th class="num">${esc(teamShort('blue'))}</th><th class="num">${esc(teamShort('red'))}</th><th class="num">진행</th></tr></thead><tbody>${rows}</tbody></table>
-      <p class="sub">${Object.values(TEAM).some(E => (E.pts||1)>1) ? '한 판 이길 때마다 종목별 승점이 올라갑니다.' : '한 판 이길 때마다 승점 1점입니다.'} 다른 기기에서 입력한 결과가 바로 반영됩니다.</p></div>
-    <div><h2 style="margin:4px 2px 12px;font-size:20px">개인전 순위 (1~3등)</h2>${indiv}</div></div>`;
+      <p class="sub">${Object.values(TEAM).some(E => (E.pts||1)>1) ? '한 판 이길 때마다 종목별 승점이 올라갑니다.' : '한 판 이길 때마다 승점 1점입니다.'} 다른 기기에서 입력한 결과가 바로 반영됩니다.</p></div>`;
 }
+// 개인전 종목 하나의 1~3등 카드 (compact: 한 줄씩 촘촘하게)
+function indivCard(k, compact){
+  const E = INDIV[k], { list, ties } = standings(k), top = list.filter(x => x.rank<=3), wn = qList(k).length;
+  // 안내판에 연습 순위도 보이기 (마스터 설정): 연습 1·2의 1~3등을 작게 (마스터 메뉴의 촘촘한 현황에서는 뺌)
+  const prac = !compact && settings().showPracRank && hasPrac(k) ? ['p1','p2'].map(rd => { const rs = roundStandings(k, rd).list.filter(x => x.rank<=3).slice(0,5);
+    return rs.length ? `<div class="prline"><b>${ROUNDS[rd]}</b>${rs.map(x => `<span><em>${x.rank}위</em> ${esc(x.p.name)} <i>${sc(k, x.total)}</i></span>`).join('')}</div>` : ''; }).join('') : '';
+  const tieNotes = ties.filter(t => !t.resolved).map(t => `<div class="note"${compact ? '' : ' style="margin-top:10px"'}>⚠ ${sc(k, t.total)} 동점: ${t.names.map(esc).join(', ')} → 결승 필요</div>`).join('');
+  if(compact) return `<div class="card stcard" style="--ev:${E.color}"><div class="sthead"><b>${E.icon} ${esc(E.name)}</b><span class="tag ${wn?'dark':''}">대기 ${wn}명</span><span class="sub">${list.length}명 기록</span></div>
+      ${tieNotes}${top.length ? top.map(x => `<div class="strow"><span class="rk">${x.rank}</span><b class="nm">${esc(x.p.name)}</b><span class="v">${sc(k, x.total)}${x.ftotal!=null?` <span class="sub">(결승 ${fmtNum(x.ftotal)})</span>`:''}</span></div>`).join('') : '<div class="empty">아직 본선 기록이 없습니다.</div>'}${prac ? `<div class="pracrank">${prac}</div>` : ''}</div>`;
+  return `<div class="card"><div class="row"><h2 class="grow h2" style="margin:0">${E.icon} ${esc(E.name)}</h2><span class="tag ${wn?'dark':''}">대기 ${wn}명</span><span class="sub">${list.length}명 기록</span></div>
+      ${tieNotes}
+      ${top.length ? `<table><tbody>${top.map(x => `<tr><td class="rank">${x.rank}</td><td><b>${esc(x.p.name)}</b></td><td class="num"><span class="score">${sc(k, x.total)}</span>${x.ftotal!=null?` <span class="sub">(결승 ${fmtNum(x.ftotal)})</span>`:''}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">아직 본선 기록이 없습니다.</div>'}${prac ? `<div class="pracrank">${prac}</div>` : ''}</div>`;
+}
+function boardView(){
+  return `<div class="cols half">
+    ${teamCard(false)}
+    <div><h2 style="margin:4px 2px 12px;font-size:20px">개인전 순위 (1~3등)</h2><div class="sumcards">${Object.keys(INDIV).map(k => indivCard(k, false)).join('')}</div></div></div>`;
+}
+// 마스터 안내판 메뉴의 현황 탭: 개인전 / 단체전
+function statIndiv(){
+  const evs = Object.keys(INDIV);
+  if(!evs.length) return '<div class="card empty">켜져 있는 개인전 종목이 없습니다.</div>';
+  return `<div class="stgrid">${evs.map(k => indivCard(k, true)).join('')}</div>`;
+}
+function statTeam(){ return teamCard(true); }
 
 /* ===================== 소리 (띵동·차임벨·음성) ===================== */
 const SND = {
@@ -212,7 +226,7 @@ function flashAttr(start, dur=FLASH_MS){
 
 function boardScreen(){
   boardTick();
-  const T = boardTarget(), ann = D.config.announce || {};
+  const T = boardTarget(), ann = D.config.announce || {}, pc = bdPC();
   const C = RADIO.lock.cast;
   const annStrip = (C ? `<div class="caststrip"${flashAttr(C.at || now(), 60000)}>📢 안내방송 중 · ${esc(C.name||'')}</div>` : '')
     + (ann.text && !ann.cleared && (now()-(ann.at||0)) < 6*3600*1000 ? `<div class="annstrip"${flashAttr(ann.at)}>📢 ${esc(ann.text)}</div>` : '')
@@ -220,13 +234,15 @@ function boardScreen(){
   let body;
   if(T.kind!=='indiv') BOARD.person = null;
   if(T.kind==='team') body = boardTeam(T.ev);
-  else if(T.kind==='summary') body = `<div class="bdhead"><h1>📊 종합 현황</h1></div>${boardView()}`;
+  else if(T.kind==='summary') body = `<div class="bdhead"><h1>📊 종합 현황</h1></div><div class="bdsum">${boardView()}</div>`;
   else if(T.kind==='awards') body = boardAwards();
   else body = boardIndiv();
   const cfg = boardCfg();
   const soundHint = boardOn() && cfg.sound && !SND.ready() ? `<button class="soundhint" data-a="bdSound">🔈 화면을 한 번 눌러 소리를 켜 주세요</button>` : '';
   const fixed = T.kind==='team' && TEAM[T.ev] && TEAM[T.ev].mode==='duel' && teamOpt(T.ev).board;     // 과녁판 중계 화면은 한 화면에 고정
-  return `<div class="bd ${fixed?'bdfix':''}">${annStrip}${body}</div>${boardOverlay()}${soundHint}`;
+  // PC·프로젝터 화면: 안내판 전체를 한 화면에 꼭 맞게 (글자 크기는 board-pc.js 가 화면 크기에 맞춰 정함)
+  const key = T.kind + (T.ev || '') + (BOARD.person ? 'P' : '');
+  return `<div class="bd ${fixed?'bdfix':''}${pc?' bdpc':''}"${pc ? ` data-fit="1" data-fskey="${key}"${T.kind==='indiv' && !BOARD.person ? ' data-fsmax="44"' : ''}` : ''}>${annStrip}${body}</div>${boardOverlay()}${soundHint}`;
 }
 function boardTeam(ev){
   const E = TEAM[ev], t = tally(ev), tot = totalPoints(), n = matchesOf(ev).length + 1;
@@ -256,7 +272,7 @@ function boardTeam(ev){
   return ccbar + call + head + `<div class="bdlabel">지금 경기${nextLine}</div>` + mid + foot;
 }
 function boardIndiv(){
-  const ps = people();
+  const ps = people(), pc = bdPC();
   if(BOARD.person && now()-BOARD.personAt < PERSON_MS && person(BOARD.person)) return boardPerson(BOARD.person);
   BOARD.person = null;
   const evs = Object.keys(INDIV);
@@ -268,18 +284,29 @@ function boardIndiv(){
   const waits = evs.filter(ev => qList(ev).length);
   const wstrip = waits.length ? `<div class="bdwait">${waits.map(ev => { const q = qList(ev);
     return `<span class="bw" style="--ev:${INDIV[ev].color}"><b>${INDIV[ev].icon} ${esc(INDIV[ev].name)} 대기 ${q.length}명</b><em>${q.slice(0,3).map(id => esc(pname(id))).join(' · ')}${q.length>3 ? ' …' : ''}</em></span>`; }).join('')}</div>` : '';
+  const cell = (ev, rd, p) => { const r = rec(ev, rd, p.id); return r ? `<td class="num ${rd}${rd==='p1'?' g':''}">${rd==='main'||rd==='final' ? `<b>${fmtNum(totalOf(ev, r.throws))}</b>` : fmtNum(totalOf(ev, r.throws))}</td>` : `<td class="num dash ${rd}${rd==='p1'?' g':''}">–</td>`; };
+  // PC 화면에서는 표마다 줄 수를 같게 맞추려고 모자란 줄을 빈 줄로 채움
+  const blank = () => `<tr class="blank"><td class="nmc">&nbsp;</td>${cols.map(c => c.rounds.map(rd => `<td class="num ${rd}${rd==='p1'?' g':''}"></td>`).join('')).join('')}</tr>`;
+  const table = (chunk, per) => `<table class="itab"><thead>
+      <tr><th rowspan="2" class="nmh">이름</th>${cols.map(c => { const E = INDIV[c.ev], wn = qList(c.ev).length;
+        return `<th colspan="${c.rounds.length}" class="evh g" style="--ev:${E.color}">${E.icon} ${esc(E.name)}${E.vunit && E.vunit!=='점' ? ` <small>(${esc(E.vunit)})</small>` : ''}${wn ? `<span class="bwn">대기 ${wn}명</span>` : ''}</th>`; }).join('')}</tr>
+      <tr>${cols.map((c, ci) => c.rounds.map((rd,k) => `<th class="num rdh${k===0?' g':''}">${ROUND_SHORT[rd]}</th>`).join('')).join('')}</tr></thead>
+    <tbody>${chunk.map(p => `<tr class="tap" data-a="bdPerson" data-v="${p.id}"><td class="nmc"><b>${esc(p.name)}</b>${isAbsent(p.id)?' <span class="tag red">불참</span>':''}</td>${cols.map(c => c.rounds.map(rd => cell(c.ev, rd, p)).join('')).join('')}</tr>`).join('')}${pc ? Array.from({ length:Math.max(0, per - chunk.length) }, blank).join('') : ''}</tbody></table>`;
+  const build = ncol => { const per = Math.ceil(ps.length / ncol) || 1; return Array.from({ length:ncol }, (_,c) => ps.slice(c*per, (c+1)*per)).map(chunk => table(chunk, per)).join(''); };
+  const head = `<div class="bdhead"><span class="bic">🎯</span><h1>개인전 기록</h1><span class="bsub">이름을 누르면 크게 볼 수 있습니다</span></div>${wstrip}`;
+  if(pc){
+    // 표를 몇 칸으로 나눌지는 board-pc.js 가 1~4칸을 모두 맞춰 보고 글자가 가장 커지는 쪽으로 정함
+    BDPC.build = build; BDPC.count = ps.length;
+    BDPC.sig = `${ps.length}|${ncols}|${Math.max(0, ...ps.map(p => p.name.length))}|${waits.length}`;
+    const n = BDPC.ncol[`indiv|${innerWidth}x${innerHeight}|${BDPC.sig}`] || (ps.length > 8 ? 2 : 1);
+    return head + (ps.length ? `<div class="ilist" data-plan="1" data-cols="${n}" style="grid-template-columns:repeat(${n},1fr)">${build(n)}</div>` : '<div class="card empty">명단이 아직 없습니다.</div>');
+  }
   // 16명까지는 표 하나, 그 위는 둘로 나눔 (폭이 좁은 화면은 표 하나로 길게)
   const ncol = ps.length <= 16 || window.innerWidth < 760 ? 1 : 2, per = Math.ceil(ps.length / ncol) || 1;
   // 가로 폭과 줄 수에 맞춰 글자 크기를 정함 (가로로 밀리거나 잘리지 않게)
   const W = Math.max(320, window.innerWidth - 32 - 14*(ncol-1)) / ncol, nf = Math.max(10, Math.min(26, Math.floor(W * 0.74 / ncols / 1.85)));
-  const cell = (ev, rd, p) => { const r = rec(ev, rd, p.id); return r ? `<td class="num ${rd}${rd==='p1'?' g':''}">${rd==='main'||rd==='final' ? `<b>${fmtNum(totalOf(ev, r.throws))}</b>` : fmtNum(totalOf(ev, r.throws))}</td>` : `<td class="num dash ${rd}${rd==='p1'?' g':''}">–</td>`; };
-  const tables = Array.from({ length:ncol }, (_,c) => ps.slice(c*per, (c+1)*per)).map(chunk => `<table class="itab"><thead>
-      <tr><th rowspan="2" class="nmh">이름</th>${cols.map(c => { const E = INDIV[c.ev], wn = qList(c.ev).length;
-        return `<th colspan="${c.rounds.length}" class="evh g" style="--ev:${E.color}">${E.icon} ${esc(E.name)}${E.vunit && E.vunit!=='점' ? ` <small>(${esc(E.vunit)})</small>` : ''}${wn ? `<span class="bwn">대기 ${wn}명</span>` : ''}</th>`; }).join('')}</tr>
-      <tr>${cols.map((c, ci) => c.rounds.map((rd,k) => `<th class="num rdh${k===0?' g':''}">${ROUND_SHORT[rd]}</th>`).join('')).join('')}</tr></thead>
-    <tbody>${chunk.map(p => `<tr class="tap" data-a="bdPerson" data-v="${p.id}"><td class="nmc"><b>${esc(p.name)}</b>${isAbsent(p.id)?' <span class="tag red">불참</span>':''}</td>${cols.map(c => c.rounds.map(rd => cell(c.ev, rd, p)).join('')).join('')}</tr>`).join('')}</tbody></table>`).join('');
-  return `<div class="bdhead"><span class="bic">🎯</span><h1>개인전 기록</h1><span class="bsub">이름을 누르면 크게 볼 수 있습니다</span></div>${wstrip}
-    ${ps.length ? `<div class="ilist" style="grid-template-columns:repeat(${ncol},1fr);--nf:${nf}px;--rowh:calc((100dvh - ${190 + (waits.length ? 70 : 0)}px - var(--sat) - var(--sab)) / ${per + 2.4})">${tables}</div>` : '<div class="card empty">명단이 아직 없습니다.</div>'}`;
+  return `${head}
+    ${ps.length ? `<div class="ilist" style="grid-template-columns:repeat(${ncol},1fr);--nf:${nf}px;--rowh:calc((100dvh - ${190 + (waits.length ? 70 : 0)}px - var(--sat) - var(--sab)) / ${per + 2.4})">${build(ncol)}</div>` : '<div class="card empty">명단이 아직 없습니다.</div>'}`;
 }
 function boardPerson(pid){
   const p = person(pid);
@@ -297,70 +324,70 @@ function boardPerson(pid){
 }
 function boardOverlay(){
   const o = BOARD.overlay; if(!o) return '';
-  if(o.kind==='ccall') return `<div class="ovl ccall ${o.c.team}" data-a="bdDismiss"${flashAttr(o.start)}><div class="lbl">${o.c.kind==='now' ? '📣 지금 나와 주세요' : '📣 준비해 주세요'}</div>
+  // PC·프로젝터 화면: 겹쳐 뜨는 화면도 글자 크기를 화면에 꼭 맞춤
+  const pc = bdPC(), ca = k => pc ? ` bdpc" data-fit="1" data-fskey="ovl-${k}` : '';
+  if(o.kind==='ccall') return `<div class="ovl ccall ${o.c.team}${ca('ccall')}" data-a="bdDismiss"${flashAttr(o.start)}><div class="lbl">${o.c.kind==='now' ? '📣 지금 나와 주세요' : '📣 준비해 주세요'}</div>
     <div class="who"><span class="tn">${esc(teamName(o.c.team))}</span></div><div class="nm">${esc(pname(o.c.pid))}</div><div class="ovev2">${EVENTS[o.c.event] ? `${EVENTS[o.c.event].icon} ${esc(EVENTS[o.c.event].name)}` : ''}</div></div>`;
-  if(o.kind==='ann') return `<div class="ovl ann" data-a="bdDismiss"${flashAttr(o.start)}><div class="lbl">📢 안내</div><div class="txt">${esc(o.ann.text)}</div></div>`;
+  if(o.kind==='ann') return `<div class="ovl ann${ca('ann')}" data-a="bdDismiss"${flashAttr(o.start)}><div class="lbl">📢 안내</div><div class="txt">${esc(o.ann.text)}</div></div>`;
   const m = o.m, E = TEAM[m.event]; if(!E) return '';
   // 대결 점수를 기록한 경우 '3 : 2' (왼쪽 청팀 · 오른쪽 홍팀)
   const osc = scoreTxt(m) ? `<div class="osc">${teamBadge('blue',true)} ${scoreTxt(m)} ${teamBadge('red',true)}</div>` : '';
   const nm = tm => E.mode==='round' ? '' : esc(pname(tm==='blue' ? m.blueId : m.redId));
   const tm = tmk => E.mode==='time' ? `<div class="tm">${fmtSec(tmk==='blue' ? m.blueTime : m.redTime)}초</div>` : '';
   const head = `<div class="ovev">${E.icon} ${esc(E.name)}</div>`;
-  if(m.winner==='draw') return `<div class="ovl result" data-a="bdDismiss">${head}<div class="half draw"${flashAttr(o.start)}><div class="big">무승부</div>${osc}</div>
+  if(m.winner==='draw') return `<div class="ovl result${ca('result')}" data-a="bdDismiss">${head}<div class="half draw"${flashAttr(o.start)}><div class="big">무승부</div>${osc}</div>
     <div class="half draw2"><div class="pair">${teamBadge('blue',true)} ${nm('blue')} ${tm('blue')}<span class="vsm">·</span>${teamBadge('red',true)} ${nm('red')} ${tm('red')}</div></div></div>`;
   const w = m.winner, l = w==='blue' ? 'red' : 'blue';
-  return `<div class="ovl result" data-a="bdDismiss">${head}
+  return `<div class="ovl result${ca('result')}" data-a="bdDismiss">${head}
     <div class="half win ${w}"${flashAttr(o.start)}><div class="big">🏆 ${esc(teamName(w))} 승리</div>${nm(w)?`<div class="nm">${nm(w)}</div>`:''}${tm(w)}${osc}</div>
     <div class="half lose"><div class="big">${esc(teamName(l))} 패</div>${nm(l)?`<div class="nm">${nm(l)}</div>`:''}${tm(l)}</div></div>`;
 }
 
 /* ===================== 마스터: 안내판 제어 · 문자 안내방송 ===================== */
 let annDraft = '';
-const BTABS = [['screen','📺','화면'], ['sound','🔔','소리'], ['ann','📢','안내방송'], ['awards','🏆','시상식'], ['summary','📊','현황'], ['prog','🧭','진행 현황']];
-// 안내판 메뉴: 위쪽 탭으로 나눠서 한 번에 한 가지만 보여 줌
+// 안내판 메뉴: 위쪽 탭 네 개 (화면·소리 / 안내방송 / 시상식 / 현황). 현황 안에는 개인전·단체전·진행 작은 탭이 있음
+const BTABS = [['screen','📺','화면·소리'], ['ann','📢','안내방송'], ['awards','🏆','시상식'], ['status','📊','현황']];
+const BSTAT = [['indiv','🎯','개인전'], ['team','🏁','단체전'], ['prog','🧭','진행']];
 function boardControl(){
   const tabs = innerTabs('board', BTABS);
-  return `<div class="bctl">${tabs}${{ screen: bcScreen, sound: bcSound, ann: bcAnn, awards: awardsControl, summary: boardView, prog: progressView }[ITAB.board]()}</div>`;
+  return `<div class="bctl">${tabs}${{ screen: bcScreen, ann: bcAnn, awards: awardsControl, status: bcStatus }[ITAB.board]()}</div>`;
 }
+function bcStatus(){
+  return innerTabs('boardStat', BSTAT, { sub:true }) + { indiv: statIndiv, team: statTeam, prog: progressView }[ITAB.boardStat]();
+}
+// 화면 고르기 · 준비 호출 · 소리를 한 화면에 촘촘하게
 function bcScreen(){
   const cfg = boardCfg();
-  const modes = [['auto','🔄 자동'], ['indiv','🎯 개인전 명단'], ['summary','📊 종합 현황'], ['awards','🏆 시상식'], ...Object.keys(TEAM).map(k => ['team:'+k, TEAM[k].icon+' '+TEAM[k].name])];
-  return `<div class="card"><h2>보여 줄 화면</h2>
-      <div class="chips">${modes.map(([k,l]) => `<button class="chip ${cfg.mode===k?'on':''}" data-a="bmode" data-v="${k}">${esc(l)}</button>`).join('')}</div>
-      <p class="sub">자동으로 두면 가장 최근에 기록이 들어온 종목을 띄웁니다. 단체전 결과가 나오면 위아래로 승패를 보여 준 뒤 준비할 선수를 부릅니다.</p></div>
+  const modes = [['auto','🔄 자동'], ['indiv','🎯 개인전'], ['summary','📊 종합'], ['awards','🏆 시상식'], ...Object.keys(TEAM).map(k => ['team:'+k, TEAM[k].icon+' '+TEAM[k].name])];
+  const sw = (k, label, sub) => `<label class="swtile"><span class="name">${label}<span class="sub">${sub}</span></span><span class="switch"><input type="checkbox" data-ch="bcfg" data-k="${k}" ${cfg[k]?'checked':''}><span></span></span></label>`;
+  return `<div class="card"><h2>보여 줄 화면 <span class="sub">자동은 가장 최근 기록 종목</span></h2>
+      <div class="chips modes">${modes.map(([k,l]) => `<button class="chip ${cfg.mode===k?'on':''}" data-a="bmode" data-v="${k}">${esc(l)}</button>`).join('')}</div></div>
     <div class="card"><h2>📣 "준비해 주세요"로 부를 선수</h2>
-      <div class="chips">${[1,2,3].map(k => `<button class="chip ${prepAhead()===k?'on':''}" data-a="bprep" data-v="${k}">${AHEAD_LABEL[k]} 선수</button>`).join('')}</div>
-      <p class="sub">예: '다다음 선수'로 두면 지금 경기 중에 그다음 경기까지 끝난 뒤 나갈 선수를 미리 부릅니다.</p></div>
-    <button class="btn primary wide" data-a="boardPreview">📺 안내판 화면 미리 보기 (소리 없이)</button>`;
-}
-function bcSound(){
-  const cfg = boardCfg();
-  const sw = (k, label, sub) => `<div class="item"><span class="name">${label}<span class="sub">${sub}</span></span><label class="switch"><input type="checkbox" data-ch="bcfg" data-k="${k}" ${cfg[k]?'checked':''}><span></span></label></div>`;
-  return `<div class="card"><div class="list">${sw('sound','🔔 띵동 소리','선수 호출·결과·안내방송 때 안내판에서 소리를 냅니다.')}
-        ${sw('callVoice','🗣 호출할 때 이름 읽기','띵동 뒤에 "청팀 ○○○, 홍팀 ○○○ 선수 준비해 주세요"라고 읽어 줍니다.')}
-        ${sw('chime','🎵 안내방송 차임벨','문자·음성 안내방송 앞에 딩동댕동 소리를 냅니다.')}
-        ${sw('flash','⚡ 깜빡임','호출·결과·안내 때 화면 테두리와 글씨를 깜빡여 농인 참가자도 알아보게 합니다.')}</div>
-      <div style="height:10px"></div><button class="btn wide" data-a="btest">🔔 안내판 소리 시험</button>
-      <p class="sub">안내판 태블릿은 처음 켤 때 화면을 한 번 눌러야 소리가 납니다.</p></div>`;
+      <div class="chips prep">${[1,2,3].map(k => `<button class="chip ${prepAhead()===k?'on':''}" data-a="bprep" data-v="${k}">${AHEAD_LABEL[k]}</button>`).join('')}</div>
+      <p class="sub">'다다음'은 그다음 경기 선수를 미리 부릅니다.</p></div>
+    <div class="card"><h2>🔔 소리와 깜빡임</h2>
+      <div class="swgrid">${sw('sound','🔔 띵동 소리','호출·결과·방송 때')}${sw('callVoice','🗣 이름 읽기','호출할 때 읽어 줌')}${sw('chime','🎵 차임벨','방송 앞 딩동댕동')}${sw('flash','⚡ 깜빡임','농인 참가자도 알아봄')}</div>
+      <p class="sub">안내판 태블릿은 처음 켤 때 화면을 한 번 눌러야 소리가 납니다.</p></div>
+    <div class="row twobtn"><button class="btn grow" data-a="btest">🔔 소리 시험</button><button class="btn primary grow" data-a="boardPreview">📺 미리 보기</button></div>`;
 }
 function bcAnn(){
   const ann = D.config.announce || {}, live = ann.text && !ann.cleared;
   return `<div class="card">
-      ${live ? `<div class="okline">지금 띄운 안내: ${esc(ann.text)}</div><button class="btn danger wide" data-a="annClear">안내 내리기</button><div style="height:12px"></div>` : ''}
-      <textarea id="annText" data-in="ann" placeholder="안내판에 크게 띄우고 읽어 줄 내용" style="min-height:96px">${esc(annDraft)}</textarea>
-      <div class="row" style="margin-top:10px"><button class="btn primary grow" data-a="annSend" data-v="voice">📢 띄우고 읽어 주기</button><button class="btn grow" data-a="annSend" data-v="text">글자만 띄우기</button></div>
+      ${live ? `<div class="okline livenote"><span class="grow">지금 띄운 안내: ${esc(ann.text)}</span><button class="btn small danger" data-a="annClear">내리기</button></div>` : ''}
+      <textarea id="annText" data-in="ann" placeholder="안내판에 크게 띄우고 읽어 줄 내용" style="min-height:76px">${esc(annDraft)}</textarea>
+      <div class="row twobtn" style="margin-top:8px"><button class="btn primary grow" data-a="annSend" data-v="voice">📢 띄우고 읽어 주기</button><button class="btn grow" data-a="annSend" data-v="text">글자만 띄우기</button></div>
       <h3>자주 쓰는 문구</h3>
-      <div class="chips">${phrases().map((t,i) => `<span class="phr"><button class="chip" data-a="annPick" data-v="${i}">${esc(t)}</button><button class="phx" data-a="annDelPhrase" data-v="${i}" aria-label="문구 지우기">✕</button></span>`).join('')}</div>
-      <div style="height:8px"></div><button class="btn small wide" data-a="annSavePhrase">입력한 내용을 자주 쓰는 문구로 저장</button>
-      <p class="sub">안내판에 15초 동안 화면 가득 띄운 뒤, 내릴 때까지 위쪽 띠로 계속 보여 줍니다. 목소리로 방송하려면 아래 📢 방송 버튼을 누른 채 말하면 됩니다.</p></div>`;
+      <div class="phrbox"><div class="phrgrid">${phrases().map((t,i) => `<span class="phr"><button class="chip" data-a="annPick" data-v="${i}" title="${esc(t)}"><span class="pt">${esc(t)}</span></button><button class="phx" data-a="annDelPhrase" data-v="${i}" aria-label="문구 지우기">✕</button></span>`).join('')}</div></div>
+      <button class="btn small wide" data-a="annSavePhrase" style="margin-top:8px">입력한 내용을 자주 쓰는 문구로 저장</button>
+      <p class="sub">안내판에 15초 동안 화면 가득 띄운 뒤, 내릴 때까지 위쪽 띠로 계속 보여 줍니다. 목소리로 방송하려면 📢 방송 버튼을 누른 채 말하면 됩니다.</p></div>`;
 }
 function awardsControl(){
   const steps = awardSteps(), i = awardsStep(), on = boardCfg().mode==='awards';
   return `<div class="card"><h2>🏆 시상식</h2>
-    <p class="sub">안내판을 시상식 화면으로 바꾸고, 개인전 종목별 3등 → 2등 → 1등, 마지막에 종합 우승 순서로 한 단계씩 발표합니다. 발표할 때마다 팡파르와 함께 이름을 읽어 줍니다.</p>
-    <div class="row">${on ? '' : '<button class="btn primary grow" data-a="awStart">🏆 시상식 화면으로 바꾸기</button>'}
+    <p class="sub">안내판을 시상식 화면으로 바꾸고, 종목별 3등 → 2등 → 1등, 마지막에 종합 우승 순서로 한 단계씩 발표합니다. 발표할 때마다 팡파르와 함께 이름을 읽어 줍니다.</p>
+    <div class="row twobtn">${on ? '' : '<button class="btn primary grow" data-a="awStart">🏆 시상식 화면으로 바꾸기</button>'}
       ${on ? `<button class="btn grow" data-a="awStep" data-v="-1" ${i<0?'disabled':''}>◀ 이전</button><button class="btn primary grow" data-a="awStep" data-v="1" ${i>=steps.length-1?'disabled':''}>다음 발표 ▶</button><button class="btn" data-a="awEnd">끝내기</button>` : ''}</div>
-    <div class="list" style="margin-top:10px">${steps.map((s,k) => `<div class="item ${k===i?'cur':''} ${k<i?'done':''}"><span class="no tag">${k+1}</span><span class="name">${esc(awardLabel(s))}<span class="sub">${s.kind==='team' ? `${esc(teamName('blue'))} ${s.tot.blue} : ${s.tot.red} ${esc(teamName('red'))}` : s.winners.map(x => esc(x.p.name)+' '+sc(s.ev, x.total)).join(', ')}</span></span>${k===i?'<span class="tag dark">지금 발표</span>':''}</div>`).join('')}</div></div>`;
+    <div class="list awlist">${steps.map((s,k) => `<div class="item ${k===i?'cur':''} ${k<i?'done':''}"><span class="no tag">${k+1}</span><span class="name">${esc(awardLabel(s))}<span class="sub">${s.kind==='team' ? `${esc(teamName('blue'))} ${s.tot.blue} : ${s.tot.red} ${esc(teamName('red'))}` : s.winners.map(x => esc(x.p.name)+' '+sc(s.ev, x.total)).join(', ')}</span></span>${k===i?'<span class="tag dark">지금 발표</span>':''}</div>`).join('')}</div></div>`;
 }
 
 /* ---------- 시상식 ---------- */
@@ -413,6 +440,8 @@ Object.assign(ACT, {
   annDelPhrase: async (el, v) => { const t = phrases()[+v]; if(!(await ask(`"${t}" 문구를 지울까요?`, '지우기', true))) return false;
     setConfig({ phrases: phrases().filter((_,i) => i!==+v) }); return false; },
   boardPreview: () => { UI.preview = !UI.preview; window.scrollTo(0,0); },
+  // 안내판 화면 종류(이 기기에만 저장): 태블릿 / PC·프로젝터
+  bdKind: (el, v) => { BDKIND = v==='pc' ? 'pc' : 'tablet'; ls.set('udh5_bdkind', BDKIND); window.scrollTo(0,0); },
 });
 document.addEventListener('change', e => { const el = e.target; if(el.dataset.ch==='bcfg') setConfig({ board:{ [el.dataset.k]: el.checked } }); });
 document.addEventListener('input', e => { if(e.target.dataset.in==='ann') annDraft = e.target.value; });

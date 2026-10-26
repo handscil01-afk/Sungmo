@@ -83,10 +83,24 @@ const askText = (msg, v, ok='저장') => dialog({ msg, input: v||'', ok });
 const ACT = {};
 
 /* 메뉴 화면 안의 위쪽 탭: 한 번에 한 가지만 보여 줘서 안에 무엇이 있는지 바로 알 수 있게 함
-   tabs: [[키, 아이콘, 이름, 작은 글씨(선택)], …] */
+   tabs: [[키, 아이콘, 이름, 작은 글씨(선택)], …]
+   탭이 많으면 줄바꿈 없이 한 줄로 옆으로 밀어서 볼 수 있고, 지금 탭은 항상 보이는 자리로 맞춰 줌. opt.sub: 안쪽 작은 탭 줄 */
 const ITAB = ls.get('udh5_itab', {});
-function innerTabs(key, tabs){
+function innerTabs(key, tabs, opt={}){
   if(!tabs.some(t => t[0]===ITAB[key])) ITAB[key] = tabs[0][0];
-  return `<div class="seg btabs">${tabs.map(([k,i,l,b]) => `<button class="${ITAB[key]===k?'on':''}" data-a="itab" data-k="${key}" data-v="${k}"><b>${i}</b><span>${l}${b!=null&&b!==''?` <small>${b}</small>`:''}</span></button>`).join('')}</div>`;
+  return `<div class="seg btabs${opt.sub?' sub':''}" data-tabs="${key}" role="tablist">${tabs.map(([k,i,l,b]) => `<button role="tab" aria-selected="${ITAB[key]===k}" class="${ITAB[key]===k?'on':''}" data-a="itab" data-k="${key}" data-v="${k}"><b>${i}</b><span>${l}${b!=null&&b!==''?` <small>${b}</small>`:''}</span></button>`).join('')}</div>`;
 }
 ACT.itab = (el, v) => { ITAB[el.dataset.k] = v; ls.set('udh5_itab', ITAB); const m = document.querySelector('main'); if(m) m.scrollTop = 0; };
+// 화면을 다시 그려도 탭 줄이 밀려 있던 자리를 지키고, 지금 탭이 가려져 있으면 보이게 밀어 줌
+const TABSCROLL = {};
+document.addEventListener('scroll', e => { const t = e.target; if(t && t.dataset && t.dataset.tabs) TABSCROLL[t.dataset.tabs] = t.scrollLeft; }, true);
+function innerTabsFix(){
+  document.querySelectorAll('.btabs[data-tabs]').forEach(el => {
+    if(el.scrollWidth <= el.clientWidth + 1) return;
+    const k = el.dataset.tabs; if(TABSCROLL[k]!=null) el.scrollLeft = TABSCROLL[k];
+    const on = el.querySelector('.on'); if(!on) return;
+    const er = el.getBoundingClientRect(), br = on.getBoundingClientRect();
+    if(br.left < er.left) el.scrollLeft += br.left - er.left - 8;
+    else if(br.right > er.right) el.scrollLeft += br.right - er.right + 8;
+  });
+}

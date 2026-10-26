@@ -523,11 +523,11 @@ function runTimesOf(ev){ const tm = (D.calls[ev]||{}).times || {}, rt = UI.runTi
 /* ---------- 계시원 화면 ---------- */
 function timerView(ev){
   const b = upNext(ev,'blue'), r = upNext(ev,'red'), tm = (D.calls[ev]||{}).times || {};
-  return `<div class="fit">
+  return `<div class="fit timerfit">
     <div class="infobar"><b>⏱ 계시 · ${matchesOf(ev).length+1}번째 대결</b>${scoreline(tally(ev))}</div>
     <div class="duel small">${pcard(ev,'blue',b,false)}<div class="vsm">VS</div>${pcard(ev,'red',r,false)}</div>
     <div class="watch huge" id="watch">0.00</div>
-    <div class="row nowrap"><button class="btn primary huge" data-a="watchToggle" id="watchBtn">시작</button><button class="btn" data-a="watchReset" aria-label="초기화" style="min-width:80px">↺</button></div>
+    <div class="row nowrap timerstart"><button class="btn primary huge" data-a="watchToggle" id="watchBtn">시작</button><button class="btn" data-a="watchReset" aria-label="초기화" style="min-width:80px">↺</button></div>
     <div class="winrow"><button class="btn blue huge" data-a="sendTime" data-v="blue">→ ${esc(teamShort('blue'))} 보내기</button><button class="btn red huge" data-a="sendTime" data-v="red">→ ${esc(teamShort('red'))} 보내기</button></div>
     <div class="nextbar"><span class="sub">보낸 기록</span><span class="who">${teamBadge('blue')}<b>${tm.blue!=null ? fmtSec(tm.blue)+'초' : '-'}</b></span><span class="who">${teamBadge('red')}<b>${tm.red!=null ? fmtSec(tm.red)+'초' : '-'}</b></span>
       <span class="grow"></span>${tm.blue!=null || tm.red!=null ? '<button class="btn small" data-a="clearTimes">지우기</button>' : ''}</div>
