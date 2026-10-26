@@ -1,7 +1,7 @@
 'use strict';
 /* ===================== 상태 ===================== */
 const D = {
-  config:{}, indiv:[], matches:[], orders:{}, calls:{}, roles:{}, presets:{}, absent:{}, msgs:[], devices:[], masters:{},
+  config:{}, indiv:[], matches:[], orders:{}, calls:{}, ccalls:{}, roles:{}, presets:{}, absent:{}, msgs:[], devices:[], masters:{},
   amMaster:false, pending:{}, loaded:{}, error:'', fatal:'',
 };
 const UI = {
@@ -46,7 +46,7 @@ function standings(ev){
     .map(x => ({ ...x, total: totalOf(ev, x.r.throws), fin: rec(ev,'final',x.p.id) }))
     .map(x => ({ ...x, ftotal: x.fin ? totalOf(ev, x.fin.throws) : null }));
   main.sort((a,b) => b.total-a.total || ((b.ftotal??-1)-(a.ftotal??-1)) || byName(a.p,b.p));
-  // 본경기 기준 순위(동점 공동), 결승 기록이 있으면 그 안에서 다시 나눔
+  // 본선 기준 순위(동점 공동), 결승 기록이 있으면 그 안에서 다시 나눔
   let rank=0, prevKey=null;
   main.forEach((x,i) => { const key = x.total+'|'+(x.ftotal??''); if(key!==prevKey){ rank=i+1; prevKey=key; } x.rank=rank; });
   const ties = [], byTotal = {};
@@ -60,6 +60,18 @@ function standings(ev){
   });
   return { list: main, ties };
 }
+
+// 연습 1·2(또는 결승)만의 순위: 합계가 높은 순, 동점은 공동 순위
+function roundStandings(ev, round){
+  const list = people().map(p => ({ p, r: rec(ev, round, p.id) })).filter(x => x.r)
+    .map(x => ({ ...x, total: totalOf(ev, x.r.throws) }));
+  list.sort((a,b) => b.total-a.total || byName(a.p,b.p));
+  let rank = 0, prev = null;
+  list.forEach((x,i) => { if(x.total!==prev){ rank = i+1; prev = x.total; } x.rank = rank; });
+  return { list };
+}
+// 사람 한 명의 회차별 기록 {p1, p2, main, final}
+const recsOf = (ev, pid) => ({ p1: rec(ev,'p1',pid), p2: rec(ev,'p2',pid), main: rec(ev,'main',pid), final: rec(ev,'final',pid) });
 
 /* ===================== 단체전 ===================== */
 function matchesOf(ev){ return D.matches.filter(m => m.event===ev && !m.deleted).sort((a,b)=>(a.at||0)-(b.at||0)); }
@@ -118,17 +130,19 @@ function remainingMatches(ev){
    한 기기에 여러 역할: coach(감독 팀), events(심판 종목), helpers(기록 도우미 종목), timers(계시원 종목), board(안내판), cast(방송 권한) */
 const TIME_EVENTS = Object.keys(TEAM).filter(k => TEAM[k].mode==='time');
 function normRole(r){
-  const o = { coach:'', events:[], helpers:[], timers:[], board:false, cast:false, preset:'', name:'' };
+  const o = { coach:'', events:[], helpers:[], timers:[], board:false, cast:false, monitor:false, preset:'', name:'' };
   if(!r) return o;
   o.coach = r.coach || (r.role==='coach' ? (r.team||'') : '');
   o.events = (r.events||[]).filter(e => EVENTS[e]);
   o.helpers = (r.helpers||[]).filter(e => EVENTS[e]);
   o.timers = (r.timers||[]).filter(e => TIME_EVENTS.includes(e));
   o.board = !!r.board || r.role==='board';
-  o.cast = !!r.cast; o.preset = r.preset||''; o.name = r.name||'';
+  o.cast = !!r.cast; o.monitor = !!r.monitor; o.preset = r.preset||''; o.name = r.name||'';
   return o;
 }
-const hasDuty = r => !!(r.coach || r.events.length || r.helpers.length || r.timers.length);
+const hasDuty = r => !!(r.coach || r.events.length || r.helpers.length || r.timers.length || r.monitor);
+// 운영 현황만 보는 기기 (점수·출석을 건드리지 않음)
+const monitorOnly = r => !!r.monitor && !(r.coach || r.events.length || r.helpers.length || r.timers.length);
 function myRole(){
   if(D.amMaster) return { ...normRole(null), role:'master' };
   const r = normRole(store && D.roles[store.uid]);
@@ -144,6 +158,7 @@ function roleParts(r){
   if(r.events.length) out.push({ icon:'🚩', text:`${n(r.events)} 심판` });
   if(r.helpers.length) out.push({ icon:'✏️', text:`${n(r.helpers)} 기록 도우미` });
   if(r.timers.length) out.push({ icon:'⏱', text:`${n(r.timers)} 계시원` });
+  if(r.monitor) out.push({ icon:'🧭', text:'운영 현황' });
   if(r.board) out.push({ icon:'📺', text:'안내판' });
   return out;
 }
@@ -156,6 +171,8 @@ const can = {
   order: team => D.amMaster || myRole().coach===team,
   time: ev => D.amMaster || myRole().timers.includes(ev) || refEvents().includes(ev),
   staff: () => D.amMaster || hasDuty(myRole()),
+  abs: () => D.amMaster || (hasDuty(myRole()) && !monitorOnly(myRole())),     // 출석(불참) 표시
+  ccall: team => D.amMaster || myRole().coach===team,                      // 감독이 자기 팀 선수 부르기
 };
 
 /* ===================== 쓰기 ===================== */

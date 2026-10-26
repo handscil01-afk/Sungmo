@@ -24,12 +24,16 @@ function settingsView(){
       <p class="sub">화면에는 팀 이름의 첫 글자(${esc(teamShort('blue'))}·${esc(teamShort('red'))})가 팀 표시로 쓰입니다. ${esc(teamShort('blue'))}은 동그라미, ${esc(teamShort('red'))}은 네모 모양입니다.</p></div>
     <div class="card"><h2>아직 정하지 못한 점수</h2>
       <div class="row"><span class="grow">후리볼 파울</span><div class="seg"><button class="${s.foul===1?'on':''}" data-a="setS" data-k="foul" data-v="1">1점</button><button class="${s.foul===1.5?'on':''}" data-a="setS" data-k="foul" data-v="1.5">1.5점</button></div></div>
-      <p class="sub">바꾸면 이미 입력한 기록의 점수도 자동으로 다시 계산됩니다.</p></div>`,
+      <p class="sub">바꾸면 이미 입력한 기록의 점수도 자동으로 다시 계산됩니다.</p></div>
+    <div class="card"><h2>개인전 표시</h2>
+      <div class="item"><span class="name">안내판에 연습 순위 보이기<span class="sub">켜면 안내판의 종합 현황에 연습 1·2의 1~3등도 함께 나옵니다. 연습 점수는 개인전 기록표에 항상 보입니다.</span></span><label class="switch"><input type="checkbox" data-ch="sets" data-k="showPracRank" ${s.showPracRank?'checked':''}><span></span></label></div></div>
+    <div class="card"><h2>줄다리기 계획 판 수</h2>
+      <div class="row"><span class="grow">진행 현황의 남은 시간 계산에 씁니다</span><div class="seg">${[1,3,5].map(n => `<button class="${s.tugRounds===n?'on':''}" data-a="setS" data-k="tugRounds" data-v="${n}">${n}판</button>`).join('')}</div></div></div>`,
     report: () => `<div class="card"><h2>결과 보고서 · 내려받기</h2>
       <button class="btn primary wide" data-a="report">🖨 결과 보고서 보기 (인쇄·PDF 저장)</button>
       <div class="row" style="margin-top:10px"><button class="btn grow" data-a="csv" data-v="indiv">개인전 기록 (엑셀용 CSV)</button><button class="btn grow" data-a="csv" data-v="team">단체전 기록 (엑셀용 CSV)</button></div></div>`,
     reset: () => `<div class="card"><h2>🧹 시험 기록 초기화</h2>
-      <p class="sub">운동회 전에 시험해 본 점수·승패·호출·안내·불참 표시·문자 무전을 한 번에 지웁니다. 명단, 팀, 담당자 명단, 역할, 일정은 그대로 남습니다.</p>
+      <p class="sub">운동회 전에 시험해 본 점수·승패·호출(감독 호출 포함)·안내·불참 표시·문자 무전을 한 번에 지웁니다. 명단, 팀, 담당자 명단, 역할, 일정은 그대로 남습니다.</p>
       <button class="btn danger wide" data-a="resetAll">시험 기록 모두 지우기</button></div>`,
   }[ITAB.settings]();
   return `<div class="bctl">${tabs}${body}</div>`;
@@ -61,11 +65,12 @@ function csv(kind){
   const q = v => { const s=String(v??''); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
   const t = v => v ? new Date(v).toLocaleString('ko-KR') : '';
   if(kind==='indiv'){
-    rows.push(['종목','구분','이름','팀','1회','2회','3회','4회','5회','합계','거리','입력자','입력 시각','수정자','수정 시각']);
+    rows.push(['종목','구분','이름','1회','2회','3회','4회','5회','합계','거리','입력자','입력 시각','수정자','수정 시각']);
     Object.entries(INDIV).forEach(([ev,E]) => { const m = optMap(ev);
-      D.indiv.filter(r => r.event===ev && !r.deleted && (r.throws||[]).length).forEach(r => {
+      D.indiv.filter(r => r.event===ev && !r.deleted && (r.throws||[]).length)
+        .sort((x,y) => (ROUND_KEYS.indexOf(x.round) - ROUND_KEYS.indexOf(y.round)) || String(pname(x.personId)).localeCompare(String(pname(y.personId)), 'ko')).forEach(r => {
         const pts = Array.from({length:5}, (_,k) => r.throws[k]!=null ? (m[r.throws[k]]?.v ?? 0) : '');
-        rows.push([E.name, r.round==='final'?'결승':'본경기', pname(r.personId), teamName(teamOf(r.personId)), ...pts, totalOf(ev,r.throws), r.dist?r.dist+'m':'', r.by||'', t(r.at), r.editedBy||'', t(r.editedAt)]);
+        rows.push([E.name, ROUNDS[r.round] || r.round, pname(r.personId), ...pts, totalOf(ev,r.throws), r.dist?r.dist+'m':'', r.by||'', t(r.at), r.editedBy||'', t(r.editedAt)]);
       }); });
   } else {
     rows.push(['종목','순번',teamName('blue')+' 선수',teamName('red')+' 선수','결과',teamName('blue')+' 기록(초)',teamName('red')+' 기록(초)','입력자','입력 시각','수정자','수정 시각']);
@@ -112,6 +117,7 @@ Object.assign(ACT, {
     D.matches.filter(m => !m.deleted).forEach(m => jobs.push(put(['main','matches',m.id], { event:m.event, deleted:true, ...by })));
     Object.keys(D.calls).forEach(ev => jobs.push(put(['main','calls',ev], { pick:{ blue:null, red:null }, call:null, times:null })));
     Object.keys(D.absent).forEach(id => jobs.push(guard(store.del(['main','absent',id]))));
+    Object.keys(D.ccalls).forEach(id => jobs.push(guard(store.del(['main','ccalls',id]))));
     D.msgs.forEach(m => jobs.push(guard(store.del(['main','msgs',m.id]))));
     if(orders) Object.values(D.orders).forEach(o => jobs.push(put(['main','orders',o.id], { event:o.event, team:o.team, list:[], by:UI.me, at:now() }, false)));
     jobs.push(setConfig({ announce:{ cleared:true }, awards:{ step:-1 }, board:{ mode:'auto' } }));
@@ -119,3 +125,5 @@ Object.assign(ACT, {
     toast(`시험 기록을 지웠습니다. (${res.filter(Boolean).length}건)`);
   },
 });
+
+document.addEventListener('change', e => { const el = e.target; if(el.dataset.ch==='sets') setConfig({ settings:{ [el.dataset.k]: el.checked } }); });

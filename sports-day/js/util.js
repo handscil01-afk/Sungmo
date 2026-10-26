@@ -8,6 +8,8 @@ const ago = t => { if(!t) return '기록 없음'; const m = Math.floor((now()-t)
 const uid = () => Math.random().toString(36).slice(2,8) + now().toString(36).slice(-4);
 const fmtSec = v => (v==null||v===''||isNaN(v)) ? '-' : Number(v).toFixed(2);
 const byName = (a,b) => a.name.localeCompare(b.name, 'ko');
+// 1~20을 ①~⑳로 (빈 칸의 순서 표시용)
+const circ = n => (n >= 1 && n <= 20) ? String.fromCodePoint(0x2460 + n - 1) : String(n);
 function mkStorage(kind){
   return {
     get(k,d){ try{ const v=window[kind].getItem(k); return v==null?d:JSON.parse(v);}catch(e){return d;} },

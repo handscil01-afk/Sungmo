@@ -13,11 +13,17 @@ function reportView(){
   }).join('');
   const indivTables = Object.entries(INDIV).map(([k,E]) => {
     const { list, ties } = standings(k), m = optMap(k);
-    return `<h3>${E.icon} ${esc(E.name)} <small>${list.length}명 기록</small></h3>
+    const tot = (ev, r) => r ? totalOf(ev, r.throws) : '';
+    // 본선 기록이 없고 연습만 한 사람은 순위 없이 뒤에 붙임
+    const ranked = new Set(list.map(x => x.p.id));
+    const only = people().filter(p => !ranked.has(p.id) && (rec(k,'p1',p.id) || rec(k,'p2',p.id) || rec(k,'final',p.id)));
+    const row = (p, rank, r, total, ftotal, podium) => `<tr class="${podium?'podium':''}"><td class="num">${rank}</td><td>${esc(p.name)}</td>
+          <td class="num">${tot(k, rec(k,'p1',p.id))}</td><td class="num">${tot(k, rec(k,'p2',p.id))}</td>
+          <td>${r ? (r.throws||[]).map(t => m[t]?.v ?? 0).join(' · ') + (r.dist?` (${r.dist}m)`:'') : ''}</td><td class="num"><b>${total ?? ''}</b></td><td class="num">${ftotal ?? ''}</td></tr>`;
+    return `<h3>${E.icon} ${esc(E.name)} <small>본선 ${list.length}명 기록</small></h3>
       ${ties.filter(t => !t.resolved).map(t => `<p class="warnp">※ ${t.total}점 동점(${t.names.map(esc).join(', ')})은 결승 기록이 없어 순위를 가리지 못했습니다.</p>`).join('')}
-      ${list.length ? `<table class="rt"><thead><tr><th>순위</th><th>이름</th><th>팀</th><th>1~5회</th><th>합계</th><th>결승</th></tr></thead><tbody>
-        ${list.map(x => `<tr class="${x.rank<=3?'podium':''}"><td class="num">${x.rank}</td><td>${esc(x.p.name)}</td><td>${esc(teamName(x.p.team))}</td>
-          <td>${(x.r.throws||[]).map(t => m[t]?.v ?? 0).join(' · ')}${x.r.dist?` (${x.r.dist}m)`:''}</td><td class="num"><b>${x.total}</b></td><td class="num">${x.ftotal??''}</td></tr>`).join('')}</tbody></table>` : '<p>기록이 없습니다.</p>'}`;
+      ${list.length || only.length ? `<table class="rt"><thead><tr><th>순위</th><th>이름</th><th>연습 1</th><th>연습 2</th><th>본선 1~5회</th><th>본선 합계</th><th>결승</th></tr></thead><tbody>
+        ${list.map(x => row(x.p, x.rank, x.r, x.total, x.ftotal, x.rank<=3)).join('')}${only.map(p => row(p, '', null, null, tot(k, rec(k,'final',p.id)), false)).join('')}</tbody></table>` : '<p>기록이 없습니다.</p>'}`;
   }).join('');
   const absent = people().filter(p => isAbsent(p.id));
   return `<div class="reportbar noprint"><button class="btn" data-a="reportClose">← 돌아가기</button><span class="grow"></span><button class="btn primary" data-a="print">🖨 인쇄 · PDF 저장</button></div>

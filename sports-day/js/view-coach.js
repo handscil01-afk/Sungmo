@@ -7,7 +7,7 @@ function coachView(team){
   return `<div class="fit">
     ${eventTabs(ORDER_EVENTS, 'cev', UI.coachEv, true)}
     <div class="infobar coachinfo"><span class="sub">지금</span><b class="cn blue">${b.cur?esc(pname(b.cur)):'-'}</b><span class="sub">vs</span><b class="cn red">${r.cur?esc(pname(r.cur)):'-'}</b>
-      <span class="grow"></span>${scoreline(tally(ev))}</div>
+      <span class="grow"></span>${scoreline(tally(ev))}<button class="btn small" data-a="coachCall" aria-label="우리 팀 선수 부르기">📣<span class="bl"> 부르기</span></button></div>
     <div class="seg sm coachseg"><button class="${tab!=='opp'?'on':''}" data-a="coachTab" data-v="our">우리 팀 순서 짜기</button><button class="${tab==='opp'?'on':''}" data-a="coachTab" data-v="opp">${esc(teamName(other))} 순서 보기</button></div>
     <div class="coachfit">${orderPanel(ev, team, tab!=='opp')}${oppPanel(ev, other, tab==='opp')}</div>
   </div>`;
@@ -53,6 +53,29 @@ function oppPanel(ev, team, sel){
       ${id===u.cur?'<span class="tag dark">지금</span>':id===u.next?'<span class="tag warn">다음</span>':''}${pl[id]?`<span class="tag ok">✓ ${pl[id]}회</span>`:''}${saved.includes(id)?'':'<span class="tag">자동</span>'}${isAbsent(id)?'<span class="tag red">불참</span>':''}</div>`).join('');
   return `<div class="cpanel ${sel?'sel':''}"><div class="ptitle">${teamBadge(team)} <b>${esc(teamName(team))} 순서</b><span class="tag">보기만</span></div>
     <div class="list olist box">${rows || '<div class="empty">이 팀에 배정된 사람이 없습니다.</div>'}</div></div>`;
+}
+/* ---------- 감독: 우리 팀 선수를 안내판으로 부르기 ----------
+   main/ccalls/{종목}_{팀} 문서 하나에 가장 최근 호출을 덮어씀. 안내판이 새 호출을 알아보고 소리·화면으로 알림 */
+const CC = { team:'' };
+function ccallSheet(){
+  const ev = UI.ev, team = CC.team, E = EVENTS[ev];
+  const btn = (k, label, cls='') => { const id = upcoming(ev, team, k);
+    return `<button class="btn huge wide ccbtn ${cls}" data-a="ccallPlay" data-v="${k}" ${id?'':'disabled'} style="width:100%;margin-bottom:10px">${label}<small>${esc(id ? pname(id) : '-')}</small></button>`; };
+  const ord = orderFor(ev, team), pl = plays(ev, team), u = upNext(ev, team);
+  return `<h2>📣 ${esc(teamName(team))} 선수 부르기 <small class="sub">${E.icon} ${esc(E.name)}</small></h2>
+    ${btn(0, '지금 선수 다시 부르기')}${btn(1, '다음 선수 부르기', 'primary')}${btn(2, '다다음 선수 부르기')}
+    <h3>우리 팀 순서에서 골라 부르기</h3>
+    <div class="list olist sheetlist">${ord.map((id,i) => `<div class="item tap ${id===u.cur?'cur':''} ${pl[id]?'done':''}" data-a="ccallPick" data-v="${id}"><span class="no">${i+1}</span><span class="name">${esc(pname(id))}</span>
+      ${id===u.cur?'<span class="tag dark">지금</span>':id===u.next?'<span class="tag warn">다음</span>':''}${pl[id]?`<span class="tag ok">✓ ${pl[id]}회</span>`:''}${isAbsent(id)?'<span class="tag red">불참</span>':''}</div>`).join('') || '<div class="empty">팀원이 없습니다.</div>'}</div>
+    <p class="sub">누르면 안내판에 소리와 함께 "${esc(teamName(team))} ○○○ 준비해 주세요"가 뜹니다. 이름을 눌러 고른 선수는 "준비해 주세요"로 부릅니다.</p>
+    <button class="btn wide" data-a="closeSheet">닫기</button>`;
+}
+function ccall(pid, kind){
+  const ev = UI.ev, team = CC.team;
+  if(!can.ccall(team)) return denied();
+  if(!ORDER_EVENTS.includes(ev) || !pid){ toast('부를 선수가 없습니다.'); return Promise.resolve(false); }
+  return put(['main','ccalls',`${ev}_${team}`], { event:ev, team, pid, kind, at:now(), by:UI.me }, false)
+    .then(ok => { if(ok) toast(`안내판에 ${pname(pid)} 선수를 불렀습니다.`); return ok; });
 }
 function saveOrder(ev, team, list){
   if(!can.order(team)) return denied();
@@ -136,6 +159,9 @@ document.addEventListener('pointercancel', () => endDrag(false));
 document.addEventListener('click', e => { if(now()-DRAG.suppress < 400 && e.target.closest('[data-drag]')){ e.stopPropagation(); e.preventDefault(); } }, true);
 
 Object.assign(ACT, {
+  coachCall: () => { const team = myRole().coach || UI.orderTab || 'blue'; if(!can.ccall(team)) return denied(); CC.team = team; openSheet(ccallSheet); return false; },
+  ccallPlay: async (el, v) => { const k = +v, id = upcoming(UI.ev, CC.team, k); if(await ccall(id, k ? 'next' : 'now')) closeSheet(); return false; },
+  ccallPick: async (el, v) => { if(await ccall(v, 'next')) closeSheet(); return false; },
   coachTab: (el, v) => { UI.coachTab = v; },
   orderTab: (el, v) => { UI.orderTab = v; },
   oadd: (el, v) => { const ev=UI.ev, t=el.dataset.t; saveOrder(ev, t, [...orderSaved(ev, t), v]); return false; },

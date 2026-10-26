@@ -7,11 +7,11 @@ const MAX_TALK_MS = 60000, CHUNK_SEC = 0.15, MIC_WARM_MS = 20000;
 const JITTER = 0.18, MAX_LAG = 0.7;   // 받는 쪽: 처음 0.18초 모아 재생, 0.7초 넘게 밀리면 밀린 조각을 버리고 따라잡음
 const RADIO = { on: ls.get('udh5_radio_on', true), lock:{ radio:null, cast:null }, listen:{ radio:null, cast:null },
   rtMaster:null, rtMasters:null, rtRoles:null, err:'' };
-const TALK = { kind:null, phase:null, tid:null, seq:0, pressed:false, timer:0, maxTimer:0, data:null };
+const TALK = { kind:null, phase:null, tid:null, seq:0, pressed:false, timer:0, maxTimer:0, data:null, toggle:false };   // toggle: 이어폰 버튼으로 켠 말하기(다시 누를 때까지 계속)
 const radioRoleOK = () => D.amMaster || hasDuty(myRole());
 const castOK = () => D.amMaster || !!myRole().cast;
 // Realtime Database 규칙이 보는 역할 이름: 감독 > 심판(심판·기록 도우미·계시원) > 안내판
-const rtRoleOf = r => r.coach ? 'coach' : (r.events.length || r.helpers.length || r.timers.length) ? 'referee' : r.board ? 'board' : '';
+const rtRoleOf = r => r.coach ? 'coach' : (r.events.length || r.helpers.length || r.timers.length || r.monitor) ? 'referee' : r.board ? 'board' : '';
 
 /* ---------- μ-law 변환 ---------- */
 function muEnc(s){
@@ -27,13 +27,47 @@ const b64 = bytes => { let s = ''; for(let i = 0; i < bytes.length; i += 4096) s
 const unb64 = str => { const s = atob(str), a = new Uint8Array(s.length); for(let i = 0; i < s.length; i++) a[i] = s.charCodeAt(i); return a; };
 
 /* ---------- 마이크 ---------- */
+/* ---------- 무전 설정 (이 기기에만 저장): 마이크 고르기 · 이어폰 버튼 ---------- */
+const RCFG = { mic:'auto', btn:false, ...ls.get('udh5_radio_cfg', {}) };
+const saveRcfg = () => ls.set('udh5_radio_cfg', RCFG);
+const MIC_BUILTIN_RE = /built-in|내장|iphone|internal|speakerphone|handset|bottom|microphone 1|기본/i;
+const MIC_EXTERNAL_RE = /bluetooth|블루투스|airpods|buds|headset|hands-free|헤드셋/i;
+const MIC_BASE = { echoCancellation:true, noiseSuppression:true, autoGainControl:true, channelCount:1 };
+async function micDevices(){
+  try{ return (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind==='audioinput'); }catch(e){ return []; }
+}
+// 설정에 따라 쓸 마이크의 deviceId (null이면 브라우저 기본 마이크)
+async function resolveMicId(){
+  const c = RCFG.mic;
+  if(!c || c==='auto') return null;
+  if(c==='builtin'){
+    const d = (await micDevices()).find(x => x.label && MIC_BUILTIN_RE.test(x.label) && !MIC_EXTERNAL_RE.test(x.label));
+    return d ? d.deviceId : null;
+  }
+  return c;
+}
+// 고른 마이크로 열고, 못 찾으면 기본 마이크로 대신함
+async function openMicStream(){
+  const md = navigator.mediaDevices, id = await resolveMicId();
+  if(!id) return md.getUserMedia({ audio: MIC_BASE });
+  try{ return await md.getUserMedia({ audio:{ ...MIC_BASE, deviceId:{ exact:id } } }); }
+  catch(err){
+    if(err && (err.name==='OverconstrainedError' || err.name==='NotFoundError')){ toast('고른 마이크를 찾지 못해 기본 마이크를 씁니다.'); return md.getUserMedia({ audio: MIC_BASE }); }
+    throw err;
+  }
+}
+
 // 마이크는 말을 마친 뒤 20초 동안 켜 둠: 이어서 말할 때 마이크를 다시 여느라 늦어지지 않게
 const MIC = { stream:null, idle:0, stop:null, gate:Infinity };
 function getMic(){
   clearTimeout(MIC.idle);
   if(MIC.stream && MIC.stream.getAudioTracks().some(t => t.readyState==='live')) return Promise.resolve(MIC.stream);
-  return navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true, channelCount:1 } })
-    .then(st => (MIC.stream = st));
+  return openMicStream().then(st => (MIC.stream = st));
+}
+// 설정을 바꾸면 켜 둔 마이크를 닫아서 다음 말하기부터 새 마이크를 쓰게 함
+function micDrop(){
+  clearTimeout(MIC.idle);
+  if(MIC.stream && !MIC.stop && !TALK.kind){ MIC.stream.getTracks().forEach(t => t.stop()); MIC.stream = null; }
 }
 function micRelease(){
   clearTimeout(MIC.idle);
@@ -187,15 +221,15 @@ function boardListeners(){
 }
 
 /* ---------- 누르고 말하기 ---------- */
-async function pttDown(kind){
+async function pttDown(kind, opts){
   if(TALK.kind) return;
   if(kind==='radio' ? !radioRoleOK() : !castOK()) return;
   SND.unlock();
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ toast('이 브라우저에서는 마이크를 쓸 수 없습니다. 크롬이나 사파리로 열어 주세요.'); return; }
-  TALK.kind = kind; TALK.phase = 'wait'; TALK.pressed = true; TALK.tid = store.uid.slice(0,6) + now().toString(36); TALK.seq = 0;
+  TALK.kind = kind; TALK.phase = 'wait'; TALK.pressed = true; TALK.toggle = !!(opts && opts.toggle); TALK.tid = store.uid.slice(0,6) + now().toString(36); TALK.seq = 0;
   TALK.data = { uid:store.uid, name:UI.me, tid:TALK.tid };
   radioRender();
-  const fail = msg => { if(msg) toast(msg); if(navigator.vibrate) navigator.vibrate([60,40,60]); TALK.kind = null; TALK.phase = null; radioRender(); };
+  const fail = msg => { if(msg) toast(msg); if(navigator.vibrate) navigator.vibrate([60,40,60]); TALK.kind = null; TALK.phase = null; TALK.toggle = false; radioRender(); };
   // 마이크 켜기와 무전 잡기를 동시에 시작해서 '삑'까지 걸리는 시간을 줄임
   const micP = getMic().then(st => ({ st }), err => ({ err }));
   if(kind==='cast' && D.amMaster && boardListeners()===0) toast('소리를 켠 안내판이 없습니다. 안내판 화면을 한 번 눌러 소리를 켜 주세요.');
@@ -206,7 +240,7 @@ async function pttDown(kind){
     if(res.error) return fail(radioReady() ? '무전기 서버에 연결하지 못했습니다.' : (D.amMaster ? '무전기 권한을 먼저 확인해 주세요(🔒 버튼).' : '무전기 권한을 준비하는 중입니다. 마스터 기기가 켜져 있는지 확인해 주세요.'));
     return fail(`${res.lock && res.lock.name || '다른 사람'} 님이 ${kind==='cast' ? '방송' : '말하는'} 중입니다.`);
   }
-  const giveUp = async () => { if(MIC.stop) MIC.stop(); else micRelease(); await rt.release(kind); TALK.kind = null; TALK.phase = null; radioRender(); };
+  const giveUp = async () => { if(MIC.stop) MIC.stop(); else micRelease(); await rt.release(kind); TALK.kind = null; TALK.phase = null; TALK.toggle = false; radioRender(); };
   if(!TALK.pressed) return giveUp();
   try{
     const m = await micP; if(m.err) throw m.err;
@@ -237,7 +271,7 @@ async function pttUp(){
   TALK.phase = 'end'; radioRender();
   await new Promise(r => setTimeout(r, 200));
   MIC.stop && MIC.stop();
-  TALK.kind = null; TALK.phase = null; radioRender();
+  TALK.kind = null; TALK.phase = null; TALK.toggle = false; radioRender();
   const rt = await getRT();
   await rt.release(kind);
   setTimeout(() => rt.dropTalk(kind, tid), 10000);
@@ -259,12 +293,14 @@ function radioSetup(){
         <div class="wkstat" id="wkstat"></div>
         <button class="wkbig" id="wkbig" data-kind="radio"><span class="ic">🎙</span><span class="lb">누르고 말하기</span><span class="hint"></span></button>
         <div class="wkfoot" id="wkfoot"></div>
+        <div class="wkset" id="wkset"></div>
       </div>
       <div class="wkmsg" id="wkmsg"></div>
     </div></div>`;
   const b = $('#wkbig');
-  b.addEventListener('pointerdown', e => { e.preventDefault(); try{ b.setPointerCapture(e.pointerId); }catch(x){} pttDown(b.dataset.kind); });
-  ['pointerup','pointercancel','lostpointercapture'].forEach(t => b.addEventListener(t, () => { if(TALK.kind===b.dataset.kind || TALK.pressed) pttUp(); }));
+  // 이어폰 버튼으로 켠 말하기(toggle)는 화면 단추를 한 번 누르면 끝남. 손을 뗄 때는 끝내지 않음
+  b.addEventListener('pointerdown', e => { e.preventDefault(); if(TALK.toggle && TALK.kind){ pttUp(); return; } try{ b.setPointerCapture(e.pointerId); }catch(x){} pttDown(b.dataset.kind); });
+  ['pointerup','pointercancel','lostpointercapture'].forEach(t => b.addEventListener(t, () => { if(TALK.toggle) return; if(TALK.kind===b.dataset.kind || TALK.pressed) pttUp(); }));
   b.addEventListener('contextmenu', e => e.preventDefault());
   $('#wkbg').addEventListener('click', e => { if(e.target.id==='wkbg' && !TALK.kind){ WK.open = false; radioRender(); } });
 }
@@ -297,7 +333,7 @@ function radioRender(){
       if(!TALK.kind) b.dataset.kind = kind;
       const mine = TALK.kind===kind, busy = lock && lock.uid!==store.uid;
       let cls = 'wkbig ' + kind, ic = kind==='cast' ? '📢' : '🎙', lb = kind==='cast' ? '누르고 방송하기' : '누르고 말하기', hint = '누르고 있는 동안만 보냅니다';
-      if(mine && TALK.phase==='live'){ cls += ' live'; lb = kind==='cast' ? '방송 중' : '말하세요'; hint = '손을 떼면 끝납니다'; }
+      if(mine && TALK.phase==='live'){ cls += ' live'; lb = kind==='cast' ? '방송 중' : '말하세요'; hint = TALK.toggle ? '이어폰 버튼을 다시 누르면 끝납니다' : '손을 떼면 끝납니다'; }
       else if(mine && TALK.phase==='end'){ cls += ' live'; lb = '끝내는 중'; hint = ''; }
       else if(mine){ cls += ' wait'; ic = '⏳'; lb = '연결 중…'; hint = '비프음이 나면 말하세요'; }
       else if(busy){ cls += kind==='radio' ? ' rx' : ' busy'; ic = kind==='radio' ? '🔊' : '🔒'; lb = `${lock.name||''}`; hint = kind==='radio' ? '말하는 중 · 끝나면 누를 수 있습니다' : '방송 중'; }
@@ -311,13 +347,21 @@ function radioRender(){
       if($('#wkstat').innerHTML!==st) $('#wkstat').innerHTML = st;
       const ft = (kind==='radio' ? `<label class="wkopt"><input type="checkbox" data-a="rxToggle" ${RADIO.on?'checked':''}> 다른 사람 무전 듣기</label>` : '')
         + (D.amMaster && RT && RADIO.rtMaster===false ? '<button class="btn small" data-a="rxMaster">🔒 권한 확인</button>' : '')
-        + (RADIO.on && SND.ctx && !SND.ready() ? '<button class="btn small" data-a="rxUnlock">🔈 소리 켜기</button>' : '');
+        + (RADIO.on && SND.ctx && !SND.ready() ? '<button class="btn small" data-a="rxUnlock">🔈 소리 켜기</button>' : '')
+        + (kind==='radio' && RCFG.btn && radioRoleOK() ? '<span class="wkopt">🎧 이어폰 버튼으로 켜고 끌 수 있습니다</span>' : '');
       if($('#wkfoot').innerHTML!==ft) $('#wkfoot').innerHTML = ft;
     }
   }
+  // 무전 설정은 말하는 동안에는 숨김 (마이크 시험도 멈춤)
+  const showSet = WK.open && WK.tab!=='msg' && !TALK.kind;
+  $('#wkset').style.display = showSet ? '' : 'none';
+  if(!showSet && RS.test) rsTestStop();
+  if(showSet) rsDraw();
+  if(RCFG.btn && !radioRoleOK() && EB.audio) ebStop();
   // 창을 닫아 두었을 때 다른 사람이 말하면 위쪽에 이름을 띄움
   let chips = '';
   if(ok && !WK.open){
+    if(TALK.toggle && TALK.kind==='radio' && TALK.phase==='live') chips += `<button class="rxchip live" data-a="wkOpen">🔴 <b>말하는 중</b> · 이어폰 버튼을 다시 누르면 끝납니다</button>`;
     if(rx && radioRoleOK()) chips += `<button class="rxchip live" data-a="wkOpen">🔊 <b>${esc(L.name||'')}</b> 말하는 중</button>`;
     if(castRx && !boardOn() && radioRoleOK()) chips += `<div class="rxchip cast">📢 <b>${esc(C.name||'')}</b> 방송 중</div>`;
     if(radioRoleOK() && RADIO.on && SND.ctx && !SND.ready()) chips += `<button class="rxchip warn" data-a="rxUnlock">🔈 눌러서 무전 소리 켜기</button>`;
@@ -326,6 +370,126 @@ function radioRender(){
   const cbox = box.querySelector('.rxchips'); if(cbox.innerHTML!==chips) cbox.innerHTML = chips;
   document.body.classList.remove('has-radio');
 }
+
+/* ---------- 무전 설정 창(⚙): 마이크 고르기 · 마이크 시험 · 이어폰 버튼 ---------- */
+const RS = { open:false, devs:[], test:null, raf:0, sig:'' };
+async function rsLoadDevs(){
+  RS.devs = await micDevices(); rsDraw();
+}
+if(navigator.mediaDevices && navigator.mediaDevices.addEventListener){ try{ navigator.mediaDevices.addEventListener('devicechange', () => { if(RS.open) rsLoadDevs(); }); }catch(e){} }
+async function rsTestStart(){
+  if(RS.test) return;
+  if(TALK.kind){ toast('말하는 중에는 시험할 수 없습니다.'); return; }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ toast('이 브라우저에서는 마이크를 쓸 수 없습니다. 크롬이나 사파리로 열어 주세요.'); return; }
+  try{
+    const st = await openMicStream(), ctx = SND.ensure();
+    if(!ctx){ st.getTracks().forEach(t => t.stop()); toast('이 브라우저에서는 마이크 시험을 할 수 없습니다.'); return; }
+    const src = ctx.createMediaStreamSource(st), an = ctx.createAnalyser(); an.fftSize = 1024; src.connect(an);
+    RS.test = { st, src, an, buf:new Float32Array(an.fftSize) };
+    rsMeter(); rsLoadDevs();
+  }catch(e){ toast(e && e.name==='NotAllowedError' ? '마이크 권한이 꺼져 있습니다. 브라우저(또는 휴대폰) 설정에서 허용해 주세요.' : '마이크를 켜지 못했습니다.'); }
+}
+function rsMeter(){
+  const T = RS.test; if(!T) return;
+  T.an.getFloatTimeDomainData(T.buf);
+  let sum = 0; for(let i = 0; i < T.buf.length; i++) sum += T.buf[i]*T.buf[i];
+  const lv = Math.min(1, Math.sqrt(Math.sqrt(sum / T.buf.length)) * 1.5);
+  const el = document.getElementById('rsLevel'); if(el) el.style.width = Math.round(lv*100)+'%';
+  RS.raf = requestAnimationFrame(rsMeter);
+}
+function rsTestStop(){
+  cancelAnimationFrame(RS.raf);
+  const T = RS.test; RS.test = null;
+  if(T){ try{ T.src.disconnect(); }catch(e){} T.st.getTracks().forEach(t => t.stop()); }
+  const el = document.getElementById('rsLevel'); if(el) el.style.width = '0%';
+  RS.sig = '';
+}
+// 상태가 바뀔 때만 다시 그림 (소리 크기 막대와 목록 선택이 깜빡이지 않게)
+function rsDraw(){
+  const box = document.getElementById('wkset'); if(!box) return;
+  const labeled = RS.devs.filter(d => d.label);
+  const sig = JSON.stringify([RS.open, !!RS.test, RCFG.mic, RCFG.btn, radioRoleOK(), labeled.map(d => d.deviceId+d.label)]);
+  if(sig === RS.sig) return;
+  RS.sig = sig;
+  const head = `<button class="rshead" data-a="rsOpen" aria-expanded="${RS.open}">⚙ 무전 설정 <span>${RS.open?'▴':'▾'}</span></button>`;
+  if(!RS.open){ box.innerHTML = head; return; }
+  const opts = [['auto','자동(기본)'], ['builtin','휴대폰 내장 마이크'], ...labeled.map(d => [d.deviceId, d.label])];
+  if(!opts.some(o => o[0]===RCFG.mic)) opts.push([RCFG.mic, '고른 마이크(목록에 없음)']);
+  box.innerHTML = head + `<div class="rsbody">
+    <div class="rsrow"><label class="rslabel" for="rsMic">마이크</label>
+      <select id="rsMic">${opts.map(([v,l]) => `<option value="${esc(v)}" ${RCFG.mic===v?'selected':''}>${esc(l)}</option>`).join('')}</select>
+      ${labeled.length ? '' : '<button class="btn small" data-a="rsLoadMics">마이크 목록 불러오기</button>'}
+      <div class="rstest"><button class="btn small ${RS.test?'ok':''}" data-a="rsTest">🎤 마이크 시험 ${RS.test?'켬':'끔'}</button><div class="rsmeter" aria-label="마이크 소리 크기"><i id="rsLevel"></i></div></div>
+      <p class="rssub">블루투스 이어폰의 마이크 소리가 작으면 휴대폰 내장 마이크를 고르세요. 기기에 따라 고른 마이크가 적용되지 않을 수 있으니 미리 시험해 주세요.</p></div>
+    ${radioRoleOK() ? `<div class="rsrow"><div class="rsline"><span class="rslabel">이어폰 버튼으로 무전 켜고 끄기</span><label class="switch"><input type="checkbox" data-a="rsBtn" ${RCFG.btn?'checked':''}><span></span></label></div>
+      <p class="rssub">누르고 있는 동안만 말하기는 안 되고, 한 번 누르면 시작하고 다시 누르면 끝납니다. 화면이 켜져 있고 이 앱이 앞에 있어야 합니다. 켜 두면 휴대폰의 음악 재생 버튼을 이 앱이 씁니다.</p></div>` : ''}
+  </div>`;
+}
+document.addEventListener('change', e => {
+  if(e.target.id !== 'rsMic') return;
+  RCFG.mic = e.target.value; saveRcfg(); micDrop();
+  const again = !!RS.test; if(again) rsTestStop();
+  rsDraw();
+  if(again) rsTestStart().then(rsDraw);
+});
+
+/* ---------- 이어폰 버튼 (미디어 재생 단추)으로 무전 켜고 끄기 ----------
+   소리 없는 짧은 음원을 계속 틀어 두면 휴대폰이 이 앱을 '음악 재생 중'으로 보고 이어폰의 재생/일시정지 단추를 이 앱에 보내 줌 */
+const EB = { audio:null, url:null, last:0, stopping:false };
+function silentWavUrl(){
+  const rate = 8000, n = rate * 10, buf = new ArrayBuffer(44 + n), v = new DataView(buf);
+  const w = (o, str) => { for(let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
+  w(0,'RIFF'); v.setUint32(4, 36 + n, true); w(8,'WAVE'); w(12,'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36,'data'); v.setUint32(40, n, true);
+  new Uint8Array(buf, 44).fill(128);                                  // 8비트 무음 = 128
+  return URL.createObjectURL(new Blob([buf], { type:'audio/wav' }));
+}
+const EB_ACTIONS = ['play','pause','stop','nexttrack','previoustrack'];
+function ebKeep(){
+  try{ if(EB.audio && EB.audio.paused) EB.audio.play().catch(() => {}); }catch(e){}
+  try{ navigator.mediaSession.playbackState = 'playing'; }catch(e){}
+}
+function ebMeta(){
+  if(!('mediaSession' in navigator)) return;
+  try{ navigator.mediaSession.metadata = new MediaMetadata({ title:'운동회 무전', artist: UI.me || '' }); }catch(e){}
+  EB_ACTIONS.forEach(act => { try{ navigator.mediaSession.setActionHandler(act, () => { ebToggle(); ebKeep(); }); }catch(e){} });
+  try{ navigator.mediaSession.playbackState = 'playing'; }catch(e){}
+}
+function ebStart(){
+  if(EB.audio){ ebMeta(); ebKeep(); return; }
+  const a = document.createElement('audio');
+  a.id = 'ebAudio'; a.src = EB.url || (EB.url = silentWavUrl()); a.loop = true; a.volume = 1; a.muted = false;
+  a.setAttribute('playsinline', ''); a.style.display = 'none';
+  document.body.appendChild(a); EB.audio = a;
+  // 전화 등으로 멈추면 다시 틀어 둠
+  a.addEventListener('pause', () => { if(EB.audio===a && RCFG.btn && !EB.stopping) setTimeout(() => { if(EB.audio===a) ebKeep(); }, 80); });
+  const pr = a.play();
+  if(pr && pr.catch) pr.catch(() => { toast('이어폰 버튼 기능을 시작하지 못했습니다. 화면을 한 번 누르면 다시 시도합니다.'); });
+  ebMeta();
+}
+function ebStop(){
+  EB.stopping = true;
+  if(EB.audio){ try{ EB.audio.pause(); }catch(e){} EB.audio.remove(); EB.audio = null; }
+  if(EB.url){ URL.revokeObjectURL(EB.url); EB.url = null; }
+  if('mediaSession' in navigator){
+    EB_ACTIONS.forEach(act => { try{ navigator.mediaSession.setActionHandler(act, null); }catch(e){} });
+    try{ navigator.mediaSession.metadata = null; navigator.mediaSession.playbackState = 'none'; }catch(e){}
+  }
+  EB.stopping = false;
+}
+// 말하는 중이 아니면 말하기 시작, 이어폰 버튼으로 시작한 말하기라면 끝냄 (600ms 안의 중복 신호는 무시)
+function ebToggle(){
+  if(!RCFG.btn || !radioRoleOK()) return;
+  const t = now(); if(t - EB.last < 600) return; EB.last = t;
+  if(TALK.kind){ if(TALK.toggle) pttUp(); return; }
+  pttDown('radio', { toggle:true });
+}
+document.addEventListener('keydown', e => {
+  if(!RCFG.btn || !radioRoleOK()) return;
+  if(['MediaPlayPause','HeadsetHook','MediaPlay','MediaPause'].includes(e.key)){ e.preventDefault(); ebToggle(); }
+});
+// 앱을 다시 열면 화면을 한 번 눌렀을 때 소리를 다시 틀어 둠 (처음 틀려면 사람이 눌러야 하므로)
+document.addEventListener('click', () => { if(RCFG.btn && !EB.audio && store && radioRoleOK()) ebStart(); }, true);
 
 /* ---------- 동작 ---------- */
 // 무전기를 쓰는 기기는 화면을 처음 누를 때 소리를 켜 둠 (받는 쪽 재생을 위해)
@@ -342,6 +506,20 @@ Object.assign(ACT, {
     return false;
   },
   rxToggle: () => { RADIO.on = !RADIO.on; ls.set('udh5_radio_on', RADIO.on); if(!RADIO.on) stopListen('radio'); radioRender(); drawSheet(); return false; },
+  rsOpen: () => { RS.open = !RS.open; if(RS.open) rsLoadDevs(); else rsTestStop(); rsDraw(); return false; },
+  rsLoadMics: async () => {
+    try{ const st = await navigator.mediaDevices.getUserMedia({ audio:true }); st.getTracks().forEach(t => t.stop()); }
+    catch(e){ toast('마이크 권한이 꺼져 있습니다. 브라우저(또는 휴대폰) 설정에서 허용해 주세요.'); }
+    await rsLoadDevs(); return false;
+  },
+  rsTest: async () => { if(RS.test) rsTestStop(); else await rsTestStart(); rsDraw(); return false; },
+  // 화면을 누른 그 순간에 소리를 시작해야 하므로 await 전에 ebStart를 부름
+  rsBtn: () => {
+    RCFG.btn = !RCFG.btn; saveRcfg();
+    if(RCFG.btn){ if(!radioRoleOK()){ RCFG.btn = false; saveRcfg(); toast('무전 권한이 있는 기기에서만 쓸 수 있습니다.'); } else { ebStart(); toast('이어폰 버튼으로 무전을 켜고 끌 수 있습니다.'); } }
+    else { ebStop(); toast('이어폰 버튼 기능을 껐습니다.'); }
+    rsDraw(); radioRender(); return false;
+  },
   micTest: async () => {
     try{ const s = await navigator.mediaDevices.getUserMedia({ audio:true }); s.getTracks().forEach(t => t.stop()); toast('마이크를 쓸 수 있습니다.'); }
     catch(e){ toast('마이크 권한이 꺼져 있습니다. 브라우저(또는 휴대폰) 설정에서 허용해 주세요.'); }

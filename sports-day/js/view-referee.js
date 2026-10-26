@@ -21,11 +21,21 @@ function lanesOf(ev){
   UI.lanes[ev] = Array.from({ length:n }, (_,i) => a[i] || null);
   return UI.lanes[ev];
 }
+// 이 기기가 고른 입력 방식: 연습('prac', 연습 1·2는 선수마다 자동) / 본선 / 결승. 예전 값(p1·p2)도 받아 줌
+const roundMode = ev => { const v = UI.round[ev]; return (v==='prac' || v==='p1' || v==='p2') ? 'prac' : v==='final' ? 'final' : 'main'; };
+const MODE_LABEL = { prac:'연습', main:'본선', final:'결승' };
 function indivView(ev){
-  const E = INDIV[ev], round = UI.round[ev]||'main', ps = people();
-  const done = ps.filter(p => rec(ev, round, p.id)).length, pct = ps.length ? Math.round(done/ps.length*100) : 0;
-  const info = `<div class="infobar"><div class="grow"><b>${round==='final'?'결승':'본경기'} ${done}/${ps.length}명</b><div class="progress"><i style="width:${pct}%"></i></div></div>
-    <div class="seg sm"><button class="${round==='main'?'on':''}" data-a="round" data-v="main">본경기</button><button class="${round==='final'?'on':''}" data-a="round" data-v="final">결승</button></div>
+  const E = INDIV[ev], mode = roundMode(ev), ps = people(), n = ps.length;
+  const c1 = ps.filter(p => rec(ev,'p1',p.id)).length, c2 = ps.filter(p => rec(ev,'p2',p.id)).length;
+  const cm = ps.filter(p => rec(ev,'main',p.id)).length, cf = ps.filter(p => rec(ev,'final',p.id)).length;
+  const nw = (t, n) => `<span class="nw">${t}<span class="cnt">${n}명</span></span>`;
+  let label, done, total;
+  if(mode==='prac'){ label = `${nw('연습 1', c1)} · ${nw('연습 2', c2)} <span class="nw">/ ${n}명</span>`; done = c1 + c2; total = n*2; }
+  else if(mode==='main'){ label = `<span class="nw">본선<span class="cnt">${cm}/${n}명</span></span>`; done = cm; total = n; }
+  else { label = `<span class="nw">결승<span class="cnt">${cf}/${n}명</span></span>`; done = cf; total = n; }
+  const pct = total ? Math.round(done/total*100) : 0;
+  const info = `<div class="infobar"><div class="grow"><b class="pgtxt">${label}</b><div class="progress"><i style="width:${pct}%"></i></div></div>
+    <div class="seg sm">${['prac','main','final'].map(k => `<button class="${mode===k?'on':''}" data-a="round" data-v="${k}">${MODE_LABEL[k]}</button>`).join('')}</div>
     <button class="btn small" data-a="indivList">📋<span class="bl"> 명단·순위</span></button></div>`;
   // 사대(칸)가 둘이면 세로 화면에서는 위아래, 가로 화면에서는 왼쪽·오른쪽에 함께 둠
   return `<div class="fit">${info}<div class="lanes n${E.lanes}">${lanesOf(ev).map((L,i) => laneBox(ev, E, L, i)).join('')}</div></div>`;
@@ -34,56 +44,86 @@ function laneBox(ev, E, L, i){
   const label = (LANE_LABELS[ev]||[])[i] || '';
   if(!L) return `<div class="lanebox empty"><button class="bigpick" data-a="pickFor" data-v="${i}"><span class="plus">＋</span><b>${esc(label)}</b><span>눌러서 선수 고르기 (안 한 사람부터)</span></button></div>`;
   const t = totalOf(ev, L.throws), m = optMap(ev), opts = E.opts(settings()), full = L.throws.length >= E.count;
+  // 채운 칸은 점수만 크게, 빈 칸은 ①②③ 순서를 흐리고 작게
   const slots = Array.from({ length:E.count }, (_,k) => { const key = L.throws[k];
     return key!=null ? `<button class="slot filled" data-a="unslot" data-i="${i}" data-k="${k}" aria-label="${k+1}번째 지우기">${m[key]?.v ?? 0}</button>`
-      : `<div class="slot ${k===L.throws.length?'next':''}">${k+1}</div>`; }).join('');
+      : `<div class="slot ${k===L.throws.length?'next':''}"><span class="ord">${circ(k+1)}</span></div>`; }).join('');
+  const rl = ROUNDS[L.round] || L.round;
+  // 연습 방식이면 이 태그를 눌러 연습 1 ↔ 연습 2를 바꿈
+  const rtag = (roundMode(ev)==='prac' && (L.round==='p1' || L.round==='p2'))
+    ? `<button class="rtag r-${L.round} sw" data-a="laneRound" data-i="${i}" aria-label="${rl} (누르면 연습 회차 바꾸기)">${esc(rl)}<small> ⇄</small></button>`
+    : `<span class="rtag r-${L.round}">${esc(rl)}</span>`;
   return `<div class="lanebox">
-    <div class="lhead"><span class="ll">${esc(label.split(' ')[0])}</span>${teamBadge(teamOf(L.pid))}<button class="nm" data-a="pickFor" data-v="${i}">${esc(pname(L.pid))}<small> ▾</small></button>
-      ${L.round==='final'?'<span class="tag warn">결승</span>':''}${L.existing?'<span class="tag warn">수정</span>':''}
-      ${ev==='archery' ? `<button class="distbtn" data-a="dist" data-i="${i}" data-v="${L.dist==='3'?'2.5':'3'}" aria-label="거리 바꾸기"><small>거리</small>${L.dist==='3'?'3':'2.5'}m</button>` : ''}
-      <span class="total">${t}<small>점</small></span><button class="xbtn" data-a="dropLane" data-i="${i}" aria-label="빼기">✕</button></div>
+    <div class="lhead"><div class="lh1"><button class="nm" data-a="pickFor" data-v="${i}">${esc(pname(L.pid))}<small> ▾</small></button>
+        <span class="total">${t}<small>점</small></span><button class="xbtn" data-a="dropLane" data-i="${i}" aria-label="빼기">✕</button></div>
+      <div class="lh2"><span class="ll">${esc(label.split(' ')[0])}</span>${rtag}${L.existing?'<span class="tag warn">수정</span>':''}
+        ${ev==='archery' ? `<button class="distbtn" data-a="dist" data-i="${i}" data-v="${L.dist==='3'?'2.5':'3'}" aria-label="거리 바꾸기"><small>거리</small>${L.dist==='3'?'3':'2.5'}m</button>` : ''}</div></div>
     <div class="slotrow"><div class="slots">${slots}</div><button class="btn undo" data-a="undoThrow" data-i="${i}" ${L.throws.length?'':'disabled'} aria-label="한 칸 지우기">↩</button></div>
     <div class="opts n${opts.length}">${opts.map(([k,l,v]) => `<button class="opt" data-a="throw" data-i="${i}" data-k="${k}" ${full?'disabled':''}><b>${v}</b>${l!==v+'점'?`<span>${esc(l)}</span>`:''}</button>`).join('')}</div>
     <button class="btn ${full?'ok':'primary'} savebtn" data-a="saveLane" data-i="${i}">${L.existing?'수정 저장':'저장'} (${L.throws.length}/${E.count})</button>
   </div>`;
 }
-// 선수 고르기 창: 안 한 사람 먼저 / 가나다 / 팀별
+// 선수 고르기 창: 안 한 사람 먼저 / 가나다
 const PK = { ev:null, lane:0, sort:'todo', q:'' };
+const pracCount = (ev, id) => (rec(ev,'p1',id) ? 1 : 0) + (rec(ev,'p2',id) ? 1 : 0);
 function indivPickRows(){
-  const ev = PK.ev, round = UI.round[ev]||'main', q = PK.q.trim();
+  const ev = PK.ev, mode = roundMode(ev), q = PK.q.trim();
   const inLane = new Map(lanesOf(ev).map((L,i) => [L && L.pid, i]).filter(x => x[0]));
   let list = people().filter(p => !q || p.name.includes(q));
-  const tOrd = p => p.team==='blue' ? 0 : p.team==='red' ? 1 : 2;
-  // 안 한 사람 먼저: 다른 칸에서 입력 중인 사람과 불참자는 뒤로
-  if(PK.sort==='todo') list.sort((a,b) => (inLane.has(a.id) - inLane.has(b.id)) || (!!rec(ev,round,a.id) - !!rec(ev,round,b.id)) || (isAbsent(a.id) - isAbsent(b.id)) || byName(a,b));
-  else if(PK.sort==='team') list.sort((a,b) => tOrd(a)-tOrd(b) || byName(a,b));
+  // 이 입력 방식에서 이미 끝낸 사람: 연습이면 연습 1·2를 모두 마친 사람, 본선·결승이면 그 회차 기록이 있는 사람
+  const doneOf = id => mode==='prac' ? pracCount(ev,id)>=2 : !!rec(ev, mode, id);
+  // 안 한 사람 먼저: 다른 칸에서 입력 중인 사람과 불참자는 뒤로. 연습은 연습을 덜 한 사람부터
+  if(PK.sort==='todo') list.sort((a,b) => (inLane.has(a.id) - inLane.has(b.id)) || (mode==='prac' ? pracCount(ev,a.id) - pracCount(ev,b.id) : (!!rec(ev,mode,a.id) - !!rec(ev,mode,b.id))) || (isAbsent(a.id) - isAbsent(b.id)) || byName(a,b));
   return list.map(p => {
-    const r = rec(ev, round, p.id), li = inLane.get(p.id);
-    const st = li!=null ? `<span class="tag warn">${esc(LANE_LABELS[ev][li])} 입력 중</span>` : r ? `<span class="tag ok">✓ ${totalOf(ev,r.throws)}점</span>` : isAbsent(p.id) ? '<span class="tag red">불참</span>' : '<span class="tag">아직</span>';
-    return `<div class="item tap ${r?'done':''}" data-a="pickPerson" data-v="${p.id}">${teamBadge(p.team)}<span class="name">${esc(p.name)}</span>${st}</div>`;
+    const R = recsOf(ev, p.id), li = inLane.get(p.id), tot = r => totalOf(ev, r.throws);
+    let st;
+    if(li!=null) st = `<span class="tag warn">${esc(LANE_LABELS[ev][li])} 입력 중</span>`;
+    else if(mode==='prac'){
+      const txt = `연1 ${R.p1?'✓':'–'} · 연2 ${R.p2?'✓':'–'}${R.main ? ` · 본선 ${tot(R.main)}점` : ''}`;
+      st = (R.p1 || R.p2 || R.main) ? `<span class="tag ${R.p1 && R.p2 ? 'ok' : ''}">${txt}</span>` : isAbsent(p.id) ? '<span class="tag red">불참</span>' : '<span class="tag">아직</span>';
+    }
+    else if(mode==='main') st = R.main ? `<span class="tag ok">✓ 본선 ${tot(R.main)}점</span>` : isAbsent(p.id) ? '<span class="tag red">불참</span>' : '<span class="tag">아직</span>';
+    else st = R.final ? `<span class="tag ok">✓ 결승 ${tot(R.final)}점</span>` : R.main ? `<span class="tag">본선 ${tot(R.main)}점</span>` : isAbsent(p.id) ? '<span class="tag red">불참</span>' : '<span class="tag">아직</span>';
+    return `<div class="item tap ${doneOf(p.id)?'done':''}" data-a="pickPerson" data-v="${p.id}"><span class="name">${esc(p.name)}</span>${st}</div>`;
   }).join('') || `<div class="empty">${people().length ? '해당하는 사람이 없습니다.' : '명단이 비어 있습니다. 마스터가 명단을 먼저 넣어 주세요.'}</div>`;
 }
 function indivPickSheet(){
-  const ev = PK.ev, E = INDIV[ev];
-  return `<h2>${E.icon} ${esc((LANE_LABELS[ev]||[])[PK.lane]||'')} 선수 고르기</h2>
+  const ev = PK.ev, E = INDIV[ev], mode = roundMode(ev);
+  return `<h2>${E.icon} ${esc((LANE_LABELS[ev]||[])[PK.lane]||'')} 선수 고르기 <small class="sub">${MODE_LABEL[mode]}</small></h2>
     <div class="row nowrap" style="margin-bottom:10px"><input id="pkq" data-in="pkq" placeholder="이름 검색" value="${esc(PK.q)}" autocomplete="off">
-      <div class="seg sm">${[['todo','안 한 사람 먼저'],['name','가나다'],['team','팀별']].map(([k,l]) => `<button class="${PK.sort===k?'on':''}" data-a="pkSort" data-v="${k}">${l}</button>`).join('')}</div></div>
+      <div class="seg sm">${[['todo','안 한 사람 먼저'],['name','가나다']].map(([k,l]) => `<button class="${PK.sort===k?'on':''}" data-a="pkSort" data-v="${k}">${l}</button>`).join('')}</div></div>
     <div class="list sheetlist" id="pkRows">${indivPickRows()}</div>
-    <p class="sub">이미 기록이 있는 사람을 고르면 그 기록을 고칠 수 있습니다.</p>
+    <p class="sub">${mode==='prac' ? '연습 1이 없으면 연습 1, 있으면 연습 2로 자동으로 들어갑니다. 둘 다 있으면 연습 2를 고칩니다.' : '이미 기록이 있는 사람을 고르면 그 기록을 고칠 수 있습니다.'}</p>
     <button class="btn wide" data-a="closeSheet">닫기</button>`;
 }
 // 명단·순위 창
-let ilTab = 'list';
+let ilTab = 'list', ilRank = 'main';
 function indivListSheet(){
-  const ev = UI.ev, E = INDIV[ev], round = UI.round[ev]||'main';
-  const body = ilTab==='rank' ? indivRank(ev) : `<div class="list sheetlist">${people().map(p => { const r = rec(ev, round, p.id);
-      return `<div class="item tap" data-a="editRec" data-v="${p.id}">${teamBadge(p.team)}<span class="name">${esc(p.name)}</span>${r ? `<span class="tag ok">✓ ${totalOf(ev,r.throws)}점</span>` : isAbsent(p.id) ? '<span class="tag red">불참</span>' : '<span class="tag">아직</span>'}</div>`; }).join('') || '<div class="empty">명단이 비어 있습니다.</div>'}</div>`;
+  const ev = UI.ev, E = INDIV[ev];
+  const body = ilTab==='rank' ? indivRank(ev) : `<div class="list sheetlist">${people().map(p => { const R = recsOf(ev, p.id), tot = r => r ? totalOf(ev, r.throws) : '–';
+      const sum = `연1 ${tot(R.p1)} · 연2 ${tot(R.p2)} · 본선 ${tot(R.main)}${R.final ? ` · 결승 ${tot(R.final)}` : ''}`;
+      const any = R.p1 || R.p2 || R.main || R.final;
+      return `<div class="item tap" data-a="editRec" data-v="${p.id}"><span class="name">${esc(p.name)}<span class="sub rsum">${sum}</span></span>${!any && isAbsent(p.id) ? '<span class="tag red">불참</span>' : ''}</div>`; }).join('') || '<div class="empty">명단이 비어 있습니다.</div>'}</div>`;
   return `<h2>${E.icon} ${esc(E.name)}</h2>
     <div class="seg" style="margin-bottom:12px"><button class="${ilTab==='list'?'on':''}" data-a="ilTab" data-v="list">명단 (가나다)</button><button class="${ilTab==='rank'?'on':''}" data-a="ilTab" data-v="rank">순위</button></div>
     ${body}<button class="btn primary wide" data-a="closeSheet" style="margin-top:12px">닫기</button>`;
 }
 function indivRank(ev){
-  const { list, ties } = standings(ev), m = optMap(ev);
+  const hasFinal = people().some(p => rec(ev,'final',p.id));
+  const kinds = ['main','p1','p2'].concat(hasFinal ? ['final'] : []);
+  if(!kinds.includes(ilRank)) ilRank = 'main';
+  const sel = `<div class="seg sm" style="margin-bottom:10px">${kinds.map(k => `<button class="${ilRank===k?'on':''}" data-a="ilRank" data-v="${k}">${ROUNDS[k]}</button>`).join('')}</div>`;
+  const m = optMap(ev);
+  if(ilRank!=='main'){
+    const { list } = roundStandings(ev, ilRank);
+    const rows = list.map(x => `<tr class="tap" data-a="editRec" data-v="${x.p.id}"><td class="rank">${x.rank}</td>
+      <td><b>${esc(x.p.name)}</b>${x.r.dist?` <span class="sub" style="display:inline">${x.r.dist}m</span>`:''}
+        <div class="sub">${(x.r.throws||[]).map(k => m[k]?.v ?? 0).join(' · ')} · ${esc(x.r.editedBy||x.r.by||'')} ${hm(x.r.editedAt||x.r.at)}</div></td>
+      <td class="num"><span class="score">${x.total}</span></td></tr>`).join('');
+    return sel + (list.length ? `<table><thead><tr><th>순위</th><th>이름</th><th class="num">${ROUNDS[ilRank]} 점수</th></tr></thead><tbody>${rows}</tbody></table>
+      <p class="sub">줄을 누르면 그 기록을 ${can.record(ev)?'고치거나 지울':'자세히 볼'} 수 있습니다.</p>` : `<div class="empty">${ROUNDS[ilRank]} 기록이 아직 없습니다.</div>`);
+  }
+  const { list, ties } = standings(ev);
   let html = '';
   ties.forEach(t => {
     html += t.resolved
@@ -92,25 +132,25 @@ function indivRank(ev){
   });
   const rows = list.map(x => `<tr class="tap" data-a="editRec" data-v="${x.p.id}">
     <td class="rank">${x.rank}</td>
-    <td><span class="row nowrap" style="gap:8px">${teamBadge(x.p.team)}<b>${esc(x.p.name)}</b>${x.r.dist?` <span class="sub">${x.r.dist}m</span>`:''}</span>
+    <td><b>${esc(x.p.name)}</b>${x.r.dist?` <span class="sub" style="display:inline">${x.r.dist}m</span>`:''}
       <div class="sub">${(x.r.throws||[]).map(k => m[k]?.v ?? 0).join(' · ')} · ${esc(x.r.editedBy||x.r.by||'')} ${hm(x.r.editedAt||x.r.at)}</div></td>
     <td class="num"><span class="score">${x.total}</span>${x.ftotal!=null?`<div class="sub">결승 ${x.ftotal}</div>`:''}</td></tr>`).join('');
-  return html + (list.length ? `<table><thead><tr><th>순위</th><th>이름</th><th class="num">점수</th></tr></thead><tbody>${rows}</tbody></table>
-    <p class="sub">줄을 누르면 그 기록을 ${can.record(ev)?'고치거나 지울':'자세히 볼'} 수 있습니다.</p>` : '<div class="empty">아직 기록이 없습니다.</div>');
+  return sel + html + (list.length ? `<table><thead><tr><th>순위</th><th>이름</th><th class="num">본선 점수</th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="sub">줄을 누르면 그 기록을 ${can.record(ev)?'고치거나 지울':'자세히 볼'} 수 있습니다.</p>` : '<div class="empty">아직 본선 기록이 없습니다.</div>');
 }
 function recSheet(ev, pid){
   const E = INDIV[ev], m = optMap(ev), editable = can.record(ev);
   const part = round => {
-    const r = rec(ev, round, pid);
-    if(!r) return `<div class="card"><b>${round==='main'?'본경기':'결승'}</b> <span class="sub">기록 없음</span>${editable?` <button class="btn small" data-a="reopen" data-v="${round}" data-p="${pid}">입력하기</button>`:''}</div>`;
+    const r = rec(ev, round, pid), nm = ROUNDS[round];
+    if(!r) return `<div class="card"><b>${nm}</b> <span class="sub">기록 없음</span>${editable?` <button class="btn small" data-a="reopen" data-v="${round}" data-p="${pid}">입력하기</button>`:''}</div>`;
     const hist = (r.history||[]).slice(-5).reverse().map(h => `<div class="sub">· ${hm(h.at)} ${esc(h.by)}: ${(h.throws||[]).map(k => m[k]?.v ?? 0).join(' · ')}</div>`).join('');
-    return `<div class="card"><div class="row"><b class="grow" style="font-size:20px">${round==='main'?'본경기':'결승'} ${totalOf(ev,r.throws)}점</b>
+    return `<div class="card"><div class="row"><b class="grow" style="font-size:20px">${nm}<span class="rsc">${totalOf(ev,r.throws)}점</span></b>
       ${editable?`<button class="btn small" data-a="reopen" data-v="${round}" data-p="${pid}">고치기</button><button class="btn small danger" data-a="delRec" data-v="${round}" data-p="${pid}">지우기</button>`:''}</div>
       <div class="sub" style="margin-top:6px">${(r.throws||[]).map(k => `${m[k]?.v ?? 0}(${esc(m[k]?.l||'')})`).join(' · ')}</div>
       <div class="sub">입력 ${esc(r.by)} ${hm(r.at)}${r.editedBy?` · 수정 ${esc(r.editedBy)} ${hm(r.editedAt)}`:''}</div>
       ${hist?`<div style="margin-top:8px"><b class="sub">이전 기록</b>${hist}</div>`:''}</div>`;
   };
-  return `<h2 class="row">${teamBadge(teamOf(pid))} ${esc(pname(pid))} · ${esc(E.name)}</h2>${part('main')}${part('final')}<button class="btn wide" data-a="closeSheet">닫기</button>`;
+  return `<h2 class="row">${esc(pname(pid))} · ${esc(E.name)}</h2>${ROUND_KEYS.map(part).join('')}<button class="btn wide" data-a="closeSheet">닫기</button>`;
 }
 
 /* ---------- 단체전: 위쪽에 지금 대결, 아래쪽에 대기 순서 ---------- */
@@ -241,12 +281,20 @@ function stopWatch(){ const w=UI.watch; if(w.running){ w.acc += performance.now(
 
 /* ---------- 저장 ---------- */
 const saveLanes = () => ls.set('udh5_lanes2', UI.lanes);
-// i번째 칸(왼쪽·오른쪽 사대)에 선수를 넣음. 이미 다른 칸에 있으면 알려 주기만 함
-function addLane(ev, pid, i){
+// i번째 칸(왼쪽·오른쪽 사대)에 선수를 넣음. 이미 다른 칸에 있으면 알려 주기만 함.
+// 연습 방식이면 연습 1이 없을 때 연습 1, 있으면 연습 2로 들어가고, 둘 다 있으면 연습 2를 고침. force: 회차를 직접 정함
+function addLane(ev, pid, i, force){
   const lanes = lanesOf(ev), at = lanes.findIndex(L => L && L.pid===pid);
-  if(at>=0){ if(at!==i) toast(`${pname(pid)}은(는) ${LANE_LABELS[ev][at]}에서 입력 중입니다.`); return; }
-  const round = UI.round[ev]||'main', r = rec(ev, round, pid);
-  lanes[i] = { pid, round, throws: r ? [...r.throws] : [], dist: r?.dist || '2.5', existing: !!r };
+  if(at>=0 && !force){ if(at!==i) toast(`${pname(pid)}은(는) ${LANE_LABELS[ev][at]}에서 입력 중입니다.`); return; }
+  const mode = roundMode(ev);
+  let round = force || mode;
+  if(!force && mode==='prac'){
+    if(!rec(ev,'p1',pid)) round = 'p1';
+    else if(!rec(ev,'p2',pid)) round = 'p2';
+    else { round = 'p2'; toast(`${pname(pid)}은(는) 연습 1·2를 모두 마쳤습니다. 연습 2 기록을 고칩니다.`); }
+  }
+  const r = rec(ev, round, pid);
+  lanes[at>=0 ? at : i] = { pid, round, throws: r ? [...r.throws] : [], dist: r?.dist || '2.5', existing: !!r };
   saveLanes();
 }
 async function saveLane(ev, i){
@@ -255,7 +303,7 @@ async function saveLane(ev, i){
   if(!L.throws.length){ toast('점수가 하나도 입력되지 않았습니다.'); return; }
   if(L.throws.length < E.count && !(await ask(`${E.count}${E.unit} 중 ${L.throws.length}${E.unit}만 입력했습니다.\n이대로 저장할까요?`, '저장'))) return;
   const id = recId(ev, L.round, L.pid), prev = D.indiv.find(r => r.id===id), p = person(L.pid);
-  const data = { event:ev, round:L.round, personId:L.pid, personName:p?.name||'', team:p?.team||'', throws:L.throws, deleted:false };
+  const data = { event:ev, round:L.round, personId:L.pid, personName:p?.name||'', throws:L.throws, deleted:false };
   if(ev==='archery') data.dist = L.dist;
   if(prev && !prev.deleted && (prev.throws||[]).length){
     data.editedBy = UI.me; data.editedAt = now();
@@ -284,7 +332,17 @@ function saveMatch(ev, winner, extra={}){
 /* ---------- 동작 ---------- */
 Object.assign(ACT, {
   sub: (el, v) => { UI.sub[UI.ev] = v; },
-  round: (el, v) => { const ev=UI.ev; if(lanesOf(ev).some(Boolean)){ toast('입력 중인 사람을 먼저 저장하거나 빼 주세요.'); return false; } UI.round[ev]=v; },
+  round: (el, v) => { const ev=UI.ev; if(roundMode(ev)===v) return false; if(lanesOf(ev).some(Boolean)){ toast('입력 중인 사람을 먼저 저장하거나 빼 주세요.'); return false; } UI.round[ev]=v; },
+  // 연습 방식에서 칸의 회차 태그를 누르면 연습 1 ↔ 연습 2 (그 회차에 기록이 있으면 불러옴)
+  laneRound: async (el) => {
+    const ev=UI.ev, i=+el.dataset.i, L=lanesOf(ev)[i]; if(!L || (L.round!=='p1' && L.round!=='p2')) return false;
+    const to = L.round==='p1' ? 'p2' : 'p1', cur = rec(ev, L.round, L.pid), r = rec(ev, to, L.pid);
+    const dirty = L.throws.length && JSON.stringify(L.throws) !== JSON.stringify(cur ? cur.throws : []);
+    if(dirty && !(await ask(`입력 중인 점수는 저장되지 않습니다.\n${ROUNDS[to]}(으)로 바꿀까요?`, '바꾸기', true))) return false;
+    L.round = to; L.throws = r ? [...r.throws] : []; L.existing = !!r; if(r && r.dist) L.dist = r.dist;
+    saveLanes();
+  },
+  ilRank: (el, v) => { ilRank = v; drawSheet(); return false; },
   pickFor: (el, v) => { if(!can.record(UI.ev)) return denied(); PK.ev = UI.ev; PK.lane = +v; PK.q = ''; openSheet(indivPickSheet); render(); return false; },
   pkSort: (el, v) => { PK.sort = v; drawSheet(); return false; },
   pickPerson: async (el, v) => {
@@ -305,10 +363,15 @@ Object.assign(ACT, {
   saveLane: async (el) => { await saveLane(UI.ev, +el.dataset.i); },
   editRec: (el, v) => { const ev=UI.ev; openSheet(() => recSheet(ev, v)); return false; },
   reopen: (el, v) => { const ev=UI.ev; if(!can.record(ev)) return denied();
-    const lanes = lanesOf(ev), free = lanes.findIndex(L => !L), at = lanes.findIndex(L => L && L.pid===el.dataset.p);
+    const pid = el.dataset.p, lanes = lanesOf(ev), free = lanes.findIndex(L => !L), at = lanes.findIndex(L => L && L.pid===pid);
+    const mode = (v==='p1' || v==='p2') ? 'prac' : v;
     if(at<0 && free<0){ toast('입력 칸이 차 있습니다. 먼저 저장하거나 빼 주세요.'); return false; }
-    if(at<0 && (UI.round[ev]||'main')!==v && lanes.some(Boolean)){ toast('입력 중인 사람을 먼저 저장하거나 빼 주세요.'); return false; }
-    UI.round[ev]=v; addLane(ev, el.dataset.p, at>=0 ? at : free); closeSheet(); },
+    if(at<0 && roundMode(ev)!==mode && lanes.some(Boolean)){ toast('입력 중인 사람을 먼저 저장하거나 빼 주세요.'); return false; }
+    if(at>=0 && lanes[at].round!==v){
+      const L = lanes[at], cur = rec(ev, L.round, pid);
+      if(L.throws.length && JSON.stringify(L.throws)!==JSON.stringify(cur ? cur.throws : [])){ toast('입력 중인 점수를 먼저 저장하거나 빼 주세요.'); return false; }
+    }
+    UI.round[ev] = mode; addLane(ev, pid, at>=0 ? at : free, v); closeSheet(); },
   delRec: async (el, v) => { const ev=UI.ev; if(!can.record(ev)) return denied();
     if(!(await ask('이 기록을 지울까요?','지우기',true))) return false;
     const id=recId(ev,v,el.dataset.p), prev=D.indiv.find(r => r.id===id);

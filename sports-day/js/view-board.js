@@ -7,9 +7,12 @@ function boardView(){
     return `<tr><td><span class="row nowrap" style="gap:8px"><span style="font-size:22px">${E.icon}</span><b>${esc(E.name)}</b></span></td><td class="num score" style="color:var(--blue)">${t.blue}</td><td class="num score" style="color:var(--red)">${t.red}</td><td class="num sub">${matchesOf(k).length}판</td></tr>`; }).join('');
   const indiv = Object.entries(INDIV).map(([k,E]) => {
     const { list, ties } = standings(k), top = list.filter(x => x.rank<=3);
+    // 안내판에 연습 순위도 보이기 (마스터 설정): 연습 1·2의 1~3등을 작게
+    const prac = settings().showPracRank ? ['p1','p2'].map(rd => { const rs = roundStandings(k, rd).list.filter(x => x.rank<=3).slice(0,5);
+      return rs.length ? `<div class="prline"><b>${ROUNDS[rd]}</b>${rs.map(x => `<span><em>${x.rank}위</em> ${esc(x.p.name)} <i>${x.total}점</i></span>`).join('')}</div>` : ''; }).join('') : '';
     return `<div class="card"><div class="row"><h2 class="grow h2" style="margin:0">${E.icon} ${esc(E.name)}</h2><span class="sub">${list.length}명 기록</span></div>
       ${ties.filter(t => !t.resolved).map(t => `<div class="note" style="margin-top:10px">⚠ ${t.total}점 동점: ${t.names.map(esc).join(', ')} → 결승 필요</div>`).join('')}
-      ${top.length ? `<table><tbody>${top.map(x => `<tr><td class="rank">${x.rank}</td><td><span class="row nowrap" style="gap:8px">${teamBadge(x.p.team)}<b>${esc(x.p.name)}</b></span></td><td class="num"><span class="score">${x.total}점</span>${x.ftotal!=null?` <span class="sub">(결승 ${x.ftotal})</span>`:''}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">아직 기록이 없습니다.</div>'}</div>`;
+      ${top.length ? `<table><tbody>${top.map(x => `<tr><td class="rank">${x.rank}</td><td><b>${esc(x.p.name)}</b></td><td class="num"><span class="score">${x.total}점</span>${x.ftotal!=null?` <span class="sub">(결승 ${x.ftotal})</span>`:''}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">아직 본선 기록이 없습니다.</div>'}${prac ? `<div class="pracrank">${prac}</div>` : ''}</div>`;
   }).join('');
   return `<div class="cols half">
     <div class="card"><h2>단체전 승점</h2>
@@ -79,7 +82,7 @@ document.addEventListener('pointerdown', () => { if(myRole().role==='board'){ co
 
 /* ===================== 안내판 ===================== */
 const RESULT_MS = 7000, CALL_MS = 30000, ANN_MS = 15000, FLASH_MS = 8000, PERSON_MS = 120000;
-const BOARD = { init:false, seen:new Set(), lastCall:{}, annId:null, testAt:0, overlay:null, queue:[], busy:false, timer:0, callFx:null, person:null, personAt:0 };
+const BOARD = { init:false, seen:new Set(), lastCall:{}, lastCc:{}, ccInit:false, ccFx:null, annId:null, testAt:0, overlay:null, queue:[], busy:false, timer:0, callFx:null, person:null, personAt:0 };
 // 지금 안내판에 띄울 화면: 마스터가 정한 것, 자동이면 가장 최근에 기록이 들어온 종목
 function boardTarget(){
   const m = boardCfg().mode || 'auto';
@@ -88,6 +91,8 @@ function boardTarget(){
   let best = { t:0, kind:'indiv' };
   D.matches.forEach(x => { const t = Math.max(x.at||0, x.editedAt||0); if(!x.deleted && TEAM[x.event] && t>best.t) best = { t, kind:'team', ev:x.event }; });
   Object.entries(D.calls).forEach(([ev, c]) => { const t = (c.call||{}).at||0; if(TEAM[ev] && t>best.t) best = { t, kind:'team', ev }; });
+  // 감독이 자기 팀 선수를 부른 것도 가장 최근 활동으로 침
+  Object.values(D.ccalls).forEach(c => { const t = c.at||0; if(TEAM[c.event] && ORDER_EVENTS.includes(c.event) && t>best.t) best = { t, kind:'team', ev:c.event }; });
   D.indiv.forEach(x => { const t = Math.max(x.at||0, x.editedAt||0); if(t>best.t) best = { t, kind:'indiv' }; });
   return best;
 }
@@ -112,6 +117,13 @@ function boardTick(){
     const call = c.call || {};
     if((call.at||0) > (BOARD.lastCall[ev]||0)){ BOARD.lastCall[ev] = call.at; if(TEAM[ev] && call.at > now()-120000) BOARD.queue.push({ kind:'call', ev, call }); }
   });
+  // 감독이 부른 선수: 처음 불러온 것은 이미 본 것으로 치고, 그 뒤에 새로 생긴 것만 알림
+  if(D.loaded.ccalls){
+    if(!BOARD.ccInit){ Object.values(D.ccalls).forEach(c => { BOARD.lastCc[c.id] = c.at||0; }); BOARD.ccInit = true; }
+    else Object.values(D.ccalls).forEach(c => {
+      if((c.at||0) > (BOARD.lastCc[c.id]||0)){ BOARD.lastCc[c.id] = c.at; if(TEAM[c.event] && c.at > now()-120000) BOARD.queue.push({ kind:'ccall', c }); }
+    });
+  }
   if(ann.id && ann.id!==BOARD.annId){ BOARD.annId = ann.id; if(ann.text && !ann.cleared) BOARD.queue.push({ kind:'ann', ann }); }
   if((cfg.testAt||0) > BOARD.testAt){ BOARD.testAt = cfg.testAt; BOARD.queue.push({ kind:'test' }); }
   const st = awardsStep();
@@ -136,6 +148,12 @@ function runFx(){
       if(sound){ const d = SND.dingdong(); if(cfg.callVoice) setTimeout(() => SND.speak(callText(c.blue, c.red, c.kind)), d*1000+200); }
       dur = voiceMs;
     } else dur = 0;
+  } else if(fx.kind==='ccall'){
+    const c = fx.c, T = boardTarget();
+    // 그 종목 화면을 보고 있으면 위쪽 호출 띠로, 다른 화면이면 잠깐 화면 가득 띄움
+    if(T.kind==='team' && T.ev===c.event){ BOARD.ccFx = { ev:c.event, team:c.team, pid:c.pid, kind:c.kind, start:now() }; dur = voiceMs; }
+    else { BOARD.overlay = { kind:'ccall', c, start:now() }; dur = 7000; }
+    if(sound){ const d = SND.dingdong(); if(cfg.callVoice) setTimeout(() => SND.speak(ccallText(c)), d*1000+200); }
   } else if(fx.kind==='ann'){
     BOARD.overlay = { kind:'ann', ann:fx.ann, start:now() }; dur = ANN_MS;
     if(sound){ const d = cfg.chime ? SND.chime() : 0; if(fx.ann.voice!==false) setTimeout(() => SND.speak(fx.ann.text), d*1000+300); }
@@ -158,6 +176,9 @@ function finishFx(){
   if(done && done.kind==='result' && TEAM[done.m.event].mode!=='round' && !BOARD.queue.some(f => f.kind==='result' && f.m.event===done.m.event))
     BOARD.queue.unshift({ kind:'autocall', ev:done.m.event });
   queueRender(); runFx();
+}
+function ccallText(c){
+  return `${teamName(c.team)} ${pname(c.pid)} 선수, ${c.kind==='now' ? '지금 경기장으로 나와 주세요.' : '준비해 주세요.'}`;
 }
 function callText(blue, red, kind){
   return `${teamName('blue')} ${pname(blue)}, ${teamName('red')} ${pname(red)} 선수, ${kind==='now' ? '지금 경기장으로 나와 주세요.' : '준비해 주세요.'}`;
@@ -197,6 +218,9 @@ function boardTeam(ev){
   const fx = BOARD.callFx && BOARD.callFx.ev===ev && now()-BOARD.callFx.start < CALL_MS ? BOARD.callFx : null;
   const pa = prepAhead(), pb = upcoming(ev,'blue',pa), pr = upcoming(ev,'red',pa);
   const cb = fx ? fx.blue : pb, cr = fx ? fx.red : pr, kind = fx ? fx.kind : 'next';
+  const cc = BOARD.ccFx && BOARD.ccFx.ev===ev && now()-BOARD.ccFx.start < CALL_MS ? BOARD.ccFx : null;
+  const ccbar = cc ? `<div class="callbar one ${cc.kind==='now'?'now':''}"${flashAttr(cc.start)}><div class="cl">${cc.kind==='now' ? '📣 지금 나와 주세요' : '📣 준비해 주세요'}</div>
+      <div class="cp">${teamBadge(cc.team,true)}<b>${esc(teamName(cc.team))} ${esc(pname(cc.pid))}</b></div></div>` : '';
   const call = cb && cr ? `<div class="callbar ${kind==='now'?'now':''}"${fx ? flashAttr(fx.start) : ''}>
       <div class="cl">${kind==='now' ? '📣 지금 나와 주세요' : '📣 준비해 주세요'}</div>
       <div class="cp">${teamBadge('blue',true)}<b>${esc(pname(cb))}</b></div><div class="cp">${teamBadge('red',true)}<b>${esc(pname(cr))}</b></div></div>` : '';
@@ -204,35 +228,46 @@ function boardTeam(ev){
   const bp = (tm, id) => `<div class="bp ${tm}"><div class="lbl">${esc(teamName(tm))}${id?` ${ord(tm).indexOf(id)+1}번`:''}</div><div class="nm">${id?esc(pname(id)):'-'}</div></div>`;
   // 다다음 선수를 부르는 경우, 그 사이의 다음 경기도 작게 보여 줌
   const nextLine = pa > 1 && b.next && r.next ? `<span class="bdnext">다음 경기 ${teamBadge('blue')} ${esc(pname(b.next))} · ${teamBadge('red')} ${esc(pname(r.next))}</span>` : '';
-  return call + head + `<div class="bdlabel">지금 경기${nextLine}</div><div class="bdvs">${bp('blue', b.cur)}<div class="vsm">VS</div>${bp('red', r.cur)}</div>` + foot;
+  return ccbar + call + head + `<div class="bdlabel">지금 경기${nextLine}</div><div class="bdvs">${bp('blue', b.cur)}<div class="vsm">VS</div>${bp('red', r.cur)}</div>` + foot;
 }
 function boardIndiv(){
   const ps = people();
   if(BOARD.person && now()-BOARD.personAt < PERSON_MS && person(BOARD.person)) return boardPerson(BOARD.person);
   BOARD.person = null;
   const evs = Object.keys(INDIV);
-  const cell = (ev, p) => { const r = rec(ev,'main',p.id); return r ? `<td class="num"><b>${totalOf(ev, r.throws)}</b></td>` : '<td class="num dash">–</td>'; };
-  const ncol = ps.length > 36 ? 3 : ps.length > 14 ? 2 : 1, per = Math.ceil(ps.length / ncol) || 1;
-  const tables = Array.from({ length:ncol }, (_,c) => ps.slice(c*per, (c+1)*per)).map(chunk => `<table class="itab"><thead><tr><th>이름</th>${evs.map(ev => `<th class="num">${INDIV[ev].icon} ${esc(INDIV[ev].name)}</th>`).join('')}</tr></thead>
-    <tbody>${chunk.map(p => `<tr class="tap" data-a="bdPerson" data-v="${p.id}"><td><span class="row nowrap" style="gap:8px">${teamBadge(p.team)}<b>${esc(p.name)}</b>${isAbsent(p.id)?' <span class="tag red">불참</span>':''}</span></td>${evs.map(ev => cell(ev, p)).join('')}</tr>`).join('')}</tbody></table>`).join('');
+  // 종목마다 연1 · 연2 · 본선 (결승 기록이 있는 종목만 결승 칸을 더함)
+  const cols = evs.map(ev => ({ ev, rounds: ['p1','p2','main'].concat(D.indiv.some(r => r.event===ev && r.round==='final' && !r.deleted && (r.throws||[]).length) ? ['final'] : []) }));
+  const ncols = cols.reduce((n, c) => n + c.rounds.length, 0);
+  // 16명까지는 표 하나, 그 위는 둘로 나눔 (폭이 좁은 화면은 표 하나로 길게)
+  const ncol = ps.length <= 16 || window.innerWidth < 760 ? 1 : 2, per = Math.ceil(ps.length / ncol) || 1;
+  // 가로 폭과 줄 수에 맞춰 글자 크기를 정함 (가로로 밀리거나 잘리지 않게)
+  const W = Math.max(320, window.innerWidth - 32 - 14*(ncol-1)) / ncol, nf = Math.max(10, Math.min(26, Math.floor(W * 0.74 / ncols / 1.85)));
+  const cell = (ev, rd, p) => { const r = rec(ev, rd, p.id); return r ? `<td class="num ${rd}${rd==='p1'?' g':''}">${rd==='main'||rd==='final' ? `<b>${totalOf(ev, r.throws)}</b>` : totalOf(ev, r.throws)}</td>` : `<td class="num dash ${rd}${rd==='p1'?' g':''}">–</td>`; };
+  const tables = Array.from({ length:ncol }, (_,c) => ps.slice(c*per, (c+1)*per)).map(chunk => `<table class="itab"><thead>
+      <tr><th rowspan="2" class="nmh">이름</th>${cols.map(c => `<th colspan="${c.rounds.length}" class="evh g" style="--ev:${INDIV[c.ev].color}">${INDIV[c.ev].icon} ${esc(INDIV[c.ev].name)}</th>`).join('')}</tr>
+      <tr>${cols.map(c => c.rounds.map((rd,k) => `<th class="num rdh${k===0?' g':''}">${ROUND_SHORT[rd]}</th>`).join('')).join('')}</tr></thead>
+    <tbody>${chunk.map(p => `<tr class="tap" data-a="bdPerson" data-v="${p.id}"><td class="nmc"><b>${esc(p.name)}</b>${isAbsent(p.id)?' <span class="tag red">불참</span>':''}</td>${cols.map(c => c.rounds.map(rd => cell(c.ev, rd, p)).join('')).join('')}</tr>`).join('')}</tbody></table>`).join('');
   return `<div class="bdhead"><span class="bic">🎯</span><h1>개인전 기록</h1><span class="bsub">이름을 누르면 크게 볼 수 있습니다</span></div>
-    ${ps.length ? `<div class="ilist" style="grid-template-columns:repeat(${ncol},1fr)">${tables}</div>` : '<div class="card empty">명단이 아직 없습니다.</div>'}`;
+    ${ps.length ? `<div class="ilist" style="grid-template-columns:repeat(${ncol},1fr);--nf:${nf}px;--rowh:calc((100dvh - 190px - var(--sat) - var(--sab)) / ${per + 2.4})">${tables}</div>` : '<div class="card empty">명단이 아직 없습니다.</div>'}`;
 }
 function boardPerson(pid){
   const p = person(pid);
   const cards = Object.entries(INDIV).map(([ev,E]) => {
-    const r = rec(ev,'main',pid), m = optMap(ev), st = standings(ev).list.find(x => x.p.id===pid), f = rec(ev,'final',pid);
+    const R = recsOf(ev, pid), r = R.main, m = optMap(ev), st = standings(ev).list.find(x => x.p.id===pid), tot = x => totalOf(ev, x.throws);
+    const sub = ['p1','p2','final'].filter(k => R[k]).map(k => `<div class="pl">${ROUNDS[k]} <b>${tot(R[k])}점</b></div>`).join('');
     return `<div class="pcard" style="--ev:${E.color}"><div class="pe">${E.icon} ${esc(E.name)}</div>
-      ${r ? `<div class="pv">${totalOf(ev, r.throws)}<small>점</small></div><div class="pt">${(r.throws||[]).map(k => m[k]?.v ?? 0).join(' · ')}</div>
-        <div class="pr">${st ? `${st.rank}위` : ''}${f ? ` · 결승 ${totalOf(ev, f.throws)}점` : ''}</div>` : '<div class="pv none">아직 안 함</div>'}</div>`;
+      ${r ? `<div class="pv">${tot(r)}<small>점</small></div><div class="pt">${(r.throws||[]).map(k => m[k]?.v ?? 0).join(' · ')}</div>
+        <div class="pr">본선 ${st ? `${st.rank}위` : ''}</div>` : '<div class="pv none">본선 아직</div>'}${sub ? `<div class="psub">${sub}</div>` : ''}</div>`;
   }).join('');
   return `<div class="pview tap" data-a="bdPerson" data-v="">
-    <div class="pname">${teamBadge(p.team, true)}<b>${esc(p.name)}</b><span class="bsub">${esc(teamName(p.team)||'')}</span></div>
+    <div class="pname"><b>${esc(p.name)}</b></div>
     <div class="pcards">${cards}</div>
     <div class="pback">화면을 한 번 더 누르면 목록으로 돌아갑니다</div></div>`;
 }
 function boardOverlay(){
   const o = BOARD.overlay; if(!o) return '';
+  if(o.kind==='ccall') return `<div class="ovl ccall ${o.c.team}" data-a="bdDismiss"${flashAttr(o.start)}><div class="lbl">${o.c.kind==='now' ? '📣 지금 나와 주세요' : '📣 준비해 주세요'}</div>
+    <div class="who"><span class="tn">${esc(teamName(o.c.team))}</span></div><div class="nm">${esc(pname(o.c.pid))}</div><div class="ovev2">${EVENTS[o.c.event].icon} ${esc(EVENTS[o.c.event].name)}</div></div>`;
   if(o.kind==='ann') return `<div class="ovl ann" data-a="bdDismiss"${flashAttr(o.start)}><div class="lbl">📢 안내</div><div class="txt">${esc(o.ann.text)}</div></div>`;
   const m = o.m, E = TEAM[m.event];
   const nm = tm => E.mode==='round' ? '' : esc(pname(tm==='blue' ? m.blueId : m.redId));
@@ -248,11 +283,11 @@ function boardOverlay(){
 
 /* ===================== 마스터: 안내판 제어 · 문자 안내방송 ===================== */
 let annDraft = '';
-const BTABS = [['screen','📺','화면'], ['sound','🔔','소리'], ['ann','📢','안내방송'], ['awards','🏆','시상식'], ['summary','📊','현황']];
+const BTABS = [['screen','📺','화면'], ['sound','🔔','소리'], ['ann','📢','안내방송'], ['awards','🏆','시상식'], ['summary','📊','현황'], ['prog','🧭','진행 현황']];
 // 안내판 메뉴: 위쪽 탭으로 나눠서 한 번에 한 가지만 보여 줌
 function boardControl(){
   const tabs = innerTabs('board', BTABS);
-  return `<div class="bctl">${tabs}${{ screen: bcScreen, sound: bcSound, ann: bcAnn, awards: awardsControl, summary: boardView }[ITAB.board]()}</div>`;
+  return `<div class="bctl">${tabs}${{ screen: bcScreen, sound: bcSound, ann: bcAnn, awards: awardsControl, summary: boardView, prog: progressView }[ITAB.board]()}</div>`;
 }
 function bcScreen(){
   const cfg = boardCfg();
@@ -306,7 +341,7 @@ const awardsStep = () => { const a = D.config.awards; return a && typeof a.step=
 const awardLabel = s => s.kind==='team' ? '종합 우승 발표' : `${INDIV[s.ev].name} ${s.rank}등`;
 function awardSpeech(s){
   if(s.kind==='team'){ const t = s.tot; return t.blue===t.red ? `종합 결과, ${t.blue} 대 ${t.red} 무승부입니다.` : `종합 우승, ${teamName(t.blue>t.red?'blue':'red')}입니다. 축하합니다.`; }
-  return `${INDIV[s.ev].name} ${s.rank}등, ${s.winners.map(x => `${teamName(x.p.team)} ${x.p.name}`).join(', ')}. 축하합니다.`;
+  return `${INDIV[s.ev].name} ${s.rank}등, ${s.winners.map(x => x.p.name).join(', ')}. 축하합니다.`;
 }
 function boardAwards(){
   const steps = awardSteps(), i = awardsStep();
@@ -319,7 +354,7 @@ function boardAwards(){
   }
   const E = INDIV[s.ev], medal = { 1:'🥇', 2:'🥈', 3:'🥉' }[s.rank];
   return `<div class="award r${s.rank}"${fx}><div class="aev">${E.icon} ${esc(E.name)}</div><div class="aic">${medal}</div><div class="at">${s.rank}등</div>
-    ${s.winners.map(x => `<div class="aname">${teamBadge(x.p.team,true)} ${esc(x.p.name)} <span class="apt">${x.total}점</span></div>`).join('')}</div>`;
+    ${s.winners.map(x => `<div class="aname">${esc(x.p.name)} <span class="apt">${x.total}점</span></div>`).join('')}</div>`;
 }
 
 Object.assign(ACT, {
@@ -349,4 +384,8 @@ Object.assign(ACT, {
 document.addEventListener('change', e => { const el = e.target; if(el.dataset.ch==='bcfg') setConfig({ board:{ [el.dataset.k]: el.checked } }); });
 document.addEventListener('input', e => { if(e.target.dataset.in==='ann') annDraft = e.target.value; });
 // 호출 띠·깜빡임이 끝나는 시각에 맞춰 화면을 다시 그림
-setInterval(() => { if(boardOn() && (BOARD.callFx || (D.config.announce||{}).text || schedule().length || boardCfg().mode==='awards')) queueRender(); }, 5000);
+setInterval(() => { if(boardOn() && (BOARD.callFx || BOARD.ccFx || (D.config.announce||{}).text || schedule().length || boardCfg().mode==='awards')) queueRender(); }, 5000);
+
+// 안내판 표는 화면 크기에 맞춰 글자 크기를 정하므로, 화면을 돌리거나 크기가 바뀌면 다시 그림
+let resizeTimer = 0;
+window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { if(typeof boardOn==='function' && (boardOn() || UI.preview)) queueRender(); }, 200); });

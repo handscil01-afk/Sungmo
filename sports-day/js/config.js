@@ -16,7 +16,12 @@ const DEMO = new URLSearchParams(location.search).has('demo');
 const DEMO_MASTER_PW = '0000';
 
 /* ===================== 종목 정의 ===================== */
-const DEFAULT_SETTINGS = { tuhoShort: 0, foul: 1 };
+// showPracRank: 안내판에 연습 순위도 보일지 / tugRounds: 줄다리기 계획 판 수(진행 현황의 남은 시간 계산용)
+const DEFAULT_SETTINGS = { tuhoShort: 0, foul: 1, showPracRank: true, tugRounds: 3 };
+// 개인전 회차: 연습 1·2, 본선(순위 기준), 결승(동점 가리기)
+const ROUNDS = { p1:'연습 1', p2:'연습 2', main:'본선', final:'결승' };
+const ROUND_SHORT = { p1:'연1', p2:'연2', main:'본선', final:'결승' };
+const ROUND_KEYS = ['p1','p2','main','final'];
 const INDIV = {
   archery: { name:'양궁', icon:'🏹', color:'#6d28d9', lanes:2, count:5, unit:'발',
     hint:'과녁 5 · 배너 3 · 밖 0',

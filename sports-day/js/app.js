@@ -19,12 +19,14 @@ function fixEv(list){ if(!list.includes(UI.ev)) UI.ev = list[0]; }
 // 여러 역할을 가진 기기: 역할마다 하나씩 (감독 / 맡은 종목 / 계시)
 function staffTabs(r){
   const t = [];
+  if(r.monitor) t.push({ k:'mon', icon:'🧭', label:'진행 현황', color:'#0f172a' });
   if(r.coach) t.push({ k:'coach', icon:'📋', label:`${teamName(r.coach)} 감독`, color: r.coach==='blue' ? '#0044d1' : '#cf0a2c' });
   refEvents(r).forEach(ev => t.push({ k:'ev:'+ev, icon:EVENTS[ev].icon, label:EVENTS[ev].name + (r.events.includes(ev) ? '' : ' 기록'), color:EVENTS[ev].color, ev }));
   r.timers.forEach(ev => t.push({ k:'timer:'+ev, icon:'⏱', label:`${EVENTS[ev].name} 계시`, color:'#111827', ev }));
   return t;
 }
 function staffBody(r){
+  if(UI.stab==='mon') return progressView();
   if(UI.stab==='coach'){
     if(!ORDER_EVENTS.includes(UI.coachEv)) UI.coachEv = ORDER_EVENTS[0];
     UI.ev = UI.coachEv;
@@ -70,7 +72,7 @@ function render(){
     if(!st.some(t => t.k===UI.stab)) UI.stab = st[0].k;
     const cur = st.find(t => t.k===UI.stab);
     picker = pickerBtn(cur.icon, cur.label, cur.color, st.length>1);
-    body = staffBody(r); fit = true;
+    body = staffBody(r); fit = UI.stab!=='mon';          // 진행 현황은 길어서 페이지 스크롤
   } else if(r.role==='board'){
     shell = 'shell boardshell'; body = boardScreen();
     corner = `<button class="cornerbtn" data-a="menu" aria-label="메뉴">${ICON.menu}</button>`;
@@ -133,7 +135,8 @@ function menuSheet(){
     <div class="list menu">
       <div class="item tap" data-a="rename"><span class="name">✏️ 이름 바꾸기</span></div>
       ${r.role!=='board' ? '<div class="item tap" data-a="schedSheet"><span class="name">📅 진행 일정<span class="sub">오늘 일정과 남은 시간을 봅니다.</span></span></div>' : ''}
-      ${can.staff() ? '<div class="item tap" data-a="msgSheet"><span class="name">💬 문자 무전 · 🚨 긴급 호출</span></div><div class="item tap" data-a="attSheet"><span class="name">👥 출석 체크<span class="sub">오지 않은 선수를 불참으로 표시합니다.</span></span></div>' : ''}
+      ${can.staff() ? '<div class="item tap" data-a="msgSheet"><span class="name">💬 문자 무전 · 🚨 긴급 호출</span></div>' : ''}
+      ${can.abs() ? '<div class="item tap" data-a="attSheet"><span class="name">👥 출석 체크<span class="sub">오지 않은 선수를 불참으로 표시합니다.</span></span></div>' : ''}
       ${r.role!=='master' && r.role!=='wait' ? '<div class="item tap" data-a="leaveRole"><span class="name">🔄 담당 다시 고르기<span class="sub">지금 역할에서 나가고 담당자를 다시 고릅니다.</span></span></div>' : ''}
       ${r.role==='master' ? '<div class="item tap" data-a="masterLogout"><span class="name">👑 마스터에서 나가기<span class="sub">이 기기의 마스터 권한을 뺍니다.</span></span></div>'
         : '<div class="item tap" data-a="masterLogin"><span class="name">👑 마스터로 들어가기<span class="sub">마스터 비밀번호가 필요합니다.</span></span></div>'}
@@ -239,6 +242,8 @@ function subscribe(){
   const map = k => (l, p) => { D[k] = Object.fromEntries(l.map(x => [x.id, x])); D.pending[k] = p; D.loaded[k] = true; queueRender(); };
   store.onDoc(['config'], (d, p) => { D.config = d || {}; D.pending.config = p ? 1 : 0; D.loaded.config = true; queueRender(); }, onErr);
   store.onCol(['main','calls'], map('calls'), onErr);
+  // 감독 호출은 없어도 점수판이 돌아가야 하므로, 읽지 못해도 오류 띠는 띄우지 않음 (Firestore 규칙에 ccalls가 없을 때)
+  store.onCol(['main','ccalls'], map('ccalls'), e => console.error(e));
   store.onCol(['main','indiv'], col('indiv'), onErr);
   store.onCol(['main','matches'], col('matches'), onErr);
   store.onCol(['main','orders'], map('orders'), onErr);
@@ -270,6 +275,8 @@ function authError(e){
   touchDevice();
   setInterval(() => { if(document.visibilityState==='visible') touchDevice(); }, 120000);
   setInterval(() => { if(D.amMaster && UI.mtab==='people') queueRender(); }, 60000);
+  // 진행 현황 화면은 남은 시간이 흘러가므로 30초마다 다시 그림
+  setInterval(() => { if(typeof progressVisible==='function' && progressVisible()) queueRender(); }, 30000);
   document.addEventListener('visibilitychange', () => { if(document.visibilityState==='visible') touchDevice(); });
   render();
 })();

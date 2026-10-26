@@ -8,7 +8,8 @@ function deviceRole(id){
 }
 const asRole = p => { const r = normRole(p); r.role = r.board ? 'board' : hasDuty(r) ? 'staff' : 'wait'; return r; };
 const roleTagCls = r => r.role==='wait' ? 'warn' : r.role==='master' ? 'dark' : r.coach ? (r.coach==='red' ? 'red' : 'blue') : '';
-const pickRoleFields = r => { const n = normRole(r); return { coach:n.coach, events:n.events, helpers:n.helpers, timers:n.timers, board:n.board, cast:n.cast }; };
+// monitor는 켜져 있을 때만 넣음: 규칙을 아직 올리지 않은 서버에서도 예전 담당자 선택이 막히지 않게 (없으면 꺼짐으로 읽음)
+const pickRoleFields = r => { const n = normRole(r); return { coach:n.coach, events:n.events, helpers:n.helpers, timers:n.timers, board:n.board, cast:n.cast, ...(n.monitor ? { monitor:true } : {}) }; };
 function presetList(){
   return Object.entries(D.presets).map(([id,p]) => ({ id, ...p }))
     .sort((a,b) => (!!a.volunteer - !!b.volunteer) || String(a.label||'').localeCompare(String(b.label||''), 'ko'));
@@ -50,6 +51,7 @@ function peopleView(){
         <div class="item"><span class="tag">🚩 심판</span><span class="name"><span class="sub">맡은 종목만 보입니다. 단체전은 지금 대결과 대기 순서, 승패 입력이고, 개인전은 두 사대 점수 입력입니다.</span></span></div>
         <div class="item"><span class="tag">✏️ 기록 도우미</span><span class="name"><span class="sub">맡은 종목의 점수를 심판과 똑같이 입력합니다.</span></span></div>
         <div class="item"><span class="tag">⏱ 계시원</span><span class="name"><span class="sub">큰 초시계로 시간을 재서 심판 화면으로 보냅니다. 심판이 확인한 뒤 저장합니다.</span></span></div>
+        <div class="item"><span class="tag">🧭 운영 현황</span><span class="name"><span class="sub">센터장·사무국장 대행: 종목별 진행 현황과 남은 시간을 보고, 무전·문자만 씁니다. 점수나 출석은 건드리지 않습니다.</span></span></div>
         <div class="item"><span class="tag">📺 안내판</span><span class="name"><span class="sub">가로로 세워 둔 태블릿에 호출·결과·현황을 크게 띄웁니다.</span></span></div>
       </div></div>`,
   }[ITAB.people]();
@@ -95,10 +97,10 @@ function roleEditor(){
     <div class="card"><h2>🚩 심판 <span class="sub">점수·승패를 입력합니다</span></h2>${chips('events', Object.keys(EVENTS))}</div>
     <div class="card"><h2>✏️ 기록 도우미 <span class="sub">심판과 똑같이 점수를 입력합니다</span></h2>${chips('helpers', Object.keys(EVENTS))}</div>
     <div class="card"><h2>⏱ 계시원 <span class="sub">시간을 재서 심판 화면으로 보냅니다</span></h2>${chips('timers', TIME_EVENTS)}</div>
-    <div class="card"><div class="list">${flag('board','📺 안내판','이 기기를 안내판 화면으로만 씁니다(다른 역할 화면은 숨겨집니다).')}${flag('cast','📢 음성 방송 권한','안내판 스피커로 말하는 방송 버튼이 생깁니다.')}</div></div>`;
+    <div class="card"><div class="list">${flag('monitor','🧭 운영 현황','센터장·사무국장 대행: 진행 현황을 보고 무전·문자만 씁니다.')}${flag('board','📺 안내판','이 기기를 안내판 화면으로만 씁니다(다른 역할 화면은 숨겨집니다).')}${flag('cast','📢 음성 방송 권한','안내판 스피커로 말하는 방송 버튼이 생깁니다.')}</div></div>`;
 }
-const draftEmpty = () => !RD.coach && !RD.events.length && !RD.helpers.length && !RD.timers.length && !RD.board;
-const draftFields = () => ({ coach:RD.coach, events:RD.events.filter(e => EVENTS[e]), helpers:RD.helpers.filter(e => EVENTS[e]), timers:RD.timers.filter(e => TIME_EVENTS.includes(e)), board:!!RD.board, cast:!!RD.cast });
+const draftEmpty = () => !RD.coach && !RD.events.length && !RD.helpers.length && !RD.timers.length && !RD.board && !RD.monitor;
+const draftFields = () => ({ coach:RD.coach, events:RD.events.filter(e => EVENTS[e]), helpers:RD.helpers.filter(e => EVENTS[e]), timers:RD.timers.filter(e => TIME_EVENTS.includes(e)), board:!!RD.board, cast:!!RD.cast, monitor:!!RD.monitor });
 
 function presetSheet(){
   return `<h2>${RD.id ? '담당자 고치기' : RD.volunteer ? '봉사자 자리 추가' : '담당자 추가'}</h2>
@@ -221,10 +223,10 @@ Object.assign(ACT, {
     if(!(await ask('지금 역할에서 나가고 담당자를 다시 고를까요?', '다시 고르기'))) return false;
     await guard(store.del(['main','roles',store.uid])); closeSheet();
   },
-  attSheet: () => { attFilter = 'all'; openSheet(attendanceSheet); return false; },
+  attSheet: () => { if(!can.abs()) return denied(); attFilter = 'all'; openSheet(attendanceSheet); return false; },
   attFilter: (el, v) => { attFilter = v; drawSheet(); return false; },
   absToggle: (el, v) => {
-    if(!can.staff()) return denied();
+    if(!can.abs()) return denied();
     if(isAbsent(v)) guard(store.del(['main','absent',v]));
     else put(['main','absent',v], { absent:true, team:teamOf(v), by:UI.me, at:now() }, false);
     return false;

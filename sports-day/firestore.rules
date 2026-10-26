@@ -25,9 +25,10 @@ service cloud.firestore {
       let d = request.resource.data;
       let p = get(/databases/$(database)/documents/undonghoe5/main/presets/$(d.preset)).data;
       return signedIn() && request.auth.uid == uid
-        && d.keys().hasOnly(['preset', 'name', 'coach', 'events', 'helpers', 'timers', 'board', 'cast', 'at', 'by'])
+        && d.keys().hasOnly(['preset', 'name', 'coach', 'events', 'helpers', 'timers', 'board', 'cast', 'monitor', 'at', 'by'])
         && d.coach == p.coach && d.events == p.events && d.helpers == p.helpers
-        && d.timers == p.timers && d.board == p.board && d.cast == p.cast;
+        && d.timers == p.timers && d.board == p.board && d.cast == p.cast
+        && d.get('monitor', false) == p.get('monitor', false);
     }
     // 기록의 종목을 다른 종목으로 바꿔치기하지 못하게 함
     function sameEvent() { return resource == null || resource.data.event == request.resource.data.event; }
@@ -79,6 +80,13 @@ service cloud.firestore {
       allow read: if signedIn();
       allow write: if open() && id == request.resource.data.event + '_' + request.resource.data.team
         && (isMaster() || coachOf(request.resource.data.team));
+    }
+    // 감독의 우리 팀 선수 호출(안내판에 띄움): 마스터 또는 그 팀 감독만 만들고 고침. 지우기(초기화)는 마스터만
+    match /undonghoe5/main/ccalls/{id} {
+      allow read: if signedIn();
+      allow create, update: if open() && id == request.resource.data.event + '_' + request.resource.data.team
+        && (isMaster() || coachOf(request.resource.data.team));
+      allow delete: if open() && isMaster();
     }
     // 안내판 선수 호출·계시 기록: 마스터, 그 종목 심판·기록 도우미·계시원
     match /undonghoe5/main/calls/{ev} {
