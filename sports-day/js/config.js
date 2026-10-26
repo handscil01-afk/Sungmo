@@ -14,6 +14,10 @@ const RTDB_URL = 'https://handscil-sports-default-rtdb.asia-southeast1.firebased
 // 주소 뒤에 ?demo=1 을 붙이면 이 기기에만 저장하는 연습 모드
 const DEMO = new URLSearchParams(location.search).has('demo');
 const DEMO_MASTER_PW = '0000';
+// firestore.rules 를 고칠 때마다 올림: 마스터 기기가 서버에 올라간 규칙이 최신인지 확인하는 데 씀
+const RULES_VER = 12;
+// 담당자 명단에서 역할을 고르다가 권한 오류가 나면: 서버 규칙을 아직 새 것으로 바꾸지 않은 경우가 많음
+const RULES_OLD_MSG = '서버 규칙이 아직 바뀌지 않아 이 역할로 들어갈 수 없습니다. 마스터에게 알려 주세요.';
 
 /* ===================== 종목 정의 ===================== */
 // showPracRank: 안내판에 연습 순위도 보일지 / tugRounds: 줄다리기 계획 판 수(진행 현황의 남은 시간 계산용)

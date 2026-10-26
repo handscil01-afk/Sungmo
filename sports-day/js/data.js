@@ -130,14 +130,15 @@ function remainingMatches(ev){
    한 기기에 여러 역할: coach(감독 팀), events(심판 종목), helpers(기록 도우미 종목), timers(계시원 종목), board(안내판), cast(방송 권한) */
 const TIME_EVENTS = Object.keys(TEAM).filter(k => TEAM[k].mode==='time');
 function normRole(r){
-  const o = { coach:'', events:[], helpers:[], timers:[], board:false, cast:false, monitor:false, preset:'', name:'' };
+  const o = { coach:'', events:[], helpers:[], timers:[], board:false, cast:false, monitor:false, voice:false, preset:'', name:'' };
   if(!r) return o;
   o.coach = r.coach || (r.role==='coach' ? (r.team||'') : '');
   o.events = (r.events||[]).filter(e => EVENTS[e]);
   o.helpers = (r.helpers||[]).filter(e => EVENTS[e]);
   o.timers = (r.timers||[]).filter(e => TIME_EVENTS.includes(e));
   o.board = !!r.board || r.role==='board';
-  o.cast = !!r.cast; o.monitor = !!r.monitor; o.preset = r.preset||''; o.name = r.name||'';
+  // monitor: true(진행 현황 화면) 또는 'voice'(중계 모드: 보이스오버용 간단 화면)
+  o.cast = !!r.cast; o.monitor = !!r.monitor; o.voice = r.monitor==='voice'; o.preset = r.preset||''; o.name = r.name||'';
   return o;
 }
 const hasDuty = r => !!(r.coach || r.events.length || r.helpers.length || r.timers.length || r.monitor);
@@ -158,7 +159,7 @@ function roleParts(r){
   if(r.events.length) out.push({ icon:'🚩', text:`${n(r.events)} 심판` });
   if(r.helpers.length) out.push({ icon:'✏️', text:`${n(r.helpers)} 기록 도우미` });
   if(r.timers.length) out.push({ icon:'⏱', text:`${n(r.timers)} 계시원` });
-  if(r.monitor) out.push({ icon:'🧭', text:'운영 현황' });
+  if(r.monitor) out.push({ icon:'🧭', text: r.voice ? '운영 현황(중계 모드)' : '운영 현황' });
   if(r.board) out.push({ icon:'📺', text:'안내판' });
   return out;
 }
@@ -176,15 +177,16 @@ const can = {
 };
 
 /* ===================== 쓰기 ===================== */
-function guard(p){
+// denyMsg: 권한이 없다는 오류일 때만 대신 보여 줄 문구 (예: 서버 규칙이 아직 예전 것일 때)
+function guard(p, denyMsg){
   return Promise.resolve(p).then(() => true, e => {
     console.error(e);
-    toast(e && e.code==='permission-denied' ? '이 작업을 할 권한이 없습니다. 마스터에게 역할을 확인해 주세요.' : '저장하지 못했습니다: '+(e.message||e));
+    toast(e && e.code==='permission-denied' ? (denyMsg || '이 작업을 할 권한이 없습니다. 마스터에게 역할을 확인해 주세요.') : '저장하지 못했습니다: '+(e.message||e));
     return false;
   });
 }
 function denied(){ toast('이 작업을 할 권한이 없습니다.'); return Promise.resolve(false); }
-const put = (p, obj, merge=true) => guard(store.put(p, obj, merge));
+const put = (p, obj, merge=true, denyMsg) => guard(store.put(p, obj, merge), denyMsg);
 const boardCfg = () => ({ mode:'auto', sound:true, flash:true, chime:true, callVoice:true, prepAhead:2, ...(D.config.board||{}) });
 // 안내판 '준비해 주세요'로 부를 선수: 지금 선수 뒤 몇 번째인지 (1 다음, 2 다다음, 3 세 번째 뒤)
 const prepAhead = () => Math.max(1, Math.min(3, +boardCfg().prepAhead || 2));

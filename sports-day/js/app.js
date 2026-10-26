@@ -55,6 +55,13 @@ function render(){
   if(UI.report && D.amMaster){ app.innerHTML = reportView(); setBodyMode(false); radioRender(); return; }
   const ae = document.activeElement, keep = ae && ae.id ? { id:ae.id, s:ae.selectionStart, e:ae.selectionEnd } : null;
   const r = myRole();
+  // 중계 모드(보이스오버용 간단 화면): 센터장님 기기. 다른 화면과 달리 데이터가 바뀌어도 화면을 다시 그리지 않아 보이스오버 초점이 풀리지 않음
+  const vOn = typeof voiceShellOn==='function' && voiceShellOn(r);
+  document.body.classList.toggle('vmode', vOn);
+  if(vOn){
+    voiceTick(); voiceRender(); setBodyMode(false); drawSheet(); radioInit(); radioRender();
+    return;
+  }
   let body = '', nav = '', shell = 'shell', picker = '', corner = '', fit = false, head;
   if(r.role==='master'){
     if(UI.mtab==='game'){
@@ -83,13 +90,26 @@ function render(){
     corner = `<button class="btn primary previewexit" data-a="boardPreview">미리 보기 끝내기</button>`;
   }
   const err = D.error ? `<div class="note">${esc(D.error)}</div>` : '';
-  app.innerHTML = `<div class="${shell}">${head}<main class="${fit?'fitmain':''}">${r.role==='wait'?installBanner():''}${err}${body}</main>${nav}${corner}</div>`;
+  const rulesWarn = D.amMaster && D.rulesOld && !UI.preview ? `<div class="note rulesold" role="alert"><b>서버 규칙이 예전 것입니다.</b> 파이어베이스 콘솔 Firestore 규칙에 새 firestore.rules를 붙여 넣고 게시해 주세요. 게시하기 전에는 담당자 명단의 운영 현황·감독 호출 등이 막힙니다.
+    <div class="row" style="margin-top:8px"><button class="btn small" data-a="rulesRecheck">게시했어요, 다시 확인</button></div></div>` : '';
+  app.innerHTML = `<div class="${shell}">${head}<main class="${fit?'fitmain':''}">${r.role==='wait'?installBanner():''}${rulesWarn}${err}${body}</main>${nav}${corner}</div>`;
   setBodyMode(!!nav);
   if(keep){ const el = document.getElementById(keep.id); if(el){ el.focus(); try{ el.setSelectionRange(keep.s, keep.e); }catch(e){} } }
   drawSheet();
   paintWatch();
   radioInit(); radioRender();
-  if(D.amMaster){ rtSyncSoon(); dedupeSoon(); }
+  if(D.amMaster){ rtSyncSoon(); dedupeSoon(); rulesCheck(); }
+}
+/* 서버 규칙이 최신인지 확인 (마스터 기기, 접속할 때 한 번): main/meta/rules 문서를 쓸 수 있으면 최신 규칙
+   예전 규칙이면 이 문서가 막혀 permission-denied가 나므로, 마스터 화면 위쪽에 경고 카드를 띄움 */
+let rulesChecked = false;
+function rulesCheck(force){
+  if(!force && (rulesChecked || DEMO)) return;
+  if(!store || !D.amMaster || !online()) return;
+  rulesChecked = true;
+  Promise.resolve(store.put(['main','meta','rules'], { ver:RULES_VER, at:now(), by:UI.me })).then(
+    () => { if(D.rulesOld){ D.rulesOld = false; queueRender(); if(force) toast('서버 규칙이 최신입니다.'); } },
+    e => { if(e && e.code==='permission-denied'){ D.rulesOld = true; queueRender(); if(force) toast('아직 예전 규칙입니다. 게시한 뒤 1분쯤 지나 다시 확인해 주세요.'); } else rulesChecked = false; });
 }
 // 아래 메뉴(마스터)와 무전기 줄 높이만큼 화면을 비움
 function setBodyMode(hasNav){ document.body.classList.toggle('has-nav', hasNav); }
@@ -129,6 +149,7 @@ function fatalView(){
     <div class="row" style="margin-top:14px"><button class="btn primary" data-a="reload">다시 시도</button><a class="btn" href="?demo=1">연습 모드로 열기</a></div></div></div>`;
 }
 function menuSheet(){
+  if(voiceMode()) return voiceMenu();
   const r = myRole();
   return `<h2>메뉴</h2>
     <p>이 기기: <b>${esc(UI.me)}</b> · ${esc(roleIcon(r))} ${esc(roleLabel(r))}</p>
@@ -144,6 +165,7 @@ function menuSheet(){
       ${FS.supported() ? `<div class="item"><span class="name">자동 전체화면<span class="sub">화면을 처음 누르면 주소창 없이 전체화면으로 바꿉니다.</span></span><label class="switch"><input type="checkbox" data-ch="autofs" ${UIX.autoFS?'checked':''}><span></span></label></div>
         <div class="item tap" data-a="fs"><span class="name">${FS.on()?'↙ 전체화면 끝내기':'↗ 전체화면 켜기'}</span></div>` : ''}
       ${isStandalone() ? '' : '<div class="item tap" data-a="install"><span class="name">📲 홈 화면에 설치하기</span></div>'}
+      ${r.role!=='board' ? psMenu() : ''}
       ${radioRoleOK() ? `<div class="item"><span class="name">🎙 무전 소리 듣기<span class="sub">끄면 다른 사람의 무전이 이 기기에서 나오지 않습니다. 말하기는 그대로 됩니다.</span></span><label class="switch"><input type="checkbox" data-a="rxToggle" ${RADIO.on?'checked':''}><span></span></label></div>` : ''}
       ${radioRoleOK() || castOK() ? `<div class="item tap" data-a="micTest"><span class="name">🎤 마이크 미리 허용하기<span class="sub">처음 한 번 마이크 권한을 허용해 두면 당일에 바로 말할 수 있습니다.</span></span></div>
         <div class="item"><span class="name">📡 무전기 연결<span class="sub">${!RT ? '불러오는 중' : RT.st.connected ? '연결됨' : '끊김'} · ${radioReady() ? '권한 확인됨' : '권한 확인 전'}${DEMO ? '' : ` · ${esc(RTDB_URL.replace('https://',''))}`}</span></span></div>` : ''}
@@ -175,7 +197,7 @@ Object.assign(ACT, {
     UI.me = n; idStore.set('udh5_me', n); touchDevice(true);
     // 담당자 명단에 있는 이름이면 그 역할로 바로 들어감
     const ps = presetList().find(p => !p.volunteer && String(p.label).trim()===n);
-    if(ps && !D.amMaster) put(['main','roles',store.uid], { preset:ps.id, name:n, ...pickRoleFields(ps), at:now() }, false).then(ok => ok && toast(`${n} 님, 들어왔습니다.`)); },
+    if(ps && !D.amMaster) put(['main','roles',store.uid], { preset:ps.id, name:n, ...pickRoleFields(ps), at:now() }, false, RULES_OLD_MSG).then(ok => ok && toast(`${n} 님, 들어왔습니다.`)); },
   rename: async () => { const n = await askText('이 기기를 쓰는 사람 이름', UI.me); if(n && n.trim()){ UI.me = n.trim(); idStore.set('udh5_me', UI.me); touchDevice(true); } },
   ev: (el, v) => { UI.ev = v; UI.q = ''; ls.set('udh5_ev', v); window.scrollTo(0,0); },
   mtab: (el, v) => { UI.mtab = v; ls.set('udh5_mtab', v); window.scrollTo(0,0); },
@@ -194,6 +216,7 @@ Object.assign(ACT, {
   fs: () => { FS.toggle(); return false; },
   later: () => { UIX.installDismissed = true; saveUIX(); toast('오른쪽 위 메뉴에서 언제든 설치할 수 있습니다.'); },
   reload: () => { location.reload(); return false; },
+  rulesRecheck: () => { rulesCheck(true); return false; },
 });
 
 document.addEventListener('click', async e => {

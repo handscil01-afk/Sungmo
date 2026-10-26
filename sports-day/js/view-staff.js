@@ -9,7 +9,8 @@ function deviceRole(id){
 const asRole = p => { const r = normRole(p); r.role = r.board ? 'board' : hasDuty(r) ? 'staff' : 'wait'; return r; };
 const roleTagCls = r => r.role==='wait' ? 'warn' : r.role==='master' ? 'dark' : r.coach ? (r.coach==='red' ? 'red' : 'blue') : '';
 // monitor는 켜져 있을 때만 넣음: 규칙을 아직 올리지 않은 서버에서도 예전 담당자 선택이 막히지 않게 (없으면 꺼짐으로 읽음)
-const pickRoleFields = r => { const n = normRole(r); return { coach:n.coach, events:n.events, helpers:n.helpers, timers:n.timers, board:n.board, cast:n.cast, ...(n.monitor ? { monitor:true } : {}) }; };
+// 중계 모드(보이스오버용 간단 화면)는 monitor 값을 true 대신 'voice'로 저장함
+const pickRoleFields = r => { const n = normRole(r); return { coach:n.coach, events:n.events, helpers:n.helpers, timers:n.timers, board:n.board, cast:n.cast, ...(n.monitor ? { monitor: n.voice ? 'voice' : true } : {}) }; };
 function presetList(){
   return Object.entries(D.presets).map(([id,p]) => ({ id, ...p }))
     .sort((a,b) => (!!a.volunteer - !!b.volunteer) || String(a.label||'').localeCompare(String(b.label||''), 'ko'));
@@ -51,7 +52,7 @@ function peopleView(){
         <div class="item"><span class="tag">🚩 심판</span><span class="name"><span class="sub">맡은 종목만 보입니다. 단체전은 지금 대결과 대기 순서, 승패 입력이고, 개인전은 두 사대 점수 입력입니다.</span></span></div>
         <div class="item"><span class="tag">✏️ 기록 도우미</span><span class="name"><span class="sub">맡은 종목의 점수를 심판과 똑같이 입력합니다.</span></span></div>
         <div class="item"><span class="tag">⏱ 계시원</span><span class="name"><span class="sub">큰 초시계로 시간을 재서 심판 화면으로 보냅니다. 심판이 확인한 뒤 저장합니다.</span></span></div>
-        <div class="item"><span class="tag">🧭 운영 현황</span><span class="name"><span class="sub">센터장·사무국장 대행: 종목별 진행 현황과 남은 시간을 보고, 무전·문자만 씁니다. 점수나 출석은 건드리지 않습니다.</span></span></div>
+        <div class="item"><span class="tag">🧭 운영 현황</span><span class="name"><span class="sub">센터장·사무국장 대행: 종목별 진행 현황과 남은 시간을 보고, 무전·문자만 씁니다. 점수나 출석은 건드리지 않습니다. '중계 모드'를 켜면 보이스오버용 간단 글자 화면이 됩니다.</span></span></div>
         <div class="item"><span class="tag">📺 안내판</span><span class="name"><span class="sub">가로로 세워 둔 태블릿에 호출·결과·현황을 크게 띄웁니다.</span></span></div>
       </div></div>`,
   }[ITAB.people]();
@@ -89,7 +90,7 @@ async function dedupeDevices(){
 
 /* ---------- 역할 고르기 (담당자 명단과 기기에 함께 씀) ---------- */
 let RD = null;
-function newDraft(src){ return { ...pickRoleFields(src), events:[...normRole(src).events], helpers:[...normRole(src).helpers], timers:[...normRole(src).timers] }; }
+function newDraft(src){ const n = normRole(src); return { ...pickRoleFields(src), monitor:!!n.monitor, voice:!!n.voice, events:[...n.events], helpers:[...n.helpers], timers:[...n.timers] }; }
 function roleEditor(){
   const chips = (k, list) => `<div class="chips">${list.map(ev => `<button class="chip ${RD[k].includes(ev)?'on':''}" data-a="rdTog" data-k="${k}" data-v="${ev}">${EVENTS[ev].icon} ${esc(EVENTS[ev].name)}</button>`).join('')}</div>`;
   const flag = (k, title, sub) => `<div class="item"><span class="name">${title}<span class="sub">${sub}</span></span><button class="btn small ${RD[k]?'ok':''}" data-a="rdFlag" data-k="${k}">${RD[k]?'켬':'끔'}</button></div>`;
@@ -97,10 +98,10 @@ function roleEditor(){
     <div class="card"><h2>🚩 심판 <span class="sub">점수·승패를 입력합니다</span></h2>${chips('events', Object.keys(EVENTS))}</div>
     <div class="card"><h2>✏️ 기록 도우미 <span class="sub">심판과 똑같이 점수를 입력합니다</span></h2>${chips('helpers', Object.keys(EVENTS))}</div>
     <div class="card"><h2>⏱ 계시원 <span class="sub">시간을 재서 심판 화면으로 보냅니다</span></h2>${chips('timers', TIME_EVENTS)}</div>
-    <div class="card"><div class="list">${flag('monitor','🧭 운영 현황','센터장·사무국장 대행: 진행 현황을 보고 무전·문자만 씁니다.')}${flag('board','📺 안내판','이 기기를 안내판 화면으로만 씁니다(다른 역할 화면은 숨겨집니다).')}${flag('cast','📢 음성 방송 권한','안내판 스피커로 말하는 방송 버튼이 생깁니다.')}</div></div>`;
+    <div class="card"><div class="list">${flag('monitor','🧭 운영 현황','센터장·사무국장 대행: 진행 현황을 보고 무전·문자만 씁니다.')}${RD.monitor ? flag('voice','중계 모드(보이스오버용 간단 화면)','그림 없이 큰 글자 단추만 있는 화면으로 바뀌고, 지금 상황을 글로 읽어 줍니다. 단체전 결과가 저장되면 보이스오버가 바로 읽어 줍니다.') : ''}${flag('board','📺 안내판','이 기기를 안내판 화면으로만 씁니다(다른 역할 화면은 숨겨집니다).')}${flag('cast','📢 음성 방송 권한','안내판 스피커로 말하는 방송 버튼이 생깁니다.')}</div></div>`;
 }
 const draftEmpty = () => !RD.coach && !RD.events.length && !RD.helpers.length && !RD.timers.length && !RD.board && !RD.monitor;
-const draftFields = () => ({ coach:RD.coach, events:RD.events.filter(e => EVENTS[e]), helpers:RD.helpers.filter(e => EVENTS[e]), timers:RD.timers.filter(e => TIME_EVENTS.includes(e)), board:!!RD.board, cast:!!RD.cast, monitor:!!RD.monitor });
+const draftFields = () => ({ coach:RD.coach, events:RD.events.filter(e => EVENTS[e]), helpers:RD.helpers.filter(e => EVENTS[e]), timers:RD.timers.filter(e => TIME_EVENTS.includes(e)), board:!!RD.board, cast:!!RD.cast, monitor: RD.monitor ? (RD.voice ? 'voice' : true) : false });
 
 function presetSheet(){
   return `<h2>${RD.id ? '담당자 고치기' : RD.volunteer ? '봉사자 자리 추가' : '담당자 추가'}</h2>
@@ -162,7 +163,7 @@ Object.assign(ACT, {
   presetEdit: (el, v) => { const p = D.presets[v]; RD = { id:v, label:p.label||'', volunteer:!!p.volunteer, ...newDraft(p) }; openSheet(presetSheet); return false; },
   rdTog: (el, v) => { const a = RD[el.dataset.k]; a.includes(v) ? a.splice(a.indexOf(v),1) : a.push(v); RD.preset = ''; drawSheet(); return false; },
   rdCoach: (el, v) => { RD.coach = v; RD.preset = ''; drawSheet(); return false; },
-  rdFlag: (el) => { const k = el.dataset.k; RD[k] = !RD[k]; if(k!=='volunteer') RD.preset = ''; drawSheet(); return false; },
+  rdFlag: (el) => { const k = el.dataset.k; RD[k] = !RD[k]; if(k==='monitor' && !RD.monitor) RD.voice = false; if(k!=='volunteer') RD.preset = ''; drawSheet(); return false; },
   rdPreset: (el, v) => { const p = D.presets[v]; if(!p) return false; Object.assign(RD, newDraft(p), { preset:v }); drawSheet(); return false; },
   presetSave: async () => {
     if(!can.master()) return denied();
@@ -217,7 +218,7 @@ Object.assign(ACT, {
       if(!name || !name.trim()) return false; name = name.trim();
     } else if(!(await ask(`${p.label}\n(${roleLabel(asRole(p))})\n이 이름으로 들어갈까요?`, '들어가기'))) return false;
     UI.me = name; idStore.set('udh5_me', name); touchDevice(true);
-    if(await put(['main','roles',store.uid], { preset:v, name, ...pickRoleFields(p), at:now() }, false)) toast(`${name} 님, 들어왔습니다.`);
+    if(await put(['main','roles',store.uid], { preset:v, name, ...pickRoleFields(p), at:now() }, false, D.amMaster ? undefined : RULES_OLD_MSG)) toast(`${name} 님, 들어왔습니다.`);
   },
   leaveRole: async () => {
     if(!(await ask('지금 역할에서 나가고 담당자를 다시 고를까요?', '다시 고르기'))) return false;

@@ -38,8 +38,11 @@ async function firebaseRT(){
         return { ok:true };
       }catch(e){ return { ok:false, error:e }; }
     },
-    refresh(kind, d){ return R.set(r(kind+'/lock'), lockData(d)).catch(()=>{}); },
+    // 내 무전 잡기가 아직 내 것일 때만 시각을 갱신함: 마스터가 끊은 뒤에 다시 만들어지지 않게 (없거나 남의 것이면 아무것도 쓰지 않음)
+    refresh(kind, d){ return R.runTransaction(r(kind+'/lock'), cur => (cur && cur.uid===d.uid) ? lockData(d) : undefined, { applyLocally:false }).catch(()=>{}); },
     async release(kind){ const ref = r(kind+'/lock'); try{ await R.onDisconnect(ref).cancel(); await R.remove(ref); }catch(e){} },
+    // 마스터가 남의 송신을 끊음 (데이터베이스 규칙이 마스터에게만 남의 잠금을 지우도록 허용함)
+    forceRelease(kind){ return R.remove(r(kind+'/lock')); },
     onLock(kind, cb, err){ return R.onValue(r(kind+'/lock'), s => cb(s.val()), err); },
     send(kind, tid, seq, d){
       const k = R.push(r(kind+'/s')).key;
@@ -78,8 +81,9 @@ function demoRT(){
     async acquire(kind, d){ const cur = state().locks[kind];
       if(cur && cur.uid!==d.uid && now()-cur.at < LOCK_STALE_MS) return { ok:false, lock:cur };
       setLock(kind, { uid:d.uid, name:d.name, tid:d.tid, at:now() }); return { ok:true }; },
-    async refresh(kind, d){ setLock(kind, { uid:d.uid, name:d.name, tid:d.tid, at:now() }); },
+    async refresh(kind, d){ const cur = state().locks[kind]; if(cur && cur.uid===d.uid) setLock(kind, { uid:d.uid, name:d.name, tid:d.tid, at:now() }); },
     async release(kind){ setLock(kind, null); },
+    async forceRelease(kind){ setLock(kind, null); },
     onLock(kind, cb){ subs[kind].add(cb); setTimeout(() => cb(state().locks[kind] || null), 0); return () => subs[kind].delete(cb); },
     async send(kind, tid, seq, d){ post({ t:'chunk', kind, tid, u:store.uid, d }); },
     onStream(kind, cb){ const s = { kind, cb }; streamSubs.add(s); return () => streamSubs.delete(s); },

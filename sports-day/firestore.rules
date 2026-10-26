@@ -1,6 +1,7 @@
 rules_version = '2';
 // 가을운동회 점수판 (sports-day) Firestore 규칙
 // 파이어베이스 콘솔 → Firestore Database → 규칙 탭에 그대로 붙여 넣고 게시합니다.
+// 규칙 버전 12 (js/config.js 의 RULES_VER 와 같은 숫자). 마스터 기기가 접속할 때 main/meta/rules 에 이 번호를 써 보고, 막히면 '규칙이 예전 것'이라고 알려 줌
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
@@ -99,6 +100,11 @@ service cloud.firestore {
       allow create: if open() && (isMaster() || hasRole()) && request.resource.data.uid == request.auth.uid
         && request.resource.data.text is string && request.resource.data.text.size() <= 300;
       allow update, delete: if open() && isMaster();
+    }
+    // 규칙 확인용 표식(버전): 마스터 기기가 접속할 때 한 번 씀. 쓸 수 없으면 서버 규칙이 예전 것이라는 뜻
+    match /undonghoe5/main/meta/{id} {
+      allow read: if signedIn();
+      allow write: if open() && isMaster();
     }
     // 불참 표시: 마스터와 역할이 있는 진행요원
     match /undonghoe5/main/absent/{pid} {

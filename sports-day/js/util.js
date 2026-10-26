@@ -30,28 +30,47 @@ function toast(msg, actLabel, act){
   b.onclick = () => { $('#toast').classList.remove('show'); act && act(); };
   $('#toast').classList.add('show');
   clearTimeout(toastTimer); toastTimer = setTimeout(()=>$('#toast').classList.remove('show'), actLabel?6000:2800);
+  if(typeof voiceToast==='function') voiceToast(msg);   // 중계 모드: 보이스오버가 읽도록 숨은 알림 칸에도 넣음
 }
 
 /* ===================== 아래에서 올라오는 창(시트) ===================== */
-let sheetRender = null;
-function openSheet(fn){ sheetRender = fn; $('#sheet').classList.add('open'); drawSheet(); $('#sheetBox').scrollTop = 0; }
-function closeSheet(){ sheetRender=null; $('#sheet').classList.remove('open'); $('#sheetBox').innerHTML=''; }
+let sheetRender = null, sheetOpener = null;
+const inVoice = () => typeof voiceMode==='function' && voiceMode();
+function openSheet(fn){
+  // 닫을 때 보이스오버 초점을 원래 단추로 돌려주려고, 처음 열 때만 기억함
+  if(!$('#sheet').classList.contains('open')) sheetOpener = document.activeElement;
+  sheetRender = fn; $('#sheet').classList.add('open'); drawSheet(); $('#sheetBox').scrollTop = 0;
+  if(inVoice()){ const h = $('#sheetBox h2'); if(h){ h.setAttribute('tabindex', '-1'); h.focus(); } }
+}
+function closeSheet(){
+  sheetRender=null; $('#sheet').classList.remove('open'); $('#sheetBox').innerHTML=''; $('#sheetBox').__h = null;
+  const o = sheetOpener; sheetOpener = null;
+  if(inVoice() && o && document.contains(o)){ try{ o.focus(); }catch(e){} }
+}
 function drawSheet(){
   if(!sheetRender) return;
   const box = $('#sheetBox'), top = box.scrollTop;
-  box.innerHTML = sheetRender(); box.scrollTop = top;
+  let h = sheetRender();
+  if(inVoice()){
+    // 중계 모드: 그림 문자를 빼고, 내용이 같으면 다시 그리지 않음(보이스오버 초점이 풀리지 않게)
+    h = vstrip(h);
+    if(box.__h === h) return;
+    box.__h = h; box.innerHTML = h; voiceA11y(box);
+  } else { box.__h = null; box.innerHTML = h; }
+  box.scrollTop = top;
 }
 $('#sheet').addEventListener('click', e => { if(e.target.id==='sheet') closeSheet(); });
 
 /* ===================== 대화창 (alert·confirm·prompt 대신) ===================== */
 function dialog({ msg, input=null, type='text', ok='확인', cancel='취소', danger=false }){
   return new Promise(res => {
-    const box = $('#dlgBox');
+    const box = $('#dlgBox'), prev = document.activeElement;
     box.innerHTML = `<p class="msg">${esc(msg)}</p>${input!=null?`<input id="dlgIn" type="${type}" value="${esc(input)}" autocomplete="off"><div style="height:14px"></div>`:''}
       <div class="row end">${cancel?`<button class="btn" id="dlgNo">${esc(cancel)}</button>`:''}<button class="btn ${danger?'danger':'primary'}" id="dlgOk">${esc(ok)}</button></div>`;
     $('#dlg').classList.add('open');
     const inp = $('#dlgIn'); if(inp){ inp.focus(); inp.select(); }
-    const done = v => { $('#dlg').classList.remove('open'); box.innerHTML=''; res(v); setTimeout(flushDeferred, 0); };
+    else if(inVoice()){ const m = box.querySelector('.msg'); m.setAttribute('tabindex', '-1'); m.focus(); }   // 보이스오버가 질문부터 읽도록
+    const done = v => { $('#dlg').classList.remove('open'); box.innerHTML=''; res(v); setTimeout(flushDeferred, 0); if(inVoice() && prev && document.contains(prev)){ try{ prev.focus(); }catch(e){} } };
     $('#dlgOk').onclick = () => done(inp ? inp.value : true);
     if($('#dlgNo')) $('#dlgNo').onclick = () => done(inp ? null : false);
     if(inp) inp.onkeydown = e => { if(e.key==='Enter') done(inp.value); };

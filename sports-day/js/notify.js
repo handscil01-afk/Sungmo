@@ -23,17 +23,19 @@ const leftText = ms => ms <= 0 ? '시간 지남' : ms < 60000 ? '1분 안 남음
 
 /* ---------- 안내 창 (새 창처럼 화면 가운데에 크게) ---------- */
 const NQ = []; let ncur = null, nalarm = 0;
-function notice(n){ NQ.push(n); if(!ncur) showNotice(); }
+function notice(n){ NQ.push(n); if(!ncur) showNotice(); if(typeof psWake==='function') psWake(); }   // 절전 화면이 켜져 있으면 깨움
 function showNotice(){
   clearInterval(nalarm);
   ncur = NQ.shift();
   const box = $('#notice');
   if(!ncur){ box.className = ''; box.innerHTML = ''; return; }
-  const ic = { time:'⏰', msg:'💬', sos:'🚨' }[ncur.kind] || '📢';
+  const V = voiceMode(), ic = V ? '' : ({ time:'⏰', msg:'💬', sos:'🚨' }[ncur.kind] || '📢');
   box.className = 'open ' + ncur.kind;
   box.innerHTML = `<div class="nbox"><div class="nic">${ic}</div><div class="nt">${esc(ncur.title)}</div>${ncur.msg?`<div class="nm">${esc(ncur.msg)}</div>`:''}
     <div class="nfrom">${esc(ncur.from||'')}${ncur.from?' · ':''}${hm(ncur.at||now())}${NQ.length?` · 남은 안내 ${NQ.length}개`:''}</div>
     <button class="btn huge ${ncur.kind==='sos'?'danger':'primary'}" data-a="ntcOk">확인</button></div>`;
+  // 중계 모드: 보이스오버가 바로 읽도록 알림 내용을 읽기 전용 알림 칸에도 넣음
+  if(V) voiceSay(`${ncur.kind==='sos' ? '긴급 호출. ' : ''}${ncur.title}.${ncur.msg ? ' ' + ncur.msg + '.' : ''}${ncur.from ? ' ' + ncur.from + ' 님이 보냈습니다.' : ''}`);
   const beep = () => {
     SND.unlock();
     if(ncur.kind==='sos'){ SND.play([[880,0,0.25],[660,0.3,0.25],[880,0.6,0.25],[660,0.9,0.25]]); if(navigator.vibrate) navigator.vibrate([400,150,400,150,400]); }
@@ -101,13 +103,14 @@ let msgTo = 'staff', msgDraft = '';
 // 문자 무전 내용: 아래 창(메뉴)과 무전 창의 '문자' 탭에서 함께 씀
 function msgBody(){
   const recent = D.msgs.slice().sort((a,b) => (b.at||0)-(a.at||0)).slice(0, 8);
-  return `<p class="sub" style="margin-top:0">누르면 바로 보냅니다. 받는 사람 기기에는 소리·진동과 함께 안내 창이 뜹니다.</p>
+  const html = `<p class="sub" style="margin-top:0">누르면 바로 보냅니다. 받는 사람 기기에는 소리·진동과 함께 안내 창이 뜹니다.</p>
     <div class="chips" style="margin-bottom:10px">${WHO.map(([k,l]) => `<button class="chip ${msgTo===k?'on':''}" data-a="msgTo" data-v="${k}">${esc(l)}</button>`).join('')}</div>
     <div class="pgrid">${MSG_PHRASES.map((p,i) => `<button class="pbtn" data-a="msgPhrase" data-v="${i}"><b>${esc(p)}</b></button>`).join('')}</div>
     <div class="row nowrap" style="margin-top:12px"><input id="msgText" data-in="msg" placeholder="직접 적어서 보내기" value="${esc(msgDraft)}" autocomplete="off"><button class="btn primary" data-a="msgSend">보내기</button></div>
     <button class="btn danger huge wide" data-a="sosSend" style="margin-top:14px;width:100%">🚨 긴급 호출</button>
     <h3>최근 15분</h3>
     <div class="list">${recent.map(m => `<div class="item"><span class="tag ${m.kind==='sos'?'red':''}">${m.kind==='sos'?'🚨':'💬'} ${hm(m.at)}</span><span class="name">${esc(m.text||'긴급 호출')}<span class="sub">${esc(m.name||'')} → ${esc(m.kind==='sos'?'모든 진행요원':whoLabel(m.to))}</span></span></div>`).join('') || '<div class="empty">아직 주고받은 문자가 없습니다.</div>'}</div>`;
+  return voiceMode() ? vstrip(html) : html;
 }
 function msgSheet(){
   return `<h2>💬 문자 무전</h2>${msgBody()}<button class="btn wide" data-a="closeSheet" style="margin-top:12px">닫기</button>`;

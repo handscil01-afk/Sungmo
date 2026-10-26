@@ -24,10 +24,18 @@ function boardView(){
 
 /* ===================== 소리 (띵동·차임벨·음성) ===================== */
 const SND = {
-  ctx:null, unlocked:false,
+  ctx:null, unlocked:false, wasRunning:false,
   ensure(){
     try{
-      if(!this.ctx){ const C = window.AudioContext || window.webkitAudioContext; if(!C) return null; this.ctx = new C(); }
+      if(!this.ctx){
+        const C = window.AudioContext || window.webkitAudioContext; if(!C) return null; this.ctx = new C();
+        // 전화 등으로 소리가 끊기면(interrupted·suspended) 말하던 중이었다면 송신을 끝냄
+        this.ctx.addEventListener('statechange', () => {
+          const st = this.ctx.state;
+          if(st==='running') this.wasRunning = true;
+          else { const was = this.wasRunning; this.wasRunning = false; if(was && typeof talkAbort==='function') talkAbort(); }
+        });
+      }
       if(this.ctx.state==='suspended') this.ctx.resume().catch(()=>{});
     }catch(e){ return null; }
     return this.ctx;
@@ -66,6 +74,17 @@ const SND = {
     o.start(t0); o2.start(t0); o.stop(t0+dur+0.05); o2.stop(t0+dur+0.05);
   },
   play(notes){ const c = this.ensure(); if(!c) return 0; const t = c.currentTime+0.08; notes.forEach(([f, dt, d]) => this.tone(f, t+dt, d)); return Math.max(...notes.map(n => n[1]+n[2])); },
+  // ----- 무전 효과음 (모두 sine 두 겹 톤). at: 소리를 낼 AudioContext 시각(없으면 지금)
+  tones(notes, vol=0.4, at){
+    const c = this.ensure(); if(!c) return 0;
+    const t = at != null ? at : c.currentTime + 0.03;
+    notes.forEach(([f, dt, d]) => this.tone(f, t+dt, d, vol));
+    return Math.max(...notes.map(n => n[1]+n[2])) + (at != null ? 0 : 0.03);
+  },
+  chirp(){ return this.tones([[1800, 0, 0.06], [2400, 0.075, 0.06]], 0.35); },                       // 말해도 좋다는 짧은 '삑삑'
+  endTone(at){ return this.tones([[900, 0, 0.12], [600, 0.15, 0.12]], 0.4, at); },                   // 말이 끝남: 낮아지는 '뚜-뚜'
+  busy(){ return this.tones([[480, 0, 0.1], [480, 0.17, 0.1], [480, 0.34, 0.1]], 0.4); },           // 누군가 말하는 중: '뚜뚜뚜'
+  warn(){ return this.tones([[1200, 0, 0.25]], 0.4); },                                              // 50초 경고
   dingdong(){ return this.play([[659.25, 0, 1.1], [523.25, 0.55, 1.5]]); },                       // 띵-동 (선수 호출)
   chime(){ return this.play([[523.25, 0, 0.9], [659.25, 0.42, 0.9], [783.99, 0.84, 0.9], [1046.5, 1.26, 1.5]]); }, // 딩동댕동 (안내방송)
   fanfare(){ return this.play([[523.25, 0, 0.25], [659.25, 0.18, 0.25], [783.99, 0.36, 0.25], [1046.5, 0.54, 1.0]]); },
