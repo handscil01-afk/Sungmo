@@ -35,7 +35,7 @@ function showNotice(){
     <div class="nfrom">${esc(ncur.from||'')}${ncur.from?' · ':''}${hm(ncur.at||now())}${NQ.length?` · 남은 안내 ${NQ.length}개`:''}</div>
     <button class="btn huge ${ncur.kind==='sos'?'danger':'primary'}" data-a="ntcOk">확인</button></div>`;
   // 중계 모드: 보이스오버가 바로 읽도록 알림 내용을 읽기 전용 알림 칸에도 넣음
-  if(V) voiceSay(`${ncur.kind==='sos' ? '긴급 호출. ' : ''}${ncur.title}.${ncur.msg ? ' ' + ncur.msg + '.' : ''}${ncur.from ? ' ' + ncur.from + ' 님이 보냈습니다.' : ''}`);
+  if(V) say(`${ncur.kind==='sos' ? '긴급 호출. ' : ''}${ncur.title}.${ncur.msg ? ' ' + ncur.msg + '.' : ''}${ncur.from ? ' ' + ncur.from + ' 님이 보냈습니다.' : ''}`);
   const beep = () => {
     SND.unlock();
     if(ncur.kind==='sos'){ SND.play([[880,0,0.25],[660,0.3,0.25],[880,0.6,0.25],[660,0.9,0.25]]); if(navigator.vibrate) navigator.vibrate([400,150,400,150,400]); }

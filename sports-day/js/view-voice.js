@@ -168,7 +168,7 @@ function voiceTick(){
     VOICE.seen.add(m.id);
     if(!m.deleted && TEAM[m.event] && (m.at||0) > now() - 120000) texts.push(matchSpeech(m));
   });
-  if(texts.length) voiceSay(texts.join(' '));
+  if(texts.length) say(texts.join(' '));
 }
 
 /* ---------- 메뉴 (그림 없이) ---------- */
@@ -180,6 +180,7 @@ function voiceMenu(){
       ${btn('rename', '이름 바꾸기')}
       ${btn('schedSheet', '진행 일정 보기', '오늘 일정과 남은 시간을 봅니다.')}
       <label class="vmrow"><span>다른 사람 무전 듣기</span><input type="checkbox" data-a="rxToggle" ${RADIO.on ? 'checked' : ''}></label>
+      ${btn('ttsSheet', '음성 안내 방식', '보이스오버로 읽을지 휴대폰 음성으로 읽을지 정하고 시험합니다.')}
       ${btn('micTest', '마이크 미리 허용하기', '처음 한 번 마이크를 허용해 두면 바로 말할 수 있습니다.')}
       ${btn('leaveRole', '담당 다시 고르기', '지금 역할에서 나가고 담당자를 다시 고릅니다.')}
       ${btn('masterLogin', '마스터로 들어가기', '마스터 비밀번호가 필요합니다.')}

@@ -60,7 +60,6 @@ const SND = {
   // 화면을 처음 누를 때 소리와 음성을 켜 둠 (태블릿은 사람이 한 번 눌러야 소리를 낼 수 있음)
   unlock(){
     this.ensure();
-    if(!this.unlocked && 'speechSynthesis' in window){ try{ const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); }catch(e){} }
     this.unlocked = true;
     this.loadRoger();
   },
@@ -104,20 +103,8 @@ const SND = {
   dingdong(){ return this.play([[659.25, 0, 1.1], [523.25, 0.55, 1.5]]); },                       // 띵-동 (선수 호출)
   chime(){ return this.play([[523.25, 0, 0.9], [659.25, 0.42, 0.9], [783.99, 0.84, 0.9], [1046.5, 1.26, 1.5]]); }, // 딩동댕동 (안내방송)
   fanfare(){ return this.play([[523.25, 0, 0.25], [659.25, 0.18, 0.25], [783.99, 0.36, 0.25], [1046.5, 0.54, 1.0]]); },
-  // 읽어 주기: 읽던 것이 있을 때만 멈추고 잠깐 뒤에 읽음(멈추기 바로 뒤에 읽으면 안드로이드 크롬 등에서 새 문장까지 버려지는 경우가 있음)
-  utt:null,
-  speak(text){
-    if(!('speechSynthesis' in window) || !text) return;
-    const ss = window.speechSynthesis;
-    const go = () => { try{
-      const u = new SpeechSynthesisUtterance(text); u.lang = 'ko-KR'; u.rate = 0.92; u.volume = 1;
-      const v = ss.getVoices().find(x => /ko/i.test(x.lang)); if(v) u.voice = v;
-      this.utt = u;                       // 읽는 도중에 지워져 소리가 끊기지 않게 붙잡아 둠
-      try{ ss.resume(); }catch(e){}       // 멈춘 상태로 굳어 있으면 풀어 줌
-      ss.speak(u);
-    }catch(e){} };
-    try{ if(ss.speaking || ss.pending){ ss.cancel(); setTimeout(go, 150); } else go(); }catch(e){ go(); }
-  },
+  // 읽어 주기: 기기 설정(자동·기기 음성·보이스오버·끄기)에 맞춰 읽음 → js/speech.js
+  speak(text){ if(typeof say === 'function') say(text); },
 };
 document.addEventListener('pointerdown', () => { if(myRole().role==='board'){ const was = SND.ready(); SND.unlock(); if(!was) setTimeout(() => { queueRender(); touchDevice(); }, 400); } }, true);
 
@@ -244,7 +231,7 @@ function boardScreen(){
   else if(T.kind==='awards') body = boardAwards();
   else body = boardIndiv();
   const cfg = boardCfg();
-  const soundHint = boardOn() && cfg.sound && !SND.ready() ? `<button class="soundhint" data-a="bdSound">🔈 화면을 한 번 눌러 소리를 켜 주세요</button>` : '';
+  const soundHint = boardOn() && cfg.sound && (!SND.ready() || (typeof TTS==='object' && TTS.needTap)) ? `<button class="soundhint" data-a="bdSound">🔈 화면을 한 번 눌러 소리를 켜 주세요</button>` : '';
   const fixed = T.kind==='team' && TEAM[T.ev] && TEAM[T.ev].mode==='duel' && teamOpt(T.ev).board;     // 과녁판 중계 화면은 한 화면에 고정
   // PC·프로젝터 화면: 안내판 전체를 한 화면에 꼭 맞게 (글자 크기는 board-pc.js 가 화면 크기에 맞춰 정함)
   const key = T.kind + (T.ev || '') + (BOARD.person ? 'P' : '');
