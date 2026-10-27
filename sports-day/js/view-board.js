@@ -104,13 +104,19 @@ const SND = {
   dingdong(){ return this.play([[659.25, 0, 1.1], [523.25, 0.55, 1.5]]); },                       // 띵-동 (선수 호출)
   chime(){ return this.play([[523.25, 0, 0.9], [659.25, 0.42, 0.9], [783.99, 0.84, 0.9], [1046.5, 1.26, 1.5]]); }, // 딩동댕동 (안내방송)
   fanfare(){ return this.play([[523.25, 0, 0.25], [659.25, 0.18, 0.25], [783.99, 0.36, 0.25], [1046.5, 0.54, 1.0]]); },
+  // 읽어 주기: 읽던 것이 있을 때만 멈추고 잠깐 뒤에 읽음(멈추기 바로 뒤에 읽으면 안드로이드 크롬 등에서 새 문장까지 버려지는 경우가 있음)
+  utt:null,
   speak(text){
     if(!('speechSynthesis' in window) || !text) return;
-    try{
+    const ss = window.speechSynthesis;
+    const go = () => { try{
       const u = new SpeechSynthesisUtterance(text); u.lang = 'ko-KR'; u.rate = 0.92; u.volume = 1;
-      const v = speechSynthesis.getVoices().find(x => /ko/i.test(x.lang)); if(v) u.voice = v;
-      speechSynthesis.cancel(); speechSynthesis.speak(u);
-    }catch(e){}
+      const v = ss.getVoices().find(x => /ko/i.test(x.lang)); if(v) u.voice = v;
+      this.utt = u;                       // 읽는 도중에 지워져 소리가 끊기지 않게 붙잡아 둠
+      try{ ss.resume(); }catch(e){}       // 멈춘 상태로 굳어 있으면 풀어 줌
+      ss.speak(u);
+    }catch(e){} };
+    try{ if(ss.speaking || ss.pending){ ss.cancel(); setTimeout(go, 150); } else go(); }catch(e){ go(); }
   },
 };
 document.addEventListener('pointerdown', () => { if(myRole().role==='board'){ const was = SND.ready(); SND.unlock(); if(!was) setTimeout(() => { queueRender(); touchDevice(); }, 400); } }, true);
@@ -174,7 +180,7 @@ function runFx(){
   const voiceMs = cfg.callVoice && sound ? 5000 : 2200;
   BOARD.busy = true;
   let dur = 1800;
-  if(fx.kind==='test'){ if(sound) SND.dingdong(); toast('안내판 소리 시험'); }
+  if(fx.kind==='test'){ if(sound){ const d = SND.dingdong(); if(cfg.callVoice) setTimeout(() => SND.speak('안내판 소리 시험입니다.'), d*1000+200); dur = voiceMs; } toast('안내판 소리 시험'); }
   else if(fx.kind==='call' || fx.kind==='autocall'){
     let c = fx.call;
     if(fx.kind==='autocall'){ const pa = prepAhead(), b = upcoming(fx.ev,'blue',pa), r = upcoming(fx.ev,'red',pa); c = b && r ? { kind:'next', blue:b, red:r } : null; }

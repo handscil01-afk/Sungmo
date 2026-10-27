@@ -288,9 +288,9 @@ async function pttDown(kind, opts){
   }
   if(!alive()) return;
   if(!TALK.pressed) return giveUp();
-  // 보낼 준비가 끝남: 말해도 좋다는 '삑삑'을 울리고, 그 소리가 끝나는 순간부터 목소리를 보냄
+  // 보낼 준비가 끝남: 로저 비프음(roger.wav)을 울리고, 그 소리가 끝나는 순간부터 목소리를 보냄
   TALK.phase = 'live'; TALK.liveAt = now();
-  const d = SND.chirp();
+  const d = SND.roger();
   MIC.gate = (SND.ctx ? SND.ctx.currentTime : 0) + d + 0.02;
   vib(40);
   TALK.timer = setInterval(() => rt.refresh(kind, TALK.data), 3000);
