@@ -173,16 +173,17 @@ function runFx(){
   if(fx.kind==='test'){ if(sound){ const d = SND.dingdong(); if(cfg.callVoice) setTimeout(() => SND.speak('안내판 소리 시험입니다.'), d*1000+200); dur = voiceMs; } toast('안내판 소리 시험'); }
   else if(fx.kind==='call' || fx.kind==='autocall'){
     let c = fx.call;
-    if(fx.kind==='autocall'){ const pa = prepAhead(), b = upcoming(fx.ev,'blue',pa), r = upcoming(fx.ev,'red',pa); c = b && r ? { kind:'next', blue:b, red:r } : null; }
+    if(fx.kind==='autocall'){ const pa = prepAhead(), b = upcoming(fx.ev,'blue',pa), r = upcoming(fx.ev,'red',pa); c = b && r ? { kind:'next', blue:b, red:r, ahead:pa } : null; }
     if(c){
-      BOARD.callFx = { ev:fx.ev, kind:c.kind, blue:c.blue, red:c.red, start:now() };
-      if(sound){ const d = SND.dingdong(); if(cfg.callVoice) setTimeout(() => SND.speak(callText(c.blue, c.red, c.kind)), d*1000+200); }
+      const ahead = c.ahead != null ? c.ahead : (c.kind==='now' ? 0 : 1);
+      BOARD.callFx = { ev:fx.ev, kind:c.kind, blue:c.blue, red:c.red, ahead, start:now() };
+      if(sound){ const d = SND.dingdong(); if(cfg.callVoice) setTimeout(() => SND.speak(callText(c.blue, c.red, c.kind, ahead)), d*1000+200); }
       dur = voiceMs;
     } else dur = 0;
   } else if(fx.kind==='ccall'){
     const c = fx.c, T = boardTarget();
     // 그 종목 화면을 보고 있으면 위쪽 호출 띠로, 다른 화면이면 잠깐 화면 가득 띄움
-    if(T.kind==='team' && T.ev===c.event){ BOARD.ccFx = { ev:c.event, team:c.team, pid:c.pid, kind:c.kind, start:now() }; dur = voiceMs; }
+    if(T.kind==='team' && T.ev===c.event){ BOARD.ccFx = { ev:c.event, team:c.team, pid:c.pid, kind:c.kind, ahead:c.ahead, start:now() }; dur = voiceMs; }
     else { BOARD.overlay = { kind:'ccall', c, start:now() }; dur = 7000; }
     if(sound){ const d = SND.dingdong(); if(cfg.callVoice) setTimeout(() => SND.speak(ccallText(c)), d*1000+200); }
   } else if(fx.kind==='ann'){
@@ -208,11 +209,16 @@ function finishFx(){
     BOARD.queue.unshift({ kind:'autocall', ev:done.m.event });
   queueRender(); runFx();
 }
+// 호출 문구: 몇 번째 뒤 선수인지 함께 말함 (ahead 1 다음, 2 다다음, 3 세 번째 뒤). 이름을 골라 부른 경우처럼 모르면 '준비해 주세요'만
+const aheadWord = a => (a > 0 && AHEAD_LABEL[a]) ? AHEAD_LABEL[a] + ' 선수' : '';
+function callLabel(kind, ahead){ if(kind==='now') return '📣 지금 나와 주세요'; const w = aheadWord(ahead); return `📣 ${w ? w + ', ' : ''}준비해 주세요`; }
 function ccallText(c){
-  return `${teamName(c.team)} ${pname(c.pid)} 선수, ${c.kind==='now' ? '지금 경기장으로 나와 주세요.' : '준비해 주세요.'}`;
+  const w = c.kind==='now' ? '' : aheadWord(c.ahead);
+  return `${w ? w + ', ' : ''}${teamName(c.team)} ${pname(c.pid)} 선수, ${c.kind==='now' ? '지금 경기장으로 나와 주세요.' : '준비해 주세요.'}`;
 }
-function callText(blue, red, kind){
-  return `${teamName('blue')} ${pname(blue)}, ${teamName('red')} ${pname(red)} 선수, ${kind==='now' ? '지금 경기장으로 나와 주세요.' : '준비해 주세요.'}`;
+function callText(blue, red, kind, ahead){
+  const w = kind==='now' ? '' : aheadWord(ahead == null ? 1 : ahead);
+  return `${w ? w + ', ' : ''}${teamName('blue')} ${pname(blue)}, ${teamName('red')} ${pname(red)} 선수, ${kind==='now' ? '지금 경기장으로 나와 주세요.' : '준비해 주세요.'}`;
 }
 // 깜빡임: 다시 그려도 애니메이션이 처음부터 다시 시작되지 않게 시작 시각만큼 앞당김
 function flashAttr(start, dur=FLASH_MS){
@@ -238,7 +244,7 @@ function boardScreen(){
   const fixed = T.kind==='team' && TEAM[T.ev] && TEAM[T.ev].mode==='duel' && teamOpt(T.ev).board;     // 과녁판 중계 화면은 한 화면에 고정
   // PC·프로젝터 화면: 안내판 전체를 한 화면에 꼭 맞게 (글자 크기는 board-pc.js 가 화면 크기에 맞춰 정함)
   const key = T.kind + (T.ev || '') + (BOARD.person ? 'P' : '');
-  return `<div class="bd ${fixed?'bdfix':''}${pc?' bdpc':''}"${pc ? ` data-fit="1" data-fskey="${key}"${T.kind==='indiv' && !BOARD.person ? ' data-fsmax="44"' : ''}` : ''}>${annStrip}${body}</div>${boardOverlay()}${soundHint}`;
+  return `<div class="bd ${fixed?'bdfix':''}${pc?' bdpc':''}"${pc ? ` data-fit="1" data-fskey="${key}"${T.kind==='indiv' && !BOARD.person ? ' data-fsmax="44"' : ''}` : ''}>${pc ? body + annStrip : annStrip + body}</div>${boardOverlay()}${soundHint}`;
 }
 function boardTeam(ev){
   const E = TEAM[ev], t = tally(ev), tot = totalPoints(), n = matchesOf(ev).length + 1;
@@ -253,18 +259,21 @@ function boardTeam(ev){
   const pa = prepAhead(), pb = upcoming(ev,'blue',pa), pr = upcoming(ev,'red',pa);
   const cb = fx ? fx.blue : pb, cr = fx ? fx.red : pr, kind = fx ? fx.kind : 'next';
   const cc = BOARD.ccFx && BOARD.ccFx.ev===ev && now()-BOARD.ccFx.start < CALL_MS ? BOARD.ccFx : null;
-  const ccbar = cc ? `<div class="callbar one ${cc.kind==='now'?'now':''}"${flashAttr(cc.start)}><div class="cl">${cc.kind==='now' ? '📣 지금 나와 주세요' : '📣 준비해 주세요'}</div>
+  const ccbar = cc ? `<div class="callbar one ${cc.kind==='now'?'now':''}"${flashAttr(cc.start)}><div class="cl">${callLabel(cc.kind, cc.ahead)}</div>
       <div class="cp">${teamBadge(cc.team,true)}<b>${esc(teamName(cc.team))} ${esc(pname(cc.pid))}</b></div></div>` : '';
   const call = cb && cr ? `<div class="callbar ${kind==='now'?'now':''}"${fx ? flashAttr(fx.start) : ''}>
-      <div class="cl">${kind==='now' ? '📣 지금 나와 주세요' : '📣 준비해 주세요'}</div>
+      <div class="cl">${callLabel(kind, fx ? fx.ahead : pa)}</div>
       <div class="cp">${teamBadge('blue',true)}<b>${esc(pname(cb))}</b></div><div class="cp">${teamBadge('red',true)}<b>${esc(pname(cr))}</b></div></div>` : '';
   const ord = tm => orderFor(ev, tm);
-  const bp = (tm, id) => `<div class="bp ${tm}"><div class="lbl">${esc(teamName(tm))}${id?` ${ord(tm).indexOf(id)+1}번`:''}</div><div class="nm">${id?esc(pname(id)):'-'}</div></div>`;
+  const tg = teamOpt(ev).board, mk = tg ? marksOf(ev) : null;
+  const bp = (tm, id) => `<div class="bp ${tm}"><div class="lbl">${esc(teamName(tm))}${id?` ${ord(tm).indexOf(id)+1}번`:''}</div><div class="nm">${id?esc(pname(id)):'-'}</div>${mk ? `<div class="bcnt">던진 개수 <b>${markCount(mk, tm)}</b></div>` : ''}</div>`;
   // 다다음 선수를 부르는 경우, 그 사이의 다음 경기도 작게 보여 줌
   const nextLine = pa > 1 && b.next && r.next ? `<span class="bdnext">다음 경기 ${teamBadge('blue')} ${esc(pname(b.next))} · ${teamBadge('red')} ${esc(pname(r.next))}</span>` : '';
   // 과녁판 중계 종목: 지금 선수 옆(가로 화면) 또는 아래(세로 화면)에 과녁판을 크게 띄움
   const duelHtml = `<div class="bdvs">${bp('blue', b.cur)}<div class="vsm">VS</div>${bp('red', r.cur)}</div>`;
-  const mid = teamOpt(ev).board ? `<div class="bdsplit">${duelHtml}${tgtBoardHtml(ev)}</div>` : duelHtml;
+  const mid = tg ? `<div class="bdsplit">${duelHtml}${tgtBoardHtml(ev, { legend:false })}</div>` : duelHtml;
+  // PC·프로젝터(무대 위 높은 화면)는 호출 띠를 아래쪽에 둠
+  if(bdPC()) return head + `<div class="bdlabel">지금 경기${nextLine}</div>` + mid + foot + ccbar + call;
   return ccbar + call + head + `<div class="bdlabel">지금 경기${nextLine}</div>` + mid + foot;
 }
 function boardIndiv(){
@@ -322,7 +331,7 @@ function boardOverlay(){
   const o = BOARD.overlay; if(!o) return '';
   // PC·프로젝터 화면: 겹쳐 뜨는 화면도 글자 크기를 화면에 꼭 맞춤
   const pc = bdPC(), ca = k => pc ? ` bdpc" data-fit="1" data-fskey="ovl-${k}` : '';
-  if(o.kind==='ccall') return `<div class="ovl ccall ${o.c.team}${ca('ccall')}" data-a="bdDismiss"${flashAttr(o.start)}><div class="lbl">${o.c.kind==='now' ? '📣 지금 나와 주세요' : '📣 준비해 주세요'}</div>
+  if(o.kind==='ccall') return `<div class="ovl ccall ${o.c.team}${ca('ccall')}" data-a="bdDismiss"${flashAttr(o.start)}><div class="lbl">${callLabel(o.c.kind, o.c.ahead)}</div>
     <div class="who"><span class="tn">${esc(teamName(o.c.team))}</span></div><div class="nm">${esc(pname(o.c.pid))}</div><div class="ovev2">${EVENTS[o.c.event] ? `${EVENTS[o.c.event].icon} ${esc(EVENTS[o.c.event].name)}` : ''}</div></div>`;
   if(o.kind==='ann') return `<div class="ovl ann${ca('ann')}" data-a="bdDismiss"${flashAttr(o.start)}><div class="lbl">📢 안내</div><div class="txt">${esc(o.ann.text)}</div></div>`;
   const m = o.m, E = TEAM[m.event]; if(!E) return '';
@@ -332,7 +341,7 @@ function boardOverlay(){
   const tm = tmk => E.mode==='time' ? `<div class="tm">${fmtSec(tmk==='blue' ? m.blueTime : m.redTime)}초</div>` : '';
   const head = `<div class="ovev">${E.icon} ${esc(E.name)}</div>`;
   if(m.winner==='draw') return `<div class="ovl result${ca('result')}" data-a="bdDismiss">${head}<div class="half draw"${flashAttr(o.start)}><div class="big">무승부</div>${osc}</div>
-    <div class="half draw2"><div class="pair">${teamBadge('blue',true)} ${nm('blue')} ${tm('blue')}<span class="vsm">·</span>${teamBadge('red',true)} ${nm('red')} ${tm('red')}</div></div></div>`;
+    <div class="half draw2"><div class="dpair">${TEAM_KEYS.map(k => `<div class="dp ${k}"><div class="dl">${esc(teamName(k))}</div>${nm(k) ? `<div class="nm">${nm(k)}</div>` : ''}${tm(k)}</div>`).join('')}</div></div></div>`;
   const w = m.winner, l = w==='blue' ? 'red' : 'blue';
   return `<div class="ovl result${ca('result')}" data-a="bdDismiss">${head}
     <div class="half win ${w}"${flashAttr(o.start)}><div class="big">🏆 ${esc(teamName(w))} 승리</div>${nm(w)?`<div class="nm">${nm(w)}</div>`:''}${tm(w)}${osc}</div>

@@ -1472,3 +1472,31 @@ body.nocursor,body.nocursor *{cursor:none!important}
 .ovl.ccall.bdpc .who{font-size:calc(var(--fs)*1.8)}
 .ovl.ccall.bdpc .nm{font-size:calc(var(--fs)*5.4)}
 .ovl.ccall.bdpc .ovev2{font-size:calc(var(--fs)*1.2)}
+
+/* ---------- 2026-10-27: 무승부 화면 · 과녁판 화면 배치 ---------- */
+/* 무승부: 아래 칸에 두 선수를 팀 색 상자로 나란히 */
+.ovl .dpair{display:flex;gap:3vw;width:100%;justify-content:center;align-items:stretch}
+.ovl .dp{flex:1;max-width:44vw;border:6px solid;border-radius:24px;padding:2vh 2vw;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6vh;text-align:center}
+.ovl .dp.blue{background:var(--blue-soft);border-color:var(--blue)} .ovl .dp.red{background:var(--red-soft);border-color:var(--red)}
+.ovl .dp .dl{font-size:clamp(24px,5vh,56px);font-weight:900;line-height:1.2}
+.ovl .dp.blue .dl{color:var(--blue-ink)} .ovl .dp.red .dl{color:var(--red-ink)}
+.ovl .dp .nm{word-break:keep-all}
+.ovl.bdpc .dpair{gap:calc(var(--fs)*1.2)} .ovl.bdpc .dp{padding:calc(var(--fs)*.5) calc(var(--fs)*.8);border-width:max(3px,calc(var(--fs)*.2));border-radius:calc(var(--fs)*.8)}
+.ovl.bdpc .dp .dl{font-size:calc(var(--fs)*1.8)}
+/* 과녁판 종목: 던진 개수는 선수 칸 안에, 과녁 아래 범례가 없으니 과녁을 높이만큼 크게 */
+.bp .bcnt{font-size:clamp(16px,3vh,30px);font-weight:800;color:var(--sub);line-height:1.2}
+.bp .bcnt b{font-size:1.35em;color:var(--ink);margin-left:.2em}
+.bdpc .bp .bcnt{font-size:calc(var(--fs)*1.1)}
+.bdtg.nolg{--lg:0px}
+@media (min-width:761px) and (orientation:landscape){
+  .bdsplit .bdvs{flex:1 1 0;min-width:0}
+  .bdsplit .bp .nm{font-size:clamp(34px,8vh,96px)}
+  .bdtg.nolg{width:max(120px, min(64cqw, 100cqh))}
+  /* 태블릿: 호출 띠를 한 줄로 얇게 해서 과녁에 높이를 줌 */
+  .bd.bdfix:not(.bdpc) .callbar{padding:6px 18px;border-width:4px;gap:6px 24px;flex-wrap:nowrap}
+  .bd.bdfix:not(.bdpc) .callbar .cl{font-size:clamp(20px,3.6vh,36px)}
+  .bd.bdfix:not(.bdpc) .callbar .cp{font-size:clamp(28px,5.4vh,56px)}
+  .bd.bdfix:not(.bdpc) .callbar .tb.big{width:clamp(34px,6vh,56px);height:clamp(34px,6vh,56px);font-size:clamp(18px,3.4vh,32px)}
+  .bd.bdfix:not(.bdpc) .bdhead h1{font-size:clamp(24px,4.2vh,44px)}
+  .bd.bdfix:not(.bdpc) .bscore .n{font-size:clamp(32px,6vh,60px)}
+}

@@ -56,10 +56,10 @@ function targetPanel(ev, editable){
   return `<div class="tgtpanel gtgt">${head}<div class="tgtwrap">${tgtBox(ev, { list:mk.list, interactive:editable, edit, sel })}</div>${acts}${hint}</div>`;
 }
 // 안내판: 과녁판 + 팀별 개수. 방금 찍힌 표시는 잠깐 커졌다 작아짐
-function tgtBoardHtml(ev){
+function tgtBoardHtml(ev, o = {}){
   const mk = marksOf(ev), fresh = mk.addAt && now() - mk.addAt < 5000;
-  return `<div class="bdtg">${tgtBox(ev, { list:mk.list, board:true, pulseN: fresh ? mk.addN : 0, pulseAt: mk.addAt })}
-    <div class="tglegend"><span class="blue">${teamBadge('blue')} ${esc(teamName('blue'))} ${markCount(mk,'blue')}개</span><span class="red">${teamBadge('red')} ${esc(teamName('red'))} ${markCount(mk,'red')}개</span></div></div>`;
+  return `<div class="bdtg${o.legend===false ? ' nolg' : ''}">${tgtBox(ev, { list:mk.list, board:true, pulseN: fresh ? mk.addN : 0, pulseAt: mk.addAt })}
+    ${o.legend===false ? '' : `<div class="tglegend"><span class="blue">${teamBadge('blue')} ${esc(teamName('blue'))} ${markCount(mk,'blue')}개</span><span class="red">${teamBadge('red')} ${esc(teamName('red'))} ${markCount(mk,'red')}개</span></div>`}</div>`;
 }
 
 /* ---------- 표시 저장 ---------- */

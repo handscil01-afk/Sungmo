@@ -70,11 +70,11 @@ function ccallSheet(){
     <p class="sub">누르면 안내판에 소리와 함께 "${esc(teamName(team))} ○○○ 준비해 주세요"가 뜹니다. 이름을 눌러 고른 선수는 "준비해 주세요"로 부릅니다.</p>
     <button class="btn wide" data-a="closeSheet">닫기</button>`;
 }
-function ccall(pid, kind){
+function ccall(pid, kind, ahead){
   const ev = UI.ev, team = CC.team;
   if(!can.ccall(team)) return denied();
   if(!ORDER_EVENTS.includes(ev) || !pid){ toast('부를 선수가 없습니다.'); return Promise.resolve(false); }
-  return put(['main','ccalls',`${ev}_${team}`], { event:ev, team, pid, kind, at:now(), by:UI.me }, false)
+  return put(['main','ccalls',`${ev}_${team}`], { event:ev, team, pid, kind, ...(ahead != null ? { ahead } : {}), at:now(), by:UI.me }, false)
     .then(ok => { if(ok) toast(`안내판에 ${pname(pid)} 선수를 불렀습니다.`); return ok; });
 }
 function saveOrder(ev, team, list){
@@ -160,7 +160,7 @@ document.addEventListener('click', e => { if(now()-DRAG.suppress < 400 && e.targ
 
 Object.assign(ACT, {
   coachCall: () => { const team = myRole().coach || UI.orderTab || 'blue'; if(!can.ccall(team)) return denied(); CC.team = team; openSheet(ccallSheet); return false; },
-  ccallPlay: async (el, v) => { const k = +v, id = upcoming(UI.ev, CC.team, k); if(await ccall(id, k ? 'next' : 'now')) closeSheet(); return false; },
+  ccallPlay: async (el, v) => { const k = +v, id = upcoming(UI.ev, CC.team, k); if(await ccall(id, k ? 'next' : 'now', k)) closeSheet(); return false; },
   ccallPick: async (el, v) => { if(await ccall(v, 'next')) closeSheet(); return false; },
   coachTab: (el, v) => { UI.coachTab = v; },
   orderTab: (el, v) => { UI.orderTab = v; },

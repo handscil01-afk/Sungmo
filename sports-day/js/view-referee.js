@@ -473,7 +473,7 @@ Object.assign(ACT, {
   callPlayers: (el, v) => { const ev=UI.ev; if(!can.record(ev)) return denied();
     const k = v==='now' ? 0 : v==='next' ? 1 : (+v || 0), b = upcoming(ev,'blue',k), r = upcoming(ev,'red',k);
     if(!b || !r){ toast('부를 선수가 없습니다.'); return false; }
-    put(['main','calls',ev], { call:{ at:now(), kind: k ? 'next' : 'now', blue:b, red:r, by:UI.me } }); closeSheet();
+    put(['main','calls',ev], { call:{ at:now(), kind: k ? 'next' : 'now', ahead:k, blue:b, red:r, by:UI.me } }); closeSheet();
     toast(`안내판에 ${pname(b)} · ${pname(r)} 선수를 불렀습니다.`); return false; },
   listSheet: (el, v) => { listTab = v || (TEAM[UI.ev].mode==='round' ? 'rec' : 'order'); openSheet(listSheet); return false; },
   listTab: (el, v) => { listTab = v; drawSheet(); return false; },
