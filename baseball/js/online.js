@@ -81,7 +81,7 @@ function cfgSummary(){
   const me = SET.name || '나', peer = NET.peer ? NET.peer.name : '상대';
   const hostName = NET.role === 'host' ? me : peer, guestName = NET.role === 'host' ? (NET.peer ? peer : '손님') : me;
   const order = s => s === 0 ? '먼저 공격' : '나중에 공격';
-  return [`${c.mode === 'simple' ? '간단' : '정밀'} 모드, ${c.innings}이닝 경기입니다.`,
+  return [`${MODE_NAME[c.mode] || '정밀 모드'}, ${c.innings}이닝 경기입니다.`,
     `${hostName}: ${teamLabel(c.hostTeam)}, ${order(c.hostSide)}.`,
     `${guestName}: ${teamLabel(c.guestTeam)}, ${order(1 - c.hostSide)}.`];
 }
@@ -124,20 +124,26 @@ function netStartGame(via){
 // gameNext의 온라인 판: 방장은 상태를 보내고, 둘 다 "내 차례면 메뉴, 아니면 기다림"
 function netNext(via, res, lines){
   if(NET.role === 'host' && res) netPushState(res);
-  const key = G ? `${G.at}|${G.half}|${G.pa}|${G.over}` : '';
+  const key = G ? `${G.at}|${G.half}|${G.pa}|${G.over}|${G.pre ? G.pre.ready.join() : ''}` : '';
   // 채팅·명단 같은 화면을 보는 중에 결과가 오면, 같은 타석 안에서는 화면을 바꾸지 않고 읽어만 줌
   if(via === 'auto' && UI.S && (UI.S.sub || !UI.S.board) && NET.key === key && UI.make !== lobbyScreen){
     rerender(); if(lines.length) speak(lines.map(l => l.s || l).join(' ')); return;
   }
   NET.key = key;
   if(G.over){ GS.auto = null; go(endScreen, via, lines); return; }
+  if(G.pre){
+    if(!G.pre.ready[NET.side]){ go(() => pregameScreen(NET.side), via, lines); return; }
+    go(() => ({ board:true, q:`준비를 마쳤습니다. ${NET.peer ? NET.peer.name + '님' : '상대'}이 준비하기를 기다립니다.`, opts:[
+      { n:1, t:'채팅과 음성 대화', act: v => go(talkScreen, v) }, { n:6, t:'상대 팀 보기', act: v => go(() => rosterScreen(1 - NET.side), v) }] }), via, lines);
+    return;
+  }
   if(GS.auto && autoDone()) GS.auto = null;
   const my = NET.side, def = 1 - batIdx(G), role = my === def ? 'def' : 'off';
   const chosen = NET.role === 'host' ? !!GS.pend[role] : (NET.sent || !!(NET.pend && NET.pend[my]));
   if(chosen){ go(waitScreen, via, lines); return; }
   if(GS.auto && GS.auto.side === my){
     go(waitScreen, via, lines);
-    const c = G.mode === 'detail' ? (role === 'def' ? aiPitch(G) : aiBat(G)) : (role === 'def' ? aiSimpleDef(G) : aiSimpleOff(G));
+    const c = role === 'def' ? aiDefChoice(G) : aiOffChoice(G);
     setTimeout(() => { if(G && !G.over && NET.on) submit(role, c, 'auto'); }, 300);
     return;
   }
@@ -198,16 +204,42 @@ function onAct(v){
   if(a.k === 'choice'){
     if(a.role !== role || GS.pend[role]) return;   // 차례가 아니거나 이미 받음
     let c = a.c;
-    if(G.mode === 'detail'){ if(role === 'def' ? !VALID_PITCH(c) : !VALID_BAT(c)) return; c = role === 'def' ? (c.k === 'ibb' ? { k:'ibb' } : { k:'pitch', t:c.t, r:c.r, c:c.c, e:c.e, w:c.w }) : { k:c.k, g:c.g ?? null }; }
+    if(G.mode === 'manager'){
+      if(!c || !(role === 'def' ? ORDER_DEF : ORDER_OFF)[c.k]) return;
+      if((c.k === 'steal' || c.k === 'hitrun') && !canSteal(G)) return;
+      c = { k:c.k };
+    }
+    else if(G.mode === 'detail'){ if(role === 'def' ? !VALID_PITCH(c) : !VALID_BAT(c)) return; c = role === 'def' ? (c.k === 'ibb' ? { k:'ibb' } : { k:'pitch', t:c.t, r:c.r, c:c.c, e:c.e, w:c.w }) : { k:c.k, g:c.g ?? null }; }
     else if(!(role === 'def' ? ['attack', 'nibble', 'ibb'] : ['power', 'normal', 'contact', 'bunt']).includes(c)) return;
     GS.pend[role] = c;
     if(!tryResolve('auto')) netPushState(null);
     return;
   }
-  if(a.k === 'align' && role === 'def' && G.mode === 'detail' && [0, 1, 2].includes(a.inf) && [0, 1, 2].includes(a.of)){
+  // 감독 모드 경기 전 준비: 손님은 자기 팀만
+  if(G.pre){
+    if(G.pre.ready[side]) return;
+    let r = null;
+    if(a.k === 'ready'){ G.pre.ready[side] = true; if(G.pre.ready.every(Boolean)) beginGame(G); r = flush(G); }
+    else if(a.k === 'lineup'){
+      const T = G.teams[side], ok9 = i => Number.isInteger(i) && i >= 0 && i < 9;
+      if(a.a === 'rec') r = recommendLineup(G, side);
+      else if(a.a === 'swap' && ok9(a.i) && ok9(a.j) && a.i !== a.j) r = swapOrder(G, side, a.i, a.j);
+      else if(a.a === 'bench' && ok9(a.slot) && T.bench[a.b]) r = useBench(G, side, a.slot, a.b, 'pre');
+      else if(a.a === 'starter' && T.pit[a.idx]) r = setStarter(G, side, a.idx);
+    }
+    if(r) gameNext('auto', r);
+    return;
+  }
+  if(a.k === 'ph' && role === 'off' && G.mode === 'manager' && G.pitchNo === 0 && G.teams[side].bench[a.b]){
+    const r = useBench(G, side, G.teams[side].bi, a.b, 'ph'); gameNext('auto', r); return;
+  }
+  if(a.k === 'pr' && role === 'off' && G.mode === 'manager' && G.bases.includes(a.slot) && G.teams[side].bench[a.b]){
+    const r = useBench(G, side, a.slot, a.b, 'pr'); gameNext('auto', r); return;
+  }
+  if(a.k === 'align' && role === 'def' && detailed(G) && [0, 1, 2].includes(a.inf) && [0, 1, 2].includes(a.of)){
     const r = setAlign(G, side, a.inf, a.of); gameNext('auto', r); return;
   }
-  if(a.k === 'pitcher' && role === 'def' && G.mode === 'detail' && G.teams[side].pit[a.idx] && !G.teams[side].pit[a.idx].used){
+  if(a.k === 'pitcher' && role === 'def' && detailed(G) && G.teams[side].pit[a.idx] && !G.teams[side].pit[a.idx].used){
     const r = changePitcher(G, side, a.idx); gameNext('auto', r); return;
   }
   if(a.k === 'steal' && role === 'off' && G.mode === 'simple' && canSteal(G)){

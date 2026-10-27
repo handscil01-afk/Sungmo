@@ -13,8 +13,7 @@ function run(mode){
     let guard = 0;
     while(!G.over){
       if(++guard > 5000) throw new Error('끝나지 않는 경기 ' + n);
-      if(mode === 'detail') playPitch(G, aiPitch(G), aiBat(G));
-      else playSimple(G, aiSimpleDef(G), aiSimpleOff(G));
+      playStep(G, aiDefChoice(G), aiOffChoice(G));
       // 규칙 확인
       const on = G.bases.filter(x => x != null);
       if(new Set(on).size !== on.length) throw new Error('같은 주자가 두 베이스에: ' + JSON.stringify(G.bases) + ' 경기 ' + n);
@@ -39,3 +38,4 @@ function run(mode){
 }
 run('detail');
 run('simple');
+run('manager');

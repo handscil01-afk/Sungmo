@@ -144,6 +144,7 @@ async function netLeave(){
 // 방장: 경기 상태를 보냄. pend: 팀마다 이미 고른 선택이 방장 기기에 있는지(무엇을 골랐는지는 보내지 않음)
 function netPushState(res){
   if(!NET.on || NET.role !== 'host' || !G) return;
+  if(NET.gidPushed !== G.at){ NET.gidPushed = G.at; NET.pushedN = 0; }
   const F = FB, { R } = F;
   const c = JSON.parse(JSON.stringify(G, (k, v) => (k === 'log' || k === 'rng' || k === 'out' || k === 'fx' || k === 'names' || k === 'prevTypes') ? undefined : v));
   c.teams[NET.side].lastSel = null;   // 방장이 겨냥했던 곳은 보내지 않음
@@ -152,7 +153,12 @@ function netPushState(res){
   const off = batIdx(G), def = 1 - off;
   pend[def] = !!GS.pend.def; pend[off] = !!GS.pend.off;
   NET.stN++;
-  const st = { n: NET.stN, gid: G.at, g, tail: JSON.stringify(G.log.slice(-40)), fx: JSON.stringify(res ? res.fx : []), pend, at: F.TS };
+  // 지난번에 보낸 뒤로 생긴 문장을 모두 보냄 (감독 모드는 여러 타석이 한꺼번에 진행됨). 다시 들어온 손님을 위해 최근 40줄은 늘 붙임
+  const recent = G.log.length > 40 ? G.log[G.log.length - 41].n : 0;
+  const from = Math.min(NET.pushedN || 0, recent);
+  const tail = G.log.filter(l => l.n > from).slice(-300);
+  NET.pushedN = G.log.length ? G.log[G.log.length - 1].n : 0;
+  const st = { n: NET.stN, gid: G.at, g, tail: JSON.stringify(tail), fx: JSON.stringify(res ? res.fx : []), pend, at: F.TS };
   R.set(F.ref(NET.code + '/state'), st).catch(e => netNotice(netErr(e)));
   ls.set('bb_netg', { code: NET.code, G, opts: GS.opts });
 }

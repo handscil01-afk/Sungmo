@@ -12,8 +12,9 @@ const ls = {
 // fs: 글자 크기 · theme: 화면 색 · voice: 읽어 주기(sr 화면 낭독기 · tts 기기 음성 · off) · dice: 판정 과정 보기
 // pad: 코스 키패드 배열(phone 1 2 3이 위 · pc 7 8 9가 위) · snd: 효과음 · vib: 진동 · quick: 명령 칸에서 숫자를 누르면 바로 고르기
 // name: 온라인 대전에서 쓰는 내 이름 · chatRead: 받은 채팅 읽어 주기 · vmode: 음성 대화 방식(call 통화 · ptt 무전기)
+// mgrAsk: 감독 모드에서 작전을 묻는 때(key 중요한 순간만 · every 매 타석) · mgrPitch: 감독 모드에서 공 하나하나 읽기
 // watch: 관전 자동 재생 간격(초) · autoFS: 자동 전체화면 · installDismissed: 설치 안내 배너를 닫았는지
-const SET_DEF = { fs:1, theme:'dark', voice:'sr', dice:false, pad:'phone', snd:true, vib:true, quick:true, watch:4, autoFS:true, installDismissed:false, rate:1, name:'', chatRead:true, vmode:'call' };
+const SET_DEF = { fs:1, theme:'dark', voice:'sr', dice:false, pad:'phone', snd:true, vib:true, quick:true, watch:4, autoFS:true, installDismissed:false, rate:1, name:'', chatRead:true, vmode:'call', mgrAsk:'key', mgrPitch:false };
 const SET = { ...SET_DEF, ...ls.get('bb_set', {}) };
 const saveSet = () => ls.set('bb_set', SET);
 function applySet(){

@@ -92,6 +92,35 @@ const PORT = 8766;
       }
       if(!(await q(page)).includes('경기가 끝났습니다')) errors.push('둘이 하기 정밀이 끝나지 않음');
       console.log(`${name}: 둘이 하기 정밀 끝, 기기 넘기기 ${hand}번`);
+      // 감독 모드 혼자 하기 3이닝: 경기 전 준비(추천 타순, 순서 바꾸기, 벤치, 선발) 뒤 무작위 작전
+      await page.keyboard.press('4');
+      for(const k of ['1', '3', '1', '1', '1', '2', '2', '1']) await page.keyboard.press(k);
+      if(!(await q(page)).includes('타순과 선발 투수')) errors.push('감독 모드 경기 전 준비 화면이 아님: ' + await q(page));
+      await shot(page, `${name}-pregame`);
+      for(const k of ['2', '3', '1', '2', '4', '1', '3', '5', '2']) await page.keyboard.press(k);
+      const lineupLog = await page.evaluate(() => G.log.filter(l => l.k === 'c').map(l => l.s).join(' / '));
+      console.log('경기 전 변경:', lineupLog);
+      await page.keyboard.press('1');
+      await shot(page, `${name}-manager`);
+      const asked = [];
+      for(let i = 0; i < 3000; i++){
+        const qq = await q(page);
+        if(qq.includes('경기가 끝났습니다')) break;
+        if(/작전/.test(qq)) asked.push(qq.slice(0, 12));
+        const os = (await opts(page)).filter(o => !/더 보기|설정|그만하기|처음 화면/.test(o.t));
+        if(!os.length){ await page.keyboard.press('.'); continue; }
+        const o = os[Math.floor(Math.random() * os.length)];
+        await page.keyboard.press(o.n);
+      }
+      if(!(await q(page)).includes('경기가 끝났습니다')) errors.push('감독 모드가 끝나지 않음');
+      console.log(`${name}: 감독 모드 끝, 작전을 물은 횟수 ${asked.length}`);
+      await shot(page, `${name}-manager-end`);
+      // 감독 모드 관전
+      await page.keyboard.press('4');
+      for(const k of ['4', '3', '3', '4', '2', '1']) await page.keyboard.press(k);
+      await page.keyboard.press('4');
+      await page.waitForFunction(() => document.querySelector('#q').textContent.includes('경기가 끝났습니다'));
+      console.log(`${name}: 감독 모드 관전 끝`);
     }
     // 설정 화면: 글자 크기·화면 색 바꾸기
     await page.keyboard.press('4');

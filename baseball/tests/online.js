@@ -32,7 +32,7 @@ const PORT = 8769, URL0 = `http://localhost:${PORT}/baseball/?emu=1`;
   await host.keyboard.press('3'); await host.keyboard.press('1');
   await waitQ(host, /이름을/); await say(host, '센터장');
   await waitQ(host, /어떤 방식/);
-  for(const k of [mode === 'simple' ? '1' : '2', '1', '1', '1', '1']) await host.keyboard.press(k);
+  for(const k of [{ simple:'1', detail:'2', manager:'3' }[mode], '1', '1', '1', '1']) await host.keyboard.press(k);
   await waitQ(host, /방 코드는/);
   const code = await host.evaluate(() => NET.code);
   console.log('방 코드', code);
@@ -77,9 +77,9 @@ const PORT = 8769, URL0 = `http://localhost:${PORT}/baseball/?emu=1`;
 
   // 경기 시작 → 양쪽이 무작위로 골라 끝까지
   await waitQ(host, /경기를 시작할까요/); await host.keyboard.press('1');
-  await waitQ(guest, /어떻게|어떤 공|고르는 중/);
+  await waitQ(guest, /어떻게|어떤 공|고르는 중|타순과/);
   await shot(host, 'on-host-game'); await shot(guest, 'on-guest-game');
-  const skip = /더 보기|채팅|설정|나가기|닫기|작전|노림수|맡기기|수비 위치/;
+  const skip = mode === 'manager' ? /더 보기|채팅|설정|나가기|닫기|상대 팀 보기/ : /더 보기|채팅|설정|나가기|닫기|작전|노림수|맡기기|수비 위치/;
   let steps = 0;
   for(; steps < 3000; steps++){
     const [qh, qg] = [await q(host), await q(guest)];
@@ -87,7 +87,7 @@ const PORT = 8769, URL0 = `http://localhost:${PORT}/baseball/?emu=1`;
     let moved = false;
     for(const p of [host, guest]){
       const qq = p === host ? qh : qg;
-      if(/고르는 중|끝났습니다|시작하기를/.test(qq)) continue;
+      if(/고르는 중|끝났습니다|시작하기를|준비하기를/.test(qq)) continue;
       const os = (await p.$$eval('#opts .opt', els => els.map(e => ({ n:e.dataset.n, t:e.querySelector('b').textContent })))).filter(o => !skip.test(o.t));
       if(!os.length){ await p.keyboard.press('.'); continue; }
       await p.keyboard.press(os[Math.floor(Math.random() * os.length)].n); moved = true;
@@ -102,13 +102,12 @@ const PORT = 8769, URL0 = `http://localhost:${PORT}/baseball/?emu=1`;
 
   // 한 판 더 → 새 경기가 손님에게도 시작됨
   await host.keyboard.press('1');
-  await waitQ(guest, /어떻게|어떤 공|고르는 중/);
+  await waitQ(guest, /어떻게|어떤 공|고르는 중|타순과/);
   console.log('한 판 더 시작됨');
 
   // 손님이 방에서 나감 → 방장에게 알림
+  await guest.click('#menuBtn'); await waitQ(guest, /더 보기/);
   await guest.keyboard.press('9');
-  const more = await q(guest);
-  if(/더 보기/.test(more)) { await guest.keyboard.press('9'); }
   await guest.waitForSelector('#dlg.open'); await guest.click('#dlg [data-dlg="0"]');
   await waitQ(guest, /무엇을 할까요/);
   await host.waitForFunction(() => !NET.peer, null, { timeout:8000 });

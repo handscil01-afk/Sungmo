@@ -45,7 +45,7 @@ function boardHTML(){
   const dots = (n, max, cls) => Array.from({ length:max }, (_, i) => `<i class="${i < n ? 'on ' + cls : ''}"></i>`).join('');
   const base = i => G.bases[i] != null ? 'on' : '';
   let zone = '';
-  if(G.mode === 'detail'){
+  if(detailed(G)){
     const L = G.lastLoc, dot = L && G.pitchNo ? `<circle cx="${50 + clamp(L.x, -1.9, 1.9) * 25}" cy="${50 - clamp(L.y, -1.9, 1.9) * 25}" r="6" class="ball"/>` : '';
     zone = `<svg class="zone" viewBox="0 0 100 100"><rect x="25" y="25" width="50" height="50" class="zr"/>
       <path d="M41.7 25V75M58.3 25V75M25 41.7H75M25 58.3H75" class="zl"/>${dot}</svg>`;
@@ -62,12 +62,12 @@ function boardHTML(){
       <div class="cnt"><div><span>B</span>${dots(G.balls, 3, 'g')}</div><div><span>S</span>${dots(G.strikes, 2, 'y')}</div><div><span>O</span>${dots(G.outs, 2, 'r')}</div></div>
       ${zone}
     </div>
-    ${G.over ? '' : `<div class="who"><span>타자 ${esc(B.name)} <small>${T.bi + 1}번${G.mode === 'detail' ? ' · ' + (B.hand === 'L' ? '좌' : '우') : ''}</small></span><span>투수 ${esc(P.name)} <small>${P.n}구</small></span></div>`}
+    ${G.over ? '' : `<div class="who"><span>타자 ${esc(B.name)} <small>${T.bi + 1}번${detailed(G) ? ' · ' + (B.hand === 'L' ? '좌' : '우') : ''}</small></span><span>투수 ${esc(P.name)} <small>${P.n}구</small></span></div>`}
   </div><p id="sit" class="sr-only">${esc(situation(G))}</p>`;
 }
 function gameStatus(){
   const out = [situation(G)];
-  if(G.mode === 'detail'){
+  if(detailed(G)){
     const F = fieldTeam(G);
     out.push(`수비 위치: 내야 ${ALIGN_IN[F.align.inf]}, 외야 ${ALIGN_OUT[F.align.of]}. 날씨: ${windText(G)}.`);
   }
@@ -84,11 +84,14 @@ function recentLines(n){ return G.log.filter(l => l.k !== 'd' || SET.dice).slice
 /* ---------- 진행 ---------- */
 // 결과(res)를 보여 주고, 다음에 누가 무엇을 골라야 하는지 정함
 function gameNext(via, res){
+  // 감독 모드: 묻지 않는 타석은 바로 진행하고 결과를 모음 (온라인 손님은 방장이 계산)
+  if(G.mode === 'manager' && !(NET.on && NET.role === 'guest')) res = mgrAuto(res);
   if(res){ playFx(res.fx); }
   const lines = visible(res ? res.lines : []);
   if(NET.on){ netNext(via, res, lines); return; }
   saveGame();
   if(G.over){ ls.del('bb_game'); go(endScreen, via, lines); return; }
+  if(G.pre){ const ti = [0, 1].find(t => !G.pre.ready[t] && needs(t)); go(() => pregameScreen(ti), via, lines); return; }
   if(GS.auto && autoDone()) GS.auto = null;
   const off = batIdx(G), def = 1 - off;
   if(GS.auto && !needs(off) && !needs(def)){ // 혼자 하기에서 맡겨 둔 동안은 바로 끝까지 진행
@@ -112,11 +115,7 @@ function autoDone(){
   if(a.scope === 'half') return G.half !== a.half;
   return false;
 }
-function stepAI(){
-  const P = G.mode === 'detail' ? aiPitch(G) : aiSimpleDef(G);
-  const B = G.mode === 'detail' ? aiBat(G) : aiSimpleOff(G);
-  return G.mode === 'detail' ? playPitch(G, P, B) : playSimple(G, P, B);
-}
+function stepAI(){ return playStep(G, aiDefChoice(G), aiOffChoice(G)); }
 function runSteps(stop){
   const acc = { lines:[], fx:[] }; let guard = 0;
   while(!G.over && !stop() && guard++ < 4000){ const r = stepAI(); acc.lines.push(...r.lines); acc.fx.push(...r.fx); }
@@ -135,10 +134,10 @@ function tryResolve(via){
   const off = batIdx(G), def = 1 - off;
   if(!GS.pend.def && (needs(def) || remote(def))) return false;
   if(!GS.pend.off && (needs(off) || remote(off))) return false;
-  const D = GS.pend.def || (G.mode === 'detail' ? aiPitch(G) : aiSimpleDef(G));
-  const O = GS.pend.off || (G.mode === 'detail' ? aiBat(G) : aiSimpleOff(G));
+  const D = GS.pend.def || aiDefChoice(G);
+  const O = GS.pend.off || aiOffChoice(G);
   GS.pend = { def:null, off:null };
-  const res = G.mode === 'detail' ? playPitch(G, D, O) : playSimple(G, D, O);
+  const res = playStep(G, D, O);
   gameNext(via, res);
   return true;
 }
@@ -152,8 +151,8 @@ function delegate(scope, via){
   if(twoP()){
     // 둘이 하기: 맡긴 쪽만 컴퓨터가 고르고, 상대는 계속 직접 고름
     const off = batIdx(G), def = 1 - off;
-    if(ti === def){ submit('def', G.mode === 'detail' ? aiPitch(G) : aiSimpleDef(G), via); }
-    else submit('off', G.mode === 'detail' ? aiBat(G) : aiSimpleOff(G), via);
+    if(ti === def) submit('def', aiDefChoice(G), via);
+    else submit('off', aiOffChoice(G), via);
     return;
   }
   gameNext(via, { lines:[{ s: scope === 'pa' ? '이번 타석을 맡깁니다.' : scope === 'half' ? '이번 이닝을 맡깁니다.' : '이번 공을 맡깁니다.', k:'c' }], fx:[] });
@@ -170,6 +169,7 @@ function handoffScreen(ti){
 /* ---------- 수비 (정밀 모드) ---------- */
 function defMain(){
   if(G.mode === 'simple') return simpleDef();
+  if(G.mode === 'manager') return mgrDef();
   const ti = 1 - batIdx(G), T = G.teams[ti], P = curPitcher(G), B = curBatter(G);
   const last = T.lastSel && T.lastSel.k === 'pitch' && P.pitches.some(x => x.t === T.lastSel.t) ? T.lastSel : null;
   const opts = P.pitches.map((x, i) => ({ n: i + 1, t: PITCH[x.t].name, s: `${gradeWord(x.g)} · 보통 세기로 약 ${expVel(P, x.t, 2)}킬로`, act: v => { GS.sel = { k:'pitch', t:x.t }; go(locScreen, v); } }));
@@ -234,13 +234,14 @@ function bullpenScreen(){
   const opts = benchPitchers(G, ti).slice(0, 8).map((x, i) => ({ n: i + 1, t: x.p.name, s: pitcherInfo(G, T, x.i, true), act: v => {
     if(NET.on && NET.role === 'guest'){ netSendAct({ k:'pitcher', idx:x.i }); go(defMain, v, [`투수를 ${josa(x.p.name, '으로', '로')} 바꿉니다.`]); return; }
     const r = changePitcher(G, ti, x.i); saveGame(); if(NET.on) netPushState(r); go(defMain, v, visible(r.lines)); } }));
-  return { board:true, sub:true, q:'누구로 바꿀까요?', opts, back: v => go(tacticScreen, v) };
+  return { board:true, sub:true, q:'누구로 바꿀까요?', opts, back: v => go(G.mode === 'manager' ? defMain : tacticScreen, v) };
 }
 
 /* ---------- 공격 (정밀 모드) ---------- */
 const GUESS = { fast:'직구 계열 노리기', break:'변화구 노리기' };
 function offMain(){
   if(G.mode === 'simple') return simpleOff();
+  if(G.mode === 'manager') return mgrOff();
   const ti = batIdx(G), T = G.teams[ti], B = curBatter(G), bs = G.bases;
   if(GS.guessPA !== G.pa){ GS.guess = null; GS.guessPA = G.pa; }
   const g = GS.guess;
@@ -306,8 +307,13 @@ function moreScreen(){
     { n:3, t:`${A.short} 명단`, act: v => go(() => rosterScreen(0), v) },
     { n:4, t:`${H.short} 명단`, act: v => go(() => rosterScreen(1), v) },
     { n:5, t: NET.on ? '채팅과 음성 대화' : '최근 기록', s: NET.on ? voiceLabel() : '최근 12줄', act: v => NET.on ? go(talkScreen, v) : note(recentLines(12), v) },
-    { n:6, t:'이번 타석 맡기기', hide: !playing || G.over, s:'이번 타석이 끝날 때까지 컴퓨터가 대신 고릅니다.', act: v => delegate('pa', v) },
-    { n:7, t:'이번 이닝 맡기기', hide: !playing || twoP() || G.over, s: NET.on ? '이번 이닝이 끝날 때까지 컴퓨터가 내 팀을 대신 고릅니다.' : '이번 이닝이 끝날 때까지 컴퓨터가 대신 고르고, 결과만 알려 줍니다.', act: v => delegate('half', v) },
+    { n:6, t:`작전을 묻는 때: ${SET.mgrAsk === 'every' ? '매 타석' : '중요한 순간만'}`, hide: G.mode !== 'manager' || (NET.on && NET.role === 'guest'),
+      s:'중요한 순간: 득점권에 주자가 있을 때, 무사 1루, 경기 후반 접전, 투수가 지쳤을 때.' + (NET.on ? ' 온라인에서는 두 사람 모두에게 적용됩니다.' : ''),
+      act: () => { SET.mgrAsk = SET.mgrAsk === 'every' ? 'key' : 'every'; saveSet(); stay(`작전을 묻는 때: ${SET.mgrAsk === 'every' ? '매 타석' : '중요한 순간만'}`); } },
+    { n:7, t:`중계: ${SET.mgrPitch ? '공 하나하나' : '타석 결과만'}`, hide: G.mode !== 'manager',
+      act: () => { SET.mgrPitch = !SET.mgrPitch; saveSet(); stay(`중계: ${SET.mgrPitch ? '공 하나하나 읽기' : '타석 결과만 읽기'}`); } },
+    { n:6, key:'pa', t:'이번 타석 맡기기', hide: !playing || G.over || G.mode === 'manager', s:'이번 타석이 끝날 때까지 컴퓨터가 대신 고릅니다.', act: v => delegate('pa', v) },
+    { n:7, key:'half', t:'이번 이닝 맡기기', hide: !playing || twoP() || G.over || G.mode === 'manager', s: NET.on ? '이번 이닝이 끝날 때까지 컴퓨터가 내 팀을 대신 고릅니다.' : '이번 이닝이 끝날 때까지 컴퓨터가 대신 고르고, 결과만 알려 줍니다.', act: v => delegate('half', v) },
     { n:8, t:'설정', act: v => go(() => settingsScreen(() => go(moreScreen, 'click')), v) },
     NET.on ? { n:9, t:'방에서 나가기', s:'경기를 그만두고 방에서 나갑니다.', act: () => leaveRoomAsk() }
       : { n:9, t:'경기 그만하기', s:'경기는 저장되어 처음 화면에서 이어 할 수 있습니다.', act: v => { saveGame(); G = null; go(homeScreen, v, ['경기를 저장했습니다. 이어하기로 다시 시작할 수 있습니다.']); } },
@@ -316,9 +322,11 @@ function moreScreen(){
 function rosterScreen(ti){
   const T = G.teams[ti], own = ownTeam(ti);
   const say = [`${T.name}, ${STYLES[T.style].name}. ${STYLES[T.style].desc}${own ? '' : ' 상대 팀 능력치는 등급으로만 보입니다.'}`];
-  if(G.mode === 'detail'){
+  if(detailed(G)){
     T.bat.forEach((b, i) => say.push(batterInfo(G, T, i, own)));
     T.pit.forEach((p, i) => say.push((i === T.pi ? '지금 투수. ' : p.used ? '이미 던짐. ' : '') + pitcherInfo(G, T, i, own)));
+    (T.bench || []).forEach(b => say.push(`벤치 ${b.name}, ${b.role}, ${handText(b.hand)}. ${own ? `컨택 ${b.con}, 파워 ${b.pow}, 선구안 ${b.eye}, 스피드 ${b.spd}` : `컨택 ${gradeWord(b.con)}, 파워 ${gradeWord(b.pow)}, 스피드 ${gradeWord(b.spd)}`}.`));
+    (T.gone || []).forEach(b => say.push(`교체되어 나감: ${b.name}, 오늘 ${batterLine(b)}.`));
   } else {
     T.bat.forEach((b, i) => say.push(`${i + 1}번 ${POS[b.pos]} ${b.name}, 오늘 ${batterLine(b)}.`));
     say.push(`투수 ${T.pit[T.pi].name}.`);

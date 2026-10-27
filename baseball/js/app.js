@@ -11,7 +11,7 @@ function homeScreen(){
       { n:2, t:'둘이 하기', s:'한 기기를 번갈아 쓰며 대결합니다.', act: v => { NEW.kind = '2p'; go(modeScreen, v); } },
       { n:3, t:'온라인 대전', s:'각자 휴대폰으로 만나 대결하고, 채팅과 음성 대화를 합니다.', act: v => go(onlineHome, v) },
       { n:4, t:'컴퓨터끼리 관전', s:'컴퓨터 두 팀의 경기를 듣습니다.', act: v => { NEW.kind = 'watch'; go(modeScreen, v); } },
-      { n:5, t:'이어하기', hide: !sv, s: sv ? `${sv.G.mode === 'simple' ? '간단' : '정밀'} 모드, ${situation(sv.G)}` : '', act: v => resumeGame(v) },
+      { n:5, t:'이어하기', hide: !sv, s: sv ? `${MODE_NAME[sv.G.mode]}, ${sv.G.pre ? '경기 전 준비 중' : situation(sv.G)}` : '', act: v => resumeGame(v) },
       { n:6, t:'게임 방법과 키 안내', act: v => go(() => helpScreen(() => go(homeScreen, 'click')), v) },
       { n:7, t:'설정', s:'글자 크기, 화면 색, 읽어 주기, 효과음, 진동', act: v => go(() => settingsScreen(() => go(homeScreen, 'click')), v) },
       { n:8, t:'홈 화면에 설치하기', hide: !canInstall(), s:'아이콘으로 바로 열고 화면을 넓게 씁니다.', act: () => doInstall() },
@@ -19,12 +19,14 @@ function homeScreen(){
 }
 
 /* ---------- 경기 준비 ---------- */
+const MODE_NAME = { simple:'간단 모드', detail:'정밀 모드', manager:'감독 모드' };
 const NEW = { kind:'1p', mode:'simple', a:null, b:null, first:1, innings:3, diff:1 };
 const teamLabel = k => { const t = teamInfo(k); return `${t.name} (${STYLES[t.style].name})`; };
 function modeScreen(){
   return { q:'어떤 방식으로 할까요?', back: v => go(NEW.kind === 'online' ? onlineHome : homeScreen, v), opts:[
     { n:1, t:'간단 모드', s:'타석마다 한 번 고르고, 주사위로 결과를 정합니다. 처음 해 보는 분께 알맞습니다.', act: v => { NEW.mode = 'simple'; go(() => teamScreen(0), v); } },
     { n:2, t:'정밀 모드', s:'공 하나마다 구종, 코스, 세기를 고릅니다. 선수 능력치, 컨디션, 바람, 수비 위치가 결과를 바꿉니다.', act: v => { NEW.mode = 'detail'; go(() => teamScreen(0), v); } },
+    { n:3, t:'감독 모드', s:'선수들이 알아서 던지고 치고, 감독은 타순, 선발 투수, 작전, 대타, 투수 교체만 지시합니다. 중요한 순간에만 묻습니다.', act: v => { NEW.mode = 'manager'; go(() => teamScreen(0), v); } },
   ] };
 }
 function teamScreen(which){
@@ -80,7 +82,7 @@ function readyScreen(){
   const o = newOpts();
   const role = ti => NEW.kind === '1p' ? (o.ctrl[ti] === 'human' ? '내 팀' : '컴퓨터') : NEW.kind === '2p' ? o.who[ti] : '컴퓨터';
   const say = [
-    `${NEW.mode === 'simple' ? '간단' : '정밀'} 모드, ${NEW.innings}이닝 경기입니다.`,
+    `${MODE_NAME[NEW.mode]}, ${NEW.innings}이닝 경기입니다.`,
     `원정(먼저 공격): ${teamLabel(o.teams[0])}, ${role(0)}.`,
     `홈(나중에 공격): ${teamLabel(o.teams[1])}, ${role(1)}.`,
   ];
@@ -196,8 +198,18 @@ const HELP = {
     '음성이 연결되지 않으면(일부 휴대폰 데이터망) 와이파이로 바꾸거나 채팅을 써 주세요.',
     '연결이 끊기면 같은 기기에서 다시 열고 온라인 대전의 방 다시 들어가기를 누르면 이어 합니다. 경기는 방장 기기가 계산하므로, 방장이 나가면 경기가 멈춥니다.',
   ],
+  '감독 모드': [
+    '감독 모드에서는 선수들이 공 하나하나를 알아서 던지고 칩니다. 감독은 경기 전 준비와 작전만 맡습니다.',
+    '경기 전: 타순을 바꾸거나 추천 타순을 쓰고, 벤치 선수를 넣고, 선발 투수를 고른 뒤 준비 완료를 누릅니다. 내 팀 선수는 능력치가 숫자로 보입니다.',
+    '작전은 중요한 순간에만 묻습니다. 득점권에 주자가 있을 때, 무사 1루일 때, 경기 후반 접전일 때, 우리 투수가 지쳤거나 점수를 많이 줬을 때입니다. 그 사이의 타석은 선수들이 알아서 하고 결과만 모아서 읽어 줍니다. 더 보기에서 매 타석 묻기로 바꿀 수 있습니다.',
+    '공격 작전: 타자에게 맡기기, 적극적으로 쳐라, 신중하게 골라라, 번트(희생 번트, 스퀴즈, 기습 번트), 도루, 히트 앤드 런, 대타, 대주자.',
+    '히트 앤드 런은 1루 주자가 먼저 뛰고 타자가 꼭 맞히는 작전입니다. 땅볼이어도 병살이 되지 않고, 안타면 1루 주자가 3루까지 가기 쉽습니다. 대신 헛스윙하면 주자가 잡힐 수 있고, 직선타면 주자까지 함께 잡히기 쉽습니다.',
+    '수비 작전: 투수에게 맡기기, 정면 승부(볼넷이 줄고 맞기 쉬움), 어렵게 승부(유인구로 장타를 피하고 볼넷이 늘어남), 고의 볼넷, 투수 교체, 수비 위치.',
+    '대타와 대주자로 나간 선수 대신 들어간 선수는 그 자리의 수비도 맡습니다. 바뀌어 나간 선수는 이번 경기에 다시 나오지 못합니다.',
+    '중계는 처음에 타석 결과만 읽습니다. 더 보기에서 공 하나하나 읽기로 바꿀 수 있습니다.',
+    '컴퓨터 감독도 경기 후반 접전에서는 대타, 대주자, 투수 교체를 씁니다. 온라인 대전에서도 감독 모드로 대결할 수 있습니다.',
+  ],
   '앞으로 만들 것': [
-    '3단계, 감독 모드: 공 하나하나는 선수가 알아서 하고, 감독은 타순, 선발 투수, 대타, 투수 교체, 작전만 지시합니다.',
     '그다음: 우리 센터 이름으로 팀과 선수 만들기, 시즌 기록, 히트 앤드 런과 견제구 같은 작전, 관중 소리.',
   ],
 };

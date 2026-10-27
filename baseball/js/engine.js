@@ -16,6 +16,8 @@ const rint = (G, a, b) => a + Math.floor(rnd(G) * (b - a + 1));
 const pickOne = (G, arr) => arr[Math.floor(rnd(G) * arr.length)];
 function gauss(G){ let u = 0; while(!u) u = rnd(G); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rnd(G)); }
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+// 정밀 계산(능력치·바람·컨디션)을 쓰는 모드: 정밀 모드와 감독 모드
+const detailed = G => G.mode !== 'simple';
 // [[값, 무게], ...] 중에서 하나
 function wpick(G, items){
   const tot = items.reduce((s, x) => s + Math.max(0, x[1]), 0);
@@ -44,6 +46,7 @@ function josa(w, a, b){
 /* ---------- 문장 남기기 ---------- */
 function emit(G, s, k = 'p'){
   const e = { s, k, n: ++G.seq };
+  if(k === 'r' && G.teams && !G.over) e.b = curBatter(G).name;   // 타석 결과 문장의 타자 (감독 모드 요약에 씀)
   G.log.push(e);
   if(G.log.length > 1500) G.log.splice(0, G.log.length - 1500);
   G.out.push(e);
@@ -90,6 +93,20 @@ function makePitcher(G, S, starter, bias){
     pitches, cond: condRoll(G), n: 0, load: 0, used: starter, warned: 0,
     st: { out:0, h:0, r:0, bb:0, k:0, hr:0 } };
 }
+// 벤치 선수 4명: 장타 대타 · 교타 대타 · 대주자 · 수비 요원
+const BENCH_ROLES = [
+  { pos:'1B', role:'장타 대타', t:{ pow:16, con:-2, spd:-8 } },
+  { pos:'LF', role:'교타 대타', t:{ con:12, eye:8, pow:-6 } },
+  { pos:'CF', role:'대주자', t:{ spd:24, pow:-12 } },
+  { pos:'SS', role:'수비 요원', t:{ def:14, con:-6, pow:-8 } },
+];
+function makeBench(G, S, b, bias){
+  const m = S.bat, v = k => stat(G, 46 + (b.t[k] || 0) + (m[k] || 0) + bias);
+  return { id: 'b' + G.names.length, name: newName(G), pos: b.pos, role: b.role, hand: rnd(G) < 0.36 ? 'L' : 'R',
+    con: v('con'), pow: v('pow'), eye: v('eye'), spd: v('spd'), def: v('def'),
+    aggr: clamp(Math.round(50 + gauss(G) * 14 + S.aggr), 5, 95), cond: condRoll(G), seen: false,
+    st: { pa:0, ab:0, h:0, hr:0, rbi:0, bb:0, k:0, r:0, sb:0 } };
+}
 function makeTeam(G, key, bias){
   const info = teamInfo(key), S = STYLES[info.style];
   const T = { key, name: info.name, short: info.short, style: info.style, color: info.color,
@@ -97,35 +114,45 @@ function makeTeam(G, key, bias){
   for(let i = 0; i < 9; i++) T.bat.push(makeBatter(G, S, i, bias));
   T.pit.push(makePitcher(G, S, true, bias));
   for(let i = 0; i < 4; i++) T.pit.push(makePitcher(G, S, false, bias));
-  T.def = Math.round(T.bat.reduce((s, b) => s + b.def, 0) / 9 + S.def);
+  T.bench = BENCH_ROLES.map(b => makeBench(G, S, b, bias));
+  T.gone = [];   // 경기 중에 교체되어 나간 선수 (기록은 남김)
+  T.def = teamDef(T);
   return T;
 }
+
+const teamDef = T => Math.round(T.bat.reduce((s, b) => s + b.def, 0) / 9 + STYLES[T.style].def);
 
 /* ---------- 경기 시작 ----------
    o: { mode:'simple'|'detail', innings, teams:[원정 팀 키, 홈 팀 키], ctrl:['human'|'cpu', ...], who:[이름, 이름], diff:0~2, seed } */
 const EXTRA_INN = 3;
 function newGame(o){
   const G = { v:1, rng: (o.seed >>> 0) || (Date.now() >>> 0), seq:0, log:[], out:[], fx:[], names:[],
-    mode: o.mode === 'simple' ? 'simple' : 'detail', innings: o.innings || 3, ctrl: o.ctrl || ['human', 'cpu'],
+    mode: ['simple', 'manager'].includes(o.mode) ? o.mode : 'detail', innings: o.innings || 3, ctrl: o.ctrl || ['human', 'cpu'],
     who: o.who || ['', ''], diff: o.diff == null ? 1 : o.diff,
     inning:1, top:true, outs:0, balls:0, strikes:0, bases:[null, null, null], pitchNo:0, pa:0, half:0,
     over:false, winner:null, prev:null, lastLoc:null, at: Date.now() };
   // 컴퓨터 난이도: 쉬움이면 컴퓨터 팀 능력치를 조금 낮추고, 어려움이면 조금 높임
   const cpuBias = [-6, 0, 5][G.diff] || 0;
   G.teams = [0, 1].map(i => makeTeam(G, o.teams[i], G.ctrl[i] === 'cpu' && G.ctrl[1 - i] !== 'cpu' ? cpuBias : 0));
-  if(G.mode === 'detail'){
+  if(detailed(G)){
     const dir = wpick(G, [['none', 15], ['out', 28], ['in', 25], ['lr', 16], ['rl', 16]]);
     G.wind = { dir, spd: dir === 'none' ? 0 : rint(G, 1, 8) };
   } else G.wind = { dir:'none', spd:0 };
+  // 감독 모드에서 사람이 맡은 팀이 있으면 경기 전에 타순·선발 투수를 정함 (beginGame으로 시작)
+  G.pre = G.mode === 'manager' && G.ctrl.includes('human') ? { ready: G.ctrl.map(c => c !== 'human') } : null;
+  if(!G.pre) beginGame(G);
+  return G;
+}
+function beginGame(G){
+  G.pre = null;
   const [A, H] = G.teams;
   emit(G, `오늘 경기는 원정 ${A.name}, 홈 ${H.name}의 대결입니다. ${G.innings}이닝 경기입니다.`, 'i');
-  if(G.mode === 'detail'){
+  if(detailed(G)){
     emit(G, `날씨: ${windText(G)}.`, 'i');
-    G.teams.forEach(T => { const P = T.pit[0]; emit(G, `${T.short} 선발 투수 ${P.name}${P.cond >= 1 ? ', 몸이 가벼워 보입니다' : P.cond <= -1 ? ', 몸이 조금 무거워 보입니다' : ''}.`, 'n'); });
+    G.teams.forEach(T => { const P = T.pit[T.pi]; emit(G, `${T.short} 선발 투수 ${P.name}${P.cond >= 1 ? ', 몸이 가벼워 보입니다' : P.cond <= -1 ? ', 몸이 조금 무거워 보입니다' : ''}.`, 'n'); });
   }
   emit(G, `1회초, ${A.short}의 공격입니다.`, 'i');
   startPA(G);
-  return G;
 }
 const windText = G => G.wind.dir === 'none' || !G.wind.spd ? '바람 없음' : `${WIND[G.wind.dir].name}, 초속 ${G.wind.spd}미터`;
 
@@ -152,7 +179,7 @@ const scoreText = G => `${G.teams[0].short} ${runsOf(G.teams[0])}, ${G.teams[1].
 function situation(G){
   if(G.over) return `경기 끝. ${scoreText(G)}.`;
   const P = curPitcher(G), B = curBatter(G);
-  return `${halfName(G)} ${batTeam(G).short} 공격. ${scoreText(G)}. ${G.outs}아웃 ${basesText(G.bases)}. ${countText(G)}. 타자 ${B.name}, 투수 ${P.name}${G.mode === 'detail' ? ` 투구 수 ${P.n}개` : ''}.`;
+  return `${halfName(G)} ${batTeam(G).short} 공격. ${scoreText(G)}. ${G.outs}아웃 ${basesText(G.bases)}. ${countText(G)}. 타자 ${B.name}, 투수 ${P.name}${detailed(G) ? ` 투구 수 ${P.n}개` : ''}.`;
 }
 function scoreboard(G){
   return G.teams.map((T, ti) => {
@@ -184,9 +211,9 @@ function startPA(G){
   const T = batTeam(G), B = curBatter(G);
   B.st.pa++;
   let s = `${T.bi + 1}번 타자 ${POS[B.pos]} ${B.name}`;
-  if(G.mode === 'detail') s += `, ${handText(B.hand)}`;
+  if(detailed(G)) s += `, ${handText(B.hand)}`;
   s += B.st.pa > 1 ? `. 오늘 ${batterLine(B)}.` : '.';
-  if(G.mode === 'detail' && !B.seen){
+  if(detailed(G) && !B.seen){
     B.seen = true;
     if(B.cond >= 2) s += ' 오늘 타격감이 아주 좋아 보입니다.';
     else if(B.cond === 1) s += ' 컨디션이 좋아 보입니다.';
@@ -194,10 +221,11 @@ function startPA(G){
     else if(B.cond <= -2) s += ' 오늘 몸이 무거워 보입니다.';
   }
   emit(G, s, 'n');
+  if(G.mode === 'manager' && G.ctrl[batIdx(G)] === 'cpu' && typeof aiManageOff === 'function') aiManageOff(G);
   // 지친 투수 알림 (사람이 수비할 때 판단하도록)
   const P = curPitcher(G), f = fatigue(P);
-  if(G.mode === 'detail' && f > 0.05 && P.warned < 1){ P.warned = 1; emit(G, `투수 ${P.name}, 투구 수 ${P.n}개. 공에 힘이 떨어지기 시작합니다.`, 'c'); }
-  else if(G.mode === 'detail' && f > 0.6 && P.warned < 2){ P.warned = 2; emit(G, `투수 ${P.name}, 많이 지쳤습니다. 구속과 제구가 떨어집니다.`, 'c'); }
+  if(detailed(G) && f > 0.05 && P.warned < 1){ P.warned = 1; emit(G, `투수 ${P.name}, 투구 수 ${P.n}개. 공에 힘이 떨어지기 시작합니다.`, 'c'); }
+  else if(detailed(G) && f > 0.6 && P.warned < 2){ P.warned = 2; emit(G, `투수 ${P.name}, 많이 지쳤습니다. 구속과 제구가 떨어집니다.`, 'c'); }
 }
 // keep: 타석이 끝나지 않았는데 3아웃(도루 실패 등)이면 같은 타자가 다음 이닝에 다시 나옴
 function endPA(G, keep){
@@ -226,7 +254,7 @@ function endHalf(G){
     if(G.inning > G.innings) emit(G, '동점이라 연장전에 들어갑니다.', 'i');
   }
   G.outs = 0; G.bases = [null, null, null]; G.half++;
-  if(G.mode === 'detail' && rnd(G) < 0.2){
+  if(detailed(G) && rnd(G) < 0.2){
     const before = windText(G);
     G.wind.spd = clamp(G.wind.spd + pickOne(G, [-2, -1, 1, 2]), 0, 9);
     if(G.wind.spd && G.wind.dir === 'none') G.wind.dir = pickOne(G, ['out', 'in', 'lr', 'rl']);
@@ -245,7 +273,7 @@ function gameOver(G){
   emit(G, `경기 끝! ${A.short} ${a} 대 ${h} ${H.short}. ${win ? (G.walkoff ? `${win.short}의 끝내기 승리입니다!` : `${win.short} 승리!`) : '무승부입니다.'}`, 'i');
   // 오늘의 선수: 안타·홈런·타점이 가장 좋은 타자
   let best = null, bv = -1;
-  G.teams.forEach(T => T.bat.forEach(B => { const v = B.st.h + B.st.hr * 2 + B.st.rbi + B.st.bb * 0.3 + (T === win ? 0.5 : 0); if(v > bv){ bv = v; best = { T, B }; } }));
+  G.teams.forEach(T => [...T.bat, ...(T.gone || [])].forEach(B => { const v = B.st.h + B.st.hr * 2 + B.st.rbi + B.st.bb * 0.3 + (T === win ? 0.5 : 0); if(v > bv){ bv = v; best = { T, B }; } }));
   if(best && bv > 0) emit(G, `오늘의 선수: ${best.T.short} ${best.B.name}, ${batterLine(best.B)}.`, 'i');
   fx(G, 'end');
 }
@@ -281,8 +309,8 @@ function onHit(G, n, ev, simple){
     const r = b[k]; if(r == null) continue;
     let to = k + n;
     if(n === 1 && k === 1 && rnd(G) < clamp(0.55 + (spd(r) - 50) / 120 + (ev - 0.5) * 0.4 + ofAdj, 0.1, 0.95)) to = 3;
-    else if(n === 1 && k === 0 && nb[2] == null && rnd(G) < clamp(0.22 + (spd(r) - 50) / 150, 0.05, 0.6)) to = 2;
-    else if(n === 2 && k === 0 && rnd(G) < clamp(0.42 + (spd(r) - 50) / 120 + ofAdj, 0.1, 0.9)) to = 3;
+    else if(n === 1 && k === 0 && nb[2] == null && rnd(G) < clamp(0.22 + (spd(r) - 50) / 150 + (G.hrun ? 0.4 : 0), 0.05, 0.9)) to = 2;
+    else if(n === 2 && k === 0 && rnd(G) < clamp(0.42 + (spd(r) - 50) / 120 + ofAdj + (G.hrun ? 0.3 : 0), 0.1, 0.95)) to = 3;
     if(to >= 3) sc.push(r); else nb[to] = r;
   }
   nb[n - 1] = T.bi;
@@ -385,7 +413,9 @@ function playPitch(G, Psel, Bsel){
     else if(G.prev.t === Psel.t) timing = 4;
   }
   G.prev = { t: Psel.t, vel, fast: pt.fast };
-  const k = Bsel.k, swingIntent = k === 'swing' || k === 'power' || k === 'contact';
+  // 히트 앤드 런: 1루 주자가 미리 뛰고, 타자는 웬만하면 방망이를 내서 맞히기에 집중함
+  const hr = Bsel.k === 'hitrun' && G.bases[0] != null;
+  const k = Bsel.k === 'hitrun' ? 'contact' : Bsel.k, swingIntent = k === 'swing' || k === 'power' || k === 'contact';
   const breaking = !pt.fast;
   const end = () => { endPA(G); return flush(G); };
   const strikeCall = () => { const border = zd > 0.95 && zd < 1.05; if(!border) return inZone; return rnd(G) < clamp(0.5 - (zd - 1) * 8, 0.1, 0.9); };
@@ -420,7 +450,8 @@ function playPitch(G, Psel, Bsel){
 
   /* 치지 않기 (지켜보기 · 도루) */
   let swing = false;
-  if(swingIntent){
+  if(hr){ swing = zd < 1.6; emit(G, '히트 앤드 런 작전, 1루 주자가 먼저 뜁니다.', 'c'); }
+  else if(swingIntent){
     if(inZone) swing = true;
     else {
       const eye = B.eye + B.cond * 4 + (k === 'contact' ? 8 : k === 'power' ? -10 : 0);
@@ -431,8 +462,9 @@ function playPitch(G, Psel, Bsel){
   if(!swing){
     const why = !swingIntent ? (inZone && zd < 0.5 ? '그대로 지켜봅니다. ' : '지켜봅니다. ') : '끝까지 참아 냅니다. ';
     const r = taken(why);
-    if(k === 'steal' && r !== 'end' && G.outs < 3) doSteal(G, false, breaking);
-    else if(k === 'steal' && r === 'end' && G.outs < 3 && G.strikes >= 3) doSteal(G, false, breaking);
+    const run = k === 'steal' || hr;
+    if(run && r !== 'end' && G.outs < 3) doSteal(G, false, breaking);
+    else if(run && r === 'end' && G.outs < 3 && G.strikes >= 3) doSteal(G, false, breaking);
     if(r === 'end') return end();
     if(G.outs >= 3){ endPA(G, true); return flush(G); }
     return flush(G);
@@ -450,9 +482,12 @@ function playPitch(G, Psel, Bsel){
     G.strikes++; fx(G, 'whiff');
     if(G.strikes >= 3){
       emit(G, `${head} ${chaseWord}헛스윙! 삼진 아웃.`, 'r');
-      B.st.ab++; B.st.k++; P.st.k++; addOut(G); fx(G, 'k'); return end();
+      B.st.ab++; B.st.k++; P.st.k++; addOut(G); fx(G, 'k');
+      if(hr && G.outs < 3) doSteal(G, false, breaking);
+      return end();
     }
     emit(G, `${head} ${chaseWord}헛스윙. ${countText(G)}.`, 'p');
+    if(hr){ doSteal(G, false, breaking); if(G.outs >= 3){ endPA(G, true); return flush(G); } }
     return flush(G);
   }
   // 맞힘: 파울인지 안으로 들어갔는지
@@ -472,7 +507,9 @@ function playPitch(G, Psel, Bsel){
   const q = clamp(rnd(G) * 0.75 + 0.08 + (bq - pq) / 220 + (inZone ? 0.18 * cen : -0.12), 0, 1);
   const ev = clamp(0.45 * q + 0.45 * (B.pow + B.cond * 4) / 100 + ({ swing:0, power:0.07, contact:-0.07 })[k] + (pt.fast && vel >= 153 ? 0.02 : 0) + gauss(G) * 0.035, 0, 1.08);
   emit(G, `판정 타구: 정확도 ${Math.round(q * 100)}, 힘 ${Math.round(ev * 100)}.`, 'd');
+  G.hrun = hr;
   inPlay(G, { head: head + ' ' + chaseWord, x, y, q, ev, k, pt });
+  G.hrun = false;
   return end();
 }
 
@@ -585,7 +622,7 @@ function inPlay(G, o){
     out(`잘 맞은 직선 타구, 그러나 ${fielder(F, pos)} 정면. 직선타 아웃.`, () => {
       // 뛰어나갔던 주자가 돌아오지 못하면 함께 아웃
       const b = G.bases, on = [0, 1, 2].filter(i => b[i] != null);
-      if(on.length && G.outs < 3 && rnd(G) < 0.08){ const i = on[on.length - 1]; const R = T.bat[b[i]]; b[i] = null; addOut(G); emit(G, `${R.name}, 돌아가지 못해 함께 아웃! 더블 플레이. ${G.outs}아웃.`, 'r'); }
+      if(on.length && G.outs < 3 && rnd(G) < (G.hrun ? 0.45 : 0.08)){ const i = on[on.length - 1]; const R = T.bat[b[i]]; b[i] = null; addOut(G); emit(G, `${R.name}, 돌아가지 못해 함께 아웃! 더블 플레이. ${G.outs}아웃.`, 'r'); }
     });
     return;
   }
@@ -640,6 +677,13 @@ function inPlay(G, o){
 function groundOut(G, head, pos, inf){
   const T = batTeam(G), B = curBatter(G), b = G.bases, F = fieldTeam(G);
   const who = fielder(F, pos);
+  // 히트 앤드 런: 주자가 미리 뛰어 병살을 피하고 한 베이스씩 감
+  if(G.hrun && b[0] != null){
+    B.st.ab++; addOut(G);
+    emit(G, `${head} 땅볼, ${ga(who)} 잡아 1루로. 아웃. 미리 뛴 주자는 다음 베이스까지 갑니다. ${G.outs}아웃.`, 'r'); fx(G, 'out');
+    if(G.outs < 3) advanceOnOut(G, { all:true });
+    return;
+  }
   // 병살: 1루 주자가 있고 아웃이 2개 미만일 때
   if(b[0] != null && G.outs < 2){
     const pDP = clamp(0.32 + [-0.1, 0, 0.1][inf] - (B.spd - 50) / 200, 0.1, 0.75);
@@ -748,4 +792,86 @@ function swapPitcher(G, ti, idx){
   T.pi = idx; nw.used = true;
   emit(G, `${T.short} 투수 교체: ${old.name}에서 ${josa(nw.name, '으로', '로')} 바뀝니다. ${nw.name}, 최고 구속 ${nw.vel}킬로.`, 'c');
   fx(G, 'change');
+}
+
+/* ---------- 감독 모드 ----------
+   감독은 타석마다 작전만 지시하고, 공 하나하나는 선수(컴퓨터)가 던지고 침.
+   D(수비): { k:'normal' 맡기기 | 'attack' 정면 승부 | 'nibble' 어렵게 승부 | 'ibb' 고의 볼넷 }
+   O(공격): { k:'normal' 맡기기 | 'aggr' 적극적으로 | 'patient' 신중하게 | 'bunt' 번트 | 'steal' 도루 | 'hitrun' 히트 앤드 런 } */
+const ORDER_DEF = { normal:'투수에게 맡기기', attack:'정면 승부', nibble:'어렵게 승부', ibb:'고의 볼넷' };
+const ORDER_OFF = { normal:'타자에게 맡기기', aggr:'적극적으로 쳐라', patient:'신중하게 골라라', bunt:'번트', steal:'도루', hitrun:'히트 앤드 런' };
+function playManager(G, D, O){
+  if(G.over) return flush(G);
+  if(D.k === 'ibb') return playPitch(G, { k:'ibb' }, { k:'take' });
+  const acc = { lines:[], fx:[] }, pa = G.pa, half = G.half;
+  let first = true, guard = 0;
+  while(!G.over && G.pa === pa && G.half === half && guard++ < 40){
+    const P = aiPitch(G, D.k);
+    let B = aiBat(G, O.k);
+    if(first && O.k === 'steal' && canSteal(G)) B = { k:'steal', g:null };
+    if(first && O.k === 'hitrun' && G.bases[0] != null && canSteal(G)) B = { k:'hitrun', g:null };
+    if(O.k === 'bunt' && G.strikes < 2) B = { k:'bunt', g:null };
+    first = false;
+    const r = playPitch(G, P, B);
+    acc.lines.push(...r.lines); acc.fx.push(...r.fx);
+  }
+  return acc;
+}
+// 타순 추천: 4번(장타) → 3번 → 1번(발·출루) → 5번 → 2번 → 나머지는 잘 치는 순서
+function recommendLineup(G, ti){
+  const T = G.teams[ti], left = T.bat.slice(), out = new Array(9);
+  const score = [
+    b => b.spd + b.con * 0.8 + b.eye * 0.8, b => b.con + b.eye * 0.7 + b.spd * 0.4, b => b.con + b.pow * 0.8,
+    b => b.pow * 1.3 + b.con * 0.4, b => b.pow + b.con * 0.6,
+  ];
+  const take = (slot, f) => { left.sort((a, b) => f(b) - f(a)); out[slot] = left.shift(); };
+  [3, 2, 0, 4, 1].forEach(s => take(s, score[s]));
+  left.sort((a, b) => (b.con + b.pow) - (a.con + a.pow)).forEach((b, i) => { out[5 + i] = b; });
+  T.bat = out;
+  emit(G, `${T.short} 타순을 추천 타순으로 바꿨습니다.`, 'c');
+  return flush(G);
+}
+function swapOrder(G, ti, i, j){
+  const T = G.teams[ti], a = T.bat[i], b = T.bat[j];
+  T.bat[i] = b; T.bat[j] = a;
+  emit(G, `${T.short} 타순 변경: ${i + 1}번 ${b.name}, ${j + 1}번 ${a.name}.`, 'c');
+  return flush(G);
+}
+function setStarter(G, ti, idx){
+  const T = G.teams[ti], P = T.pit[idx];
+  if(!P || idx === T.pi) return flush(G);
+  T.pit[T.pi].used = false; T.pi = idx; P.used = true;
+  emit(G, `${T.short} 선발 투수: ${P.name}${P.starter ? '' : '. 불펜 투수라 오래 던지지 못합니다'}.`, 'c');
+  return flush(G);
+}
+// 벤치 선수 넣기. kind: pre(경기 전, 빠진 선수는 벤치로) · ph(대타) · pr(대주자, slot은 그 주자의 타순)
+// benchIn: 문장만 남김 (타석 시작 중에 컴퓨터가 바꿀 때) / useBench: 사람이 바꿀 때
+function useBench(G, ti, slot, b, kind){ benchIn(G, ti, slot, b, kind); return flush(G); }
+function benchIn(G, ti, slot, b, kind){
+  const T = G.teams[ti], old = T.bat[slot], nw = T.bench[b];
+  if(!old || !nw) return;
+  nw.pos = old.pos;
+  T.bat[slot] = nw;
+  if(kind === 'pre'){ T.bench[b] = old; emit(G, `${T.short} 선발 명단 변경: ${slot + 1}번 ${POS[nw.pos]} ${nw.name}, ${josa(old.name, '은', '는')} 벤치로.`, 'c'); }
+  else {
+    T.bench.splice(b, 1); T.gone.push(old);
+    if(kind === 'ph'){
+      old.st.pa--; nw.st.pa++;
+      emit(G, `${T.short} 대타: ${old.name} 대신 ${nw.name}, ${handText(nw.hand)}. ${nw.role}입니다.`, 'c');
+    } else {
+      const base = G.bases.indexOf(slot);
+      emit(G, `${T.short} 대주자: ${base + 1}루 주자 ${old.name} 대신 ${nw.name}.`, 'c');
+    }
+  }
+  T.def = teamDef(T);
+  fx(G, 'change');
+}
+// 중요한 순간: 감독에게 작전을 물을 때 (ti 팀 기준)
+function mgrImportant(G, ti){
+  if(G.over) return false;
+  const b = G.bases, on = b.some(x => x != null), risp = b[1] != null || b[2] != null;
+  const late = G.inning >= Math.max(2, G.innings - 2), close = Math.abs(runsOf(G.teams[0]) - runsOf(G.teams[1])) <= 2;
+  if(batIdx(G) === ti) return risp || (b[0] != null && G.outs === 0) || (late && close && on);
+  const P = curPitcher(G);
+  return risp || fatigue(P) > 0.2 || P.st.r >= 4 || (late && close && on);
 }

@@ -78,7 +78,17 @@ function renderLog(){
   while(ol.children.length > 80) ol.removeChild(ol.firstChild);
 }
 // 보이는 문장만 (판정 과정은 설정에 따라)
-const visible = lines => (lines || []).filter(l => l.k !== 'd' || SET.dice);
+// 감독 모드에서 '타석 결과만' 중계일 때는 공 하나하나의 문장과 앞선 타자 소개를 빼고 읽음
+const visible = lines => {
+  let L = (lines || []).filter(l => l.k !== 'd' || SET.dice);
+  if(typeof G !== 'undefined' && G && G.mode === 'manager' && !SET.mgrPitch){
+    // 타석 결과는 "타자 이름: 결과"로 줄이고, 공 하나하나·앞선 타자 소개·상대 수비 위치 변경은 뺌 (중계 기록에는 모두 남음)
+    const lastN = L.map(l => l.k).lastIndexOf('n');
+    L = L.filter((l, i) => l.k !== 'p' && (l.k !== 'n' || i === lastN) && !/수비 위치 변경/.test(l.s))
+      .map(l => l.k === 'r' && l.b && /^(제\d+구|주사위)/.test(l.s) ? { ...l, s: `${l.b}: ${l.s.replace(/^제\d+구, [^.]+?공\.\s*/, '')}` } : l);
+  }
+  return L;
+};
 
 /* ---------- 고르기 ---------- */
 function choose(n, via){
