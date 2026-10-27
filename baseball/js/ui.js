@@ -1,0 +1,169 @@
+'use strict';
+/* ===================== 화면 틀: 번호로 고르는 메뉴 =====================
+   모든 화면은 "질문 하나 + 번호 붙은 선택지"로 되어 있어서, 같은 방법으로 고름
+   - 단추 누르기(보이스오버·톡백 두 번 탭, 마우스)
+   - 숫자 키(리보 키보드 숫자판, PC 키보드)
+   - 명령 칸에 숫자나 낱말을 적고 입력(한소네 점자 입력, 보이스오버 빠른 탐색이 켜져 있을 때)
+   공통 키: 0 지금 상황 · 점(.) 뒤로 · 더하기(+) 점수판 · 빼기(-) 타자·투수 정보 · 곱하기(*) 키 안내 · 나누기(/) 최근 기록
+
+   화면(S): { q:질문, opts:[{ n:번호, t:이름, s:설명, act(via) }], grid:코스 판, back:뒤로 함수, board:경기 상황판, top:위쪽 HTML, note:처음 보일 메모 }
+   go(만드는 함수, via, say): via는 click(단추) · key(키·명령 칸) · auto(자동 진행) · init(처음 열기)
+   - click: 결과 글(#say)이나 질문으로 초점을 옮겨 화면 낭독기가 바로 읽게 함
+   - key·auto: 초점은 그대로 두고 숨은 알림 칸으로 읽어 줌 */
+const UI = { make:null, S:null, say:[], logN:0 };
+
+function go(make, via = 'init', lines = []){
+  UI.make = make; UI.say = lines || [];
+  UI.S = make(); if(UI.say.length || !UI.S.say) UI.S.say = UI.say;
+  render();
+  const say = UI.S.say.map(l => l.s || l);
+  const msg = [...say, UI.S.q].filter(Boolean).join(' ');
+  if(via === 'click'){
+    setTimeout(() => { const el = say.length ? $('#say') : $('#q'); if(el) el.focus({ preventScroll:false }); }, 40);
+    if(SET.voice === 'tts') ttsSay(msg);
+  } else if(via === 'key' || via === 'auto') speak(msg);
+}
+// 같은 화면을 다시 그림 (설정을 바꿨을 때, 설치 단추가 생겼을 때). 초점은 그대로
+function rerender(){ if(!UI.make) return; UI.S = UI.make(); if(UI.say.length || !UI.S.say) UI.S.say = UI.say; render(); }
+function stay(msg){ rerender(); speak(msg); }
+
+function render(){
+  const S = UI.S, hadFocus = $('#opts').contains(document.activeElement);
+  applySet();
+  $('#top').innerHTML = S.top || '';
+  const bs = $('#boardSec');
+  if(S.board && typeof boardHTML === 'function' && G){ bs.hidden = false; bs.innerHTML = boardHTML(); }
+  else { bs.hidden = true; bs.innerHTML = ''; }
+  $('#say').innerHTML = (S.say || []).map(l => `<p class="${l.k ? 'k-' + l.k : ''}">${esc(l.s || l)}</p>`).join('');
+  $('#say').hidden = !(S.say || []).length;
+  const nt = $('#note'); nt.innerHTML = (S.note || []).map(l => `<p>${esc(l)}</p>`).join(''); nt.hidden = !(S.note || []).length;
+  $('#q').textContent = S.q || '';
+  renderOpts(S);
+  const ex = $('#extra');
+  ex.innerHTML = S.back ? '<button type="button" class="btn back" id="backBtn">뒤로<span class="kh" aria-hidden="true"> (점 키)</span></button>' : '';
+  $('#logSec').hidden = !S.board;
+  if(S.board) renderLog();
+  if(hadFocus && !$('#opts').contains(document.activeElement)) $('#q').focus();
+}
+function renderOpts(S){
+  const box = $('#opts');
+  box.className = 'opts' + (S.grid ? ' grid' : '');
+  box.setAttribute('aria-label', S.grid ? '코스 고르기 (스트라이크 존)' : '선택지');
+  const want = (S.opts || []).filter(o => !o.hide);
+  const have = new Map([...box.children].map(el => [el.dataset.k, el]));
+  want.forEach((o, i) => {
+    const k = String(o.key || o.n);
+    let el = have.get(k);
+    if(el) have.delete(k);
+    else { el = document.createElement('button'); el.type = 'button'; el.dataset.k = k; }
+    el.className = 'opt' + (o.cls ? ' ' + o.cls : '');
+    el.dataset.n = o.n;
+    const html = `<span class="num">${o.n}<span class="sr-only">번. </span></span><span class="tx"><b>${esc(o.t)}</b>${o.s ? `<span class="sr-only">. </span><small>${esc(o.s)}</small>` : ''}</span>`;
+    if(el.__h !== html){ el.innerHTML = html; el.__h = html; }
+    if(box.children[i] !== el) box.insertBefore(el, box.children[i] || null);
+  });
+  have.forEach(el => el.remove());
+}
+// 중계 기록: 새 줄만 덧붙이고 최근 80줄만 둠
+function renderLog(){
+  const ol = $('#log');
+  if(!G){ ol.innerHTML = ''; UI.logN = 0; return; }
+  const shown = G.log.filter(l => l.k !== 'd' || SET.dice);
+  if(UI.logG !== G || ol.__dice !== SET.dice || !ol.children.length){ ol.innerHTML = ''; UI.logN = 0; UI.logG = G; ol.__dice = SET.dice; }
+  const fresh = shown.filter(l => l.n > UI.logN);
+  fresh.slice(-80).forEach(l => { const li = document.createElement('li'); li.className = 'k-' + l.k; li.textContent = l.s; ol.appendChild(li); });
+  if(fresh.length) UI.logN = fresh[fresh.length - 1].n;
+  while(ol.children.length > 80) ol.removeChild(ol.firstChild);
+}
+// 보이는 문장만 (판정 과정은 설정에 따라)
+const visible = lines => (lines || []).filter(l => l.k !== 'd' || SET.dice);
+
+/* ---------- 고르기 ---------- */
+function choose(n, via){
+  const o = (UI.S.opts || []).find(x => !x.hide && String(x.n) === String(n));
+  if(!o){ speak(`${n}번은 지금 고를 수 없습니다.`); return; }
+  stopAutoPlay();
+  o.act(via);
+}
+function back(via){
+  if(UI.S && UI.S.back){ stopAutoPlay(); UI.S.back(via); }
+  else speak('뒤로 갈 곳이 없습니다.');
+}
+// 메모: 상황·점수판 같은 정보를 결과 글 아래에 보여 주고 읽어 줌
+function note(lines, via){
+  const nt = $('#note');
+  nt.innerHTML = lines.map(l => `<p>${esc(l)}</p>`).join(''); nt.hidden = false;
+  if(via === 'click'){ setTimeout(() => nt.focus(), 40); if(SET.voice === 'tts') ttsSay(lines.join(' ')); }
+  else speak(lines.join(' '));
+}
+function optionsText(){
+  return (UI.S.opts || []).filter(o => !o.hide).map(o => `${o.n}번 ${o.t}`).join(', ');
+}
+const KEY_HELP = [
+  '숫자 1부터 9: 선택지 고르기.',
+  '0: 지금 상황 듣기.',
+  '점(.) 또는 백스페이스: 뒤로.',
+  '더하기(+): 점수판 듣기.',
+  '빼기(-): 지금 타자와 투수 정보 듣기.',
+  '곱하기(*): 이 키 안내.',
+  '나누기(/): 최근 기록 듣기.',
+  '명령 칸에는 숫자나 낱말(상황, 점수, 선수, 기록, 도움, 뒤로, 또는 선택지 이름)을 적고 입력합니다.',
+];
+function keyCmd(k, via){
+  if(/^[1-9]$/.test(k)) return choose(k, via);
+  if(k === '.') return back(via);
+  if(k === '0') return note(typeof gameStatus === 'function' && G && UI.S.board ? gameStatus() : [`${UI.S.q || ''}`, optionsText() + '.'], via);
+  if(k === '*') return note(KEY_HELP, via);
+  if(G && UI.S.board){
+    if(k === '+') return note(scoreboard(G), via);
+    if(k === '-') return note(whoInfo(), via);
+    if(k === '/') return note(recentLines(8), via);
+  } else if('+-/'.includes(k)) return note(['경기 중에만 쓰는 키입니다.'], via);
+}
+const WORDS = { '상황':'0', '점수':'+', '점수판':'+', '선수':'-', '정보':'-', '도움':'*', '도움말':'*', '키':'*', '?':'*', '기록':'/', '뒤로':'.', '취소':'.' };
+function textCmd(v){
+  v = v.trim(); if(!v) return;
+  if(/^[0-9.+\-*/]$/.test(v)) return keyCmd(v, 'key');
+  if(WORDS[v]) return keyCmd(WORDS[v], 'key');
+  const ops = (UI.S.opts || []).filter(o => !o.hide);
+  const o = ops.find(x => x.t === v) || ops.find(x => x.t.replace(/\s/g, '').includes(v.replace(/\s/g, '')));
+  if(o) return choose(o.n, 'key');
+  speak(`알아듣지 못했습니다. 번호를 입력해 주세요. ${optionsText()}.`);
+}
+
+/* ---------- 입력 연결 ---------- */
+document.addEventListener('click', e => {
+  const o = e.target.closest && e.target.closest('#opts .opt');
+  if(o){ choose(o.dataset.n, 'click'); return; }
+  if(e.target.closest && e.target.closest('#backBtn')){ back('click'); return; }
+  if(e.target.closest && e.target.closest('#menuBtn')){ stopAutoPlay(); if(typeof openMenu === 'function') openMenu('click'); }
+});
+function keyName(e){
+  if(e.code && /^Numpad[0-9]$/.test(e.code)) return e.code.slice(6);
+  if(/^[0-9]$/.test(e.key)) return e.key;
+  if(e.code === 'NumpadDecimal' || e.key === '.' || e.key === 'Backspace' || e.key === 'Escape') return '.';
+  if(e.key === '+' || e.code === 'NumpadAdd') return '+';
+  if(e.key === '-' || e.code === 'NumpadSubtract') return '-';
+  if(e.key === '*' || e.code === 'NumpadMultiply') return '*';
+  if(e.key === '/' || e.code === 'NumpadDivide') return '/';
+  return null;
+}
+document.addEventListener('keydown', e => {
+  if(dlgOpen() || e.ctrlKey || e.metaKey || e.altKey) return;
+  const t = e.target, tag = t && t.tagName;
+  if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  const k = keyName(e);
+  if(!k) return;
+  e.preventDefault();
+  keyCmd(k, 'key');
+});
+function bindCmd(){
+  const inp = $('#cmd');
+  inp.addEventListener('input', () => {
+    if(!SET.quick) return;
+    const v = inp.value.trim();
+    if(/^[0-9.+\-*/]$/.test(v)){ inp.value = ''; keyCmd(v, 'key'); }
+  });
+  inp.addEventListener('keydown', e => { if(e.key === 'Escape'){ e.preventDefault(); inp.value = ''; back('key'); } });
+  $('#cmdForm').addEventListener('submit', e => { e.preventDefault(); const v = inp.value; inp.value = ''; textCmd(v); });
+}
