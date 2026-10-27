@@ -64,7 +64,7 @@ const PORT = 8766;
     console.log(`${name}: 간단 둘이 3이닝 ${s2}번 만에 끝`);
     // 관전: 정밀 3이닝, 경기 끝까지
     await page.keyboard.press('4');
-    for(const k of ['3', '2', '3', '4', '2', '1']) await page.keyboard.press(k);
+    for(const k of ['4', '2', '3', '4', '2', '1']) await page.keyboard.press(k);
     await page.keyboard.press('4');
     await page.waitForFunction(() => document.querySelector('#q').textContent.includes('경기가 끝났습니다'));
     console.log(`${name}: 관전 끝`);
@@ -75,7 +75,7 @@ const PORT = 8766;
       await page.keyboard.press('9'); await page.keyboard.press('7');
       await page.keyboard.press('9'); await page.keyboard.press('9');
       if(!(await q(page)).includes('무엇을 할까요')) errors.push('그만하기 뒤 처음 화면이 아님');
-      await page.keyboard.press('4');
+      await page.keyboard.press('5');
       const s3 = await playToEnd(page, name + ' 이어하기', true);
       console.log(`${name}: 맡기기·이어하기 ${s3}번 만에 끝`);
       // 둘이 하기 정밀 모드 1이닝 (기기 넘기기 화면 포함)
@@ -95,7 +95,7 @@ const PORT = 8766;
     }
     // 설정 화면: 글자 크기·화면 색 바꾸기
     await page.keyboard.press('4');
-    await page.keyboard.press('6');
+    await page.keyboard.press('7');
     for(const k of ['1', '2', '2', '1', '1', '1']) await page.keyboard.press(k);
     await shot(page, `${name}-settings`); await noOverflow(page, name + ' 설정');
     await page.keyboard.press('2'); await page.keyboard.press('1'); await page.keyboard.press('1');

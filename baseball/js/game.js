@@ -3,18 +3,25 @@
    한 공(간단 모드는 한 타석)마다 수비와 공격이 각자 몰래 고르고, 둘 다 고르면 계산함.
    - 혼자 하기: 사람이 고르면 컴퓨터가 그 자리에서 고르고 바로 결과
    - 둘이 하기(한 기기): 수비가 먼저 고르고 "기기 넘기기" 화면 뒤에 공격이 고름
-   - 관전·맡기기: 컴퓨터가 양쪽을 고름 */
+   - 관전·맡기기: 컴퓨터가 양쪽을 고름
+   - 온라인 대전: 각 기기는 자기 팀만 고름. 방장 기기가 계산하고 상태를 보냄 (js/online.js) */
 let G = null;
-const GS = { pend:{ def:null, off:null }, sel:null, auto:null, holder:-1, guessPA:-1, play:0, opts:null };
+const GS = { pend:{ def:null, off:null }, sel:null, auto:null, holder:-1, guess:null, guessPA:-1, play:0, opts:null };
 
 const isHuman = ti => G.ctrl[ti] === 'human';
-const twoP = () => isHuman(0) && isHuman(1);
-const needs = ti => isHuman(ti) && !(GS.auto && GS.auto.side === ti);
+// local: 이 기기에서 고르는 팀 (온라인에서는 내 팀만)
+const local = ti => !NET.on || ti === NET.side;
+const twoP = () => isHuman(0) && isHuman(1) && !NET.on;
+const needs = ti => isHuman(ti) && local(ti) && !(GS.auto && GS.auto.side === ti);
+// 상대 기기에서 선택이 와야 하는 팀
+const remote = ti => NET.on && !local(ti);
+// 능력치를 숫자로 보여 줄 팀 (내 팀, 관전이면 모두)
+const ownTeam = ti => NET.on ? ti === NET.side : (isHuman(ti) || G.ctrl.every(c => c === 'cpu'));
 const whoLabel = ti => twoP() ? `${G.who[ti] || G.teams[ti].short}, ` : '';
 // 사람이 응원하는 팀 (혼자 하기) · 둘 다 사람이면 지금 공격 팀
 const myTeam = () => isHuman(0) && !isHuman(1) ? 0 : isHuman(1) && !isHuman(0) ? 1 : -1;
 
-function saveGame(){ if(G) ls.set('bb_game', { G, opts: GS.opts, holder: GS.holder }); }
+function saveGame(){ if(G && !NET.on) ls.set('bb_game', { G, opts: GS.opts, holder: GS.holder }); }
 function loadSaved(){ const s = ls.get('bb_game', null); return s && s.G && !s.G.over && s.G.v === 1 ? s : null; }
 
 function startGame(opts, via){
@@ -68,7 +75,7 @@ function gameStatus(){
   return out;
 }
 function whoInfo(){
-  const bi = batIdx(G), fi = 1 - bi, own = ti => isHuman(ti);
+  const bi = batIdx(G), fi = 1 - bi, own = ownTeam;
   if(G.mode === 'simple') return [`타자 ${batTeam(G).bi + 1}번 ${curBatter(G).name}, 오늘 ${batterLine(curBatter(G))}.`, `투수 ${curPitcher(G).name}.`];
   return ['타자: ' + batterInfo(G, G.teams[bi], G.teams[bi].bi, own(bi)), '투수: ' + pitcherInfo(G, G.teams[fi], G.teams[fi].pi, own(fi))];
 }
@@ -79,6 +86,7 @@ function recentLines(n){ return G.log.filter(l => l.k !== 'd' || SET.dice).slice
 function gameNext(via, res){
   if(res){ playFx(res.fx); }
   const lines = visible(res ? res.lines : []);
+  if(NET.on){ netNext(via, res, lines); return; }
   saveGame();
   if(G.over){ ls.del('bb_game'); go(endScreen, via, lines); return; }
   if(GS.auto && autoDone()) GS.auto = null;
@@ -116,22 +124,31 @@ function runSteps(stop){
 }
 // side: 'def' | 'off'
 function submit(side, choice, via){
-  GS.pend[side] = choice; GS.sel = null;
+  GS.sel = null;
+  // 온라인 손님: 방장에게 보내고 결과를 기다림
+  if(NET.on && NET.role === 'guest'){ NET.sent = true; netSendAct({ k:'choice', role:side, c:choice }); gameNext(via, null); return; }
+  GS.pend[side] = choice;
+  if(!tryResolve(via)) gameNext(via, null);
+}
+// 양쪽 선택이 모두 있으면 계산함 (컴퓨터·맡긴 쪽은 그 자리에서 고름)
+function tryResolve(via){
   const off = batIdx(G), def = 1 - off;
-  if(!GS.pend.def && needs(def)){ gameNext(via, null); return; }
-  if(!GS.pend.off && needs(off)){ gameNext(via, null); return; }
+  if(!GS.pend.def && (needs(def) || remote(def))) return false;
+  if(!GS.pend.off && (needs(off) || remote(off))) return false;
   const D = GS.pend.def || (G.mode === 'detail' ? aiPitch(G) : aiSimpleDef(G));
   const O = GS.pend.off || (G.mode === 'detail' ? aiBat(G) : aiSimpleOff(G));
   GS.pend = { def:null, off:null };
   const res = G.mode === 'detail' ? playPitch(G, D, O) : playSimple(G, D, O);
   gameNext(via, res);
+  return true;
 }
 // 맡기기: 이번 공 · 이번 타석 · 이번 이닝
 function delegate(scope, via){
-  const ti = GS.holder >= 0 ? GS.holder : myTeam();
-  GS.pend = { def:null, off:null };
+  const ti = NET.on ? NET.side : GS.holder >= 0 ? GS.holder : myTeam();
+  if(!NET.on) GS.pend = { def:null, off:null };
   GS.auto = { side: ti, scope, seq: G.seq, pitchNo: G.pitchNo, pa: G.pa, half: G.half };
   GS.autoScope = scope;
+  if(NET.on){ gameNext(via, { lines:[{ s: scope === 'pa' ? '이번 타석을 맡깁니다.' : '이번 이닝을 맡깁니다.', k:'c' }], fx:[] }); return; }
   if(twoP()){
     // 둘이 하기: 맡긴 쪽만 컴퓨터가 고르고, 상대는 계속 직접 고름
     const off = batIdx(G), def = 1 - off;
@@ -172,25 +189,28 @@ function locScreen(){
       GS.sel = { ...GS.sel, r, c };
       if(r === 1 && c === 1){ GS.sel.e = 'in'; go(powScreen, v); } else go(edgeScreen, v);
     } });
-  return { board:true, grid:true, q:`${PITCH[GS.sel.t].name}, 어디로 던질까요? 몸쪽은 타자 쪽입니다.`, opts, back: v => go(defMain, v) };
+  return { board:true, sub:true, grid:true, q:`${PITCH[GS.sel.t].name}, 어디로 던질까요? 몸쪽은 타자 쪽입니다.`, opts, back: v => go(defMain, v) };
 }
 function edgeScreen(){
   const s = GS.sel, name = ZONE_NAME[s.r][s.c];
   const opts = ['in', 'edge', 'out'].map((e, i) => ({ n: i + 1, t: EDGE[e].name, s: EDGE[e].sub, act: v => { GS.sel = { ...GS.sel, e }; go(powScreen, v); } }));
-  return { board:true, q:`${PITCH[s.t].name}, ${name}. 얼마나 붙일까요?`, opts, back: v => go(locScreen, v) };
+  return { board:true, sub:true, q:`${PITCH[s.t].name}, ${name}. 얼마나 붙일까요?`, opts, back: v => go(locScreen, v) };
 }
 function powScreen(){
   const s = GS.sel, P = curPitcher(G);
   const sub = { 1:'구위가 좋아지지만 제구가 흔들리고 힘이 빨리 빠집니다.', 2:'평소대로 던집니다.', 3:'제구가 좋아지지만 공이 가벼워집니다.' };
   const opts = [1, 2, 3].map(w => ({ n:w, t:`${POWER[w].name}, 약 ${expVel(P, s.t, w)}킬로`, s: sub[w], act: v => submit('def', { ...GS.sel, w }, v) }));
-  return { board:true, q:`${PITCH[s.t].name}, ${ZONE_NAME[s.r][s.c]}${s.r === 1 && s.c === 1 ? '' : ', ' + EDGE[s.e].name}. 얼마나 세게 던질까요?`, opts,
+  return { board:true, sub:true, q:`${PITCH[s.t].name}, ${ZONE_NAME[s.r][s.c]}${s.r === 1 && s.c === 1 ? '' : ', ' + EDGE[s.e].name}. 얼마나 세게 던질까요?`, opts,
     back: v => go(s.r === 1 && s.c === 1 ? locScreen : edgeScreen, v) };
 }
 function alignScreen(){
   const ti = 1 - batIdx(G), T = G.teams[ti], a = T.align;
-  const set = (inf, of, v) => { const r = setAlign(G, ti, inf, of); saveGame(); rerender(); speak(r.lines.map(l => l.s).join(' ')); };
+  const set = (inf, of, v) => {
+    if(NET.on && NET.role === 'guest'){ netSendAct({ k:'align', inf, of }); T.align = { inf, of }; rerender(); speak(`수비 위치: 내야 ${ALIGN_IN[inf]}, 외야 ${ALIGN_OUT[of]}.`); return; }
+    const r = setAlign(G, ti, inf, of); saveGame(); if(NET.on) netPushState(r); rerender(); speak(r.lines.map(l => l.s).join(' '));
+  };
   const mark = on => on ? ' (지금)' : '';
-  return { board:true, q:`수비 위치를 고르세요. 지금 내야 ${ALIGN_IN[a.inf]}, 외야 ${ALIGN_OUT[a.of]}.`, back: v => go(defMain, v), opts:[
+  return { board:true, sub:true, q:`수비 위치를 고르세요. 지금 내야 ${ALIGN_IN[a.inf]}, 외야 ${ALIGN_OUT[a.of]}.`, back: v => go(defMain, v), opts:[
     { n:1, t:'내야 전진 수비' + mark(a.inf === 0), s:'3루 주자의 득점을 막습니다. 대신 땅볼이 빠져나가기 쉽습니다.', act: v => set(0, a.of, v) },
     { n:2, t:'내야 보통 수비' + mark(a.inf === 1), act: v => set(1, a.of, v) },
     { n:3, t:'내야 후진 수비' + mark(a.inf === 2), s:'강한 땅볼과 병살에 강합니다. 느린 땅볼은 내야 안타가 되기 쉽습니다.', act: v => set(2, a.of, v) },
@@ -203,7 +223,7 @@ function alignScreen(){
 function tacticScreen(){
   const ti = 1 - batIdx(G), P = curPitcher(G);
   const bench = benchPitchers(G, ti);
-  return { board:true, q:'작전을 고르세요.', back: v => go(defMain, v), opts:[
+  return { board:true, sub:true, q:'작전을 고르세요.', back: v => go(defMain, v), opts:[
     { n:1, t:'고의 볼넷', s:'이번 타자를 그냥 1루로 내보냅니다.', act: v => submit('def', G.mode === 'detail' ? { k:'ibb' } : 'ibb', v) },
     { n:2, t:'투수 교체', s: bench.length ? `불펜에 ${bench.length}명이 남았습니다.` : '바꿀 투수가 없습니다.', hide: G.mode !== 'detail', act: v => bench.length ? go(bullpenScreen, v) : speak('바꿀 투수가 없습니다.') },
     { n:3, t:'지금 투수 상태 듣기', hide: G.mode !== 'detail', act: v => note([pitcherInfo(G, G.teams[ti], G.teams[ti].pi, true)], v) },
@@ -212,8 +232,9 @@ function tacticScreen(){
 function bullpenScreen(){
   const ti = 1 - batIdx(G), T = G.teams[ti];
   const opts = benchPitchers(G, ti).slice(0, 8).map((x, i) => ({ n: i + 1, t: x.p.name, s: pitcherInfo(G, T, x.i, true), act: v => {
-    const r = changePitcher(G, ti, x.i); saveGame(); go(defMain, v, visible(r.lines)); } }));
-  return { board:true, q:'누구로 바꿀까요?', opts, back: v => go(tacticScreen, v) };
+    if(NET.on && NET.role === 'guest'){ netSendAct({ k:'pitcher', idx:x.i }); go(defMain, v, [`투수를 ${josa(x.p.name, '으로', '로')} 바꿉니다.`]); return; }
+    const r = changePitcher(G, ti, x.i); saveGame(); if(NET.on) netPushState(r); go(defMain, v, visible(r.lines)); } }));
+  return { board:true, sub:true, q:'누구로 바꿀까요?', opts, back: v => go(tacticScreen, v) };
 }
 
 /* ---------- 공격 (정밀 모드) ---------- */
@@ -221,8 +242,8 @@ const GUESS = { fast:'직구 계열 노리기', break:'변화구 노리기' };
 function offMain(){
   if(G.mode === 'simple') return simpleOff();
   const ti = batIdx(G), T = G.teams[ti], B = curBatter(G), bs = G.bases;
-  if(GS.guessPA !== G.pa){ T.guess = null; GS.guessPA = G.pa; }
-  const g = T.guess;
+  if(GS.guessPA !== G.pa){ GS.guess = null; GS.guessPA = G.pa; }
+  const g = GS.guess;
   const runner = bs[1] != null && bs[2] == null ? T.bat[bs[1]] : bs[0] != null && bs[1] == null ? T.bat[bs[0]] : null;
   const runners = bs.some(x => x != null);
   const bat = k => v => submit('off', { k, g }, v);
@@ -239,8 +260,8 @@ function offMain(){
   ] };
 }
 function guessScreen(){
-  const T = batTeam(G), set = (g, v) => { T.guess = g; go(offMain, v, [{ s:`노림수: ${g ? GUESS[g] : '없음'}.`, k:'c' }]); };
-  return { board:true, q:'무엇을 노릴까요?', back: v => go(offMain, v), opts:[
+  const set = (g, v) => { GS.guess = g; GS.guessPA = G.pa; go(offMain, v, [{ s:`노림수: ${g ? GUESS[g] : '없음'}.`, k:'c' }]); };
+  return { board:true, sub:true, q:'무엇을 노릴까요?', back: v => go(offMain, v), opts:[
     { n:1, t:GUESS.fast, s:'직구·투심·커터', act: v => set('fast', v) },
     { n:2, t:GUESS.break, s:'슬라이더·커브·체인지업·포크', act: v => set('break', v) },
     { n:3, t:'노림수 없음', act: v => set(null, v) },
@@ -268,6 +289,7 @@ function simpleOff(){
     { n:3, t:'맞히기', s: simpleOdds(null, 'contact'), act: v => submit('off', 'contact', v) },
     { n:4, t: runners ? '번트' : '기습 번트', s: runners ? '주자를 한 베이스 보냅니다. 타자는 대개 아웃됩니다.' : '빠른 발로 1루를 노립니다.', act: v => submit('off', 'bunt', v) },
     { n:5, t:'도루', s:'주자가 다음 베이스로 뜁니다. 성공 확률 60%. 타석은 그대로 이어집니다.', hide: !canSteal(G), act: v => {
+      if(NET.on && NET.role === 'guest'){ netSendAct({ k:'steal' }); speak('도루를 보냈습니다.'); return; }
       const r = playSimple(G, null, 'steal'); gameNext(v, r); } },
     { n:8, t:'맡기기', s:'이번 타석은 컴퓨터가 골라 줍니다.', act: v => submit('off', aiSimpleOff(G), v) },
     { n:9, t:'더 보기', s:'점수판, 맡기기, 설정', act: v => go(moreScreen, v) },
@@ -278,20 +300,21 @@ function simpleOff(){
 function moreScreen(){
   const playing = needs(0) || needs(1);
   const [A, H] = G.teams;
-  return { board:true, q:'더 보기', back: v => gameNext(v, null), opts:[
+  return { board:true, sub:true, q:'더 보기', back: v => gameNext(v, null), opts:[
     { n:1, t:'점수판', act: v => note(scoreboard(G), v) },
     { n:2, t:'지금 타자와 투수', act: v => note(whoInfo(), v) },
     { n:3, t:`${A.short} 명단`, act: v => go(() => rosterScreen(0), v) },
     { n:4, t:`${H.short} 명단`, act: v => go(() => rosterScreen(1), v) },
-    { n:5, t:'최근 기록', s:'최근 12줄', act: v => note(recentLines(12), v) },
-    { n:6, t:'이번 타석 맡기기', hide: !playing, s:'이번 타석이 끝날 때까지 컴퓨터가 대신 고릅니다.', act: v => delegate('pa', v) },
-    { n:7, t:'이번 이닝 맡기기', hide: !playing || twoP(), s:'이번 이닝이 끝날 때까지 컴퓨터가 대신 고르고, 결과만 알려 줍니다.', act: v => delegate('half', v) },
+    { n:5, t: NET.on ? '채팅과 음성 대화' : '최근 기록', s: NET.on ? voiceLabel() : '최근 12줄', act: v => NET.on ? go(talkScreen, v) : note(recentLines(12), v) },
+    { n:6, t:'이번 타석 맡기기', hide: !playing || G.over, s:'이번 타석이 끝날 때까지 컴퓨터가 대신 고릅니다.', act: v => delegate('pa', v) },
+    { n:7, t:'이번 이닝 맡기기', hide: !playing || twoP() || G.over, s: NET.on ? '이번 이닝이 끝날 때까지 컴퓨터가 내 팀을 대신 고릅니다.' : '이번 이닝이 끝날 때까지 컴퓨터가 대신 고르고, 결과만 알려 줍니다.', act: v => delegate('half', v) },
     { n:8, t:'설정', act: v => go(() => settingsScreen(() => go(moreScreen, 'click')), v) },
-    { n:9, t:'경기 그만하기', s:'경기는 저장되어 처음 화면에서 이어 할 수 있습니다.', act: v => { saveGame(); G = null; go(homeScreen, v, ['경기를 저장했습니다. 이어하기로 다시 시작할 수 있습니다.']); } },
+    NET.on ? { n:9, t:'방에서 나가기', s:'경기를 그만두고 방에서 나갑니다.', act: () => leaveRoomAsk() }
+      : { n:9, t:'경기 그만하기', s:'경기는 저장되어 처음 화면에서 이어 할 수 있습니다.', act: v => { saveGame(); G = null; go(homeScreen, v, ['경기를 저장했습니다. 이어하기로 다시 시작할 수 있습니다.']); } },
   ] };
 }
 function rosterScreen(ti){
-  const T = G.teams[ti], own = isHuman(ti) || G.ctrl.every(c => c === 'cpu');
+  const T = G.teams[ti], own = ownTeam(ti);
   const say = [`${T.name}, ${STYLES[T.style].name}. ${STYLES[T.style].desc}${own ? '' : ' 상대 팀 능력치는 등급으로만 보입니다.'}`];
   if(G.mode === 'detail'){
     T.bat.forEach((b, i) => say.push(batterInfo(G, T, i, own)));
@@ -300,7 +323,7 @@ function rosterScreen(ti){
     T.bat.forEach((b, i) => say.push(`${i + 1}번 ${POS[b.pos]} ${b.name}, 오늘 ${batterLine(b)}.`));
     say.push(`투수 ${T.pit[T.pi].name}.`);
   }
-  return { board:true, q:`${T.short} 명단입니다. 위 글을 한 줄씩 읽어 보세요.`, back: v => go(moreScreen, v), say,
+  return { board:true, sub:true, q:`${T.short} 명단입니다. 위 글을 한 줄씩 읽어 보세요.`, back: v => go(moreScreen, v), say,
     opts:[{ n:1, t:'돌아가기', act: v => go(moreScreen, v) }] };
 }
 // 위쪽 메뉴 단추
@@ -345,6 +368,13 @@ function stopAutoPlay(say){
 /* ---------- 경기 끝 ---------- */
 function endScreen(){
   const o = GS.opts;
+  if(NET.on) return { board:true, q: NET.role === 'host' ? '경기가 끝났습니다. 한 판 더 할까요?' : '경기가 끝났습니다. 방장이 한 판 더를 고르면 새 경기가 시작됩니다.', opts:[
+    { n:1, t:'한 판 더', hide: NET.role !== 'host', s:'같은 팀으로 새 경기를 시작합니다. 선수 능력치와 날씨는 새로 정해집니다.', act: v => netStartGame(v) },
+    { n:2, t:'점수판', act: v => note(scoreboard(G), v) },
+    { n:3, t:'경기 기록 전체', act: v => go(() => logScreen(), v) },
+    { n:4, t:'채팅과 음성 대화', act: v => go(talkScreen, v) },
+    { n:9, t:'방에서 나가기', act: () => leaveRoomAsk() },
+  ] };
   return { board:true, q:'경기가 끝났습니다. 무엇을 할까요?', opts:[
     { n:1, t:'같은 설정으로 다시 하기', s:'선수 능력치와 날씨는 새로 정해집니다.', act: v => startGame({ ...o, seed: (Date.now() >>> 0) }, v) },
     { n:2, t:'점수판', act: v => note(scoreboard(G), v) },
@@ -354,6 +384,6 @@ function endScreen(){
 }
 function logScreen(){
   const say = G.log.filter(l => l.k !== 'd' || SET.dice).slice(-300);
-  return { board:true, q:'경기 기록입니다. 위 글을 한 줄씩 읽어 보세요.', say, back: v => go(G.over ? endScreen : moreScreen, v),
+  return { board:true, sub:true, q:'경기 기록입니다. 위 글을 한 줄씩 읽어 보세요.', say, back: v => go(G.over ? endScreen : moreScreen, v),
     opts:[{ n:1, t:'돌아가기', act: v => go(G.over ? endScreen : moreScreen, v) }] };
 }

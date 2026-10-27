@@ -19,7 +19,7 @@ function go(make, via = 'init', lines = []){
   const say = UI.S.say.map(l => l.s || l);
   const msg = [...say, UI.S.q].filter(Boolean).join(' ');
   if(via === 'click'){
-    setTimeout(() => { const el = say.length ? $('#say') : $('#q'); if(el) el.focus({ preventScroll:false }); }, 40);
+    setTimeout(() => { const el = UI.S.focusCmd ? $('#cmd') : say.length ? $('#say') : $('#q'); if(el) el.focus({ preventScroll:false }); }, 40);
     if(SET.voice === 'tts') ttsSay(msg);
   } else if(via === 'key' || via === 'auto') speak(msg);
 }
@@ -43,6 +43,8 @@ function render(){
   ex.innerHTML = S.back ? '<button type="button" class="btn back" id="backBtn">뒤로<span class="kh" aria-hidden="true"> (점 키)</span></button>' : '';
   $('#logSec').hidden = !S.board;
   if(S.board) renderLog();
+  if(typeof renderChat === 'function') renderChat(true);
+  if(typeof voiceUI === 'function') voiceUI();
   if(hadFocus && !$('#opts').contains(document.activeElement)) $('#q').focus();
 }
 function renderOpts(S){
@@ -110,6 +112,7 @@ const KEY_HELP = [
   '명령 칸에는 숫자나 낱말(상황, 점수, 선수, 기록, 도움, 뒤로, 또는 선택지 이름)을 적고 입력합니다.',
 ];
 function keyCmd(k, via){
+  if(UI.S.input && /^[0-9]$/.test(k)) return UI.S.onDigit(k, via);   // 방 코드처럼 숫자를 입력하는 화면
   if(/^[1-9]$/.test(k)) return choose(k, via);
   if(k === '.') return back(via);
   if(k === '0') return note(typeof gameStatus === 'function' && G && UI.S.board ? gameStatus() : [`${UI.S.q || ''}`, optionsText() + '.'], via);
@@ -124,9 +127,14 @@ const WORDS = { '상황':'0', '점수':'+', '점수판':'+', '선수':'-', '정�
 function textCmd(v){
   v = v.trim(); if(!v) return;
   if(/^[0-9.+\-*/]$/.test(v)) return keyCmd(v, 'key');
+  if(UI.S.onText) return UI.S.onText(v, 'key');   // 이름·방 코드·채팅처럼 글을 받는 화면
   if(WORDS[v]) return keyCmd(WORDS[v], 'key');
   const ops = (UI.S.opts || []).filter(o => !o.hide);
-  const o = ops.find(x => x.t === v) || ops.find(x => x.t.replace(/\s/g, '').includes(v.replace(/\s/g, '')));
+  const exact = ops.find(x => x.t === v);
+  if(exact) return choose(exact.n, 'key');
+  // 온라인 대전: 명령이 아닌 글은 채팅으로 보냄
+  if(typeof NET !== 'undefined' && NET.on){ netChat(v); speak('채팅을 보냈습니다.'); return; }
+  const o = ops.find(x => x.t.replace(/\s/g, '').includes(v.replace(/\s/g, '')));
   if(o) return choose(o.n, 'key');
   speak(`알아듣지 못했습니다. 번호를 입력해 주세요. ${optionsText()}.`);
 }

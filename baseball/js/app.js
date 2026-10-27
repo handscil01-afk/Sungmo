@@ -9,11 +9,12 @@ function homeScreen(){
     opts:[
       { n:1, t:'혼자 하기', s:'컴퓨터 팀과 대결합니다.', act: v => { NEW.kind = '1p'; go(modeScreen, v); } },
       { n:2, t:'둘이 하기', s:'한 기기를 번갈아 쓰며 대결합니다.', act: v => { NEW.kind = '2p'; go(modeScreen, v); } },
-      { n:3, t:'컴퓨터끼리 관전', s:'컴퓨터 두 팀의 경기를 듣습니다.', act: v => { NEW.kind = 'watch'; go(modeScreen, v); } },
-      { n:4, t:'이어하기', hide: !sv, s: sv ? `${sv.G.mode === 'simple' ? '간단' : '정밀'} 모드, ${situation(sv.G)}` : '', act: v => resumeGame(v) },
-      { n:5, t:'게임 방법과 키 안내', act: v => go(() => helpScreen(() => go(homeScreen, 'click')), v) },
-      { n:6, t:'설정', s:'글자 크기, 화면 색, 읽어 주기, 효과음, 진동', act: v => go(() => settingsScreen(() => go(homeScreen, 'click')), v) },
-      { n:7, t:'홈 화면에 설치하기', hide: !canInstall(), s:'아이콘으로 바로 열고 화면을 넓게 씁니다.', act: () => doInstall() },
+      { n:3, t:'온라인 대전', s:'각자 휴대폰으로 만나 대결하고, 채팅과 음성 대화를 합니다.', act: v => go(onlineHome, v) },
+      { n:4, t:'컴퓨터끼리 관전', s:'컴퓨터 두 팀의 경기를 듣습니다.', act: v => { NEW.kind = 'watch'; go(modeScreen, v); } },
+      { n:5, t:'이어하기', hide: !sv, s: sv ? `${sv.G.mode === 'simple' ? '간단' : '정밀'} 모드, ${situation(sv.G)}` : '', act: v => resumeGame(v) },
+      { n:6, t:'게임 방법과 키 안내', act: v => go(() => helpScreen(() => go(homeScreen, 'click')), v) },
+      { n:7, t:'설정', s:'글자 크기, 화면 색, 읽어 주기, 효과음, 진동', act: v => go(() => settingsScreen(() => go(homeScreen, 'click')), v) },
+      { n:8, t:'홈 화면에 설치하기', hide: !canInstall(), s:'아이콘으로 바로 열고 화면을 넓게 씁니다.', act: () => doInstall() },
     ] };
 }
 
@@ -21,13 +22,13 @@ function homeScreen(){
 const NEW = { kind:'1p', mode:'simple', a:null, b:null, first:1, innings:3, diff:1 };
 const teamLabel = k => { const t = teamInfo(k); return `${t.name} (${STYLES[t.style].name})`; };
 function modeScreen(){
-  return { q:'어떤 방식으로 할까요?', back: v => go(homeScreen, v), opts:[
+  return { q:'어떤 방식으로 할까요?', back: v => go(NEW.kind === 'online' ? onlineHome : homeScreen, v), opts:[
     { n:1, t:'간단 모드', s:'타석마다 한 번 고르고, 주사위로 결과를 정합니다. 처음 해 보는 분께 알맞습니다.', act: v => { NEW.mode = 'simple'; go(() => teamScreen(0), v); } },
     { n:2, t:'정밀 모드', s:'공 하나마다 구종, 코스, 세기를 고릅니다. 선수 능력치, 컨디션, 바람, 수비 위치가 결과를 바꿉니다.', act: v => { NEW.mode = 'detail'; go(() => teamScreen(0), v); } },
   ] };
 }
 function teamScreen(which){
-  const q = NEW.kind === '1p' ? (which ? '상대 팀을 고르세요.' : '내 팀을 고르세요.')
+  const q = NEW.kind === '1p' || NEW.kind === 'online' ? (which ? '상대 팀을 고르세요.' : '내 팀을 고르세요.')
           : NEW.kind === '2p' ? (which ? '둘째 사람의 팀을 고르세요.' : '첫째 사람의 팀을 고르세요.')
           : (which ? '홈 팀을 고르세요.' : '원정 팀을 고르세요.');
   const taken = which ? NEW.a : null;
@@ -41,7 +42,7 @@ function teamScreen(which){
   return { q, opts, back: v => go(which ? () => teamScreen(0) : modeScreen, v) };
 }
 function sideScreen(){
-  const me = NEW.kind === '1p' ? '내 팀' : '첫째 사람 팀';
+  const me = NEW.kind === '2p' ? '첫째 사람 팀' : '내 팀';
   const set = (f, v) => { NEW.first = f; go(inningsScreen, v); };
   return { q:`${me}(${teamInfo(NEW.a).short})이 먼저 공격할까요?`, back: v => go(() => teamScreen(1), v), opts:[
     { n:1, t:'먼저 공격', s:'원정 팀이 되어 매회 초에 공격합니다.', act: v => set(1, v) },
@@ -50,7 +51,7 @@ function sideScreen(){
   ] };
 }
 function inningsScreen(){
-  const set = (n, v) => { NEW.innings = n; go(NEW.kind === '1p' ? diffScreen : readyScreen, v); };
+  const set = (n, v) => { NEW.innings = n; if(NEW.kind === 'online') createRoomFlow(v); else go(NEW.kind === '1p' ? diffScreen : readyScreen, v); };
   return { q:'몇 이닝 경기를 할까요?', back: v => go(NEW.kind === 'watch' ? () => teamScreen(1) : sideScreen, v), opts:[
     { n:1, t:'1이닝', s:'맛보기. 몇 분이면 끝납니다.', act: v => set(1, v) },
     { n:2, t:'3이닝', s:'짧은 경기.', act: v => set(3, v) },
@@ -124,6 +125,8 @@ function settings2(backTo){
     { n:5, t:`자동 전체화면: ${onOff(SET.autoFS)}`, hide: isStandalone(), s:'켜면 화면을 처음 누를 때 전체화면으로 바뀝니다.', act: ch(() => { SET.autoFS = !SET.autoFS; FS.userExit = false; }, () => `자동 전체화면 ${onOff(SET.autoFS)}`) },
     { n:6, t:'홈 화면에 설치하기', hide: !canInstall(), act: () => doInstall() },
     { n:7, t:'소리 시험', s:'읽어 주기, 효과음, 진동을 시험합니다.', act: v => { playFx(['bat', 'hit']); speak('소리 시험입니다. 딱! 잘 맞은 타구, 안타!'); if(v === 'click' && SET.voice === 'sr') note(['소리 시험입니다. 딱! 잘 맞은 타구, 안타!'], v); } },
+    { n:9, t:`받은 채팅 읽어 주기: ${onOff(SET.chatRead)}`, s:'온라인 대전에서 상대가 보낸 채팅을 바로 읽어 줍니다. 채팅 목록은 늘 화면에 남습니다.',
+      act: ch(() => { SET.chatRead = !SET.chatRead; }, () => `채팅 읽어 주기 ${onOff(SET.chatRead)}`) },
     { n:8, t:'저장된 경기 지우기', hide: !loadSaved(), act: () => openDlg('저장된 경기 지우기', ['이어 하던 경기를 지울까요? 되돌릴 수 없습니다.'], [
       { label:'지우기', act: () => { ls.del('bb_game'); stay('저장된 경기를 지웠습니다.'); } }, { label:'그만두기' }]) },
   ] };
@@ -184,8 +187,16 @@ const HELP = {
     '화면이 보이는 분은 설정에서 글자 크기와 화면 색(어두운 화면, 밝은 화면, 노랑 바탕)을 바꿀 수 있습니다. 화면 낭독기를 쓰지 않는다면 읽어 주기를 기기 음성으로 바꾸세요.',
     '안드로이드 휴대폰은 안타, 홈런, 삼진, 득점 때 진동으로도 알려 줍니다.',
   ],
+  '온라인 대전, 채팅, 음성': [
+    '한 사람이 방을 만들고 방 코드 네 자리나 초대 링크를 상대에게 알려 줍니다. 상대는 방 코드로 들어가기에서 숫자 네 자리를 누릅니다. 초대 링크를 받았다면 링크를 열고 이름만 적으면 됩니다.',
+    '두 사람이 각자 자기 팀만 고릅니다. 상대가 무엇을 골랐는지는 결과가 나와야 압니다. 내가 먼저 고르면 상대를 기다리는 화면이 나옵니다.',
+    '채팅: 명령 칸에 글을 적고 입력하면 상대에게 보냅니다(선택지 이름과 똑같은 글은 그 선택지를 고릅니다). 받은 채팅은 바로 읽어 주고, 화면 아래 채팅 목록에 남습니다. 빠른 문구도 있습니다.',
+    '음성 대화: 채팅과 음성 대화 화면에서 켭니다. 두 사람이 모두 켜면 연결됩니다. 목소리는 기기끼리 직접 오가서 서버 한도를 쓰지 않습니다.',
+    '통화 방식은 마이크가 계속 켜져 있고, 위쪽의 마이크 끄기 단추로 잠시 끌 수 있습니다. 무전기 방식은 위쪽 말하기 단추를 누르고 있는 동안 말합니다. 화면 낭독기에서는 두 번 탭으로 말하기를 켜고, 다시 두 번 탭해서 끕니다. 말을 시작하면 삑 소리가 납니다.',
+    '음성이 연결되지 않으면(일부 휴대폰 데이터망) 와이파이로 바꾸거나 채팅을 써 주세요.',
+    '연결이 끊기면 같은 기기에서 다시 열고 온라인 대전의 방 다시 들어가기를 누르면 이어 합니다. 경기는 방장 기기가 계산하므로, 방장이 나가면 경기가 멈춥니다.',
+  ],
   '앞으로 만들 것': [
-    '2단계, 온라인 대전: 방 코드로 만나 각자 휴대폰으로 대결하고, 문자 채팅과 음성 대화를 함께 합니다.',
     '3단계, 감독 모드: 공 하나하나는 선수가 알아서 하고, 감독은 타순, 선발 투수, 대타, 투수 교체, 작전만 지시합니다.',
     '그다음: 우리 센터 이름으로 팀과 선수 만들기, 시즌 기록, 히트 앤드 런과 견제구 같은 작전, 관중 소리.',
   ],
@@ -199,4 +210,10 @@ function helpScreen(backTo){
 /* ---------- 시작 ---------- */
 applySet();
 bindCmd();
-go(homeScreen, 'init');
+voiceUI();
+// 초대 링크(?room=1234)로 열면 바로 그 방에 들어감
+(function(){
+  const room = new URLSearchParams(location.search).get('room');
+  if(room && /^[0-9]{4}$/.test(room)) go(() => nameScreen(() => startJoin(room, 'click')), 'init', [`방 ${spaced(room)}에 초대받았습니다.`]);
+  else go(homeScreen, 'init');
+})();
