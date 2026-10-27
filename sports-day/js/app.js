@@ -175,6 +175,7 @@ function menuSheet(){
       ${FS.supported() ? `<div class="item"><span class="name">자동 전체화면<span class="sub">화면을 처음 누르면 주소창 없이 전체화면으로 바꿉니다.</span></span><label class="switch"><input type="checkbox" data-ch="autofs" ${UIX.autoFS?'checked':''}><span></span></label></div>
         <div class="item tap" data-a="fs"><span class="name">${FS.on()?'↙ 전체화면 끝내기':'↗ 전체화면 켜기'}</span></div>` : ''}
       ${isStandalone() ? '' : '<div class="item tap" data-a="install"><span class="name">📲 홈 화면에 설치하기</span></div>'}
+      ${r.role==='board' ? `<div class="item"><span class="name">🔊 이 기기에서 소리 내기<span class="sub">끄면 이 안내판은 화면만 보여 줍니다. 읽기가 안 되는 기기는 끄고, 읽기가 되는 다른 기기를 안내판으로 하나 더 켜서 스피커에 연결하면 됩니다.</span></span><label class="switch"><input type="checkbox" data-a="bdMute" ${bdMute()?'':'checked'}><span></span></label></div>` : ''}
       <div class="item tap" data-a="ttsSheet"><span class="name">🗣 음성 안내<span class="sub">읽기 방식(자동·기기 음성·보이스오버·끄기)을 정하고, 이 기기에서 읽히는지 시험합니다.</span></span></div>
       ${r.role!=='board' ? psMenu() : ''}
       ${radioRoleOK() ? `<div class="item"><span class="name">🎙 무전 소리 듣기<span class="sub">끄면 다른 사람의 무전이 이 기기에서 나오지 않습니다. 말하기는 그대로 됩니다.</span></span><label class="switch"><input type="checkbox" data-a="rxToggle" ${RADIO.on?'checked':''}><span></span></label></div>` : ''}

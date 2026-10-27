@@ -109,6 +109,9 @@ const SND = {
 document.addEventListener('pointerdown', () => { if(myRole().role==='board'){ const was = SND.ready(); SND.unlock(); if(!was) setTimeout(() => { queueRender(); touchDevice(); }, 400); } }, true);
 
 /* ===================== 안내판 ===================== */
+// 이 안내판 기기에서만 소리 끄기(읽기가 안 되는 기기 대신 다른 기기를 스피커 쪽 안내판으로 쓸 때)
+const bdMute = () => !!ls.get('udh5_bdmute', false);
+ACT.bdMute = () => { ls.set('udh5_bdmute', !bdMute()); touchDevice(); toast(bdMute() ? '이 기기에서는 안내판 소리를 내지 않습니다.' : '이 기기에서 안내판 소리를 냅니다.'); drawSheet(); return false; };
 const RESULT_MS = 7000, CALL_MS = 30000, ANN_MS = 15000, FLASH_MS = 8000, PERSON_MS = 120000;
 const BOARD = { init:false, seen:new Set(), lastCall:{}, lastCc:{}, ccInit:false, ccFx:null, annId:null, testAt:0, overlay:null, queue:[], busy:false, timer:0, callFx:null, person:null, personAt:0 };
 // 지금 안내판에 띄울 화면: 마스터가 정한 것, 자동이면 가장 최근에 기록이 들어온 종목
@@ -163,7 +166,7 @@ function runFx(){
   // 음성 안내방송 중에는 호출·결과 소리를 방송이 끝난 뒤로 미룸
   if(BOARD.busy || RADIO.lock.cast) return;
   const fx = BOARD.queue.shift(); if(!fx) return;
-  const cfg = boardCfg(), sound = cfg.sound && SND.ready();
+  const cfg = boardCfg(), sound = cfg.sound && SND.ready() && !bdMute();
   const voiceMs = cfg.callVoice && sound ? 5000 : 2200;
   BOARD.busy = true;
   let dur = 1800;
@@ -231,7 +234,7 @@ function boardScreen(){
   else if(T.kind==='awards') body = boardAwards();
   else body = boardIndiv();
   const cfg = boardCfg();
-  const soundHint = boardOn() && cfg.sound && (!SND.ready() || (typeof TTS==='object' && TTS.needTap)) ? `<button class="soundhint" data-a="bdSound">🔈 화면을 한 번 눌러 소리를 켜 주세요</button>` : '';
+  const soundHint = boardOn() && cfg.sound && !bdMute() && (!SND.ready() || (typeof TTS==='object' && TTS.needTap)) ? `<button class="soundhint" data-a="bdSound">🔈 화면을 한 번 눌러 소리를 켜 주세요</button>` : '';
   const fixed = T.kind==='team' && TEAM[T.ev] && TEAM[T.ev].mode==='duel' && teamOpt(T.ev).board;     // 과녁판 중계 화면은 한 화면에 고정
   // PC·프로젝터 화면: 안내판 전체를 한 화면에 꼭 맞게 (글자 크기는 board-pc.js 가 화면 크기에 맞춰 정함)
   const key = T.kind + (T.ev || '') + (BOARD.person ? 'P' : '');

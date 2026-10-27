@@ -24,36 +24,49 @@ function koVoices(){ return ttsVoices().filter(v => /^ko([-_]|$)/i.test(v.lang |
 function pickKoVoice(){ const ks = koVoices(); return ks.find(v => v.localService) || ks[0] || null; }
 if(ttsOK()){ try{ speechSynthesis.addEventListener('voiceschanged', () => { if(typeof drawSheet === 'function') drawSheet(); }); }catch(e){} }
 
-// 기기 음성으로 읽기. attempt 0: 한국어 목소리를 골라서, 1: 기기 기본 목소리로
-function ttsSpeak(text, attempt = 0, inGesture = false){
+// 읽는 방법 후보: 안드로이드 크롬은 목소리마다 언어 표기가 달라('ko-KR' / 'ko_KR') 표기가 맞지 않으면 synthesis-failed를 내는 기기가 있음.
+// 그래서 목소리의 표기 그대로 → 여러 표기 → 지정 안 함 순서로 바꿔 가며 읽고, 처음 성공한 방법은 이 기기에 기억해 다음부터 먼저 씀
+function ttsVariants(){
+  const kv = pickKoVoice(), vl = kv ? (kv.lang || '') : '';
+  const list = [];
+  if(kv){ list.push({ k:'v:' + vl + ':0.95', voice:kv, lang:vl, rate:0.95 }); list.push({ k:'v:' + vl + ':1', voice:kv, lang:vl, rate:1 }); }
+  [...(vl ? [vl] : []), 'ko-KR', 'ko_KR', 'ko', ''].forEach(l => list.push({ k:'l:' + l, voice:null, lang:l, rate:1 }));
+  const seen = new Set(), out = list.filter(x => !seen.has(x.k) && seen.add(x.k));
+  const good = ls.get('udh5_ttsv', '');
+  const gi = out.findIndex(x => x.k === good);
+  if(gi > 0) out.unshift(out.splice(gi, 1)[0]);
+  return out;
+}
+const variantLabel = x => `${x.voice ? '목소리 ' + x.voice.name + ', ' : '기본 목소리, '}언어 ${x.lang || '지정 안 함'}, 속도 ${x.rate}`;
+
+// 기기 음성으로 읽기. idx: 몇 번째 방법으로 읽을지
+function ttsSpeak(text, idx = 0, inGesture = false){
   if(!text) return;
   if(!ttsOK()){ ttsLog('이 브라우저는 음성 읽기를 지원하지 않습니다.'); return; }
-  const ss = window.speechSynthesis;
+  const ss = window.speechSynthesis, vars = ttsVariants();
+  const giveUp = why => { ttsLog(why + ' 화면을 한 번 누르면 다시 읽습니다.'); TTS.pending = text; TTS.needTap = true; if(typeof queueRender === 'function') queueRender(); };
+  const next = () => { if(idx + 1 < vars.length) setTimeout(() => ttsSpeak(text, idx + 1), 120); else giveUp('모든 방법으로 읽지 못했습니다.'); };
   const run = () => {
+    const x = vars[idx]; if(!x){ giveUp('읽을 방법이 없습니다.'); return; }
     let u; try{ u = new SpeechSynthesisUtterance(text); }catch(e){ ttsLog('읽기 준비 실패: ' + (e.message || e)); return; }
-    u.lang = 'ko-KR'; u.rate = 0.95; u.pitch = 1; u.volume = 1;
-    let v = attempt === 0 ? pickKoVoice() : null;
-    if(v){ try{ u.voice = v; }catch(e){ v = null; } }   // 목소리를 못 고르면 기기 기본 목소리로 읽음
+    try{ if(x.lang) u.lang = x.lang; }catch(e){}
+    u.rate = x.rate; u.pitch = 1; u.volume = 1;
+    if(x.voice){ try{ u.voice = x.voice; }catch(e){ next(); return; } }
     let started = false, ended = false;
-    u.onstart = () => { started = true; TTS.needTap = false; ttsLog('읽기 시작' + (v ? ` (${v.name})` : ' (기본 목소리)')); };
+    u.onstart = () => { started = true; TTS.needTap = false; ls.set('udh5_ttsv', x.k); ttsLog('읽기 시작 (' + variantLabel(x) + ')'); };
     u.onend = () => { ended = true; };
     u.onerror = e => {
       ended = true; const er = (e && e.error) || '알 수 없음';
       if(er === 'interrupted' || er === 'canceled') return;
-      ttsLog('읽기 실패: ' + er);
-      if(er === 'not-allowed'){ TTS.pending = text; TTS.needTap = true; if(typeof queueRender === 'function') queueRender(); return; }
-      if(!started && attempt < 1) setTimeout(() => ttsSpeak(text, attempt + 1), 200);
+      ttsLog(`읽기 실패: ${er} (${variantLabel(x)})`);
+      if(er === 'not-allowed'){ giveUp('터치가 필요합니다.'); return; }
+      if(!started){ if(ls.get('udh5_ttsv', '') === x.k) ls.set('udh5_ttsv', ''); next(); }
     };
-    TTS.utts.push(u); if(TTS.utts.length > 6) TTS.utts.shift();   // 읽는 도중에 지워져 소리가 끊기지 않게 붙잡아 둠
+    TTS.utts.push(u); if(TTS.utts.length > 8) TTS.utts.shift();   // 읽는 도중에 지워져 소리가 끊기지 않게 붙잡아 둠
     try{ if(ss.paused) ss.resume(); }catch(e){}
-    try{ ss.speak(u); }catch(e){ ttsLog('읽기 실패: ' + (e.message || e)); return; }
-    // 3초 안에 시작하지 않으면 멈춘 것으로 보고 다른 목소리로 한 번 더, 그래도 안 되면 다음 터치 때 읽음
-    setTimeout(() => {
-      if(started || ended) return;
-      try{ ss.cancel(); }catch(e){}
-      if(attempt < 1){ ttsLog('읽기가 시작되지 않아 기본 목소리로 다시 읽습니다.'); setTimeout(() => ttsSpeak(text, attempt + 1), 200); }
-      else { ttsLog('읽기가 시작되지 않았습니다. 화면을 한 번 누르면 다시 읽습니다.'); TTS.pending = text; TTS.needTap = true; if(typeof queueRender === 'function') queueRender(); }
-    }, 3000);
+    try{ ss.speak(u); }catch(e){ ttsLog('읽기 실패: ' + (e.message || e)); next(); return; }
+    // 3초 안에 시작하지 않으면 멈춘 것으로 보고 다음 방법으로
+    setTimeout(() => { if(started || ended) return; try{ ss.cancel(); }catch(e){} ttsLog('읽기가 시작되지 않았습니다 (' + variantLabel(x) + ')'); next(); }, 3000);
   };
   // 읽던 것이 있을 때만 멈추고 잠깐 뒤에 읽음(멈추기 바로 뒤에 읽으면 새 문장까지 버려지는 기기가 있음). 터치 중이면 바로 읽음
   let busy = false; try{ busy = ss.speaking || ss.pending; }catch(e){}
@@ -97,7 +110,8 @@ function ttsSheet(){
     <div class="chips" role="group" aria-label="읽기 방식">${chips}</div>
     <div class="list" style="margin-top:12px">
       <div class="item"><span class="name">기기 음성 지원<span class="sub">${ttsOK() ? '지원함' : '이 브라우저는 지원하지 않습니다. 크롬이나 사파리로 열어 주세요.'}</span></span></div>
-      <div class="item"><span class="name">한국어 목소리 ${ks.length}개<span class="sub">${ks.length ? ks.map(v => esc(v.name) + (v.localService ? '' : '(인터넷)')).join(', ') : (all.length ? `한국어 목소리가 없습니다(전체 ${all.length}개). ${help}` : '목록을 아직 받지 못했습니다. 아래 시험을 눌러 보세요.')}</span></span></div>
+      <div class="item"><span class="name">한국어 목소리 ${ks.length}개<span class="sub">${ks.length ? ks.map(v => esc(v.name) + ' [' + esc(v.lang) + ']' + (v.localService ? '' : '(인터넷)')).join(', ') : (all.length ? `한국어 목소리가 없습니다(전체 ${all.length}개). ${help}` : '목록을 아직 받지 못했습니다. 아래 시험을 눌러 보세요.')}</span></span></div>
+      <div class="item"><span class="name">이 기기에서 성공한 읽기 방법<span class="sub">${ls.get('udh5_ttsv','') ? esc(ls.get('udh5_ttsv','')) : '아직 없습니다. 음성 시험을 누르면 여러 방법으로 차례로 읽어 봅니다.'}</span></span></div>
       <div class="item"><span class="name">최근 기록<span class="sub">${TTS.log.length ? TTS.log.map(esc).join('<br>') : '아직 없습니다.'}</span></span></div>
     </div>
     <p class="sub">${help}</p>

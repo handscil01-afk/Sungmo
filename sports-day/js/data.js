@@ -243,7 +243,7 @@ function touchDevice(joined){
   const d = { name:UI.me, seenAt:now(), ua:shortUA() };
   if(joined) d.joinAt = now();
   // 안내판은 소리가 켜져 있는지도 알려 줌 (방송할 때 듣는 안내판 수를 보여 주려고)
-  if(myRole().role==='board') d.audio = !!(SND.ready() && boardCfg().sound);
+  if(myRole().role==='board') d.audio = !!(SND.ready() && boardCfg().sound && !(typeof bdMute==='function' && bdMute()));
   store.put(['main','devices',store.uid], d).catch(()=>{});
 }
 

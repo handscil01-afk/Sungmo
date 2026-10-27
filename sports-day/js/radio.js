@@ -135,7 +135,7 @@ function onChunk(kind, c){
   if(kind==='radio' && !shouldPlay('radio')) return;
   try{ L.player.push(unb64(c.d)); }catch(e){}
 }
-function shouldPlay(kind){ return kind==='cast' ? boardOn() : (radioRoleOK() && RADIO.on && TALK.kind!=='radio'); }
+function shouldPlay(kind){ return kind==='cast' ? (boardOn() && !bdMute()) : (radioRoleOK() && RADIO.on && TALK.kind!=='radio'); }
 function onLockChange(kind, lock){
   const prev = RADIO.lock[kind];
   RADIO.lock[kind] = lock;
