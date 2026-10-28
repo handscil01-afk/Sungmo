@@ -4,7 +4,7 @@
    - 그림 문자(이모지)와 아이콘을 쓰지 않고, 글자가 있는 진짜 단추(<button>)와 제목(<h1>·<h2>)만 씀
    - 데이터가 바뀌어도 화면을 다시 그리지 않음: 보이스오버가 읽던 자리(초점)를 잃지 않게. 상황 글은 단추를 누른 순간의 내용
    - 새 단체전 결과가 저장되면 숨은 알림 칸(#vlive, aria-live)에 글을 넣어 보이스오버가 바로 읽게 함 (음성 합성은 쓰지 않음) */
-const VOICE = { panel:null, secs:[], ver:0, html:'', focus:null, init:false, seen:new Set(), sayQ:[], sayT:0, toastT:0, ready:true };
+const VOICE = { panel:null, secs:[], ver:0, html:'', focus:null, init:false, seen:new Set(), resAt:{}, sayQ:[], sayT:0, toastT:0, ready:true };
 // 중계 모드 화면에서 뺄 문자: 그림 문자, 변이 선택자, 동그라미 점
 const VSTRIP = /[\p{Extended_Pictographic}\u{FE0F}\u{200D}\u{25CF}\u{2715}]/gu;
 const vstrip = s => String(s ?? '').replace(VSTRIP, '');
@@ -15,7 +15,8 @@ const voiceMode = () => !!store && !!UI.me && !D.fatal && !D.amMaster && voiceSh
 function waitCount(ev){ return qList(ev).length; }
 
 /* ---------- 읽어 줄 글 ---------- */
-const nameOf = (m, team) => { const id = team==='blue' ? m.blueId : m.redId; return id ? pname(id) : ((team==='blue' ? m.blueName : m.redName) || ''); };
+// 한 사람 '홍길동' 또는 조 대결 '2조 홍길동, 김철수'
+const nameOf = (m, team) => { const n = matchNames(m, team, ', '), g = m[team+'Group']; return n && g ? `${g}조 ${n}` : n; };
 // 1~3등 문장. 같은 순위가 여럿이면 '공동 2등 A, B 20점'
 function rankText(st, ev){
   const groups = [];
@@ -52,16 +53,23 @@ function voiceIndiv(ev, detail){
 function voiceTeamLead(){
   let best = { t:0, ev:null };
   D.matches.forEach(m => { if(m.deleted || !TEAM[m.event]) return; const t = Math.max(m.at||0, m.editedAt||0); if(t > best.t) best = { t, ev:m.event }; });
-  Object.entries(D.calls).forEach(([ev, c]) => { const t = (c.call||{}).at||0; if(TEAM[ev] && t > best.t) best = { t, ev }; });
+  Object.entries(D.calls).forEach(([ev, c]) => { const t = Math.max((c.call||{}).at||0, (c.result||{}).at||0); if(TEAM[ev] && t > best.t) best = { t, ev }; });
   Object.values(D.ccalls).forEach(c => { const t = c.at||0; if(TEAM[c.event] && ORDER_EVENTS.includes(c.event) && t > best.t) best = { t, ev:c.event }; });
   return best.ev;
 }
-const scoreText = ev => { const t = tally(ev); return `${teamName('blue')} ${t.blue}, ${teamName('red')} ${t.red}`; };
-const totalText = () => { const t = totalPoints(); return `전체 승점 ${teamName('blue')} ${t.blue}, ${teamName('red')} ${t.red}.`; };
+// 종목 성적: '이가네 3승, 함씨네 2승' 또는 '핀 합계 37 대 41', 확정했으면 '확정, 이가네 승'을 덧붙임
+function scoreText(ev){
+  const st = eventStat(ev), r = resultOf(ev);
+  const base = st.metric==='sum' ? `${sumLabel(st.unit)} ${teamName('blue')} ${fmtNum(st.blue)}, ${teamName('red')} ${fmtNum(st.red)}` : `${teamName('blue')} ${st.blue}승, ${teamName('red')} ${st.red}승`;
+  if(!r) return `${base}, 아직 결과 확정 전`;
+  return `${base}. 결과 확정, ${teamName(r.winner)} 승${r.decider ? ' 결정전' : ''}, 승점 ${TEAM[ev].pts||1}점${resultStale(ev) ? '. 확정한 뒤 기록이 바뀌었으니 결과를 다시 확인해야 합니다' : ''}`;
+}
+const totalText = () => { const t = totalPoints(); return `종목 승점 ${teamName('blue')} ${t.blue}점, ${teamName('red')} ${t.red}점. 결과를 확정한 종목만 셉니다.`; };
 function lastResult(ev){
   const ms = matchesOf(ev), m = ms[ms.length - 1]; if(!m) return '';
   const round = TEAM[ev].mode === 'round', head = round ? '직전 판' : '직전 경기';
-  const pt = scoreTxt(m) ? `, 점수 ${fmtNum(m.blueScore)} 대 ${fmtNum(m.redScore)}` : '';
+  const u = metricOf(ev)==='sum' ? evUnit(ev) : '';
+  const pt = scoreTxt(m) ? `, 점수 ${fmtNum(m.blueScore)}${u} 대 ${fmtNum(m.redScore)}${u}` : '';
   if(m.winner === 'draw') return `${head}: 무승부${pt}.`;
   const nm = round ? '' : nameOf(m, m.winner);
   return `${head}: ${teamName(m.winner)}${nm ? ' ' + nm : ''} 승리${pt}.`;
@@ -70,8 +78,9 @@ function lastResult(ev){
 function voiceNowLine(ev){
   const E = TEAM[ev];
   if(E.mode === 'round') return `${E.name} ${matchesOf(ev).length + 1}판째.`;
-  const b = upNext(ev, 'blue').cur, r = upNext(ev, 'red').cur;
-  return b && r ? `지금 ${E.name}, ${teamName('blue')} ${pname(b)} 대 ${teamName('red')} ${pname(r)} 경기 중.` : `지금 ${E.name} 경기 중.`;
+  const b = upNext(ev, 'blue').cur, r = upNext(ev, 'red').cur, G = groupSize(ev);
+  const nm = (tm, k) => G ? `${unitNo(ev, tm, k)}조 ${unitNames(ev, tm, k, ', ')}` : pname(k);
+  return b && r ? `지금 ${E.name}, ${teamName('blue')} ${nm('blue', b)} 대 ${teamName('red')} ${nm('red', r)} 경기 중.` : `지금 ${E.name} 경기 중.`;
 }
 // kind: now(지금 상황) · indiv(개인전) · team(단체전) → [{ title, lines }]
 function voiceBuild(kind){
@@ -81,7 +90,7 @@ function voiceBuild(kind){
     const act = Object.keys(INDIV).filter(indivStarted);
     secs.push({ title:'개인전', lines: act.length ? act.flatMap(ev => voiceIndiv(ev, false)) : ['개인전은 아직 시작하지 않았습니다.'] });
     const lead = voiceTeamLead();
-    secs.push({ title:'단체전', lines: lead ? [voiceNowLine(lead), lastResult(lead), `${TEAM[lead].name} 점수 ${scoreText(lead)}.`, totalText()].filter(Boolean) : ['단체전은 아직 시작하지 않았습니다.'] });
+    secs.push({ title:'단체전', lines: lead ? [voiceNowLine(lead), lastResult(lead), `${TEAM[lead].name} ${scoreText(lead)}.`, totalText()].filter(Boolean) : ['단체전은 아직 시작하지 않았습니다.'] });
   } else if(kind === 'indiv'){
     secs.push({ title:'', lines: Object.keys(INDIV).flatMap(ev => voiceIndiv(ev, true)) });
   } else {
@@ -150,23 +159,30 @@ function voiceToast(msg){
 }
 // 새 단체전 결과가 저장되면 읽어 줌: 첫 불러오기와 2분보다 오래된 것은 건너뜀
 function matchSpeech(m){
-  const E = TEAM[m.event], t = tally(m.event), round = E.mode === 'round';
+  const E = TEAM[m.event], st = eventStat(m.event), round = E.mode === 'round', sum = st.metric === 'sum', u = sum ? st.unit : '';
+  const cum = sum ? `${sumLabel(st.unit)} ${teamName('blue')} ${fmtNum(st.blue)}, ${teamName('red')} ${fmtNum(st.red)}` : `${teamName('blue')} ${st.blue}승, ${teamName('red')} ${st.red}승`;
   const label = round ? `${E.name} ${matchesOf(m.event).findIndex(x => x.id===m.id) + 1}판째` : E.name;
   let res;
   if(m.winner === 'draw') res = '무승부';
   else { const nm = round ? '' : nameOf(m, m.winner); res = `${teamName(m.winner)}${nm ? ' ' + nm : ''} 승리`; }
   // 대결 점수를 기록한 경기는 '점수 3 대 2'를 먼저 읽고, 종목 누적은 '누적'으로 구분
-  if(scoreTxt(m)) return `${label}, ${res}, 점수 ${fmtNum(m.blueScore)} 대 ${fmtNum(m.redScore)}. 누적 ${teamName('blue')} ${t.blue}, ${teamName('red')} ${t.red}.`;
-  return `${label}, ${res}. 점수 ${teamName('blue')} ${t.blue}, ${teamName('red')} ${t.red}.`;
+  if(scoreTxt(m)) return `${label}, ${res}, 점수 ${fmtNum(m.blueScore)}${u} 대 ${fmtNum(m.redScore)}${u}. 누적 ${cum}.`;
+  return `${label}, ${res}. 누적 ${cum}.`;
 }
 function voiceTick(){
   if(!D.loaded.matches) return;
-  if(!VOICE.init){ D.matches.forEach(m => VOICE.seen.add(m.id)); VOICE.init = true; return; }
+  if(!VOICE.init){ D.matches.forEach(m => VOICE.seen.add(m.id)); Object.entries(D.calls).forEach(([ev, c]) => { VOICE.resAt[ev] = (c.result||{}).at||0; }); VOICE.init = true; return; }
   const texts = [];
   D.matches.slice().sort((a, b) => (a.at||0) - (b.at||0)).forEach(m => {
     if(VOICE.seen.has(m.id)) return;
     VOICE.seen.add(m.id);
     if(!m.deleted && TEAM[m.event] && (m.at||0) > now() - 120000) texts.push(matchSpeech(m));
+  });
+  // 심판이 종목 결과를 확정한 것도 읽어 줌
+  Object.entries(D.calls).forEach(([ev, c]) => {
+    const r = c.result; if(!r || (r.at||0) <= (VOICE.resAt[ev]||0)) return;
+    VOICE.resAt[ev] = r.at;
+    if(TEAM[ev] && resultOf(ev) && r.at > now() - 120000) texts.push(evResSpeech(ev, r));
   });
   if(texts.length) say(texts.join(' '));
 }

@@ -716,7 +716,7 @@ body.has-radio:not(.has-nav){ --dockh: calc(58px + var(--sab)) }
   .tsplit>.queue{flex:1;min-width:0}
   .pcard{min-height:70px}
   .winrow .btn.huge{min-height:56px}
-  /* 줄 잡고 달리기처럼 시간을 재는 단체전 심판: 저장 단추까지 한 화면에 */
+  /* 시간을 재는 단체전 심판: 저장 단추까지 한 화면에 */
   .tmain{gap:6px}
   .tmain>.btn.huge{flex:none;min-height:44px;font-size:18px;border-radius:14px}
   .tmain .watchrow{gap:8px} .tmain .watchrow .watch{font-size:clamp(28px,8vh,40px)} .tmain .watchrow .btn.huge{min-height:44px;min-width:96px;font-size:20px}
@@ -1499,4 +1499,171 @@ body.nocursor,body.nocursor *{cursor:none!important}
   .bd.bdfix:not(.bdpc) .callbar .tb.big{width:clamp(34px,6vh,56px);height:clamp(34px,6vh,56px);font-size:clamp(18px,3.4vh,32px)}
   .bd.bdfix:not(.bdpc) .bdhead h1{font-size:clamp(24px,4.2vh,44px)}
   .bd.bdfix:not(.bdpc) .bscore .n{font-size:clamp(32px,6vh,60px)}
+}
+
+/* ---------- 단체전 종목 승점 · 결과 확정 · 조 대결 ---------- */
+/* 볼링 핀 입력: 팀마다 한 줄 (왼쪽 −/＋ 입력, 오른쪽 0~10 빠른 단추). 좁으면 빠른 단추가 아래 줄로 내려감 */
+.scorebox.bowl .scrow{grid-template-columns:1fr;gap:6px}
+.scorebox.bowl .scol{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+.scorebox.bowl .scol .sct{flex:1 0 100%;margin:0}
+.scorebox.bowl .scol .stp{flex:0 0 150px;width:150px}
+.scq{flex:1 1 250px;min-width:0;display:grid;grid-template-columns:repeat(11,minmax(0,1fr));gap:3px}
+.scqb{min-width:0;height:40px;padding:0;border-radius:9px;border:2px solid var(--line2);background:#fff;font-size:17px;font-weight:900;font-variant-numeric:tabular-nums}
+.scqb.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.scqb:active{background:var(--ink);color:#fff}
+.scin.bad{border-color:var(--red);background:#fff1f1}
+.scres.bad{color:var(--red)}
+@media (max-height:560px) and (orientation:landscape){
+  .scorebox.bowl .scol .sct{display:none}
+  .scorebox.bowl .scol .stp{flex:0 0 136px;width:136px}
+  .scorebox.bowl .scol .scin{font-size:22px}
+  .scq{flex:1 1 0;min-width:0;gap:2px}
+  .scqb{height:38px;font-size:16px;border-radius:8px}
+  .scorebox.bowl .scol{flex-wrap:nowrap;padding:2px 5px 3px}
+  .scorebox.bowl .scrow{gap:3px}
+}
+
+/* 종목 결과 띠 (심판·감독 화면) */
+.evstrip{display:block;width:100%;flex:none;text-align:left;border-radius:12px;padding:8px 12px;font:inherit;font-size:16px;font-weight:900;border:2px solid;line-height:1.25;word-break:keep-all}
+.evstrip.evend{background:var(--ok-soft);color:var(--ok);border-color:var(--ok)}
+.evstrip.evend.blue{background:var(--blue-soft);color:var(--blue-ink);border-color:var(--blue)}
+.evstrip.evend.red{background:var(--red-soft);color:var(--red-ink);border-color:var(--red)}
+.evstrip.evwarn{background:var(--warn-soft);color:var(--warn);border-color:#e0a800}
+.evstrip.evreach{background:#fff6cc;color:#5c4400;border-color:#e0b100}
+@media (max-height:560px) and (orientation:landscape){ .evstrip{padding:3px 10px;font-size:14px} }
+
+/* 결과 확정 창 */
+.resbig{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:stretch;margin:6px 0 4px}
+.resbig .rc{align-self:center;font-size:28px;font-weight:900;color:var(--sub)}
+.rside{border:3px solid;border-radius:16px;padding:8px 6px;text-align:center;min-width:0}
+.rside.blue{background:var(--blue-soft);border-color:var(--blue);color:var(--blue-ink)}
+.rside.red{background:var(--red-soft);border-color:var(--red);color:var(--red-ink)}
+.rside.lead{box-shadow:0 0 0 4px #ffd400}
+.rside .rt{font-weight:900;font-size:16px;display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap}
+.rside .rv{font-size:clamp(40px,12vw,64px);font-weight:900;line-height:1.05;font-variant-numeric:tabular-nums}
+.rside .rv small{font-size:.38em;margin-left:2px}
+.rsub{text-align:center}
+.resnote{background:var(--warn-soft);color:var(--warn);border-radius:12px;padding:10px 12px;font-weight:800;margin:8px 0}
+
+/* 조 대결 표시 */
+.gno{display:inline-block;font-size:.72em;font-weight:900;background:rgba(0,0,0,.1);border-radius:6px;padding:0 6px;margin-right:2px;vertical-align:.1em}
+.gtag{display:inline-flex;align-items:center;justify-content:center;flex:none;min-width:38px;height:26px;border-radius:8px;font-size:13px;font-weight:900;padding:0 6px;color:#fff}
+.gtag.g1{background:#475569} .gtag.g0{background:#0f766e}
+.orow.gstart,.item.gstart{margin-top:8px}
+.gnote{margin:4px 0 8px}
+.pcard .nm.multi{display:flex;flex-direction:column;align-items:center;gap:0;font-size:clamp(22px,6.4vw,38px);line-height:1.15}
+.pcard .nm.multi.n3{font-size:clamp(19px,5.4vw,32px)}
+.pcard .nm .pn{display:block;max-width:100%}
+.queue.grp .qrow .qb,.queue.grp .qrow .qr{font-size:17px}
+.queue.grp .qrow{min-height:40px}
+
+/* 안내판: 종목 끝 띠 · 합계 단위 · 조 대결 */
+.bdend{display:flex;align-items:center;gap:16px;flex-wrap:wrap;border:4px solid;border-radius:18px;padding:8px 18px;font-size:clamp(20px,4vh,40px);font-weight:900;line-height:1.15}
+.bdend.blue{background:var(--blue);border-color:var(--blue);color:#fff} .bdend.red{background:var(--red);border-color:var(--red);color:#fff}
+.bdend span{font-size:.9em}
+.bscore .bu{font-size:clamp(16px,3vh,30px);font-weight:800;color:var(--sub);margin-left:4px;white-space:nowrap}
+.bdfoot .mini.fin{color:var(--ink);font-weight:900}
+.bp.grp .nm{font-size:clamp(34px,9vh,110px);line-height:1.1}
+.callbar .gno{background:rgba(0,0,0,.18);font-size:.6em}
+.ovl .osc.names{flex-wrap:wrap;gap:.2em .5em;font-size:clamp(30px,7.2vh,84px);line-height:1.15}
+.ovl .osc.names .c{color:inherit;opacity:.7}
+.ovl.evres .half.win .nm{font-size:clamp(30px,6.5vh,70px)}
+.ovl.evres .half.lose .big{font-size:clamp(34px,8vh,90px)}
+.ovl.bdpc.evres .half.win .nm{font-size:calc(var(--fs)*2.4)}
+.ovl.bdpc .osc.names{font-size:calc(var(--fs)*2.4)}
+
+/* 승점 카드 */
+.score.won{font-weight:900;text-decoration:underline;text-decoration-thickness:3px;text-underline-offset:4px}
+td.score small{font-size:.7em;margin-left:2px;color:var(--sub);font-weight:700}
+.rnote{font-size:12px;color:#444;margin:4px 0 0}
+.item .no.g,.orow .no.g{width:auto;min-width:40px;padding:0 6px;white-space:nowrap}
+.item .name.multi,.orow .name.multi{white-space:normal;line-height:1.2}
+.evst{font-size:12px;line-height:1.25;margin-top:2px;word-break:keep-all}
+
+/* 세로로 선 좁은 화면(휴대폰 세로)의 겹쳐 뜨는 화면: 글자 크기를 가로 폭에도 맞춤 (PC·프로젝터 화면은 board-pc.js 가 맞춤) */
+@media (max-aspect-ratio:1/1){
+  .ovl:not(.bdpc) .big{font-size:clamp(32px,min(14vh,12vw),160px)}
+  .ovl:not(.bdpc) .half.lose .big{font-size:clamp(26px,min(9vh,8.5vw),100px)}
+  .ovl:not(.bdpc) .nm{font-size:clamp(26px,min(10vh,10vw),120px)}
+  .ovl:not(.bdpc) .half.lose .nm{font-size:clamp(22px,min(7vh,7.5vw),80px)}
+  .ovl:not(.bdpc) .osc{font-size:clamp(26px,min(10vh,10vw),110px);flex-wrap:wrap}
+  .ovl:not(.bdpc) .osc.names{font-size:clamp(20px,min(6vh,6.4vw),84px)}
+  .ovl:not(.bdpc).evres .half.win .nm{font-size:clamp(22px,min(6vh,7vw),70px)}
+  .ovl:not(.bdpc).evres .half.lose .big{font-size:clamp(24px,min(8vh,8vw),90px)}
+  .ovl:not(.bdpc) .dp .dl{font-size:clamp(20px,min(5vh,6vw),56px)}
+  .ovl:not(.bdpc) .dpair{gap:2vw}
+  .ovl.ccall:not(.bdpc) .nm{font-size:clamp(34px,min(18vh,13vw),200px)}
+  .ovl.ccall:not(.bdpc) .lbl{font-size:clamp(24px,min(7vh,8vw),76px)}
+}
+
+/* 볼링 입력 줄을 더 낮게: 팀 이름 글은 줄 맨 앞에 붙임 */
+.scorebox.bowl .scol .sct{flex:0 0 auto;margin:0}
+.scorebox.bowl .scol .stp{flex:0 0 150px}
+.qhead{flex-wrap:wrap}
+.qhead .tag{flex:0 1 auto;min-width:0}
+.qhead .btn.small{flex:none;white-space:nowrap}
+@media (max-height:560px) and (orientation:landscape){
+  /* 낮은 가로 화면: 볼링은 지금 선수 카드를 한 줄로, 결과 글과 저장 단추를 한 줄에 */
+  .duel.compact{min-height:0}
+  .duel.compact .pcard{flex-direction:row;flex-wrap:wrap;justify-content:center;align-items:baseline;column-gap:8px;row-gap:0;min-height:0;padding:3px 8px;border-width:3px}
+  .duel.compact .pcard .lbl{font-size:13px}
+  .duel.compact .pcard .nm{font-size:clamp(20px,6vh,26px)}
+  .scorebox.sumbox .scres{grid-column:1;align-self:center;font-size:14px}
+  .scorebox.sumbox .btn.huge{grid-column:2;min-height:40px}
+  .scorebox.bowl .scol .scin{height:38px}
+  .scorebox.bowl .scol .stpb{height:38px}
+  .scqb{height:36px}
+  .infobar{min-height:44px;padding:4px 10px}
+}
+@media (max-height:560px) and (orientation:landscape){
+  .duel.compact .pcard{padding:2px 4px;column-gap:5px}
+  .duel.compact .pcard .lbl{font-size:12px}
+  .duel.compact .pcard .nm{font-size:clamp(20px,6vh,24px)}
+  .fitbowl .infobar .btn.small{min-height:34px;padding:3px 10px}
+  .fitbowl .infobar{min-height:40px;padding:3px 10px}
+  .scorebox.bowl .scol{padding:2px 5px}
+  .scorebox.bowl .scol .scin,.scorebox.bowl .scol .stpb{height:34px}
+  .scqb{height:34px}
+  .fitbowl .tmain{gap:4px}
+}
+
+/* 안내판: 조 이름은 한 줄에 여러 명이 들어가므로 과녁 중계 칸 안에서는 글자를 낮춤 */
+.bdsplit .bp.grp .nm{font-size:clamp(22px,5.4vh,60px);line-height:1.15}
+@media (max-width:760px){ .bdsplit .bp.grp .nm{font-size:clamp(17px,5.2vw,26px)} .bd.bdfix .bdend{padding:4px 12px;font-size:18px;border-width:3px;border-radius:14px;gap:2px 10px} }
+@media (min-width:761px) and (orientation:landscape){ .bdsplit .bp.grp .nm{font-size:clamp(26px,6.4vh,76px)} }
+@media (max-height:560px) and (orientation:landscape){ .bdsplit .bp.grp .nm{font-size:23px} .bd.bdfix .bdend{padding:1px 12px;font-size:16px;border-width:2px;border-radius:12px;gap:2px 10px} }
+.bscore{max-width:100%;flex-wrap:wrap;justify-content:center}
+@media (max-aspect-ratio:1/1) and (max-width:600px){ .bd:not(.bdpc):not(.bdfix) .bscore .n{font-size:clamp(30px,11vw,56px)} .bd:not(.bdpc) .bscore .bu{font-size:14px} .bd:not(.bdpc) .bdend{font-size:clamp(18px,5.4vw,28px);padding:6px 14px} }
+.ovl .osc.names.col{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:.12em;font-size:clamp(26px,7vh,80px)}
+.ovl .osc.names .ol{display:flex;align-items:center;justify-content:center;gap:.35em}
+.ovl.bdpc .osc.names.col{font-size:calc(var(--fs)*2.2)}
+@media (max-aspect-ratio:1/1){
+  .ovl:not(.bdpc) .osc.names{gap:.1em .3em;flex-wrap:nowrap}
+  .ovl:not(.bdpc) .osc.names .tb.big{width:28px;height:28px;font-size:15px;flex:none}
+  .ovl:not(.bdpc) .osc.names.col{font-size:clamp(20px,min(5vh,6vw),70px);flex-wrap:nowrap}
+  .ovl:not(.bdpc) .osc.names .ol{flex-wrap:wrap}
+}
+
+/* 조 호출 띠: 이름이 두 명씩이라 글자를 조금 낮춰 한 줄에 들어가게 */
+.bd:not(.bdpc) .callbar.grp .cp{font-size:clamp(22px,4.6vh,52px)}
+.bd.bdfix:not(.bdpc) .callbar.grp .cp{font-size:clamp(18px,3.8vh,40px)}
+@media (max-width:760px){ .bd:not(.bdpc) .callbar.grp .cp,.bd.bdfix:not(.bdpc) .callbar.grp .cp{font-size:clamp(20px,6.2vw,30px)} }
+@media (max-height:560px) and (orientation:landscape){ .bd.bdfix:not(.bdpc) .callbar.grp .cp{font-size:19px} .bd.bdfix:not(.bdpc) .callbar.grp .cl{font-size:16px} .bd.bdfix:not(.bdpc) .callbar.grp .tb.big{width:26px;height:26px;font-size:15px} }
+
+/* 조 대결 선수 카드: 가로로 넓은 화면(가로 휴대폰·태블릿)에서는 조원 이름을 한 줄로 */
+@media (orientation:landscape), (min-width:700px){
+  .pcard .nm.multi{flex-direction:row;flex-wrap:wrap;justify-content:center;align-items:baseline;column-gap:0;font-size:clamp(20px,3.4vw,36px);line-height:1.15}
+  .pcard .nm.multi.n3{font-size:clamp(18px,2.8vw,30px)}
+  .pcard .nm.multi .pn{display:inline;max-width:none}
+  .pcard .nm.multi .pn+.pn::before{content:'·';margin:0 .12em}
+}
+@media (max-height:560px) and (orientation:landscape){
+  .pcard .nm.multi{font-size:clamp(18px,2.6vw,24px)} .pcard .nm.multi.n3{font-size:clamp(16px,2.3vw,21px)}
+}
+/* 낮은 가로 화면: 콩주머니 B안 점수 칸은 두 팀 입력과 저장 단추를 한 줄에 */
+@media (max-height:560px) and (orientation:landscape){
+  .scorebox.sumbox:not(.bowl){grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(110px,.7fr)}
+  .scorebox.sumbox:not(.bowl) .scrow{display:contents}
+  .scorebox.sumbox:not(.bowl) .btn.huge{grid-column:3;grid-row:1;min-height:0;height:100%}
+  .scorebox.sumbox:not(.bowl) .scres{grid-column:1 / 4;grid-row:2}
 }

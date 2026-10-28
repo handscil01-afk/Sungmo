@@ -23,7 +23,10 @@ const RULES_OLD_MSG = '서버 규칙이 아직 바뀌지 않아 이 역할로 �
    INDIV_BASE·TEAM_BASE는 기본으로 들어 있는 종목. 화면에서 쓰는 INDIV·TEAM·EVENTS와 ORDER_EVENTS·TIME_EVENTS는
    rebuildEvents()가 마스터 설정(D.config.events: 끄기 off, 새 종목 custom)에 맞춰 같은 객체·배열을 그대로 고쳐서 다시 채움 */
 // showPracRank: 안내판에 연습 순위도 보일지 / tugRounds: 줄다리기 계획 판 수(진행 현황의 남은 시간 계산용)
-const DEFAULT_SETTINGS = { tuhoShort: 0, foul: 1, showPracRank: true, tugRounds: 3 };
+// beanbagMode: 콩주머니 승부 방식 (A 5판 3선승 / B 컬링식 총점)
+const DEFAULT_SETTINGS = { tuhoShort: 0, foul: 1, showPracRank: true, tugRounds: 3, beanbagMode: 'A' };
+// 콩주머니: 한 사람이 던지는 개수, 최대 판 수, 3선승
+const BEANBAG_THROWS = 3, BEANBAG_ROUNDS = 5, BEANBAG_WINS = 3;
 // 개인전 회차: 연습 1·2, 본선(순위 기준), 결승(동점 가리기)
 const ROUNDS = { p1:'연습 1', p2:'연습 2', main:'본선', final:'결승' };
 const ROUND_SHORT = { p1:'연1', p2:'연2', main:'본선', final:'결승' };
@@ -42,13 +45,21 @@ const INDIV_BASE = {
     // 예전(거리 칸) 기록을 읽을 때만 씀
     legacy: s => [['z0','2m 미만',s.tuhoShort],['z1','2~3.5m',10],['z2','3.5~5m',20],['z3','5~6.5m',30],['z4','6.5~8m',20],['z5','8~9.5m',10],['out','선 밖',0]] },
 };
-// pts: 한 번 이길 때 얻는 승점 / board: 과녁판 중계(1:1 대결만) / score: 대결 점수도 기록 (기본 종목은 D.config.events.opt 에서 읽음)
+// 단체전은 종목마다 이긴 팀에 승점 pts(기본 1)점. 종목 결과는 심판이 '결과 확정'을 눌러야 승점에 들어감 (main/calls/{종목}.result)
+// name: 화면용 짧은 이름 / full: 풀네임 / mode: duel(1:1 대결)·round(판 단위)·time(기록 비교, 직접 만든 종목만) / agg:'sum' 이면 점수(핀) 합계로 비교
+// group: 한 조 인원(콩주머니) / max: 대결 점수 최댓값 / unit: 합계 단위 / scoreFixed: 대결 점수 기록이 정해져 있음 / bag: 콩주머니 승부 방식 설정을 따름
+// board: 과녁판 중계(1:1 대결만) / score: 대결 점수도 기록 (기본 종목은 D.config.events.opt 에서 읽음) / rounds: 계획 판 수
 const TEAM_BASE = {
-  gymball: { name:'짐볼 차기', icon:'⚽', color:'#15803d', mode:'duel', hint:'더 멀리 찬 사람이 이깁니다' },
-  threeleg:{ name:'2인3각', icon:'👣', color:'#854d0e', mode:'duel', hint:'반환점을 돌아 먼저 들어온 조가 이깁니다' },
-  beanbag: { name:'콩주머니', icon:'🎯', color:'#4d7c0f', mode:'duel', hint:'1인 5개씩 번갈아 던져 가운데에 가장 가까운 쪽이 이깁니다' },
-  run:     { name:'줄 잡고 달리기', icon:'🏃', color:'#334155', mode:'time', hint:'기록(초)이 빠른 사람이 이깁니다' },
-  tug:     { name:'줄다리기', icon:'🪢', color:'#c2410c', mode:'round', hint:'판마다 이긴 팀에 승점 1점' },
+  overball:{ name:'짐볼 넘기기', full:'머리 위로 짐볼 넘기기', icon:'🏐', color:'#0369a1', mode:'round', rounds:1,
+    hint:'한 줄로 서서 짐볼을 머리 위와 다리 사이로 번갈아 뒤로 넘겨, 맨 끝까지 먼저 보낸 팀이 이깁니다' },
+  bowling: { name:'짐볼 볼링', icon:'🎳', color:'#be185d', mode:'duel', agg:'sum', scoreFixed:true, max:10, unit:'핀',
+    hint:'한 사람씩 짐볼을 한 번 굴려 쓰러뜨린 핀(10개)을 팀별로 더하고, 합계가 많은 팀이 이깁니다' },
+  beanbag: { name:'콩주머니', icon:'🎯', color:'#4d7c0f', mode:'duel', group:2, bag:true, scoreFixed:true, unit:'점',
+    hint:'두 명씩 한 조로, 1인 3개씩 한 개씩 번갈아 던져 정중앙에 가까운 쪽이 이깁니다' },
+  threeleg:{ name:'2인3각', icon:'👣', color:'#854d0e', mode:'duel',
+    hint:'참여자와 짝이 한 쌍으로 달려 먼저 들어온 쪽이 이기고, 많이 이긴 팀이 종목을 가져갑니다' },
+  tug:     { name:'줄다리기', icon:'🪢', color:'#c2410c', mode:'round',
+    hint:'판마다 이긴 팀을 기록하고, 많이 이긴 팀이 종목을 가져갑니다' },
 };
 const LANE_LABELS_BASE = { tuho:['초록 투호','빨강 투호'], archery:['왼쪽 사대','오른쪽 사대'], freeball:['타석'] };
 // 화면에서 쓰는 살아 있는 종목표 (rebuildEvents가 채움)
@@ -75,7 +86,7 @@ function buildCustomIndiv(d){
 }
 function buildCustomTeam(d){
   const mode = ['duel','time','round'].includes(d.tmode) ? d.tmode : 'duel', pts = clampInt(d.pts, 1, 5, 1);
-  const hint = { duel:'1:1로 겨뤄 이긴 쪽이 승점을 얻습니다.', time:'기록(초)이 빠른 쪽이 이깁니다.', round:'판마다 이긴 팀이 승점을 얻습니다.' }[mode] + (pts>1 ? ` 한 번 이기면 ${pts}점입니다.` : '');
+  const hint = { duel:'1:1로 겨뤄 많이 이긴 팀이 종목 승점을 얻습니다.', time:'기록(초)이 빠른 쪽이 이깁니다. 많이 이긴 팀이 종목 승점을 얻습니다.', round:'판마다 이긴 팀을 기록하고, 많이 이긴 팀이 종목 승점을 얻습니다.' }[mode] + (pts>1 ? ` 종목을 이기면 ${pts}점입니다.` : '');
   return { name:String(d.name), icon:d.icon||'🎲', color:d.color||'#334155', mode, hint, pts, custom:true, board: mode==='duel' && !!d.board, score: mode!=='time' && !!d.score };
 }
 // 켜짐·꺼짐과 관계없이 모든 종목 (기본 + 마스터가 만든 것, 지운 것은 빼고): [{ key, kind, E, custom, off, def }]
@@ -104,6 +115,8 @@ function rebuildEvents(){
     }
   });
   Object.keys(LANE_LABELS).forEach(k => { if(!INDIV[k]) delete LANE_LABELS[k]; });
+  // 예전에 저장된 감독 화면 종목(없어진 종목 포함)이 지금 없으면 첫 종목으로
+  if(typeof UI !== 'undefined' && !ORDER_EVENTS.includes(UI.coachEv)) UI.coachEv = ORDER_EVENTS[0] || '';
 }
 
 const ROLE_INFO = {

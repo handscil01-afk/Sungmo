@@ -19,7 +19,8 @@ function evSummary(x){
     const how = E.mode==='number' ? `숫자 입력${E.vunit ? `(${E.vunit})` : ''} · ${E.dir==='low' ? '낮을수록' : '높을수록'} 좋음` : '점수 단추 합계';
     return `${how} · ${E.count}${E.unit} · 칸 ${E.lanes}개 · 연습 ${E.prac ? '있음' : '없음'}`;
   }
-  return (TMODES.find(m => m[0]===E.mode) || TMODES[0])[1] + (E.pts>1 ? ` · 이기면 ${E.pts}점` : '');
+  const how = E.agg==='sum' ? `${E.unit} 합계로 승부` : E.bag ? (beanbagMode()==='B' ? '5판 점수 합계로 승부 (B안)' : '5판 중 3판 먼저 이기면 승 (A안)') : (TMODES.find(m => m[0]===E.mode) || TMODES[0])[1];
+  return how + (E.group ? ` · ${E.group}명씩 한 조` : '') + (E.pts>1 ? ` · 종목을 이기면 ${E.pts}점` : '');
 }
 function anyRecords(key){ return D.indiv.some(r => r.event===key && !r.deleted) || D.matches.some(m => m.event===key && !m.deleted); }
 
@@ -33,7 +34,9 @@ function eventsTab(){
       opts += `<div class="evopt"><span class="name">과녁판 중계<span class="sub">던진 자리를 과녁 위에 찍어 안내판에 실시간으로 보여 줍니다.</span></span>${sw(`data-ch="evopt" data-v="${x.key}" data-f="board"`, o.board, E.name+' 과녁판 중계')}</div>`;
       if(o.board) opts += `<div class="evtg"><div class="tgthumb">${tgtBox(x.key, { list:[], thumb:true })}</div><div class="evtgb"><button class="btn small" data-a="tgtUpload" data-v="${x.key}">과녁 사진 올리기</button>${hasImg ? `<button class="btn small danger" data-a="tgtDel" data-v="${x.key}">사진 지우기</button>` : '<span class="sub">사진이 없으면 기본 과녁이 나옵니다.</span>'}</div></div>`;
     }
-    if(x.kind==='team' && E.mode!=='time')
+    if(x.kind==='team' && E.scoreFixed)
+      opts += `<div class="evopt"><span class="name">대결 점수 기록<span class="sub">${E.agg==='sum' ? `${E.unit} 수로 항상 기록하고, ${E.unit} 합계가 높은 팀이 이깁니다.` : '승부 방식은 명단·설정의 팀·점수 탭에서 A안과 B안 중에 고릅니다. B안일 때는 점수로 기록합니다.'}</span></span></div>`;
+    else if(x.kind==='team' && E.mode!=='time')
       opts += `<div class="evopt"><span class="name">대결 점수 기록<span class="sub">승패 단추 대신 두 팀 점수를 넣고, 이긴 쪽은 점수로 정합니다.</span></span>${sw(`data-ch="evopt" data-v="${x.key}" data-f="score"`, o.score, E.name+' 대결 점수 기록')}</div>`;
     return `<div class="evrow ${x.off?'off':''}" style="--ev:${E.color}" data-key="${x.key}">
       <div class="evr1"><span class="evic">${E.icon}</span><span class="name"><b>${esc(E.name)}</b><span class="sub">${esc(evSummary(x))}</span></span>${sw(`data-ch="evon" data-v="${x.key}"`, !x.off, E.name+' 켜기')}</div>
@@ -72,7 +75,7 @@ function efSheet(){
       <div class="card">${tog('prac', '연습 회차 사용', '켜면 연습 1·2 입력과 연습 순위가 생깁니다.')}</div>`;
   } else {
     body = `<div class="card"><h3>승부 방식</h3><div class="seg vseg">${TMODES.map(([k,l]) => segBtn('tmode', k, l)).join('')}</div></div>
-      <div class="card">${stepper('pts', '이기면 얻는 승점', 1, 5)}
+      <div class="card">${stepper('pts', '종목을 이기면 얻는 승점', 1, 5)}
         ${F.tmode==='duel' ? tog('board', '과녁판 중계 사용', '던진 자리를 과녁 위에 찍어 안내판에 실시간으로 보여 줍니다. 과녁 사진은 종목 탭에서 올립니다.') : ''}
         ${F.tmode!=='time' ? tog('score', '대결 점수도 기록', '승패 단추 대신 두 팀 점수를 넣고, 이긴 쪽은 점수로 정합니다.') : ''}</div>`;
   }

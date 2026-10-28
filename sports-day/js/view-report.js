@@ -1,16 +1,20 @@
 'use strict';
 /* ===================== 결과 보고서 (인쇄·PDF 저장용) ===================== */
+// 보고서에 쓸 한 팀의 출전자: 한 사람은 이름, 조 대결은 '2조 홍길동·김철수'
+const rpSide = (m, tm) => { const n = matchNames(m, tm); return !n ? '-' : (m[tm+'Group'] ? `${m[tm+'Group']}조 ${n}` : n); };
 function reportView(){
   const tot = totalPoints(), w = tot.blue===tot.red ? '' : (tot.blue>tot.red ? 'blue' : 'red');
   const d = new Date(), date = `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일`;
-  // 승점 = 이긴 판 수 x 종목의 승점(기본 1)
-  const teamRows = Object.entries(TEAM).map(([k,E]) => { const t = tally(k), p = E.pts||1;
-    return `<tr><td>${E.icon} ${esc(E.name)}${p>1 ? ` (이기면 ${p}점)` : ''}</td><td class="num">${t.blue*p}</td><td class="num">${t.red*p}</td><td class="num">${t.draw}</td><td class="num">${matchesOf(k).length}</td></tr>`; }).join('');
+  // 승점: 종목마다 이긴 팀에 그 종목의 승점(기본 1)을 줌. 심판이 결과를 확정한 종목만 셈
+  const stCell = (st, tm) => `${fmtNum(st[tm])}${esc(st.unit)}`;
+  const teamRows = Object.entries(TEAM).map(([k,E]) => { const st = eventStat(k), r = resultOf(k), p = E.pts||1;
+    const res = r ? `${esc(teamName(r.winner))} 승${r.decider ? ' (결정전)' : ''}${resultStale(k) ? ' ※확정 뒤 기록이 바뀜' : ''}` : '미확정';
+    return `<tr><td>${E.icon} ${esc(E.name)}${p>1 ? ` (이기면 ${p}점)` : ''}</td><td class="num">${stCell(st,'blue')}</td><td class="num">${stCell(st,'red')}</td><td>${res}</td><td class="num">${r && r.winner==='blue' ? p : 0}</td><td class="num">${r && r.winner==='red' ? p : 0}</td></tr>`; }).join('');
   const matchTables = Object.entries(TEAM).map(([k,E]) => {
     const ms = matchesOf(k); if(!ms.length) return '';
     const hasSc = ms.some(m => m.blueScore!=null);
     return `<h3>${E.icon} ${esc(E.name)}</h3><table class="rt"><thead><tr><th>순번</th>${E.mode==='round'?'':`<th>${esc(teamName('blue'))}</th><th>${esc(teamName('red'))}</th>`}<th>결과</th>${E.mode==='time'?'<th>기록(초)</th>':''}${hasSc?'<th>점수</th>':''}</tr></thead><tbody>
-      ${ms.map((m,i) => `<tr><td class="num">${i+1}</td>${E.mode==='round'?'':`<td>${esc(m.blueId?pname(m.blueId):'-')}</td><td>${esc(m.redId?pname(m.redId):'-')}</td>`}
+      ${ms.map((m,i) => `<tr><td class="num">${i+1}</td>${E.mode==='round'?'':`<td>${esc(rpSide(m,'blue'))}</td><td>${esc(rpSide(m,'red'))}</td>`}
         <td>${m.winner==='draw' ? '무승부' : esc(teamName(m.winner))+' 승'}</td>${E.mode==='time'?`<td>${fmtSec(m.blueTime)} / ${fmtSec(m.redTime)}</td>`:''}${hasSc?`<td class="num">${scoreTxt(m)}</td>`:''}</tr>`).join('')}</tbody></table>`;
   }).join('');
   const indivTables = Object.entries(INDIV).map(([k,E]) => {
@@ -33,9 +37,10 @@ function reportView(){
     <h1>가을운동회 결과 보고서</h1>
     <p class="rmeta">${date} · 참가자 ${people().length}명(${esc(teamName('blue'))} ${members('blue').length}명, ${esc(teamName('red'))} ${members('red').length}명)${absent.length?` · 불참 ${absent.length}명`:''}</p>
     <h2>1. 종합 결과</h2>
-    <p class="rbig">${w ? `종합 우승: <b>${esc(teamName(w))}</b>` : '종합 결과: <b>무승부</b>'} (단체전 승점 ${esc(teamName('blue'))} ${tot.blue} : ${tot.red} ${esc(teamName('red'))})</p>
-    <table class="rt"><thead><tr><th>종목</th><th>${esc(teamName('blue'))}</th><th>${esc(teamName('red'))}</th><th>무승부</th><th>대결 수</th></tr></thead>
-      <tbody>${teamRows}<tr class="sum"><td>합계</td><td class="num">${tot.blue}</td><td class="num">${tot.red}</td><td></td><td></td></tr></tbody></table>
+    <p class="rbig">${w ? `종합 우승: <b>${esc(teamName(w))}</b>` : '종합 결과: <b>무승부</b>'} (종목 승점 ${esc(teamName('blue'))} ${tot.blue} : ${tot.red} ${esc(teamName('red'))})</p>
+    <table class="rt"><thead><tr><th>종목</th><th>${esc(teamName('blue'))} 성적</th><th>${esc(teamName('red'))} 성적</th><th>결과(확정)</th><th>${esc(teamName('blue'))} 승점</th><th>${esc(teamName('red'))} 승점</th></tr></thead>
+      <tbody>${teamRows}<tr class="sum"><td>합계</td><td></td><td></td><td></td><td class="num">${tot.blue}</td><td class="num">${tot.red}</td></tr></tbody></table>
+    <p class="rnote">성적은 종목마다 이긴 횟수(승) 또는 핀·점수 합계입니다. 종목에서 이긴 팀에 승점 1점을 주며, 심판이 결과를 확정한 종목만 승점에 넣었습니다.</p>
     <h2>2. 개인전 순위</h2>${indivTables}
     <h2>3. 단체전 대결 기록</h2>${matchTables || '<p>기록이 없습니다.</p>'}
     ${absent.length ? `<h2>4. 불참자</h2><p>${absent.map(p => `${esc(p.name)}(${esc(teamShort(p.team))})`).join(', ')}</p>` : ''}

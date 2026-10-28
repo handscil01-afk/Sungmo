@@ -23,17 +23,22 @@ function progressData(){
     return { ev, kind:'indiv', done, total, rem: Math.max(0, total - done), unit: unitMs(times), n: times.length,
       prac: hasPrac(ev), p1: ps.filter(p => rec(ev,'p1',p.id)).length, p2: ps.filter(p => rec(ev,'p2',p.id)).length, wait: qList(ev).length };
   });
+  // 단체전: 종목마다 이긴 팀 1점. 심판이 결과를 확정하면 그 종목은 끝난 것으로 봄
   const team = Object.keys(TEAM).map(ev => {
-    const E = TEAM[ev], ms = matchesOf(ev), times = ms.map(m => m.at || 0);
+    const E = TEAM[ev], ms = matchesOf(ev), times = ms.map(m => m.at || 0), fin = !!resultOf(ev);
     if(E.mode==='round'){
-      const planned = settings().tugRounds || 3;
-      return { ev, kind:'round', done: ms.length, total: planned, rem: Math.max(0, planned - ms.length), unit: unitMs(times), n: times.length };
+      // 머리 위로 짐볼 넘기기는 계획 1판, 줄다리기는 마스터가 정한 판 수
+      const planned = E.rounds || settings().tugRounds || 3;
+      return { ev, kind:'round', done: ms.length, total: planned, rem: fin ? 0 : Math.max(0, planned - ms.length), fin, unit: unitMs(times), n: times.length };
     }
-    const all = [...members('blue'), ...members('red')];
-    const played = new Set([...Object.keys(plays(ev,'blue')), ...Object.keys(plays(ev,'red'))]);
-    const total = all.filter(id => !isAbsent(id) || played.has(id)).length, done = all.filter(id => played.has(id)).length;
-    return { ev, kind:'duel', done, total, rem: remainingMatches(ev), unit: unitMs(times), n: times.length };
+    // 대결 종목: 한 바퀴(모든 사람 또는 모든 조가 한 번씩) 기준으로 센다. 볼링의 두 번째 바퀴는 시간이 남을 때만 하므로 세지 않음
+    const G = groupSize(ev), total = Math.max(unitList(ev, 'blue').length, unitList(ev, 'red').length);
+    let rem = remainingMatches(ev);
+    // 콩주머니 A안은 3선승이 나오면 그 자리에서 끝남
+    if(fin || (E.bag && eventStat(ev).reached)) rem = 0;
+    return { ev, kind:'duel', done: Math.max(0, total - remainingMatches(ev)), total, rem, fin, unit: G ? '조' : '대결', ms: unitMs(times), n: times.length };
   });
+  team.forEach(e => { if(e.kind==='duel'){ e.u = e.unit; e.unit = e.ms; } });
   // 아직 시작하지 않은 단체전(기록 0~1개)은 기록이 2개 이상인 다른 단체전의 평균 시간으로 추정
   const known = team.filter(e => e.unit != null).map(e => e.unit);
   const avg = known.length ? known.reduce((s,v) => s+v, 0) / known.length : null;
@@ -70,8 +75,8 @@ function progressView(){
     const E = EVENTS[e.ev], pct = e.total ? Math.min(100, Math.round(e.done / e.total * 100)) : 0;
     let main, sub = '', subFull = '';
     if(e.kind === 'indiv'){ main = `본선 ${e.done}/${e.total}명`; sub = `${e.prac ? `연1 ${e.p1} · 연2 ${e.p2} · ` : ''}대기 ${e.wait}`; subFull = `${e.prac ? `연습 1 ${e.p1}명 · 연습 2 ${e.p2}명 · ` : ''}대기 ${e.wait}명`; }
-    else if(e.kind === 'round'){ main = `${e.done}/${e.total}판`; sub = e.rem ? `남은 판 ${e.rem}` : ''; subFull = sub; }
-    else { main = `${e.done}/${e.total}명`; sub = `남은 대결 ${e.rem}`; subFull = sub; }
+    else if(e.kind === 'round'){ main = `${e.done}/${e.total}판`; sub = e.rem ? `남은 판 ${e.rem}` : (e.fin ? '결과 확정' : '결과 확정 전'); subFull = sub; }
+    else { main = `${e.done}/${e.total}${e.u}`; sub = e.rem ? `남은 ${e.u==='조' ? '조' : '대결'} ${e.rem}` : (e.fin ? '결과 확정' : '결과 확정 전'); subFull = sub; }
     let eta;
     if(a.st === 'done') eta = '<span class="tag ok">완료 ✓</span>';
     else if(a.st === 'none') eta = '<span class="tag">명단 없음</span>';
@@ -83,7 +88,7 @@ function progressView(){
   };
   return `<div class="prog">
     <div class="card progsum"><div class="row"><h2 class="grow h2" style="margin:0">🧭 진행 현황</h2><span class="sub">${hm(t)} 기준 · 완료 ${doneN}/${allN} 종목</span>
-        <details class="pcalc"><summary aria-label="남은 시간 계산 방법">ⓘ</summary><p>남은 시간은 기록을 저장한 간격의 평균(15분보다 긴 간격은 쉬는 시간으로 보고 뺌)에 남은 사람·대결 수를 곱해 계산합니다. 30초마다 새로 계산합니다.</p></details></div>
+        <details class="pcalc"><summary aria-label="남은 시간 계산 방법">ⓘ</summary><p>남은 시간은 기록을 저장한 간격의 평균(15분보다 긴 간격은 쉬는 시간으로 보고 뺌)에 남은 사람·조·대결 수를 곱해 계산합니다. 단체전은 한 바퀴 기준이고, 심판이 결과를 확정하면 끝난 것으로 봅니다. 30초마다 새로 계산합니다.</p></details></div>
       <div class="pgrps">${grp('개인전', '세 종목 동시', iMs, iCalc, iDone)}${grp('단체전', '차례로 진행', tMs, tCalc, tDone)}</div></div>
     <div class="progrid">${I.map(row).join('')}${T.map(row).join('')}</div>
   </div>`;

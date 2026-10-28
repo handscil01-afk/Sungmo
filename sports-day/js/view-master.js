@@ -22,6 +22,11 @@ function settingsView(){
       <div class="row nowrap">${teamBadge('blue')}<input id="tnBlue" value="${esc(teamName('blue'))}" autocomplete="off">${teamBadge('red')}<input id="tnRed" value="${esc(teamName('red'))}" autocomplete="off"></div>
       <div style="height:10px"></div><button class="btn wide" data-a="saveTeamNames">팀 이름 저장</button>
       <p class="sub">화면에는 팀 이름의 첫 글자(${esc(teamShort('blue'))}·${esc(teamShort('red'))})가 팀 표시로 쓰입니다. ${esc(teamShort('blue'))}은 동그라미, ${esc(teamShort('red'))}은 네모 모양입니다.</p></div>
+    <div class="card"><h2>🎯 콩주머니 승부 방식</h2>
+      <div class="seg">${[['A','A. 5판 3선승'],['B','B. 5판 총점']].map(([k,l]) => `<button class="${beanbagMode()===k?'on':''}" data-a="setBag" data-v="${k}">${l}</button>`).join('')}</div>
+      <p class="sub"><b>A안</b> 5판 중 먼저 3판을 이기는 팀이 이기고, 3승이 나오면 그 자리에서 끝납니다.</p>
+      <p class="sub"><b>B안</b> 5판의 점수를 모두 더해 점수 합계가 높은 팀이 이깁니다. 합계가 같으면 팀 대표 1명씩 1개를 던져 정합니다.</p>
+      <p class="sub">콩주머니 경기를 시작한 뒤에 바꾸면 이미 입력한 기록의 셈이 달라지니, 시작하기 전에 정해 주세요.</p></div>
     <div class="card"><h2>아직 정하지 못한 점수</h2>
       <div class="row"><span class="grow">후리볼 파울</span><div class="seg"><button class="${s.foul===1?'on':''}" data-a="setS" data-k="foul" data-v="1">1점</button><button class="${s.foul===1.5?'on':''}" data-a="setS" data-k="foul" data-v="1.5">1.5점</button></div></div>
       <p class="sub">바꾸면 이미 입력한 기록의 점수도 자동으로 다시 계산됩니다.</p></div>
@@ -61,6 +66,8 @@ function parseRoster(text){
   });
   return out;
 }
+// 내려받는 표의 출전자: 한 사람은 이름, 조 대결은 '2조 홍길동·김철수'
+const csvSide = (m, tm) => { const n = matchNames(m, tm); return n && m[tm+'Group'] ? `${m[tm+'Group']}조 ${n}` : n; };
 function csv(kind){
   const rows = [];
   const q = v => { const s=String(v??''); return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s; };
@@ -76,8 +83,14 @@ function csv(kind){
       }); });
   } else {
     rows.push(['종목','순번',teamName('blue')+' 선수',teamName('red')+' 선수','결과',teamName('blue')+' 기록(초)',teamName('red')+' 기록(초)',teamName('blue')+' 점수',teamName('red')+' 점수','입력자','입력 시각','수정자','수정 시각']);
-    Object.entries(TEAM).forEach(([ev,E]) => matchesOf(ev).forEach((m,i) => rows.push([E.name, i+1, m.blueId?pname(m.blueId):'', m.redId?pname(m.redId):'',
+    Object.entries(TEAM).forEach(([ev,E]) => matchesOf(ev).forEach((m,i) => rows.push([E.name, i+1, csvSide(m,'blue'), csvSide(m,'red'),
       m.winner==='draw' ? '무승부' : teamName(m.winner)+' 승', m.blueTime??'', m.redTime??'', m.blueScore??'', m.redScore??'', m.by||'', t(m.at), m.editedBy||'', t(m.editedAt)])));
+    // 종목 결과(심판이 확정한 것)와 승점
+    rows.push([]);
+    rows.push(['종목','종목 결과',teamName('blue')+' 성적',teamName('red')+' 성적','단위','결정전','확정한 사람','확정 시각','확정 뒤 기록 변경']);
+    Object.entries(TEAM).forEach(([ev,E]) => { const st = eventStat(ev), r = resultOf(ev);
+      rows.push([E.name, r ? teamName(r.winner)+' 승 (승점 '+(E.pts||1)+')' : '미확정', st.blue, st.red, st.unit, r && r.decider ? '예' : '', r ? (r.by||'') : '', r ? t(r.at) : '', r && resultStale(ev) ? '예' : '']); });
+    const tp = totalPoints(); rows.push(['합계 승점','',tp.blue,tp.red]);
   }
   const blob = new Blob(['﻿'+rows.map(r => r.map(q).join(',')).join('\r\n')], {type:'text/csv;charset=utf-8'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
@@ -103,6 +116,12 @@ Object.assign(ACT, {
   setTeam: (el, v) => { setConfig({ people:{ [v]:{ team: el.dataset.t } } }); return false; },
   renameP: async (el, v) => { const p = person(v), n = await askText('이름 고치기', p?.name||''); if(n && n.trim()) setConfig({ people:{ [v]:{ name:n.trim() } } }); return false; },
   delP: async (el, v) => { const p = person(v); if(!(await ask(`${p?.name}을(를) 명단에서 지울까요?\n이미 입력한 기록은 그대로 남습니다.`,'지우기',true))) return false; setConfig({ people:{ [v]:{ deleted:true } } }); return false; },
+  setBag: async (el, v) => {
+    if(v!=='A' && v!=='B') return false;
+    if(v===beanbagMode()) return false;
+    if(matchesOf('beanbag').length && !(await ask('콩주머니 경기를 이미 시작했습니다.\n승부 방식을 바꾸면 입력한 기록의 셈이 달라집니다. 바꿀까요?', '바꾸기', true))) return false;
+    setConfig({ settings:{ beanbagMode:v } }); toast(`콩주머니 승부 방식을 ${v}안으로 바꿨습니다.`); return false;
+  },
   setS: (el, v) => { setConfig({ settings:{ [el.dataset.k]: parseFloat(v) } }); return false; },
   csv: (el, v) => { csv(v); return false; },
   report: () => { UI.report = true; window.scrollTo(0,0); },
@@ -117,7 +136,7 @@ Object.assign(ACT, {
     const by = { editedBy:UI.me, editedAt:now() }, jobs = [];
     D.indiv.filter(r => !r.deleted).forEach(r => jobs.push(put(['main','indiv',r.id], { event:r.event, deleted:true, ...by })));
     D.matches.filter(m => !m.deleted).forEach(m => jobs.push(put(['main','matches',m.id], { event:m.event, deleted:true, ...by })));
-    Object.keys(D.calls).forEach(ev => jobs.push(put(['main','calls',ev], { pick:{ blue:null, red:null }, call:null, times:null, marks:{ list:[], addN:0, addAt:0 } })));
+    Object.keys(D.calls).forEach(ev => jobs.push(put(['main','calls',ev], { pick:{ blue:null, red:null }, call:null, result:null, times:null, marks:{ list:[], addN:0, addAt:0, first:'blue' } })));
     Object.keys(D.queues).forEach(id => jobs.push(guard(store.del(['main','queues',id]))));
     Object.keys(D.absent).forEach(id => jobs.push(guard(store.del(['main','absent',id]))));
     Object.keys(D.ccalls).forEach(id => jobs.push(guard(store.del(['main','ccalls',id]))));
