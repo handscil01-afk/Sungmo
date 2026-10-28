@@ -1,4 +1,4 @@
-const CACHE = 'baseball-v3';
+const CACHE = 'baseball-v4';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png',
   './css/app.css',
   './js/util.js', './js/data.js', './js/engine.js', './js/ai.js', './js/speech.js', './js/shell.js', './js/ui.js', './js/net.js', './js/voice.js', './js/game.js', './js/manager.js', './js/online.js', './js/app.js',

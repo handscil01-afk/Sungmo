@@ -4,11 +4,11 @@ const dir = path.join(__dirname, '..', 'js');
 ['data.js', 'engine.js', 'ai.js'].forEach(f => vm.runInThisContext(fs.readFileSync(path.join(dir, f), 'utf8'), { filename: f }));
 
 const N = +process.argv[2] || 300;
-function run(mode){
+function run(mode, unit){
   const tot = { g:0, runs:0, pa:0, ab:0, h:0, hr:0, k:0, bb:0, sb:0, e:0, pitches:0, xbh:0, extra:0, draws:0, lines:0, walkoff:0 };
   for(let n = 0; n < N; n++){
     const keys = TEAMS.map(t => t.key);
-    const G = newGame({ mode, innings:9, teams:[keys[n % 6], keys[(n + 1 + (n >> 3)) % 6 === n % 6 ? (n + 2) % 6 : (n + 1 + (n >> 3)) % 6]], ctrl:['cpu', 'cpu'], seed: 1000 + n });
+    const G = newGame({ mode, innings:9, teams:[keys[n % 6], keys[(n + 1 + (n >> 3)) % 6 === n % 6 ? (n + 2) % 6 : (n + 1 + (n >> 3)) % 6]], ctrl:['cpu', 'cpu'], unit, seed: 1000 + n });
     flush(G);
     let guard = 0;
     while(!G.over){
@@ -33,9 +33,10 @@ function run(mode){
     });
   }
   const per = v => (v / tot.g / 2).toFixed(2);
-  console.log(`[${mode}] ${tot.g}경기 · 팀당 경기당 득점 ${per(tot.runs)} · 안타 ${per(tot.h)} · 홈런 ${per(tot.hr)} · 삼진 ${per(tot.k)} · 볼넷 ${per(tot.bb)} · 도루 ${per(tot.sb)} · 실책 ${per(tot.e)}`);
+  console.log(`[${mode}${unit ? ' ' + unit : ''}] ${tot.g}경기 · 팀당 경기당 득점 ${per(tot.runs)} · 안타 ${per(tot.h)} · 홈런 ${per(tot.hr)} · 삼진 ${per(tot.k)} · 볼넷 ${per(tot.bb)} · 도루 ${per(tot.sb)} · 실책 ${per(tot.e)}`);
   console.log(`   타율 ${(tot.h / tot.ab).toFixed(3)} · 삼진율 ${(tot.k / tot.pa * 100).toFixed(1)}% · 볼넷률 ${(tot.bb / tot.pa * 100).toFixed(1)}% · 타석당 투구 ${(tot.pitches / tot.pa).toFixed(2)} · 연장 ${tot.extra} · 무승부 ${tot.draws} · 끝내기 ${tot.walkoff} · 경기당 문장 ${(tot.lines / tot.g).toFixed(0)}`);
 }
 run('detail');
 run('simple');
+run('simple', 'pitch');
 run('manager');

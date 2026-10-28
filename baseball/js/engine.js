@@ -123,11 +123,14 @@ function makeTeam(G, key, bias){
 const teamDef = T => Math.round(T.bat.reduce((s, b) => s + b.def, 0) / 9 + STYLES[T.style].def);
 
 /* ---------- 경기 시작 ----------
-   o: { mode:'simple'|'detail', innings, teams:[원정 팀 키, 홈 팀 키], ctrl:['human'|'cpu', ...], who:[이름, 이름], diff:0~2, seed } */
+   o: { mode:'simple'|'detail'|'manager', unit:'pa'|'pitch'(간단 모드), innings, teams:[원정 팀 키, 홈 팀 키], ctrl:['human'|'cpu', ...], who:[이름, 이름], diff:0~2, seed } */
 const EXTRA_INN = 3;
 function newGame(o){
   const G = { v:1, rng: (o.seed >>> 0) || (Date.now() >>> 0), seq:0, log:[], out:[], fx:[], names:[],
-    mode: ['simple', 'manager'].includes(o.mode) ? o.mode : 'detail', innings: o.innings || 3, ctrl: o.ctrl || ['human', 'cpu'],
+    mode: ['simple', 'manager'].includes(o.mode) ? o.mode : 'detail',
+    // 간단 모드: pa 한 번에 한 타석 · pitch 한 번에 공 하나
+    unit: o.mode === 'simple' && o.unit === 'pitch' ? 'pitch' : 'pa',
+    innings: o.innings || 3, ctrl: o.ctrl || ['human', 'cpu'],
     who: o.who || ['', ''], diff: o.diff == null ? 1 : o.diff,
     inning:1, top:true, outs:0, balls:0, strikes:0, bases:[null, null, null], pitchNo:0, pa:0, half:0,
     over:false, winner:null, prev:null, lastLoc:null, at: Date.now() };
@@ -743,10 +746,16 @@ function playSimple(G, D, O){
   P.n += rint(G, 3, 6);
   const rows = simpleTable(D, O), d = rint(G, 1, 100), row = rows.find(r => d >= r.from && d <= r.to);
   emit(G, '주사위 표: ' + rows.map(r => `${SIMPLE_NAME[r.k]} ${r.from}~${r.to}`).join(', ') + '.', 'd');
-  const head = `주사위 ${d}.`;
+  simpleOutcome(G, row.k, `주사위 ${d}.`);
+  endPA(G);
+  return flush(G);
+}
+// 간단 모드 결과 하나를 적용 (K 삼진 · BB 볼넷 · S1~S3 · HR · GO 땅볼 · FO 뜬공)
+function simpleOutcome(G, k, head){
+  const T = batTeam(G), B = curBatter(G), P = curPitcher(G);
   const fi = rint(G, 0, 2), fieldWord = ['왼쪽', '가운데', '오른쪽'][fi];
   const hit = (n, text) => { B.st.ab++; B.st.h++; T.H++; P.st.h++; if(n === 4){ B.st.hr++; P.st.hr++; fx(G, 'hr'); } else fx(G, n >= 2 ? 'xbh' : 'hit'); emit(G, `${head} ${text}`, 'r'); onHit(G, n, 0.5, true); };
-  switch(row.k){
+  switch(k){
     case 'K': B.st.ab++; B.st.k++; P.st.k++; addOut(G); emit(G, `${head} 헛스윙 삼진! ${G.outs}아웃.`, 'r'); fx(G, 'k'); break;
     case 'BB': B.st.bb++; T.BB++; P.st.bb++; emit(G, `${head} 볼넷으로 1루에 걸어 나갑니다.`, 'r'); forceWalk(G); fx(G, 'ball'); break;
     case 'S1': hit(1, `${josa(fieldWord, '으로', '로')} 가는 안타!`); break;
@@ -773,9 +782,80 @@ function playSimple(G, D, O){
       break;
     }
   }
+}
+
+/* ---------- 공 하나씩 (간단 모드의 '공 하나씩' 방식) ----------
+   한 번 고르면 공 하나: 주사위 하나로 공이 스트라이크 존에 들어오는지, 휘두르면 또 하나로 헛스윙·파울·인플레이를 정함.
+   인플레이면 타석 주사위 표(안타·홈런·땅볼·뜬공)를 한 번 더 굴림. 볼카운트가 쌓이고 3스트라이크·4볼이면 타석이 끝남.
+   D: 'attack' 정면 승부 · 'nibble' 유인구 · 'ibb' 고의 볼넷 / O: 'power' · 'normal' · 'contact' · 'take' 지켜보기 · 'bunt' */
+const SP_ZONE = { attack:64, nibble:36 };
+// 휘둘렀을 때 [헛스윙, 파울] 확률(%) (나머지는 인플레이)
+const SP_SWING = {
+  in:  { power:[25, 37], normal:[15, 42], contact:[8, 47] },
+  out: { power:[55, 27], normal:[42, 32], contact:[30, 38] },
+};
+function playSimplePitch(G, D, O){
+  if(G.over) return flush(G);
+  if(D === 'ibb' || O === 'steal') return playSimple(G, D, O);
+  const T = batTeam(G), B = curBatter(G), P = curPitcher(G);
+  G.pitchNo++; P.n++;
+  const zoneN = SP_ZONE[D] || 55, d1 = rint(G, 1, 100), inZone = d1 <= zoneN;
+  emit(G, `판정 공 위치: 1~${zoneN} 스트라이크, 주사위 ${d1}.`, 'd');
+  const where = inZone ? pickOne(G, ['스트라이크 존으로 들어오는 공', '존 구석을 찌르는 공', '가운데로 몰린 공']) : pickOne(G, ['존을 벗어나는 공', '낮게 떨어지는 공', '바깥쪽으로 빠지는 공']);
+  const head = `제${G.pitchNo}구, 주사위 ${d1}: ${where}.`;
+  const strike = text => {
+    G.strikes++; fx(G, 'mitt');
+    if(G.strikes >= 3){ emit(G, `${head} ${text} 삼진 아웃! ${G.outs + 1}아웃.`, 'r'); B.st.ab++; B.st.k++; P.st.k++; addOut(G); fx(G, 'k'); endPA(G); return flush(G); }
+    emit(G, `${head} ${text} ${countText(G)}.`, 'p'); return flush(G);
+  };
+  const ball = text => {
+    G.balls++; fx(G, 'mitt');
+    if(G.balls >= 4){ emit(G, `${head} ${text} 볼넷으로 1루에 걸어 나갑니다.`, 'r'); B.st.bb++; T.BB++; P.st.bb++; forceWalk(G); fx(G, 'ball'); endPA(G); return flush(G); }
+    emit(G, `${head} ${text} ${countText(G)}.`, 'p'); return flush(G);
+  };
+  if(O === 'take') return inZone ? strike('지켜봅니다. 스트라이크.') : ball('지켜봅니다. 볼.');
+  if(O === 'bunt'){
+    if(!inZone && rnd(G) < 0.6) return ball('번트 자세에서 방망이를 거둡니다. 볼.');
+    if(!check(G, '번트', inZone ? 0.75 : 0.5, '공을 굴림', '파울')){
+      if(G.strikes >= 2) return strike('번트 파울! 쓰리번트 실패로');
+      G.strikes++; fx(G, 'foul'); emit(G, `${head} 번트를 댔지만 파울. ${countText(G)}.`, 'p'); return flush(G);
+    }
+    fx(G, 'bunt'); buntResult(G, `${head} 번트!`, true); endPA(G); return flush(G);
+  }
+  // 존 밖 공은 휘두르려다가도 참아 낼 수 있음 (맞히기일수록 잘 참음)
+  if(!inZone){
+    const hold = { power:32, normal:50, contact:62 }[O] || 50, dh = rint(G, 1, 100);
+    emit(G, `판정 참기: 1~${hold} 참음, 주사위 ${dh}.`, 'd');
+    if(dh <= hold) return ball('방망이를 멈추고 끝까지 참아 냅니다. 볼.');
+  }
+  const [wh, fo] = SP_SWING[inZone ? 'in' : 'out'][O] || SP_SWING.in.normal;
+  const d2 = rint(G, 1, 100);
+  emit(G, `판정 스윙: 1~${wh} 헛스윙, ${wh + 1}~${wh + fo} 파울, ${wh + fo + 1}~100 인플레이, 주사위 ${d2}.`, 'd');
+  const chase = inZone ? '' : '볼에 방망이가 나갑니다. ';
+  if(d2 <= wh){ fx(G, 'whiff'); return strike(`${chase}헛스윙!`); }
+  if(d2 <= wh + fo){
+    fx(G, 'foul');
+    if(G.strikes < 2) G.strikes++;
+    emit(G, `${head} ${chase}파울. ${countText(G)}.`, 'p'); return flush(G);
+  }
+  // 인플레이: 안타·홈런·땅볼·뜬공 표를 한 번 더 굴림 (존 밖 공을 치면 약한 타구가 많음)
+  fx(G, 'bat');
+  const w = { ...SP_PLAY[O] };
+  if(!inZone){ w.HR *= 0.4; w.S2 *= 0.6; w.S1 *= 0.85; w.GO *= 1.3; w.FO *= 1.15; }
+  const tot = Object.values(w).reduce((a, b) => a + b, 0), d3 = rint(G, 1, 100);
+  let acc = 0, k = 'GO';
+  for(const key of Object.keys(w)){ acc += w[key] / tot * 100; if(d3 <= Math.round(acc)){ k = key; break; } }
+  emit(G, `판정 타구: 주사위 ${d3}, ${SIMPLE_NAME[k]}.`, 'd');
+  simpleOutcome(G, k, `${head} ${chase}딱!`);
   endPA(G);
   return flush(G);
 }
+// 인플레이 타구 표 (무게)
+const SP_PLAY = {
+  power:   { S1:17, S2:7.5, S3:0.6, HR:8.5, GO:30, FO:37 },
+  normal:  { S1:22, S2:6.5, S3:0.7, HR:4.5, GO:35, FO:31 },
+  contact: { S1:27, S2:4.5, S3:0.7, HR:1.4, GO:40, FO:27 },
+};
 
 /* ---------- 작전 (공 하나를 쓰지 않음) ---------- */
 function setAlign(G, ti, inf, of){

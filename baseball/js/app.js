@@ -20,13 +20,20 @@ function homeScreen(){
 
 /* ---------- 경기 준비 ---------- */
 const MODE_NAME = { simple:'간단 모드', detail:'정밀 모드', manager:'감독 모드' };
-const NEW = { kind:'1p', mode:'simple', a:null, b:null, first:1, innings:3, diff:1 };
+const NEW = { kind:'1p', mode:'simple', unit:'pitch', a:null, b:null, first:1, innings:3, diff:1 };
 const teamLabel = k => { const t = teamInfo(k); return `${t.name} (${STYLES[t.style].name})`; };
 function modeScreen(){
   return { q:'어떤 방식으로 할까요?', back: v => go(NEW.kind === 'online' ? onlineHome : homeScreen, v), opts:[
-    { n:1, t:'간단 모드', s:'타석마다 한 번 고르고, 주사위로 결과를 정합니다. 처음 해 보는 분께 알맞습니다.', act: v => { NEW.mode = 'simple'; go(() => teamScreen(0), v); } },
+    { n:1, t:'간단 모드', s:'주사위로 결과를 정하는 쉬운 야구입니다. 처음 해 보는 분께 알맞습니다.', act: v => { NEW.mode = 'simple'; go(unitScreen, v); } },
     { n:2, t:'정밀 모드', s:'공 하나마다 구종, 코스, 세기를 고릅니다. 선수 능력치, 컨디션, 바람, 수비 위치가 결과를 바꿉니다.', act: v => { NEW.mode = 'detail'; go(() => teamScreen(0), v); } },
     { n:3, t:'감독 모드', s:'선수들이 알아서 던지고 치고, 감독은 타순, 선발 투수, 작전, 대타, 투수 교체만 지시합니다. 중요한 순간에만 묻습니다.', act: v => { NEW.mode = 'manager'; go(() => teamScreen(0), v); } },
+  ] };
+}
+function unitScreen(){
+  const set = (u, v) => { NEW.unit = u; go(() => teamScreen(0), v); };
+  return { q:'간단 모드를 어떻게 진행할까요?', back: v => go(modeScreen, v), opts:[
+    { n:1, t:'공 하나씩', s:'한 번 고를 때마다 공 하나를 던지고 칩니다. 볼카운트가 쌓이고, 볼넷과 삼진도 공 하나하나로 정해집니다.', act: v => set('pitch', v) },
+    { n:2, t:'타석 한 번에', s:'타석마다 한 번만 고르면 결과가 바로 나옵니다. 빠르게 진행됩니다.', act: v => set('pa', v) },
   ] };
 }
 function teamScreen(which){
@@ -41,7 +48,7 @@ function teamScreen(which){
   };
   const opts = list.map((t, i) => ({ n: i + 1, t: t.name, s: `${STYLES[t.style].name}. ${STYLES[t.style].desc}`, act: v => set(t.key, v) }));
   opts.push({ n: list.length + 1, t:'아무 팀이나', s:'무작위로 고릅니다.', act: v => set(list[Math.floor(Math.random() * list.length)].key, v) });
-  return { q, opts, back: v => go(which ? () => teamScreen(0) : modeScreen, v) };
+  return { q, opts, back: v => go(which ? () => teamScreen(0) : NEW.mode === 'simple' ? unitScreen : modeScreen, v) };
 }
 function sideScreen(){
   const me = NEW.kind === '2p' ? '첫째 사람 팀' : '내 팀';
@@ -76,13 +83,13 @@ function newOpts(){
   let ctrl = ['cpu', 'cpu'], who = ['', ''];
   if(NEW.kind === '1p') ctrl = meFirst ? ['human', 'cpu'] : ['cpu', 'human'];
   if(NEW.kind === '2p'){ ctrl = ['human', 'human']; who = meFirst ? ['첫째 사람', '둘째 사람'] : ['둘째 사람', '첫째 사람']; }
-  return { mode: NEW.mode, innings: NEW.innings, teams, ctrl, who, diff: NEW.diff, seed: (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0 };
+  return { mode: NEW.mode, unit: NEW.unit, innings: NEW.innings, teams, ctrl, who, diff: NEW.diff, seed: (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0 };
 }
 function readyScreen(){
   const o = newOpts();
   const role = ti => NEW.kind === '1p' ? (o.ctrl[ti] === 'human' ? '내 팀' : '컴퓨터') : NEW.kind === '2p' ? o.who[ti] : '컴퓨터';
   const say = [
-    `${MODE_NAME[NEW.mode]}, ${NEW.innings}이닝 경기입니다.`,
+    `${MODE_NAME[NEW.mode]}${NEW.mode === 'simple' ? (NEW.unit === 'pitch' ? '(공 하나씩)' : '(타석 한 번에)') : ''}, ${NEW.innings}이닝 경기입니다.`,
     `원정(먼저 공격): ${teamLabel(o.teams[0])}, ${role(0)}.`,
     `홈(나중에 공격): ${teamLabel(o.teams[1])}, ${role(1)}.`,
   ];
@@ -140,7 +147,7 @@ const HELP = {
     '손잡다 야구는 말과 글로 진행하는 확률 야구입니다. 화면을 보지 않고 듣거나 점자로 읽으며 할 수 있습니다.',
     '혼자 하기는 컴퓨터 팀과, 둘이 하기는 한 기기를 번갈아 쓰며 대결합니다. 컴퓨터끼리 관전도 할 수 있습니다.',
     '수비할 때는 투수가 되어 공을 고르고, 공격할 때는 타자가 되어 어떻게 칠지 고릅니다. 상대가 무엇을 골랐는지는 결과가 나와야 압니다.',
-    '간단 모드는 타석마다 한 번만 고르고, 1부터 100까지의 주사위로 결과를 정합니다. 선택지마다 안타, 홈런, 삼진 확률이 함께 나옵니다.',
+    '간단 모드는 1부터 100까지의 주사위로 결과를 정합니다. 공 하나씩 방식은 한 번 고를 때마다 공 하나를 던지고 치며(스트라이크로 승부·유인구 / 강하게·보통·맞히기·지켜보기), 볼카운트가 쌓입니다. 타석 한 번에 방식은 타석마다 한 번만 고르면 결과가 바로 나옵니다. 선택지마다 확률이 함께 나옵니다.',
     '정밀 모드는 공 하나마다 구종, 코스, 붙이는 정도, 세기를 고릅니다. 선수 능력치와 컨디션, 바람, 수비 위치가 결과에 영향을 줍니다.',
     '1, 3, 5, 7, 9이닝 가운데 고르고, 동점이면 연장전을 최대 3이닝 더 합니다.',
     '경기는 공 하나마다 이 기기에 저장됩니다. 그만두었다가 처음 화면의 이어하기로 다시 할 수 있습니다.',

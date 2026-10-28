@@ -40,7 +40,7 @@ function codeScreen(){
 
 /* ---------- 방 만들기 · 들어가기 ---------- */
 function roomCfgFromNew(){
-  return { mode: NEW.mode, innings: NEW.innings, hostTeam: NEW.a, guestTeam: NEW.b, hostSide: NEW.first === 1 ? 0 : 1 };
+  return { mode: NEW.mode, unit: NEW.unit, innings: NEW.innings, hostTeam: NEW.a, guestTeam: NEW.b, hostSide: NEW.first === 1 ? 0 : 1 };
 }
 async function createRoomFlow(via){
   go(() => ({ q:'방을 만드는 중입니다…', opts:[] }), via);
@@ -81,7 +81,7 @@ function cfgSummary(){
   const me = SET.name || '나', peer = NET.peer ? NET.peer.name : '상대';
   const hostName = NET.role === 'host' ? me : peer, guestName = NET.role === 'host' ? (NET.peer ? peer : '손님') : me;
   const order = s => s === 0 ? '먼저 공격' : '나중에 공격';
-  return [`${MODE_NAME[c.mode] || '정밀 모드'}, ${c.innings}이닝 경기입니다.`,
+  return [`${MODE_NAME[c.mode] || '정밀 모드'}${c.mode === 'simple' ? (c.unit === 'pitch' ? '(공 하나씩)' : '(타석 한 번에)') : ''}, ${c.innings}이닝 경기입니다.`,
     `${hostName}: ${teamLabel(c.hostTeam)}, ${order(c.hostSide)}.`,
     `${guestName}: ${teamLabel(c.guestTeam)}, ${order(1 - c.hostSide)}.`];
 }
@@ -116,7 +116,7 @@ function netStartGame(via){
   const c = NET.cfg, teams = [], who = [];
   teams[c.hostSide] = c.hostTeam; teams[1 - c.hostSide] = c.guestTeam;
   who[c.hostSide] = SET.name || '방장'; who[1 - c.hostSide] = NET.peer ? NET.peer.name : '손님';
-  const opts = { mode:c.mode, innings:c.innings, teams, ctrl:['human', 'human'], who, diff:1, seed:(Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0 };
+  const opts = { mode:c.mode, unit:c.unit, innings:c.innings, teams, ctrl:['human', 'human'], who, diff:1, seed:(Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0 };
   startGame(opts, via);
 }
 
@@ -210,7 +210,7 @@ function onAct(v){
       c = { k:c.k };
     }
     else if(G.mode === 'detail'){ if(role === 'def' ? !VALID_PITCH(c) : !VALID_BAT(c)) return; c = role === 'def' ? (c.k === 'ibb' ? { k:'ibb' } : { k:'pitch', t:c.t, r:c.r, c:c.c, e:c.e, w:c.w }) : { k:c.k, g:c.g ?? null }; }
-    else if(!(role === 'def' ? ['attack', 'nibble', 'ibb'] : ['power', 'normal', 'contact', 'bunt']).includes(c)) return;
+    else if(!(role === 'def' ? ['attack', 'nibble', 'ibb'] : ['power', 'normal', 'contact', 'bunt', ...(G.unit === 'pitch' ? ['take'] : [])]).includes(c)) return;
     GS.pend[role] = c;
     if(!tryResolve('auto')) netPushState(null);
     return;

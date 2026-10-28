@@ -32,7 +32,7 @@ const PORT = 8769, URL0 = `http://localhost:${PORT}/baseball/?emu=1`;
   await host.keyboard.press('3'); await host.keyboard.press('1');
   await waitQ(host, /이름을/); await say(host, '센터장');
   await waitQ(host, /어떤 방식/);
-  for(const k of [{ simple:'1', detail:'2', manager:'3' }[mode], '1', '1', '1', '1']) await host.keyboard.press(k);
+  for(const k of [...({ simple:['1', '1'], detail:['2'], manager:['3'] }[mode]), '1', '1', '1', '1']) await host.keyboard.press(k);
   await waitQ(host, /방 코드는/);
   const code = await host.evaluate(() => NET.code);
   console.log('방 코드', code);

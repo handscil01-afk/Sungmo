@@ -59,7 +59,7 @@ const PORT = 8766;
     console.log(`${name}: 정밀 1이닝 ${steps}번 만에 끝`);
     // 처음 화면 → 둘이 하기, 간단 모드, 3이닝 (명령 칸으로 입력)
     await page.keyboard.press('4');
-    for(const k of ['2', '1', '2', '3', '2', '2', '1']){ await page.fill('#cmd', ''); await page.type('#cmd', k); }
+    for(const k of ['2', '1', '1', '2', '3', '2', '2', '1']){ await page.fill('#cmd', ''); await page.type('#cmd', k); }
     const s2 = await playToEnd(page, name + ' 간단 둘이', false);
     console.log(`${name}: 간단 둘이 3이닝 ${s2}번 만에 끝`);
     // 관전: 정밀 3이닝, 경기 끝까지
@@ -71,7 +71,7 @@ const PORT = 8766;
     if(name === 'phone'){
       // 혼자 하기 간단 모드 → 이번 이닝 맡기기 → 그만하기 → 이어하기 → 끝까지
       await page.keyboard.press('4');
-      for(const k of ['1', '1', '1', '1', '1', '2', '2', '1']) await page.keyboard.press(k);
+      for(const k of ['1', '1', '2', '1', '1', '1', '2', '2', '1']) await page.keyboard.press(k);
       await page.keyboard.press('9'); await page.keyboard.press('7');
       await page.keyboard.press('9'); await page.keyboard.press('9');
       if(!(await q(page)).includes('무엇을 할까요')) errors.push('그만하기 뒤 처음 화면이 아님');

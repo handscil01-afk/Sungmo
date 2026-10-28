@@ -140,6 +140,25 @@ function aiManageOff(G){
 }
 
 /* ---------- 모드에 맞게 컴퓨터가 고르기 · 한 걸음 진행 ---------- */
-const aiDefChoice = G => G.mode === 'manager' ? aiOrderDef(G) : G.mode === 'simple' ? aiSimpleDef(G) : aiPitch(G);
-const aiOffChoice = G => G.mode === 'manager' ? aiOrderOff(G) : G.mode === 'simple' ? aiSimpleOff(G) : aiBat(G);
-const playStep = (G, D, O) => G.mode === 'manager' ? playManager(G, D, O) : G.mode === 'simple' ? playSimple(G, D, O) : playPitch(G, D, O);
+const spUnit = G => G.mode === 'simple' && G.unit === 'pitch';
+const aiDefChoice = G => G.mode === 'manager' ? aiOrderDef(G) : spUnit(G) ? aiSPDef(G) : G.mode === 'simple' ? aiSimpleDef(G) : aiPitch(G);
+const aiOffChoice = G => G.mode === 'manager' ? aiOrderOff(G) : spUnit(G) ? aiSPOff(G) : G.mode === 'simple' ? aiSimpleOff(G) : aiBat(G);
+const playStep = (G, D, O) => G.mode === 'manager' ? playManager(G, D, O) : spUnit(G) ? playSimplePitch(G, D, O) : G.mode === 'simple' ? playSimple(G, D, O) : playPitch(G, D, O);
+
+/* ---------- 간단 모드 '공 하나씩' ---------- */
+function aiSPDef(G){
+  const b = G.balls, s = G.strikes;
+  if(b === 0 && s === 0 && aiSimpleDef(G) === 'ibb') return 'ibb';
+  if(b === 3) return rnd(G) < 0.85 ? 'attack' : 'nibble';
+  if(s === 2 && b < 2) return rnd(G) < 0.6 ? 'nibble' : 'attack';
+  return rnd(G) < 0.55 ? 'attack' : 'nibble';
+}
+function aiSPOff(G){
+  const b = G.balls, s = G.strikes, bs = G.bases;
+  if(s < 2 && G.outs === 0 && (bs[0] != null || bs[1] != null) && bs[2] == null && lateGame(G) && closeGame(G) && rnd(G) < 0.15) return 'bunt';
+  if(canSteal(G) && s < 2 && b < 3 && rnd(G) < 0.025) return 'steal';
+  const pTake = b === 3 && s === 0 ? 0.85 : s === 2 ? 0.1 : b === 0 && s === 0 ? 0.45 : 0.3;
+  if(rnd(G) < pTake) return 'take';
+  if(s === 2) return rnd(G) < 0.5 ? 'contact' : 'normal';
+  return wpick(G, [['power', 0.25], ['normal', 0.5], ['contact', 0.25]]);
+}

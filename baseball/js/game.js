@@ -272,8 +272,18 @@ function guessScreen(){
 /* ---------- 간단 모드 ---------- */
 const pct = (rows, ks) => rows.filter(r => ks.includes(r.k)).reduce((a, r) => a + r.to - r.from + 1, 0);
 const simpleOdds = (D, O) => { const t = simpleTable(D, O); return `안타 이상 ${pct(t, ['S1', 'S2', 'S3', 'HR'])}%, 홈런 ${pct(t, ['HR'])}%, 삼진 ${pct(t, ['K'])}%`; };
+// '공 하나씩'일 때 선택지 설명: 공이 존에 들어갈 확률, 휘둘렀을 때 헛스윙·파울·인플레이 확률
+const spZone = D => `스트라이크 존에 들어갈 확률 ${SP_ZONE[D]}%`;
+const spSwing = O => { const a = SP_SWING.in[O]; return `존에 들어온 공을 치면 헛스윙 ${a[0]}%, 파울 ${a[1]}%, 인플레이 ${100 - a[0] - a[1]}%`; };
 function simpleDef(){
   const ti = 1 - batIdx(G), B = curBatter(G);
+  if(G.unit === 'pitch') return { board:true, q:`${whoLabel(ti)}수비. 타자 ${batTeam(G).bi + 1}번 ${B.name}, 제${G.pitchNo + 1}구 ${countText(G)}. 어떤 공을 던질까요?`, opts:[
+    { n:1, t:'스트라이크로 승부', s: spZone('attack') + '. 볼넷은 줄지만 맞기 쉽습니다.', act: v => submit('def', 'attack', v) },
+    { n:2, t:'유인구', s: spZone('nibble') + '. 속으면 헛스윙, 참으면 볼입니다.', act: v => submit('def', 'nibble', v) },
+    { n:3, t:'고의 볼넷', s:'타자를 그냥 1루로 내보냅니다.', act: v => submit('def', 'ibb', v) },
+    { n:8, t:'맡기기', s:'이번 공은 컴퓨터가 골라 줍니다.', act: v => submit('def', aiSPDef(G), v) },
+    { n:9, t:'더 보기', s:'점수판, 맡기기, 설정', act: v => go(moreScreen, v) },
+  ] };
   return { board:true, q:`${whoLabel(ti)}수비. 타자 ${batTeam(G).bi + 1}번 ${B.name}. 어떻게 승부할까요?`, opts:[
     { n:1, t:'정면 승부', s:'볼넷이 줄고 안타가 조금 늘어납니다. ' + simpleOdds('attack', 'normal'), act: v => submit('def', 'attack', v) },
     { n:2, t:'유인구 승부', s:'삼진이 늘지만 볼넷도 늘어납니다. ' + simpleOdds('nibble', 'normal'), act: v => submit('def', 'nibble', v) },
@@ -284,14 +294,25 @@ function simpleDef(){
 }
 function simpleOff(){
   const ti = batIdx(G), B = curBatter(G), runners = G.bases.some(x => x != null);
+  const steal = { n:6, t:'도루', s:'주자가 다음 베이스로 뜁니다. 성공 확률 60%. 타석은 그대로 이어집니다.', hide: !canSteal(G), act: v => {
+    if(NET.on && NET.role === 'guest'){ netSendAct({ k:'steal' }); speak('도루를 보냈습니다.'); return; }
+    const r = playSimple(G, null, 'steal'); gameNext(v, r); } };
+  if(G.unit === 'pitch') return { board:true, q:`${whoLabel(ti)}공격. 타자 ${batTeam(G).bi + 1}번 ${B.name}, 제${G.pitchNo + 1}구 ${countText(G)}. 어떻게 할까요?`, opts:[
+    { n:1, t:'강하게 치기', s: spSwing('power') + '. 맞으면 장타가 잘 나옵니다.', act: v => submit('off', 'power', v) },
+    { n:2, t:'보통 치기', s: spSwing('normal'), act: v => submit('off', 'normal', v) },
+    { n:3, t:'맞히기', s: spSwing('contact') + '. 볼을 잘 참습니다.', act: v => submit('off', 'contact', v) },
+    { n:4, t:'지켜보기', s:'치지 않습니다. 존에 들어오면 스트라이크, 벗어나면 볼입니다.', act: v => submit('off', 'take', v) },
+    { n:5, t: runners ? '번트' : '기습 번트', s: runners ? '주자를 한 베이스 보냅니다. 타자는 대개 아웃됩니다.' : '빠른 발로 1루를 노립니다.', act: v => submit('off', 'bunt', v) },
+    steal,
+    { n:8, t:'맡기기', s:'이번 공은 컴퓨터가 골라 줍니다.', act: v => submit('off', aiSPOff(G), v) },
+    { n:9, t:'더 보기', s:'점수판, 맡기기, 설정', act: v => go(moreScreen, v) },
+  ] };
   return { board:true, q:`${whoLabel(ti)}공격. 타자 ${batTeam(G).bi + 1}번 ${B.name}. 어떻게 칠까요?`, opts:[
     { n:1, t:'강하게 치기', s: simpleOdds(null, 'power'), act: v => submit('off', 'power', v) },
     { n:2, t:'보통 치기', s: simpleOdds(null, 'normal'), act: v => submit('off', 'normal', v) },
     { n:3, t:'맞히기', s: simpleOdds(null, 'contact'), act: v => submit('off', 'contact', v) },
     { n:4, t: runners ? '번트' : '기습 번트', s: runners ? '주자를 한 베이스 보냅니다. 타자는 대개 아웃됩니다.' : '빠른 발로 1루를 노립니다.', act: v => submit('off', 'bunt', v) },
-    { n:5, t:'도루', s:'주자가 다음 베이스로 뜁니다. 성공 확률 60%. 타석은 그대로 이어집니다.', hide: !canSteal(G), act: v => {
-      if(NET.on && NET.role === 'guest'){ netSendAct({ k:'steal' }); speak('도루를 보냈습니다.'); return; }
-      const r = playSimple(G, null, 'steal'); gameNext(v, r); } },
+    { ...steal, n:5 },
     { n:8, t:'맡기기', s:'이번 타석은 컴퓨터가 골라 줍니다.', act: v => submit('off', aiSimpleOff(G), v) },
     { n:9, t:'더 보기', s:'점수판, 맡기기, 설정', act: v => go(moreScreen, v) },
   ] };
@@ -342,7 +363,7 @@ function openMenu(via){
 
 /* ---------- 관전 (컴퓨터끼리) ---------- */
 function watchScreen(){
-  const unit = G.mode === 'detail' ? '공' : '타석';
+  const unit = G.mode === 'detail' || G.unit === 'pitch' ? '공' : '타석';
   const step = stop => v => { const r = runSteps(stop); gameNext(v, { lines: r.lines.filter(l => !GS.short || 'ric'.includes(l.k)), fx: r.fx }); };
   const pa = G.pa, half = G.half;
   return { board:true, q:`관전 중. ${halfName(G)}. 무엇을 볼까요?`, opts:[
