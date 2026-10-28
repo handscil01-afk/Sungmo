@@ -9,27 +9,25 @@ function settingsView(){
       <div class="seg sm"><button class="${p.team==='blue'?'on blue':''}" data-a="setTeam" data-v="${p.id}" data-t="blue">${esc(teamShort('blue'))}</button><button class="${p.team==='red'?'on red':''}" data-a="setTeam" data-v="${p.id}" data-t="red">${esc(teamShort('red'))}</button><button class="${!p.team?'on':''}" data-a="setTeam" data-v="${p.id}" data-t="">미정</button></div>
       <button class="ibtn" data-a="renameP" data-v="${p.id}" aria-label="이름 고치기">✏️</button><button class="ibtn danger" data-a="delP" data-v="${p.id}" aria-label="삭제">🗑</button></div>`).join('');
   const und = ps.length-cnt.red-cnt.blue;
-  const tabs = innerTabs('settings', [['list','👥','명단', ps.length], ['add','➕','명단 넣기'], ['team','🏷','팀·점수'], ['events','🏅','종목'], ['report','🖨','보고서'], ['reset','🧹','초기화']]);
+  const tabs = innerTabs('settings', [['list','👥','명단', ps.length], ['add','➕','명단 넣기'], ['att','✅','출석 명단'], ['team','🏷','팀·점수'], ['events','🏅','종목'], ['report','🖨','보고서'], ['reset','🧹','초기화']]);
   const body = {
     list: () => `<div class="card"><div class="row"><h2 class="grow h2" style="margin:0">참여자 ${ps.length}명</h2><span class="tag blue">${esc(teamShort('blue'))} ${cnt.blue}</span><span class="tag red">${esc(teamShort('red'))} ${cnt.red}</span>${und?`<span class="tag warn">미정 ${und}</span>`:''}</div>
       <p class="sub">팀을 바로 바꿀 수 있습니다. 새로 넣을 사람은 '명단 넣기' 탭에서 붙여 넣습니다.</p>
       <div class="list">${rows || '<div class="empty">아직 명단이 없습니다. \'명단 넣기\' 탭에서 넣어 주세요.</div>'}</div></div>`,
     add: () => `<div class="card"><h2>명단 붙여넣기</h2>
-      <p class="sub">한 줄에 한 명씩 적습니다. 이름 뒤에 띄어 쓰고 <b>청</b>이나 <b>홍</b>(또는 청팀·홍팀·파랑·빨강)을 적으면 팀도 함께 정해집니다.</p>
-      <textarea id="rosterText" data-in="roster" placeholder="홍길동 청&#10;김영희 홍&#10;이철수">${esc(UI.rosterText)}</textarea>
-      <div style="height:10px"></div><button class="btn primary wide" data-a="addRoster">명단에 넣기</button></div>`,
+      <p class="sub">한 줄에 한 명씩 적습니다. 이름 뒤에 띄어 쓰고 <b>${esc(teamName('blue'))}</b>나 <b>${esc(teamName('red'))}</b>(또는 ${esc(teamShort('blue'))}·${esc(teamShort('red'))}, 청·홍, 파랑·빨강)을 적으면 팀도 함께 정해집니다.</p>
+      <textarea id="rosterText" data-in="roster" placeholder="가나다 ${esc(teamName('blue'))}&#10;라마바 ${esc(teamName('red'))}&#10;사아자">${esc(UI.rosterText)}</textarea>
+      <div style="height:10px"></div><button class="btn primary wide" data-a="addRoster">명단에 넣기</button></div>${attPasteCard()}`,
+    att: attSettingsTab,
     team: () => `<div class="card"><h2>팀 이름</h2>
-      <div class="row nowrap">${teamBadge('blue')}<input id="tnBlue" value="${esc(teamName('blue'))}" autocomplete="off">${teamBadge('red')}<input id="tnRed" value="${esc(teamName('red'))}" autocomplete="off"></div>
+      <div class="row nowrap">${teamBadge('blue')}<input id="tnBlue" value="${esc(teamName('blue'))}" autocomplete="off" aria-label="파랑 팀 이름 (화면 왼쪽)">${teamBadge('red')}<input id="tnRed" value="${esc(teamName('red'))}" autocomplete="off" aria-label="빨강 팀 이름 (화면 오른쪽)"></div>
       <div style="height:10px"></div><button class="btn wide" data-a="saveTeamNames">팀 이름 저장</button>
-      <p class="sub">화면에는 팀 이름의 첫 글자(${esc(teamShort('blue'))}·${esc(teamShort('red'))})가 팀 표시로 쓰입니다. ${esc(teamShort('blue'))}은 동그라미, ${esc(teamShort('red'))}은 네모 모양입니다.</p></div>
+      <p class="sub">왼쪽은 파랑 팀(동그라미), 오른쪽은 빨강 팀(네모)입니다. 팀 표시에는 팀 이름의 첫 글자(${esc(teamShort('blue'))}·${esc(teamShort('red'))})가 들어갑니다.</p></div>
     <div class="card"><h2>🎯 콩주머니 승부 방식</h2>
       <div class="seg">${[['A','A. 5판 3선승'],['B','B. 5판 총점']].map(([k,l]) => `<button class="${beanbagMode()===k?'on':''}" data-a="setBag" data-v="${k}">${l}</button>`).join('')}</div>
       <p class="sub"><b>A안</b> 5판 중 먼저 3판을 이기는 팀이 이기고, 3승이 나오면 그 자리에서 끝납니다.</p>
       <p class="sub"><b>B안</b> 5판의 점수를 모두 더해 점수 합계가 높은 팀이 이깁니다. 합계가 같으면 팀 대표 1명씩 1개를 던져 정합니다.</p>
       <p class="sub">콩주머니 경기를 시작한 뒤에 바꾸면 이미 입력한 기록의 셈이 달라지니, 시작하기 전에 정해 주세요.</p></div>
-    <div class="card"><h2>아직 정하지 못한 점수</h2>
-      <div class="row"><span class="grow">후리볼 파울</span><div class="seg"><button class="${s.foul===1?'on':''}" data-a="setS" data-k="foul" data-v="1">1점</button><button class="${s.foul===1.5?'on':''}" data-a="setS" data-k="foul" data-v="1.5">1.5점</button></div></div>
-      <p class="sub">바꾸면 이미 입력한 기록의 점수도 자동으로 다시 계산됩니다.</p></div>
     <div class="card"><h2>개인전 표시</h2>
       <div class="item"><span class="name">안내판에 연습 순위 보이기<span class="sub">켜면 안내판의 종합 현황에 연습 1·2의 1~3등도 함께 나옵니다. 연습 점수는 개인전 기록표에 항상 보입니다.</span></span><label class="switch"><input type="checkbox" data-ch="sets" data-k="showPracRank" ${s.showPracRank?'checked':''}><span></span></label></div></div>
     <div class="card"><h2>줄다리기 계획 판 수</h2>
@@ -39,17 +37,19 @@ function settingsView(){
       <button class="btn primary wide" data-a="report">🖨 결과 보고서 보기 (인쇄·PDF 저장)</button>
       <div class="row" style="margin-top:10px"><button class="btn grow" data-a="csv" data-v="indiv">개인전 기록 (엑셀용 CSV)</button><button class="btn grow" data-a="csv" data-v="team">단체전 기록 (엑셀용 CSV)</button></div></div>`,
     reset: () => `<div class="card"><h2>🧹 시험 기록 초기화</h2>
-      <p class="sub">운동회 전에 시험해 본 점수·승패·호출(감독 호출 포함)·개인전 대기 줄·과녁판 표시·안내·불참 표시·문자 무전을 한 번에 지웁니다. 명단, 팀, 담당자 명단, 역할, 일정은 그대로 남습니다.</p>
+      <p class="sub">운동회 전에 시험해 본 점수·승패·호출(감독 호출 포함)·개인전 대기 줄·과녁판 표시·안내·불참 표시·출석 체크·문자 무전을 한 번에 지웁니다. 선수 명단, 전체 인원 명단, 팀, 담당자 명단, 역할, 일정은 그대로 남습니다.</p>
       <button class="btn danger wide" data-a="resetAll">시험 기록 모두 지우기</button></div>`,
   }[ITAB.settings]();
   return `<div class="bctl">${tabs}${body}</div>`;
 }
 
+// 팀을 가리키는 낱말 (현재 팀 이름 + 별명). 소문자로 비교
+const teamWords = () => ({
+  blue: [teamName('blue'), '이가네', '이가', '청팀', '청', '파랑', '파랑팀', '블루', 'blue'].map(w => w.toLowerCase()),
+  red:  [teamName('red'), '함씨네', '함씨', '홍팀', '홍', '빨강', '빨강팀', '레드', 'red'].map(w => w.toLowerCase()),
+});
 function parseRoster(text){
-  const words = {
-    blue: [teamName('blue'), '청팀', '청', '파랑', '파랑팀', '블루', 'blue'].map(w => w.toLowerCase()),
-    red:  [teamName('red'), '홍팀', '홍', '빨강', '빨강팀', '레드', 'red'].map(w => w.toLowerCase()),
-  };
+  const words = teamWords();
   const out = [];
   text.split(/\r?\n|,|\t/).forEach(line => {
     const s = line.trim().replace(/^\d+[.)]\s*/, ''); if(!s) return;

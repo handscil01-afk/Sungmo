@@ -294,7 +294,7 @@ function normRole(r){
   return o;
 }
 const hasDuty = r => !!(r.coach || r.events.length || r.helpers.length || r.timers.length || r.monitor);
-// 운영 현황만 보는 기기 (점수·출석을 건드리지 않음)
+// 운영 현황만 보는 기기 (점수·불참 표시를 건드리지 않음. 전체 인원 출석 체크는 할 수 있음)
 const monitorOnly = r => !!r.monitor && !(r.coach || r.events.length || r.helpers.length || r.timers.length);
 function myRole(){
   if(D.amMaster) return { ...normRole(null), role:'master' };
@@ -326,7 +326,8 @@ const can = {
   order: team => D.amMaster || myRole().coach===team,
   time: ev => D.amMaster || myRole().timers.includes(ev) || refEvents().includes(ev),
   staff: () => D.amMaster || hasDuty(myRole()),
-  abs: () => D.amMaster || (hasDuty(myRole()) && !monitorOnly(myRole())),     // 출석(불참) 표시
+  abs: () => D.amMaster || (hasDuty(myRole()) && !monitorOnly(myRole())),     // 선수 불참 표시
+  att: () => D.amMaster || myRole().role==='staff',                         // 전체 인원 출석 체크 (운영 현황 전용 기기도 가능, 안내판·역할 대기는 불가)
   ccall: team => D.amMaster || myRole().coach===team,                      // 감독이 자기 팀 선수 부르기
 };
 

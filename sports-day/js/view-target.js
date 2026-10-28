@@ -51,7 +51,7 @@ function targetPanel(ev, editable){
       <button class="btn small ${edit?'ok':''}" data-a="tgEdit" aria-pressed="${edit}">수정</button>
       ${edit && sel ? '<button class="btn small danger" data-a="tgDelSel">이 표시 지우기</button>' : ''}
       <button class="btn small danger" data-a="tgClear" ${mk.list.length?'':'disabled'}>모두 지우기</button>
-      <span class="tgcount"><span class="blue">${esc(teamShort('blue'))} ${markCount(mk,'blue')}</span> <span class="red">${esc(teamShort('red'))} ${markCount(mk,'red')}</span></span></div>` : '';
+      <span class="tgcount"><span class="blue"><i class="mkdot blue"></i>${esc(teamShort('blue'))} ${markCount(mk,'blue')}</span> <span class="red"><i class="mkdot red"></i>${esc(teamShort('red'))} ${markCount(mk,'red')}</span></span></div>` : '';
   const hint = edit ? '<div class="sub tghint">표시를 끌어서 옮기거나, 눌러서 고른 뒤 지울 수 있습니다.</div>' : '';
   return `<div class="tgtpanel gtgt">${head}<div class="tgtwrap">${tgtBox(ev, { list:mk.list, interactive:editable, edit, sel })}</div>${acts}${hint}</div>`;
 }

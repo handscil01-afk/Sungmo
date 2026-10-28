@@ -10,7 +10,7 @@ function syncPill(){
 // 머리줄: 이름 · (지금 화면 고르기 버튼) · 저장 상태 · 메뉴. 종목 탭 줄을 따로 두지 않아 화면을 넓게 씀
 function header(r, picker=''){
   return `<header class="top"><button class="rolechip ${r.role}" data-a="menu" title="${esc(UI.me)}">${esc(roleIcon(r))}<span class="rcn"> ${esc(UI.me)}</span></button>${picker}
-    <span class="grow"></span>${syncPill()}${fsButton()}${radioHeadBtn()}<button class="hbtn" data-a="menu" aria-label="메뉴">${ICON.menu}</button></header>`;
+    <span class="grow"></span>${syncPill()}${attHeadBtn()}${fsButton()}${radioHeadBtn()}<button class="hbtn" data-a="menu" aria-label="메뉴">${ICON.menu}</button></header>`;
 }
 function pickerBtn(icon, label, color, open=true){
   return `<button class="evpick ${open?'':'still'}" style="--ev:${color}" ${open?'data-a="evSheet"':''}><span>${icon}</span><b>${esc(label)}</b>${open?'<i>▾</i>':''}</button>`;
@@ -162,12 +162,13 @@ function menuSheet(){
   return `<h2>메뉴</h2>
     <p>이 기기: <b>${esc(UI.me)}</b> · ${esc(roleIcon(r))} ${esc(roleLabel(r))}</p>
     <div class="list menu">
+      ${can.att() ? '<div class="item tap" data-a="attOpen"><span class="name">✅ 출석 체크 (전체 인원)<span class="sub">접수대에서 이용인·활동지원사·수어통역사·직원·봉사자의 출석을 체크합니다.</span></span></div>' : ''}
       <div class="item tap" data-a="rename"><span class="name">✏️ 이름 바꾸기</span></div>
       ${r.role==='board' ? `<div class="item col"><span class="name">🖥 안내판 화면 종류<span class="sub">태블릿은 지금 모양 그대로, PC·프로젝터는 모든 화면을 스크롤 없이 한 화면에 꼭 맞게 키워 보여 줍니다. 이 기기에만 적용됩니다.</span></span>
         <div class="seg sm" role="group" aria-label="안내판 화면 종류">${[['tablet','태블릿'],['pc','PC·프로젝터']].map(([k,l]) => `<button class="${BDKIND===k?'on':''}" data-a="bdKind" data-v="${k}" aria-pressed="${BDKIND===k}">${l}</button>`).join('')}</div></div>` : ''}
       ${r.role!=='board' ? '<div class="item tap" data-a="schedSheet"><span class="name">📅 진행 일정<span class="sub">오늘 일정과 남은 시간을 봅니다.</span></span></div>' : ''}
       ${can.staff() ? '<div class="item tap" data-a="msgSheet"><span class="name">💬 문자 무전 · 🚨 긴급 호출</span></div>' : ''}
-      ${can.abs() ? '<div class="item tap" data-a="attSheet"><span class="name">👥 출석 체크<span class="sub">오지 않은 선수를 불참으로 표시합니다.</span></span></div>' : ''}
+      ${can.abs() ? '<div class="item tap" data-a="attSheet"><span class="name">🚫 선수 불참 표시<span class="sub">오지 않은 선수를 불참으로 표시합니다.</span></span></div>' : ''}
       ${r.role!=='master' && r.role!=='wait' ? '<div class="item tap" data-a="leaveRole"><span class="name">🔄 담당 다시 고르기<span class="sub">지금 역할에서 나가고 담당자를 다시 고릅니다.</span></span></div>' : ''}
       ${r.role==='master' ? '<div class="item tap" data-a="masterLogout"><span class="name">👑 마스터에서 나가기<span class="sub">이 기기의 마스터 권한을 뺍니다.</span></span></div>'
         : '<div class="item tap" data-a="masterLogin"><span class="name">👑 마스터로 들어가기<span class="sub">마스터 비밀번호가 필요합니다.</span></span></div>'}

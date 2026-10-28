@@ -54,7 +54,7 @@ function peopleView(){
         <div class="item"><span class="tag">🚩 심판</span><span class="name"><span class="sub">맡은 종목만 보입니다. 단체전은 지금 대결과 대기 순서, 승패 입력이고, 개인전은 두 사대 점수 입력입니다.</span></span></div>
         <div class="item"><span class="tag">✏️ 기록 도우미</span><span class="name"><span class="sub">맡은 종목의 점수를 심판과 똑같이 입력합니다.</span></span></div>
         <div class="item"><span class="tag">⏱ 계시원</span><span class="name"><span class="sub">큰 초시계로 시간을 재서 심판 화면으로 보냅니다. 심판이 확인한 뒤 저장합니다.</span></span></div>
-        <div class="item"><span class="tag">🧭 운영 현황</span><span class="name"><span class="sub">센터장·사무국장 대행: 종목별 진행 현황과 남은 시간을 보고, 무전·문자만 씁니다. 점수나 출석은 건드리지 않습니다. '중계 모드'를 켜면 보이스오버용 간단 글자 화면이 됩니다.</span></span></div>
+        <div class="item"><span class="tag">🧭 운영 현황</span><span class="name"><span class="sub">센터장·사무국장 대행: 종목별 진행 현황과 남은 시간을 보고, 무전·문자를 쓰고, 전체 인원 출석을 체크합니다. 점수나 선수 불참 표시는 건드리지 않습니다. '중계 모드'를 켜면 보이스오버용 간단 글자 화면이 됩니다.</span></span></div>
         <div class="item"><span class="tag">📺 안내판</span><span class="name"><span class="sub">가로로 세워 둔 태블릿에 호출·결과·현황을 크게 띄웁니다.</span></span></div>
       </div></div>`,
   }[ITAB.people]();
@@ -105,7 +105,7 @@ function roleEditor(){
     <div class="card"><h2>🚩 심판 <span class="sub">점수·승패를 입력합니다</span></h2>${chips('events', Object.keys(EVENTS))}</div>
     <div class="card"><h2>✏️ 기록 도우미 <span class="sub">심판과 똑같이 점수를 입력합니다</span></h2>${chips('helpers', Object.keys(EVENTS))}</div>
     <div class="card"><h2>⏱ 계시원 <span class="sub">시간을 재서 심판 화면으로 보냅니다</span></h2>${chips('timers', TIME_EVENTS)}</div>
-    <div class="card"><div class="list">${flag('monitor','🧭 운영 현황','센터장·사무국장 대행: 진행 현황을 보고 무전·문자만 씁니다.')}${RD.monitor ? flag('voice','중계 모드(보이스오버용 간단 화면)','그림 없이 큰 글자 단추만 있는 화면으로 바뀌고, 지금 상황을 글로 읽어 줍니다. 단체전 결과가 저장되면 보이스오버가 바로 읽어 줍니다.') : ''}${flag('board','📺 안내판','이 기기를 안내판 화면으로만 씁니다(다른 역할 화면은 숨겨집니다).')}${flag('cast','📢 음성 방송 권한','안내판 스피커로 말하는 방송 버튼이 생깁니다.')}</div></div>`;
+    <div class="card"><div class="list">${flag('monitor','🧭 운영 현황','센터장·사무국장 대행: 진행 현황을 보고 무전·문자를 쓰고 전체 인원 출석을 체크합니다.')}${RD.monitor ? flag('voice','중계 모드(보이스오버용 간단 화면)','그림 없이 큰 글자 단추만 있는 화면으로 바뀌고, 지금 상황을 글로 읽어 줍니다. 단체전 결과가 저장되면 보이스오버가 바로 읽어 줍니다.') : ''}${flag('board','📺 안내판','이 기기를 안내판 화면으로만 씁니다(다른 역할 화면은 숨겨집니다).')}${flag('cast','📢 음성 방송 권한','안내판 스피커로 말하는 방송 버튼이 생깁니다.')}</div></div>`;
 }
 const draftEmpty = () => !RD.coach && !RD.events.length && !RD.helpers.length && !RD.timers.length && !RD.board && !RD.monitor;
 const draftFields = () => { const h = RD.hid || {}, add = (a, b) => [...a, ...(b||[]).filter(e => !a.includes(e))];
@@ -145,12 +145,12 @@ function presetPicker(){
     + (vol.length ? `<div class="card"><h2>🙋 봉사자로 들어오기</h2><p class="sub">맡은 자리를 누르고 이름을 적으면 됩니다.</p><div class="pgrid">${vol.map(btn).join('')}</div></div>` : '');
 }
 
-/* ---------- 출석 체크 (불참 표시) ---------- */
+/* ---------- 선수 불참 표시 (전체 인원 출석 체크는 view-attend.js) ---------- */
 let attFilter = 'all';
 function attendanceSheet(){
   const ps = people().filter(p => attFilter==='all' || (attFilter==='absent' ? isAbsent(p.id) : p.team===attFilter));
   const n = people().filter(p => isAbsent(p.id)).length;
-  return `<h2>👥 출석 체크 <span class="sub">불참 ${n}명</span></h2>
+  return `<h2>🚫 선수 불참 표시 <span class="sub">불참 ${n}명</span></h2>
     <p class="sub">오지 않은 선수를 '불참'으로 바꾸면 단체전 출전 순서에서 자동으로 건너뛰고, 명단과 안내판에도 표시됩니다.</p>
     <div class="chips" style="margin-bottom:8px">${[['all','전체'],['blue',teamName('blue')],['red',teamName('red')],['absent','불참만']].map(([k,l]) => `<button class="chip ${attFilter===k?'on':''}" data-a="attFilter" data-v="${k}">${esc(l)}</button>`).join('')}</div>
     <div class="list">${ps.map(p => `<div class="item">${teamBadge(p.team)}<span class="name">${esc(p.name)}</span>
