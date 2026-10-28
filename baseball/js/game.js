@@ -92,6 +92,16 @@ function gameNext(via, res){
   saveGame();
   if(G.over){ ls.del('bb_game'); go(endScreen, via, lines); return; }
   if(G.pre){ const ti = [0, 1].find(t => !G.pre.ready[t] && needs(t)); go(() => pregameScreen(ti), via, lines); return; }
+  // 비디오 판독: 원심에 손해를 본 팀이 사람이면 묻고, 컴퓨터(또는 맡긴 쪽·기회 없음)면 바로 정함
+  if(G.review){
+    const side = G.review.side;
+    if(!needs(side) || reviewLeft(G, side) <= 0){
+      const r = resolveReview(G, needs(side) ? false : aiChallenge(G));
+      gameNext(via, { lines:[...(res ? res.lines : []), ...r.lines], fx: r.fx }); return;
+    }
+    if(twoP() && GS.holder !== side){ go(() => handoffScreen(side), via, lines); return; }
+    GS.holder = side; go(reviewScreen, via, lines); return;
+  }
   if(GS.auto && autoDone()) GS.auto = null;
   const off = batIdx(G), def = 1 - off;
   if(GS.auto && !needs(off) && !needs(def)){ // 혼자 하기에서 맡겨 둔 동안은 바로 끝까지 진행
@@ -118,7 +128,7 @@ function autoDone(){
 function stepAI(){ return playStep(G, aiDefChoice(G), aiOffChoice(G)); }
 function runSteps(stop){
   const acc = { lines:[], fx:[] }; let guard = 0;
-  while(!G.over && !stop() && guard++ < 4000){ const r = stepAI(); acc.lines.push(...r.lines); acc.fx.push(...r.fx); }
+  while(!G.over && !stop() && guard++ < 4000){ const r = G.review ? resolveReview(G, aiChallenge(G)) : stepAI(); acc.lines.push(...r.lines); acc.fx.push(...r.fx); }
   return acc;
 }
 // side: 'def' | 'off'
@@ -156,6 +166,22 @@ function delegate(scope, via){
     return;
   }
   gameNext(via, { lines:[{ s: scope === 'pa' ? '이번 타석을 맡깁니다.' : scope === 'half' ? '이번 이닝을 맡깁니다.' : '이번 공을 맡깁니다.', k:'c' }], fx:[] });
+}
+
+/* ---------- 비디오 판독 ---------- */
+function reviewWord(p){ return p >= 0.45 ? '뒤집힐 가능성이 꽤 있어 보입니다' : p >= 0.35 ? '반반 정도로 보입니다' : '뒤집기는 어려워 보입니다'; }
+function reviewScreen(){
+  const R = G.review, left = reviewLeft(G, R.side);
+  const odds = SET.revOdds === 'word' ? reviewWord(R.p) : `뒤집힐 확률 약 ${Math.round(R.p * 100)}퍼센트`;
+  return { board:true, q:`비디오 판독을 신청할까요? 남은 기회 ${left}번. 코치 판단: ${odds}.`, opts:[
+    { n:1, t:'판독 신청', s:'판정이 뒤집히면 기회는 그대로이고, 원심이 유지되면 기회가 1번 줄어듭니다.', act: v => doReview(true, v) },
+    { n:2, t:'신청하지 않기', s:'원심대로 진행합니다.', act: v => doReview(false, v) },
+    { n:3, t:`확률을 ${SET.revOdds === 'word' ? '숫자로' : '말로'} 듣기`, act: () => { SET.revOdds = SET.revOdds === 'word' ? 'num' : 'word'; saveSet(); stay(`코치 판단: ${SET.revOdds === 'word' ? reviewWord(R.p) : `뒤집힐 확률 약 ${Math.round(R.p * 100)}퍼센트`}.`); } },
+  ] };
+}
+function doReview(yes, v){
+  if(NET.on && NET.role === 'guest'){ NET.sent = true; netSendAct({ k:'review', yes }); go(waitScreen, v, [yes ? '판독을 신청했습니다.' : '판독을 신청하지 않습니다.']); return; }
+  const r = resolveReview(G, yes); saveGame(); gameNext(v, r);
 }
 
 /* ---------- 둘이 하기: 기기 넘기기 ---------- */

@@ -36,7 +36,7 @@ function unitScreen(){
     { n:2, t:'타석 한 번에', s:'타석마다 한 번만 고르면 결과가 바로 나옵니다. 빠르게 진행됩니다.', act: v => set('pa', v) },
   ] };
 }
-function teamScreen(which){
+function teamScreen(which, page = 0){
   const q = NEW.kind === '1p' || NEW.kind === 'online' ? (which ? '상대 팀을 고르세요.' : '내 팀을 고르세요.')
           : NEW.kind === '2p' ? (which ? '둘째 사람의 팀을 고르세요.' : '첫째 사람의 팀을 고르세요.')
           : (which ? '홈 팀을 고르세요.' : '원정 팀을 고르세요.');
@@ -46,9 +46,14 @@ function teamScreen(which){
     if(which){ NEW.b = k; go(NEW.kind === 'watch' ? inningsScreen : sideScreen, v); }
     else { NEW.a = k; go(() => teamScreen(1), v); }
   };
-  const opts = list.map((t, i) => ({ n: i + 1, t: t.name, s: `${STYLES[t.style].name}. ${STYLES[t.style].desc}`, act: v => set(t.key, v) }));
-  opts.push({ n: list.length + 1, t:'아무 팀이나', s:'무작위로 고릅니다.', act: v => set(list[Math.floor(Math.random() * list.length)].key, v) });
-  return { q, opts, back: v => go(which ? () => teamScreen(0) : NEW.mode === 'simple' ? unitScreen : modeScreen, v) };
+  // 10팀이라 한 쪽에 8팀씩: 9번은 다음 쪽 / 앞 쪽
+  const desc = t => `${STYLES[t.style].name}. 홈구장 ${parkInfo(t.key).name}: ${parkInfo(t.key).desc}`;
+  const shown = page ? list.slice(8) : list.slice(0, 8);
+  const opts = shown.map((t, i) => ({ n: i + 1, t: t.name, s: desc(t), act: v => set(t.key, v) }));
+  if(page) opts.push({ n: shown.length + 1, t:'아무 팀이나', s:'무작위로 고릅니다.', act: v => set(list[Math.floor(Math.random() * list.length)].key, v) });
+  opts.push(page ? { n:9, t:'앞 쪽 팀 보기', act: v => go(() => teamScreen(which, 0), v) }
+                 : { n:9, t:'다른 팀 더 보기', s: list.slice(8).map(t => t.name).join(', ') + ', 아무 팀이나', act: v => go(() => teamScreen(which, 1), v) });
+  return { q: q + (page ? ' (두 번째 쪽)' : ''), opts, back: v => go(page ? () => teamScreen(which, 0) : which ? () => teamScreen(0) : NEW.mode === 'simple' ? unitScreen : modeScreen, v) };
 }
 function sideScreen(){
   const me = NEW.kind === '2p' ? '첫째 사람 팀' : '내 팀';
@@ -92,6 +97,7 @@ function readyScreen(){
     `${MODE_NAME[NEW.mode]}${NEW.mode === 'simple' ? (NEW.unit === 'pitch' ? '(공 하나씩)' : '(타석 한 번에)') : ''}, ${NEW.innings}이닝 경기입니다.`,
     `원정(먼저 공격): ${teamLabel(o.teams[0])}, ${role(0)}.`,
     `홈(나중에 공격): ${teamLabel(o.teams[1])}, ${role(1)}.`,
+    `경기장: ${parkInfo(o.teams[1]).name}. ${parkInfo(o.teams[1]).desc}`,
   ];
   if(NEW.kind === '1p') say.push(`컴퓨터 수준: ${['쉬움', '보통', '어려움'][NEW.diff]}.`);
   if(NEW.kind === '2p') say.push('수비하는 사람이 먼저 공을 고르고, 기기를 넘겨 공격하는 사람이 고릅니다.');
@@ -187,6 +193,8 @@ const HELP = {
     '바람: 외야 쪽으로 부는 바람은 타구를 멀리 보내고, 홈 쪽으로 부는 바람은 막습니다. 바람 덕에 간신히 넘어가는 홈런도, 맞바람에 막혀 담장 앞에서 잡히는 타구도 나옵니다. 담장은 좌우 98미터, 가운데 120미터입니다.',
     '타이밍: 같은 공을 계속 던지면 타자가 익숙해지고, 빠른 공 다음의 느린 공은 타이밍을 빼앗습니다.',
     '판정 과정 보기를 설정에서 켜면 주사위와 확률이 기록에 함께 나옵니다.',
+    '구장: 홈 팀 구장마다 담장 거리와 높이, 잔디, 파울 지역, 지붕, 바람이 다릅니다. 썬더볼츠 파크는 홈런이 잘 나오고, 블루웨일즈 스타디움은 넓어서 홈런이 적고 3루타가 많습니다. 메테오스 볼파크는 왼쪽 담장이 높고, 나이츠 돔은 바람이 없고, 윈디스 오름구장은 바람이 세고 자주 바뀝니다.',
+    '비디오 판독: 도루, 1루 승부, 담장 끝 타구처럼 아슬아슬한 플레이가 나오면 원심에 손해를 본 팀이 판독을 신청할지 고릅니다. 팀마다 경기당 2번이고, 판정이 뒤집히면 기회가 줄지 않고 원심이 유지되면 1번 줄어듭니다. 코치가 알려 주는 확률로 주사위를 굴려 뒤집힐지 정합니다. 확률은 숫자로 듣거나 말로 들을 수 있습니다.',
   ],
   '화면 낭독기, 점자, 키보드': [
     '보이스오버, 톡백: 선택지를 두 번 탭하면 결과 글로 초점이 옮겨 가서 바로 읽습니다. 오른쪽으로 쓸어 넘기면 질문과 선택지가 이어집니다.',

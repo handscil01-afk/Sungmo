@@ -38,15 +38,37 @@ const STYLES = {
              bat:{ con:+2, pow:+2 }, pit:{ ctl:+2, stf:+2 }, def:+2, aggr:0, steal:1.0, bunt:1.0, nibble:0 },
 };
 
-// 가상의 팀 (실제 구단과 관계없음)
+// 가상의 팀 (실제 구단과 관계없음). key는 저장된 경기와 온라인 방에서 쓰므로 바꾸지 않음
 const TEAMS = [
-  { key:'star',   name:'손잡다 별빛', short:'별빛', style:'balance',  color:'#facc15' },
-  { key:'whale',  name:'푸른 고래',   short:'고래', style:'contact',  color:'#38bdf8' },
-  { key:'thunder',name:'한빛 번개',   short:'번개', style:'power',    color:'#f97316' },
-  { key:'swallow',name:'날쌘 제비',   short:'제비', style:'speed',    color:'#4ade80' },
-  { key:'hawk',   name:'붉은 매',     short:'매',   style:'pitching', color:'#f87171' },
-  { key:'turtle', name:'바위 거북',   short:'거북', style:'defense',  color:'#a78bfa' },
+  { key:'star',    name:'손잡다 핸즈',     short:'핸즈',     style:'balance',  color:'#facc15' },
+  { key:'whale',   name:'서울 블루웨일즈', short:'웨일즈',   style:'contact',  color:'#38bdf8' },
+  { key:'thunder', name:'대구 썬더볼츠',   short:'썬더볼츠', style:'power',    color:'#f97316' },
+  { key:'hawk',    name:'부산 레드호크스', short:'레드호크스', style:'pitching', color:'#f87171' },
+  { key:'swallow', name:'광주 스위프트',   short:'스위프트', style:'speed',    color:'#4ade80' },
+  { key:'turtle',  name:'인천 스톤터틀즈', short:'터틀즈',   style:'defense',  color:'#a78bfa' },
+  { key:'meteor',  name:'대전 메테오스',   short:'메테오스', style:'power',    color:'#fb923c' },
+  { key:'knight',  name:'수원 나이츠',     short:'나이츠',   style:'balance',  color:'#94a3b8' },
+  { key:'beacon',  name:'창원 비컨스',     short:'비컨스',   style:'pitching', color:'#22d3ee' },
+  { key:'windy',   name:'제주 윈디스',     short:'윈디스',   style:'speed',    color:'#86efac' },
 ];
+// 홈구장. fence: 좌·중·우 담장 거리(미터) · wall: 좌·중·우 담장 높이(미터, 높을수록 넘기기 어렵고 맞고 나오는 2루타)
+// turf: 인조 잔디(땅볼이 빠름) · foul: 파울 지역 넓이 배율(넓으면 파울 플라이 아웃이 많음) · dome: 지붕(바람 없음)
+// wind: 바람 방향 무게 · spd: 바람 세기 범위 · change: 이닝마다 바람이 바뀔 확률 · hr: 간단 모드 홈런 배율 · tri: 3루타 배율
+const PARK_BASE = { fence:[98, 120, 98], wall:[2.5, 2.5, 2.5], turf:false, foul:1, dome:false,
+  wind:{ none:15, out:28, in:25, lr:16, rl:16 }, spd:[1, 8], change:0.2, hr:1, tri:1 };
+const PARKS = {
+  star:    { name:'손잡다 필드', desc:'크기가 알맞은 표준 구장입니다.' },
+  whale:   { name:'블루웨일즈 스타디움', desc:'아주 넓은 구장이라 홈런이 적고, 외야 깊숙한 2루타와 3루타가 많습니다.', fence:[101, 125, 101], wall:[2.8, 2.8, 2.8], hr:0.72, tri:1.8 },
+  thunder: { name:'썬더볼츠 파크', desc:'담장이 가깝고 낮은 홈런 공장입니다.', fence:[95, 116, 95], wall:[2.2, 2.2, 2.2], hr:1.4 },
+  hawk:    { name:'레드호크스 마린필드', desc:'바다에서 홈 쪽으로 부는 바람이 잦아 큰 타구가 자주 막힙니다.', wind:{ none:5, out:10, in:55, lr:15, rl:15 }, spd:[3, 8], hr:0.85 },
+  swallow: { name:'스위프트 그라운드', desc:'인조 잔디라 땅볼이 빨라 내야를 빠져나가는 안타가 많습니다.', turf:true, hr:0.95 },
+  turtle:  { name:'스톤터틀즈 파크', desc:'파울 지역이 넓어 파울 플라이 아웃이 많습니다.', foul:2.5, hr:0.95 },
+  meteor:  { name:'메테오스 볼파크', desc:'왼쪽 담장이 아주 높아 넘기기 어렵고, 담장을 맞고 나오는 2루타가 많습니다.', fence:[96, 118, 99], wall:[6.5, 2.5, 2.5], hr:0.9 },
+  knight:  { name:'나이츠 돔', desc:'지붕이 있는 돔 구장이라 바람이 불지 않습니다.', dome:true },
+  beacon:  { name:'비컨스 필드', desc:'오른쪽 담장이 가까워 왼손 타자의 홈런이 잘 나옵니다.', fence:[100, 120, 92], hr:1.1 },
+  windy:   { name:'윈디스 오름구장', desc:'바람이 세고 방향이 자주 바뀝니다.', wind:{ none:2, out:30, in:30, lr:19, rl:19 }, spd:[4, 10], change:0.55 },
+};
+const parkInfo = key => ({ key, ...PARK_BASE, ...(PARKS[key] || PARKS.star) });
 const teamInfo = key => TEAMS.find(t => t.key === key) || TEAMS[0];
 
 const POS = { P:'투수', C:'포수', '1B':'1루수', '2B':'2루수', '3B':'3루수', SS:'유격수', LF:'좌익수', CF:'중견수', RF:'우익수', DH:'지명타자' };

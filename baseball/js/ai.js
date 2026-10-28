@@ -139,6 +139,12 @@ function aiManageOff(G){
   if(slow != null && pr >= 0 && T.bat[slow].spd < 45 && rnd(G) < 0.6) benchIn(G, ti, slow, pr, 'pr');
 }
 
+// 컴퓨터 감독의 비디오 판독 신청: 뒤집힐 가능성이 높거나, 경기 후반 접전이면 조금 낮아도 신청
+function aiChallenge(G){
+  const R = G.review; if(!R || reviewLeft(G, R.side) <= 0) return false;
+  return R.p >= 0.42 || (lateGame(G) && closeGame(G) && R.p >= 0.3);
+}
+
 /* ---------- 모드에 맞게 컴퓨터가 고르기 · 한 걸음 진행 ---------- */
 const spUnit = G => G.mode === 'simple' && G.unit === 'pitch';
 const aiDefChoice = G => G.mode === 'manager' ? aiOrderDef(G) : spUnit(G) ? aiSPDef(G) : G.mode === 'simple' ? aiSimpleDef(G) : aiPitch(G);

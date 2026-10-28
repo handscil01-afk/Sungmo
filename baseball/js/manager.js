@@ -112,6 +112,13 @@ function mgrAuto(res){
     const off = batIdx(G), def = 1 - off;
     const human = ti => needs(ti) || remote(ti);
     if(!human(0) && !human(1)) break;
+    // 비디오 판독: 사람이 고를 차례면 멈추고, 아니면 컴퓨터가 정함
+    if(G.review){
+      const sd = G.review.side;
+      if(human(sd) && reviewLeft(G, sd) > 0) break;
+      const r = resolveReview(G, human(sd) ? false : aiChallenge(G));
+      acc.lines.push(...r.lines); acc.fx.push(...r.fx); continue;
+    }
     const ask = ti => human(ti) && (every || mgrImportant(G, ti));
     if(ask(def) || ask(off)){
       if(human(def) && !ask(def) && !GS.pend.def) GS.pend.def = { k:'normal' };

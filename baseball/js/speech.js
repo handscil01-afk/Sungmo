@@ -78,12 +78,13 @@ const SOUNDS = {
   safe:  (c, t) => { tone(c, t, 0.1, 600, 0.14); tone(c, t + 0.1, 0.1, 800, 0.14); },
   change:(c, t) => { tone(c, t, 0.15, 392, 0.12); tone(c, t + 0.16, 0.2, 523, 0.12); },
   roger: (c, t) => { tone(c, t, 0.07, 1250, 0.15, 'square'); tone(c, t + 0.08, 0.08, 950, 0.15, 'square'); },
+  review:(c, t) => { tone(c, t, 0.12, 700, 0.14, 'triangle'); tone(c, t + 0.14, 0.12, 700, 0.14, 'triangle'); tone(c, t + 0.28, 0.2, 900, 0.14, 'triangle'); },
   chat:  (c, t) => { tone(c, t, 0.08, 988, 0.14); tone(c, t + 0.1, 0.12, 1319, 0.14); },
   end:   (c, t) => { [392, 523, 659, 784].forEach((f, i) => tone(c, t + i * 0.18, 0.3, f, 0.18, 'triangle')); },
 };
-const VIB = { chat:[40, 60, 40], hit:[80], xbh:[80, 60, 80], hr:[100, 60, 100, 60, 400], score:[60, 40, 60], k:[250], out:[120], ball:[30], end:[300, 100, 300], safe:[40, 40, 40] };
+const VIB = { review:[60, 60, 60, 60, 200], chat:[40, 60, 40], hit:[80], xbh:[80, 60, 80], hr:[100, 60, 100, 60, 400], score:[60, 40, 60], k:[250], out:[120], ball:[30], end:[300, 100, 300], safe:[40, 40, 40] };
 // 한 번의 선택으로 여러 효과가 나오면 가장 중요한 것 하나(소리는 순서대로 최대 3개)
-const FX_RANK = ['chat', 'roger', 'end', 'hr', 'score', 'xbh', 'hit', 'k', 'out', 'safe', 'ball', 'change', 'bunt', 'bat', 'foul', 'whiff', 'mitt'];
+const FX_RANK = ['chat', 'roger', 'end', 'review', 'hr', 'score', 'xbh', 'hit', 'k', 'out', 'safe', 'ball', 'change', 'bunt', 'bat', 'foul', 'whiff', 'mitt'];
 function playFx(list){
   if(!list || !list.length) return;
   const uniq = [...new Set(list)];
