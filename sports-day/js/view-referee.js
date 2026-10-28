@@ -45,6 +45,15 @@ function indivView(ev){
   // 사대(칸)가 둘이면 세로 화면에서는 위아래, 가로 화면에서는 왼쪽·오른쪽에 함께 둠
   return `<div class="fit">${info}<div class="lanes n${E.lanes}">${lanesOf(ev).map((L,i) => laneBox(ev, E, L, i)).join('')}</div></div>`;
 }
+// 점수 단추: 점수를 크게, 설명(거리·이름)은 작게. E.grid 가 있으면(후리볼) 네트 배치 그대로 격자로 늘어놓고, 격자에 없는 단추(0점)는 아래에 넓게 둠
+function optsHtml(E, opts, i, full){
+  const btn = ([k,l,v], cls='', note='') => `<button class="opt${cls}" data-a="throw" data-i="${i}" data-k="${k}" ${full?'disabled':''}><b>${v}${cls.includes('zero') ? '점' : ''}</b>${note ? `<span>${esc(note)}</span>` : (l!==v+'점' ? `<span>${esc(l)}</span>` : '')}</button>`;
+  if(!E.grid) return `<div class="opts n${opts.length}">${opts.map(o => btn(o)).join('')}</div>`;
+  const by = Object.fromEntries(opts.map(o => [o[0], o])), used = new Set();
+  const cells = E.grid.flat().map(n => { const o = by['n'+n]; if(!o) return ''; used.add(o[0]); return btn(o, ' gcell'); }).join('');
+  const rest = opts.filter(o => !used.has(o[0])).map(o => btn(o, ' gcell zero', E.gridNote || '')).join('');
+  return `<div class="opts grid">${cells}${rest}</div>`;
+}
 function laneBox(ev, E, L, i){
   const label = (LANE_LABELS[ev]||[])[i] || '';
   if(!L){
@@ -67,8 +76,8 @@ function laneBox(ev, E, L, i){
   const input = num
     ? (full ? '<div class="numdone sub">모두 입력했습니다. 저장을 눌러 주세요. 칸을 누르면 그 숫자를 지웁니다.</div>' : `<div class="numrow"><label class="numlab"><span>${Math.min(L.throws.length+1, E.count)}번째${E.vunit ? ` (${esc(E.vunit)})` : ''}</span><input id="numIn${i}" class="numin" inputmode="decimal" autocomplete="off" placeholder="숫자"></label>
         <button class="btn primary numgo" data-a="throwNum" data-i="${i}">넣기</button></div>`)
-    : `<div class="opts n${opts.length}">${opts.map(([k,l,v]) => `<button class="opt" data-a="throw" data-i="${i}" data-k="${k}" ${full?'disabled':''}><b>${v}</b>${l!==v+'점'?`<span>${esc(l)}</span>`:''}</button>`).join('')}</div>`;
-  return `<div class="lanebox" style="--ev:${E.color}">
+    : optsHtml(E, opts, i, full);
+  return `<div class="lanebox${E.grid ? ' gridlane' : ''}" style="--ev:${E.color}">
     <div class="lhead"><div class="lh1"><button class="nm" data-a="pickFor" data-v="${i}">${esc(pname(L.pid))}<small> ▾</small></button>
         <span class="total">${fmtNum(t)}<small>${esc(E.vunit)}</small></span><button class="xbtn" data-a="dropLane" data-i="${i}" aria-label="빼기">✕</button></div>
       <div class="lh2"><span class="ll">${esc(label.split(' ')[0])}</span>${rtag}${L.existing?'<span class="tag warn">수정</span>':''}
@@ -179,7 +188,7 @@ function recSheet(ev, pid){
     const r = rec(ev, round, pid), nm = ROUNDS[round];
     if(!r) return `<div class="card"><b>${nm}</b> <span class="sub">기록 없음</span>${editable?` <button class="btn small" data-a="reopen" data-v="${round}" data-p="${pid}">입력하기</button>`:''}</div>`;
     const hist = (r.history||[]).slice(-5).reverse().map(h => `<div class="sub">· ${hm(h.at)} ${esc(h.by)}: ${(h.throws||[]).map(k => fmtNum(throwVal(ev, k))).join(' · ')}</div>`).join('');
-    const detail = isNum(ev) ? (r.throws||[]).map(k => fmtNum(throwVal(ev, k))).join(' · ') : (r.throws||[]).map(k => `${m[k]?.v ?? 0}(${esc(m[k]?.l||'')})`).join(' · ');
+    const detail = isNum(ev) ? (r.throws||[]).map(k => fmtNum(throwVal(ev, k))).join(' · ') : (r.throws||[]).map(k => { const v = m[k]?.v ?? 0, l = m[k]?.l || ''; return (!l || l===v+'점') ? String(v) : `${v}(${esc(l)})`; }).join(' · ');
     return `<div class="card"><div class="row"><b class="grow" style="font-size:20px">${nm}<span class="rsc">${sc(ev, totalOf(ev,r.throws))}</span></b>
       ${editable?`<button class="btn small" data-a="reopen" data-v="${round}" data-p="${pid}">고치기</button><button class="btn small danger" data-a="delRec" data-v="${round}" data-p="${pid}">지우기</button>`:''}</div>
       <div class="sub" style="margin-top:6px">${detail}</div>
@@ -319,7 +328,7 @@ function matchSheet(id){
   const E = TEAM[m.event], o = teamOpt(m.event);
   const scoreEdit = (o.score || m.blueScore!=null) && E.mode!=='time' ? `<div class="row" style="margin-bottom:12px"><label class="row">${teamBadge('blue')}<input class="timein" id="emSB" inputmode="decimal" value="${m.blueScore??''}" placeholder="점수"></label><label class="row">${teamBadge('red')}<input class="timein" id="emSR" inputmode="decimal" value="${m.redScore??''}" placeholder="점수"></label>
       <button class="btn small" data-a="emScores" data-v="${id}">점수 고치기</button></div>` : '';
-  const marks = Array.isArray(m.marks) && m.marks.length ? `<div class="mthumb"><div class="sub">과녁판 기록 (청팀 ${m.marks.filter(k => k.t==='blue').length}개 · 홍팀 ${m.marks.filter(k => k.t==='red').length}개)</div>${tgtBox(m.event, { list:m.marks, thumb:true })}</div>` : '';
+  const marks = Array.isArray(m.marks) && m.marks.length ? `<div class="mthumb"><div class="sub">과녁판 기록 (${esc(teamName('blue'))} ${m.marks.filter(k => k.t==='blue').length}개 · ${esc(teamName('red'))} ${m.marks.filter(k => k.t==='red').length}개)</div>${tgtBox(m.event, { list:m.marks, thumb:true })}</div>` : '';
   return `<h2>${esc(E.name)} 결과 고치기</h2>
     ${E.mode!=='round'?`<p class="row" style="font-size:20px;font-weight:800">${teamBadge('blue')} ${esc(pname(m.blueId))} <span class="sub">vs</span> ${teamBadge('red')} ${esc(pname(m.redId))}</p>`:''}
     ${E.mode==='time'?`<div class="row" style="margin-bottom:12px"><label class="row">${teamBadge('blue')}<input class="timein" id="emB" inputmode="decimal" value="${m.blueTime??''}"></label><label class="row">${teamBadge('red')}<input class="timein" id="emR" inputmode="decimal" value="${m.redTime??''}"></label>

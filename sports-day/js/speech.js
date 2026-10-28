@@ -123,7 +123,7 @@ Object.assign(ACT, {
   ttsTest: () => {
     const m = ttsMode();
     if(m === 'off'){ toast('음성 안내가 꺼져 있습니다.'); return false; }
-    say('음성 시험입니다. 청팀 홍길동 선수, 준비해 주세요.', true);
+    say(`음성 시험입니다. ${teamName('blue')} 홍길동 선수, 준비해 주세요.`, true);
     if(m === 'sr') toast('보이스오버·톡백이 켜져 있으면 읽어 줍니다.');
     return false;
   },
