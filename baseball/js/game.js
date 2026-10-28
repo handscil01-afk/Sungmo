@@ -12,11 +12,13 @@ const isHuman = ti => G.ctrl[ti] === 'human';
 // local: 이 기기에서 고르는 팀 (온라인에서는 내 팀만)
 const local = ti => !NET.on || ti === NET.side;
 const twoP = () => isHuman(0) && isHuman(1) && !NET.on;
-const needs = ti => isHuman(ti) && local(ti) && !(GS.auto && GS.auto.side === ti);
+// 선수 육성: 내 선수(G.focus)가 타석에 있거나 마운드에 있을 때만 직접 고름
+const focusTurn = ti => !!G.focus && (batIdx(G) === ti ? curBatter(G).id === G.focus : curPitcher(G).id === G.focus);
+const needs = ti => (isHuman(ti) || focusTurn(ti)) && local(ti) && !(GS.auto && GS.auto.side === ti);
 // 상대 기기에서 선택이 와야 하는 팀
 const remote = ti => NET.on && !local(ti);
 // 능력치를 숫자로 보여 줄 팀 (내 팀, 관전이면 모두)
-const ownTeam = ti => NET.on ? ti === NET.side : (isHuman(ti) || G.ctrl.every(c => c === 'cpu'));
+const ownTeam = ti => NET.on ? ti === NET.side : G.focusTeam != null ? ti === G.focusTeam : (isHuman(ti) || G.ctrl.every(c => c === 'cpu'));
 const whoLabel = ti => twoP() ? `${G.who[ti] || G.teams[ti].short}, ` : '';
 // 사람이 응원하는 팀 (혼자 하기) · 둘 다 사람이면 지금 공격 팀
 const myTeam = () => isHuman(0) && !isHuman(1) ? 0 : isHuman(1) && !isHuman(0) ? 1 : -1;
@@ -93,6 +95,7 @@ function gameNext(via, res){
   if(G.over){
     // 리그 경기: 결과를 리그에 넣고 그날의 다른 경기도 진행
     if(G.league && !G.league.done){ G.league.done = true; lines.push(...visible(leagueAfterMine(G))); }
+    if(G.career && !G.career.done){ G.career.done = true; lines.push(...visible(careerAfterGame(G))); }
     ls.del('bb_game'); go(endScreen, via, lines); return;
   }
   if(G.pre){ const ti = [0, 1].find(t => !G.pre.ready[t] && needs(t)); go(() => pregameScreen(ti), via, lines); return; }
@@ -114,6 +117,14 @@ function gameNext(via, res){
     const keep = more.lines.filter(l => GS.autoScope === 'pa' ? l.k !== 'd' || SET.dice : 'ric'.includes(l.k));
     gameNext(via, { lines: [...(res ? res.lines : []), ...keep], fx: more.fx });
     return;
+  }
+  // 선수 육성: 내 선수 차례가 올 때까지 빠르게 진행하고, 점수가 난 장면과 이닝 소식만 읽어 줌
+  if(G.focus && !needs(off) && !needs(def)){
+    const more = runSteps(() => needs(batIdx(G)) || needs(1 - batIdx(G)));
+    const me = (() => { const f = myLine(G, G.focus); return f ? (f.bat || f.pit).name : ''; })();
+    const lastN = more.lines.map(l => l.k).lastIndexOf('n');
+    const keep = more.lines.filter((l, i) => l.k === 'i' || (l.k === 'r' && /홈인|대기록/.test(l.s)) || (l.k === 'c' && me && l.s.includes(me)) || (i === lastN && !G.over));
+    gameNext(via, { lines:[...(res ? res.lines : []), ...keep], fx: more.fx.slice(-2) }); return;
   }
   if(!needs(off) && !needs(def)){ go(watchScreen, via, lines); return; }
   const turn = (needs(def) && !GS.pend.def) ? def : off;
@@ -427,6 +438,11 @@ function stopAutoPlay(say){
 /* ---------- 경기 끝 ---------- */
 function endScreen(){
   const o = GS.opts;
+  if(G.career) return { board:true, q:'경기가 끝났습니다. 무엇을 할까요?', opts:[
+    { n:1, t:'육성 화면으로', act: v => { G = null; go(careerHome, v); } },
+    { n:2, t:'점수판', act: v => note(scoreboard(G), v) },
+    { n:3, t:'경기 기록 전체', act: v => go(() => logScreen(), v) },
+  ] };
   if(G.league) return { board:true, q:'경기가 끝났습니다. 무엇을 할까요?', opts:[
     { n:1, t:'리그 화면으로', act: v => { G = null; go(leagueHome, v); } },
     { n:2, t:'점수판', act: v => note(scoreboard(G), v) },

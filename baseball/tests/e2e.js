@@ -64,7 +64,7 @@ const PORT = 8766;
     console.log(`${name}: 간단 둘이 3이닝 ${s2}번 만에 끝`);
     // 관전: 정밀 3이닝, 경기 끝까지
     await page.keyboard.press('4');
-    for(const k of ['5', '2', '1', '2', '2', '1']) await page.keyboard.press(k);
+    for(const k of ['6', '2', '1', '2', '2', '1']) await page.keyboard.press(k);
     await page.keyboard.press('4');
     await page.waitForFunction(() => document.querySelector('#q').textContent.includes('경기가 끝났습니다'));
     console.log(`${name}: 관전 끝`);
@@ -75,7 +75,7 @@ const PORT = 8766;
       await page.keyboard.press('9'); await page.keyboard.press('7');
       await page.keyboard.press('9'); await page.keyboard.press('9');
       if(!(await q(page)).includes('무엇을 할까요')) errors.push('그만하기 뒤 처음 화면이 아님');
-      await page.keyboard.press('6');
+      await page.keyboard.press('7');
       const s3 = await playToEnd(page, name + ' 이어하기', true);
       console.log(`${name}: 맡기기·이어하기 ${s3}번 만에 끝`);
       // 둘이 하기 정밀 모드 1이닝 (기기 넘기기 화면 포함)
@@ -117,7 +117,7 @@ const PORT = 8766;
       await shot(page, `${name}-manager-end`);
       // 감독 모드 관전
       await page.keyboard.press('4');
-      for(const k of ['5', '3', '1', '2', '2', '1']) await page.keyboard.press(k);
+      for(const k of ['6', '3', '1', '2', '2', '1']) await page.keyboard.press(k);
       await page.keyboard.press('4');
       await page.waitForFunction(() => document.querySelector('#q').textContent.includes('경기가 끝났습니다'));
       console.log(`${name}: 감독 모드 관전 끝`);
@@ -149,6 +149,41 @@ const PORT = 8766;
       if(!/감독/.test(rec)) errors.push('내 감독 기록이 없음');
       console.log(`${name}: 다음 시즌·기록실 / ${rec.split('\n').slice(0, 3).join(' / ')}`);
       await page.keyboard.press('1'); await page.keyboard.press('.');
+      // 선수 육성: 타자(유격수, 교타자) 만들기 → 훈련 → 퓨처스리그 → (능력치를 올려) 1군 승격 → 1군 경기(내 타석만) → 은퇴
+      await page.keyboard.press('.');
+      await page.keyboard.press('5'); await page.keyboard.press('1');
+      await page.waitForFunction(() => document.querySelector('#q').textContent.includes('선수 이름'));
+      await page.fill('#cmd', '홍길동'); await page.press('#cmd', 'Enter');
+      for(const k of ['1', '5', '1', '1', '4', '1']) await page.keyboard.press(k);
+      if(!(await q(page)).includes('오늘은 무엇을')) errors.push('육성 첫 화면이 아님: ' + await q(page));
+      await shot(page, `${name}-career`);
+      await page.keyboard.press('2'); await page.keyboard.press('1');
+      await page.evaluate(() => { const L = CR(); const p = myP(L); p.con = 95; p.pow = 90; p.eye = 85; p.def = 85; saveLeague(); });
+      await page.keyboard.press('1');
+      const up = await page.$eval('#say', e => e.innerText);
+      if(!/퓨처스리그/.test(up)) errors.push('퓨처스리그 경기 결과가 없음');
+      console.log(`${name}: 육성 2군 / ${up.split('\n').filter(Boolean).slice(0, 2).join(' / ').slice(0, 150)}`);
+      if(!/1군에 올라갑니다/.test(up)) errors.push('1군 승격이 안 됨: ' + up.slice(0, 120));
+      await page.keyboard.press('1');
+      let myTurns = 0;
+      for(let i = 0; i < 600; i++){
+        const qq = await q(page);
+        if(qq.includes('경기가 끝났습니다')) break;
+        if(/공격/.test(qq)) myTurns++;
+        const os = (await opts(page)).filter(o => !/더 보기|설정|그만하기|노림수|맡기기/.test(o.t));
+        if(!os.length){ await page.keyboard.press('.'); continue; }
+        await page.keyboard.press(os[Math.floor(Math.random() * os.length)].n);
+      }
+      const endS = await page.$eval('#say', e => e.innerText);
+      if(!(await q(page)).includes('경기가 끝났습니다')) errors.push('육성 1군 경기가 끝나지 않음');
+      console.log(`${name}: 육성 1군 경기 끝, 내가 고른 공 ${myTurns}번 / ${endS.split('\n').filter(l => /내 기록/.test(l)).join('')}`);
+      await page.keyboard.press('1');
+      await page.keyboard.press('9'); await page.keyboard.press('1');
+      await page.waitForSelector('#dlg.open'); await page.click('#dlg [data-dlg="0"]');
+      const fin = await page.$eval('#say', e => e.innerText);
+      if(!/은퇴/.test(fin)) errors.push('은퇴 글이 없음');
+      console.log(`${name}: 은퇴 / ${fin.split('\n').filter(Boolean).slice(0, 2).join(' / ')}`);
+      await page.keyboard.press('.');
       await page.keyboard.press('9'); await page.keyboard.press('.'); await page.keyboard.press('.');
     }
     // 설정 화면: 글자 크기·화면 색 바꾸기

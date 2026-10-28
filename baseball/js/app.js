@@ -5,16 +5,16 @@
 function homeScreen(){
   const sv = loadSaved();
   return { top: installBanner(), q:'무엇을 할까요?',
-    note:['공 하나하나를 고르며 진행하는 확률 야구입니다.', '번호 키, 화면 단추, 명령 칸 가운데 편한 방법으로 고릅니다.', '0은 지금 상황, 점(.)은 뒤로, 곱하기(*)는 키 안내입니다.'],
+    note:['공 하나하나를 고르며 진행하는 확률 야구입니다.', '번호 키, 화면 단추, 명령 칸 가운데 편한 방법으로 고릅니다.', '0은 지금 상황, 점(.)은 뒤로, 곱하기(*)는 키 안내입니다. 게임 방법은 8번 설정에 있습니다.'],
     opts:[
       { n:1, t:'혼자 하기', s:'컴퓨터 팀과 대결합니다.', act: v => { NEW.kind = '1p'; go(modeScreen, v); } },
       { n:2, t:'둘이 하기', s:'한 기기를 번갈아 쓰며 대결합니다.', act: v => { NEW.kind = '2p'; go(modeScreen, v); } },
       { n:3, t:'온라인 대전', s:'각자 휴대폰으로 만나 대결하고, 채팅과 음성 대화를 합니다.', act: v => go(onlineHome, v) },
-      { n:4, t:'리그', s: LG() ? `${teamInfo(LG().my).name}, ${LG().season}시즌` : '10개 팀 정규 시즌과 포스트시즌, 기록과 시상식', act: v => go(leagueHome, v) },
-      { n:5, t:'컴퓨터끼리 관전', s:'컴퓨터 두 팀의 경기를 듣습니다.', act: v => { NEW.kind = 'watch'; go(modeScreen, v); } },
-      { n:6, t:'이어하기', hide: !sv, s: sv ? `${MODE_NAME[sv.G.mode]}, ${sv.G.pre ? '경기 전 준비 중' : situation(sv.G)}` : '', act: v => resumeGame(v) },
-      { n:7, t:'게임 방법과 키 안내', act: v => go(() => helpScreen(() => go(homeScreen, 'click')), v) },
-      { n:8, t:'설정', s:'글자 크기, 화면 색, 읽어 주기, 효과음, 진동', act: v => go(() => settingsScreen(() => go(homeScreen, 'click')), v) },
+      { n:4, t:'리그', s: peekL('league') ? `${teamInfo(peekL('league').my).name}, ${peekL('league').season}시즌` : '10개 팀 정규 시즌과 포스트시즌, 기록과 시상식', act: v => go(leagueHome, v) },
+      { n:5, t:'선수 육성', s: (() => { const L = peekL('career'); return L && L.career && !L.career.retired ? `${(L.career.p || findPlayer(L, L.career.id)?.p || {}).name}, ${L.season}시즌` : '내 선수 한 명을 키워 명예의 전당까지'; })(), act: v => go(careerHome, v) },
+      { n:6, t:'컴퓨터끼리 관전', s:'컴퓨터 두 팀의 경기를 듣습니다.', act: v => { NEW.kind = 'watch'; go(modeScreen, v); } },
+      { n:7, t:'이어하기', hide: !sv, s: sv ? `${MODE_NAME[sv.G.mode]}, ${sv.G.pre ? '경기 전 준비 중' : situation(sv.G)}` : '', act: v => resumeGame(v) },
+      { n:8, t:'설정과 게임 방법', s:'글자 크기, 화면 색, 읽어 주기, 효과음, 진동, 게임 방법과 키 안내', act: v => go(() => settingsScreen(() => go(homeScreen, 'click')), v) },
       { n:9, t:'홈 화면에 설치하기', hide: !canInstall(), s:'아이콘으로 바로 열고 화면을 넓게 씁니다.', act: () => doInstall() },
     ] };
 }
@@ -38,14 +38,14 @@ function unitScreen(){
   ] };
 }
 function teamScreen(which, page = 0){
-  const q = NEW.kind === '1p' || NEW.kind === 'online' || NEW.kind === 'league' ? (which ? '상대 팀을 고르세요.' : '내 팀을 고르세요.')
+  const q = NEW.kind === '1p' || NEW.kind === 'online' || NEW.kind === 'league' || NEW.kind === 'career' ? (which ? '상대 팀을 고르세요.' : '내 팀을 고르세요.')
           : NEW.kind === '2p' ? (which ? '둘째 사람의 팀을 고르세요.' : '첫째 사람의 팀을 고르세요.')
           : (which ? '홈 팀을 고르세요.' : '원정 팀을 고르세요.');
   const taken = which ? NEW.a : null;
   const list = TEAMS.filter(t => t.key !== taken);
   const set = (k, v) => {
     if(which){ NEW.b = k; go(NEW.kind === 'watch' ? inningsScreen : sideScreen, v); }
-    else { NEW.a = k; go(NEW.kind === 'league' ? leagueLenScreen : () => teamScreen(1), v); }
+    else { NEW.a = k; go(NEW.kind === 'league' ? leagueLenScreen : NEW.kind === 'career' ? careerLenScreen : () => teamScreen(1), v); }
   };
   // 10팀이라 한 쪽에 8팀씩: 9번은 다음 쪽 / 앞 쪽
   const desc = t => `${STYLES[t.style].name}. 홈구장 ${parkInfo(t.key).name}: ${parkInfo(t.key).desc}`;
@@ -54,7 +54,7 @@ function teamScreen(which, page = 0){
   if(page) opts.push({ n: shown.length + 1, t:'아무 팀이나', s:'무작위로 고릅니다.', act: v => set(list[Math.floor(Math.random() * list.length)].key, v) });
   opts.push(page ? { n:9, t:'앞 쪽 팀 보기', act: v => go(() => teamScreen(which, 0), v) }
                  : { n:9, t:'다른 팀 더 보기', s: list.slice(8).map(t => t.name).join(', ') + ', 아무 팀이나', act: v => go(() => teamScreen(which, 1), v) });
-  return { q: q + (page ? ' (두 번째 쪽)' : ''), opts, back: v => go(page ? () => teamScreen(which, 0) : which ? () => teamScreen(0) : NEW.mode === 'simple' ? unitScreen : modeScreen, v) };
+  return { q: q + (page ? ' (두 번째 쪽)' : ''), opts, back: v => go(page ? () => teamScreen(which, 0) : which ? () => teamScreen(0) : NEW.kind === 'career' ? careerTypeScreen : NEW.mode === 'simple' ? unitScreen : modeScreen, v) };
 }
 function sideScreen(){
   const me = NEW.kind === '2p' ? '첫째 사람 팀' : '내 팀';
@@ -128,6 +128,7 @@ function settingsScreen(backTo){
     { n:6, t:`효과음: ${onOff(SET.snd)}`, act: ch(() => { SET.snd = !SET.snd; }, () => `효과음 ${onOff(SET.snd)}`) },
     { n:7, t:`진동: ${onOff(SET.vib)}`, s:'안드로이드 휴대폰에서 안타, 홈런, 삼진, 득점 때 진동합니다.', act: ch(() => { SET.vib = !SET.vib; }, () => `진동 ${onOff(SET.vib)}`) },
     { n:8, t:'더 보기', s:'명령 칸, 자동 재생, 음성 빠르기, 전체화면, 설치, 시험, 저장 지우기', act: v => go(() => settings2(backTo), v) },
+    { n:9, t:'게임 방법과 키 안내', act: v => go(() => helpScreen(() => go(() => settingsScreen(backTo), 'click')), v) },
   ] };
 }
 function settings2(backTo){
@@ -237,6 +238,14 @@ const HELP = {
     '기록실: 역대 우승 팀, 통산 기록 순위(은퇴 선수 포함), 한 시즌 최고 기록, 명예의 전당, 최근 은퇴 선수, 대기록, 내 감독 기록을 봅니다.',
     '대기록: 사이클링 히트, 노히트 노런, 퍼펙트게임, 통산 100호 홈런이나 1000안타 같은 이정표, 시즌 신기록이 나오면 바로 알려 줍니다.',
     '명예의 전당: 5시즌 이상 뛰고 은퇴한 선수 가운데 통산 기록이 아주 좋거나 MVP를 두 번 이상 받은 선수가 헌액됩니다. 기준은 리그 길이에 맞춰 줄어듭니다.',
+  ],
+  '선수 육성': [
+    '처음 화면의 선수 육성에서 내 선수를 만듭니다. 이름, 타자와 투수, 수비 위치(투수는 선발과 불펜), 선수 유형(교타자, 거포, 호타준족, 수비형 / 강속구, 제구형, 변화구형), 팀, 시즌 길이, 내 차례 방식(정밀, 간단)을 고릅니다.',
+    '20살 신인으로 퓨처스리그(2군)에서 시작합니다. 날마다 경기 전에 한 번 훈련하거나 쉬고, 2군 경기를 합니다. 실력이 같은 자리 1군 선수만큼 되면 1군으로 올라갑니다.',
+    '1군 경기에서는 내 선수의 타석(투수라면 내 선수가 던지는 동안)만 직접 고르고, 나머지는 빠르게 진행하며 점수가 난 장면과 이닝 소식만 읽어 줍니다. 선발 투수는 로테이션 차례인 날에 던지고, 불펜 투수는 감독이 부를 때 나갑니다.',
+    '훈련과 경기 결과로 성장 점수가 쌓이고, 10점이 되면 능력치가 1 오릅니다. 젊을수록 빨리 오르고, 나이가 들면 천천히 오르다가 떨어집니다.',
+    '첫 안타, 첫 홈런, 첫 승 같은 업적이 남고, 잘한 날에는 수훈 선수 인터뷰를 해서 인기가 오릅니다. 가끔 슬럼프나 부상도 생깁니다.',
+    '시즌이 끝나면 다음 시즌을 이어 가고, 원할 때 은퇴합니다(마흔 살이면 은퇴). 은퇴하면 통산 기록으로 명예의 전당 심사를 합니다.',
   ],
   '앞으로 만들 것': [
     '그다음: 우리 센터 이름으로 팀과 선수 만들기, 시즌 기록, 히트 앤드 런과 견제구 같은 작전, 관중 소리.',

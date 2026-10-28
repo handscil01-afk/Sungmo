@@ -351,7 +351,7 @@ function leagueNextSeason(L){
       p.cs = sumStats(p.cs, p.ss); p.ps = {}; p.ss = {};
       p.seasons = (p.seasons || 0) + 1; p.rookie = false; giveAge(L, p); p.age++;
       p.rest = 0; p.streak = 0;
-      if(rnd(L) < retireChance(p)){
+      if(rnd(L) < retireChance(p) && !(L.career && p.id === L.career.id)){   // 육성 중인 내 선수는 스스로 은퇴를 고름
         const hof = hofCheck(L, p);
         L.retired.push({ id:p.id, name:p.name, team:T.key, pit: !!p.vel, pos: p.vel ? p.role : POS[p.pos], age:p.age, seasons:p.seasons, cs:p.cs, awards:p.awards || [], hof, season:L.season });
         nRet++;
