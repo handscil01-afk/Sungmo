@@ -1756,3 +1756,9 @@ td.score small{font-size:.7em;margin-left:2px;color:var(--sub);font-weight:700}
 .lpcol h3{display:flex;align-items:center;gap:8px;margin:0 0 6px;color:var(--ink);font-size:18px}
 .lpitem.cand{background:#fff6cc;border-radius:12px}
 .lpitem .name .sub{font-size:14px}
+@media (max-height:560px) and (orientation:landscape){
+  /* 팀 이름이 길어도(이가네·함씨네) 낮은 가로 화면의 볼링 선수 카드가 두 줄로 늘지 않게: 이름은 그대로, 앞 글만 줄임 */
+  .duel.compact .pcard{flex-wrap:nowrap}
+  .duel.compact .pcard .lbl{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.02em}
+  .duel.compact .pcard .nm{flex:0 0 auto;white-space:nowrap}
+}
