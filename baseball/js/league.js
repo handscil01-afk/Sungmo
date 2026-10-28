@@ -14,13 +14,19 @@ function leaguePlayer(p, role){
   q.ss = {};
   return q;
 }
+// 예전에 만든 리그를 불러올 때 빠진 값 채우기
+function leagueFix(L){ Object.values(L.teams).forEach(T => allPlayers(T).forEach(p => giveAge(L, p))); }
+// 처음 만든 리그의 선수 나이: 21~34세
+function giveAge(L, p){ if(!p.age) p.age = 21 + Math.floor(rnd(L) * 14); }
 function leagueTeam(L, key){
   const S = STYLES[teamInfo(key).style];
   const bat = bestOrder([...Array(9)].map((_, i) => leaguePlayer(makeBatter(L, S, i, 0))));
   const bench = BENCH_ROLES.map(b => leaguePlayer(makeBench(L, S, b, 0)));
   const sp = [...Array(5)].map(() => leaguePlayer(makePitcher(L, S, true, 0), '선발'));
   const rp = [...Array(6)].map((_, i) => leaguePlayer(makePitcher(L, S, false, 0), i === 0 ? '마무리' : '불펜'));
-  return { key, bat, bench, sp, rp, rot:0, w:0, l:0, d:0, rs:0, ra:0, last:[] };
+  const T = { key, bat, bench, sp, rp, rot:0, w:0, l:0, d:0, rs:0, ra:0, last:[] };
+  allPlayers(T).forEach(p => giveAge(L, p));
+  return T;
 }
 // o: { my:내 팀, len:팀당 경기 수, mode, unit, inn:이닝, seed }
 function leagueNew(o){
@@ -106,6 +112,7 @@ function leagueApply(L, G, post){
     [...GT.bat, ...GT.gone].forEach(b => {
       if(!b.st.pa) return;
       const f = findPlayer(L, b.id); if(!f) return;
+      if(!post) milestone(L, f.p, T, { h:b.st.h, hr:b.st.hr, rbi:b.st.rbi, sb:b.st.sb });
       const s = f.p[key] ||= {};
       addTo(s, 'g', 1); ['pa', 'ab', 'h', 'hr', 'rbi', 'bb', 'k', 'r', 'sb'].forEach(k => addTo(s, k, b.st[k]));
     });
@@ -118,6 +125,7 @@ function leagueApply(L, G, post){
       const s = P[key] ||= {};
       addTo(s, 'g', 1); if(p.gs) addTo(s, 'gs', 1);
       ['out', 'h', 'r', 'bb', 'k', 'hr'].forEach(k => addTo(s, k, p.st[k]));
+      if(!post) milestone(L, P, T, { w: dec.w === p.id ? 1 : 0, sv: dec.s === p.id ? 1 : 0, k: p.st.k });
       if(dec.w === p.id) addTo(s, 'w', 1);
       if(dec.l === p.id) addTo(s, 'l', 1);
       if(dec.s === p.id) addTo(s, 'sv', 1);
@@ -134,6 +142,21 @@ function leagueApply(L, G, post){
       if(nb.every(Boolean)){ T.bat = nb; T.bench = pool.filter(p => !GT.startIds.includes(p.id)); }
     }
   });
+}
+// 대기록(사이클링 히트·노히트 노런·퍼펙트게임)을 리그에 남김
+function leagueFeats(L, G){
+  (G.feats || []).forEach(f => { (L.feats ||= []).push({ ...f, season: L.season, day: L.day + 1 }); L.news.push(f.text); });
+}
+// 통산 이정표: 통산 기록(cs)과 이번 시즌(ss)을 더한 값이 기준을 넘는 순간 소식으로 알림
+const MILESTONE = { hr:[50, 100, 200, 300, 400, 500], h:[500, 1000, 1500, 2000, 2500, 3000], rbi:[500, 1000, 1500], sb:[100, 200, 300, 400],
+  w:[50, 100, 150, 200], sv:[100, 200, 300, 400], k:[500, 1000, 1500, 2000, 2500] };
+const MS_UNIT = { hr:'호 홈런', h:'안타', rbi:'타점', sb:'도루', w:'승', sv:'세이브', k:'탈삼진' };
+function milestone(L, p, T, add){
+  for(const k in add){
+    const d = add[k] || 0; if(!d) continue;
+    const before = ((p.cs || {})[k] || 0) + ((p.ss || {})[k] || 0), after = before + d;   // ss에 더하기 전에 부름
+    (MILESTONE[k] || []).forEach(t => { if(before < t && after >= t){ const text = `대기록! ${teamName(T.key)} ${p.name}, 통산 ${t}${MS_UNIT[k]}을 달성했습니다!`; L.news.push(text); (L.feats ||= []).push({ kind:'ms', text, id:p.id, name:p.name, team:T.key, season:L.season, day:L.day + 1 }); } });
+  }
 }
 // 날마다 컨디션이 조금씩 바뀜 (절반은 어제와 같음)
 function leagueNewDay(L){ Object.values(L.teams).forEach(T => allPlayers(T).forEach(p => { if(rnd(L) < 0.5) p.cond = condRoll(L); })); }
@@ -157,6 +180,7 @@ function leagueAdvance(L, myG){
     const G = mine ? myG : leagueSim(L, g.a, g.h);
     g.ra = runsOf(G.teams[0]); g.rh = runsOf(G.teams[1]);
     leagueApply(L, G, post);
+    leagueFeats(L, G);
     out.push(`${teamName(g.a)} ${g.ra} 대 ${g.rh} ${teamName(g.h)}`);
     if(post) seriesResult(L, g, G);
   });
@@ -239,6 +263,12 @@ function leaders(L, stat, n = 10){
   rows.sort((a, b) => stat === 'era' ? a.v - b.v : b.v - a.v);
   return rows.slice(0, n);
 }
+const TITLE_NAME = { avg:'타격왕', hr:'홈런왕', rbi:'타점왕', h:'최다 안타', sb:'도루왕', era:'평균자책점 1위', w:'다승왕', sv:'세이브왕', hd:'홀드왕', k:'탈삼진왕' };
+function mvpScore(p){
+  const s = p.ss || {};
+  if(p.vel) return s.out ? (s.w || 0) * 6 + (s.sv || 0) * 3 + (s.k || 0) * 0.3 + Math.max(0, 5 - eraOf(s)) * (s.out / 27) * 2 : 0;
+  return (s.h || 0) + (s.hr || 0) * 3 + (s.rbi || 0) + (s.sb || 0) * 0.5 + (s.bb || 0) * 0.5;
+}
 const STAT_NAME = { avg:'타율', hr:'홈런', rbi:'타점', h:'안타', sb:'도루', era:'평균자책점', w:'승리', sv:'세이브', hd:'홀드', k:'탈삼진' };
 const statVal = (stat, v) => stat === 'avg' ? avgText(v) : stat === 'era' ? v.toFixed(2) : `${v}${{ hr:'개', rbi:'점', h:'개', sb:'개', w:'승', sv:'세이브', hd:'홀드', k:'개' }[stat] || ''}`;
 function endSeason(L, champ, S){
@@ -248,11 +278,100 @@ function endSeason(L, champ, S){
   let mvp = null, mv = -1;
   for(const k in L.teams){
     const T = L.teams[k], bonus = L.final.indexOf(k) < 3 ? 1.05 : 1;
-    [...T.bat, ...T.bench].forEach(p => { const s = p.ss || {}; const v = ((s.h || 0) + (s.hr || 0) * 3 + (s.rbi || 0) + (s.sb || 0) * 0.5 + (s.bb || 0) * 0.5) * bonus; if(v > mv){ mv = v; mvp = { id:p.id, name:p.name, team:k }; } });
-    [...T.sp, ...T.rp].forEach(p => { const s = p.ss || {}; if(!s.out) return; const v = ((s.w || 0) * 6 + (s.sv || 0) * 3 + (s.k || 0) * 0.3 + Math.max(0, 5 - eraOf(s)) * (s.out / 27) * 2) * bonus; if(v > mv){ mv = v; mvp = { id:p.id, name:p.name, team:k }; } });
+    allPlayers(T).forEach(p => { const v = mvpScore(p) * bonus; if(v > mv){ mv = v; mvp = { id:p.id, name:p.name, team:k }; } });
   }
   let ks = null, kv = -1;
   Object.entries(S.mvp).forEach(([id, v]) => { const f = findPlayer(L, id); if(f && f.T.key === champ && v > kv){ kv = v; ks = { id, name: f.p.name, team: champ }; } });
-  L.awards = { mvp, ksMvp: ks, titles };
+  // 신인왕: 이번 시즌 처음 뛴 신인 가운데
+  let roy = null, rv = -1;
+  for(const k in L.teams) allPlayers(L.teams[k]).forEach(p => { if(!p.rookie) return; const v = mvpScore(p); if(v > rv){ rv = v; roy = { id:p.id, name:p.name, team:k }; } });
+  L.awards = { mvp, ksMvp: ks, roy: rv > 0 ? roy : null, titles };
+  const give = (a, what) => { if(!a) return; const f = findPlayer(L, a.id); if(f) (f.p.awards ||= []).push(`${L.season}시즌 ${what}`); };
+  give(mvp, 'MVP'); give(ks, '한국시리즈 MVP'); give(L.awards.roy, '신인왕');
+  titles.forEach(t => give(t, TITLE_NAME[t.st]));
   L.news.push(`한국시리즈 우승: ${teamInfo(champ).name}!`);
+  seasonRecords(L);
+}
+
+/* ---------- 시즌 기록 · 다음 시즌 ---------- */
+// 한 시즌 최고 기록: 넘으면 소식으로 알림 (첫 시즌은 조용히 기록만)
+function seasonRecords(L){
+  L.rec ||= {};
+  ['avg', 'hr', 'rbi', 'h', 'sb', 'era', 'w', 'sv', 'hd', 'k'].forEach(st => {
+    const t = leaders(L, st, 1)[0]; if(!t) return;
+    const old = L.rec[st], better = !old || (st === 'era' ? t.v < old.v : t.v > old.v);
+    if(!better) return;
+    if(old) L.news.push(`시즌 ${STAT_NAME[st]} 신기록! ${teamName(t.T.key)} ${t.p.name}, ${statVal(st, t.v)}. 이전 기록은 ${old.season}시즌 ${old.name}의 ${statVal(st, old.v)}.`);
+    L.rec[st] = { v: t.v, name: t.p.name, team: t.T.key, season: L.season };
+  });
+}
+const sumStats = (a, b) => { const o = { ...(a || {}) }; for(const k in (b || {})) o[k] = (o[k] || 0) + b[k]; return o; };
+// 나이에 따라 성장·하락: 젊으면 오르고, 서른을 넘기면 조금씩 떨어짐 (발은 일찍 떨어짐)
+function develop(L, p){
+  const a = p.age, base = a <= 23 ? 3 : a <= 26 ? 1.5 : a <= 30 ? 0 : a <= 33 ? -1.5 : -3;
+  const ch = (k, extra = 0) => { p[k] = clamp(Math.round(p[k] + base + extra + gauss(L) * 2.5), 20, 99); };
+  if(p.vel){
+    ch('ctl'); ch('stf'); p.vel = clamp(Math.round(p.vel + base / 2 + gauss(L) * 0.8), 128, 162);
+    (p.pitches || []).forEach(x => { x.g = clamp(Math.round(x.g + base + gauss(L) * 2), 20, 99); });
+  } else { ch('con'); ch('pow'); ch('eye'); ch('def'); ch('spd', a >= 28 ? -1.5 : 0); }
+}
+function retireChance(p){
+  const a = p.age, r = p.vel ? (p.ctl + p.stf) / 2 : (p.con + p.pow + p.eye) / 3;
+  let c = a < 33 ? 0 : [0.1, 0.2, 0.35, 0.5, 0.7][a - 33] ?? 0.9;
+  if(a >= 30 && r < 40) c += 0.3;
+  return c;
+}
+// 명예의 전당 기준: 리그 길이(경기 수·이닝)에 맞춰 줄이고, 5시즌 이상 뛴 선수만
+function hofCheck(L, p){
+  if((p.seasons || 0) < 5) return false;
+  const sc = (L.len / 144) * (L.inn / 9), c = p.cs || {}, mvps = (p.awards || []).filter(x => /시즌 MVP$/.test(x)).length;
+  if(mvps >= 2) return true;
+  return p.vel ? (c.w || 0) >= 130 * sc || (c.sv || 0) >= 250 * sc || (c.k || 0) >= 1800 * sc
+               : (c.h || 0) >= 1800 * sc || (c.hr || 0) >= 300 * sc;
+}
+function rookieFor(L, T, kind, idx, old){
+  const S = STYLES[teamInfo(T.key).style];
+  let p;
+  if(kind === 'bat'){ p = leaguePlayer(makeBatter(L, S, idx, -6)); p.pos = old.pos; }
+  else if(kind === 'bench') p = leaguePlayer(makeBench(L, S, BENCH_ROLES[idx % BENCH_ROLES.length], -6));
+  else p = leaguePlayer(makePitcher(L, S, kind === 'sp', -6), old.role);
+  p.age = 20 + Math.floor(rnd(L) * 4); p.rookie = true;
+  return p;
+}
+function leagueNextSeason(L){
+  const st = standings(L), me = st.find(x => x.T.key === L.my);
+  (L.history ||= []).push({ season: L.season, champ: L.champ, first: st[0].T.key, awards: L.awards,
+    my: { rank: me.rank, w: me.T.w, l: me.T.l, d: me.T.d, post: !!(L.post && L.post.seeds.includes(L.my)), champ: L.champ === L.my } });
+  L.retired ||= []; L.hof ||= [];
+  let nRet = 0;
+  const news = [];
+  Object.values(L.teams).forEach(T => {
+    const groups = [['bat', T.bat], ['bench', T.bench], ['sp', T.sp], ['rp', T.rp]];
+    groups.forEach(([kind, arr]) => arr.forEach((p, i) => {
+      p.cs = sumStats(p.cs, p.ss); p.ps = {}; p.ss = {};
+      p.seasons = (p.seasons || 0) + 1; p.rookie = false; giveAge(L, p); p.age++;
+      p.rest = 0; p.streak = 0;
+      if(rnd(L) < retireChance(p)){
+        const hof = hofCheck(L, p);
+        L.retired.push({ id:p.id, name:p.name, team:T.key, pit: !!p.vel, pos: p.vel ? p.role : POS[p.pos], age:p.age, seasons:p.seasons, cs:p.cs, awards:p.awards || [], hof, season:L.season });
+        nRet++;
+        if(hof){ L.hof.push({ id:p.id, name:p.name, team:T.key, pit: !!p.vel, cs:p.cs, awards:p.awards || [], season:L.season }); news.push(`명예의 전당 헌액! ${teamName(T.key)}에서 ${p.seasons}시즌을 뛴 ${p.name}.`); }
+        arr[i] = rookieFor(L, T, kind, i, p);
+      } else develop(L, p);
+    }));
+    // 마무리: 불펜 가운데 가장 좋은 투수
+    T.rp.forEach(p => { p.role = '불펜'; });
+    T.rp.slice().sort((a, b) => (b.ctl + b.stf) - (a.ctl + a.stf))[0].role = '마무리';
+    T.w = T.l = T.d = T.rs = T.ra = 0; T.last = []; T.rot = 0;
+  });
+  L.season++; L.day = 0; L.phase = 'season'; L.post = null; L.awards = null; L.champ = null; L.final = null;
+  L.sched = makeSchedule(L);
+  L.news.push(`${L.season}시즌이 시작됩니다. 은퇴한 선수 ${nRet}명 자리에 신인이 들어왔습니다.`, ...news);
+}
+// 통산 순위: 지금 뛰는 선수(통산 + 이번 시즌)와 은퇴 선수
+function careerLeaders(L, stat, n = 10){
+  const rows = [];
+  for(const k in L.teams) allPlayers(L.teams[k]).forEach(p => { const v = ((p.cs || {})[stat] || 0) + ((p.ss || {})[stat] || 0); if(v > 0) rows.push({ name:p.name, team:k, v, active:true }); });
+  (L.retired || []).forEach(r => { const v = (r.cs || {})[stat] || 0; if(v > 0) rows.push({ name:r.name, team:r.team, v, active:false }); });
+  return rows.sort((a, b) => b.v - a.v).slice(0, n);
 }

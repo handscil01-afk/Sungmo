@@ -139,6 +139,16 @@ const PORT = 8766;
       if(!/한국시리즈 우승/.test(aw)) errors.push('시상식 글이 없음');
       console.log(`${name}: 리그 시즌 끝 / ${aw.split('\n').slice(1, 4).join(' / ')}`);
       await shot(page, `${name}-league-done`);
+      // 다음 시즌 시작 → 기록실 둘러보기
+      await page.keyboard.press('1');
+      const ns = await page.$eval('#say', e => e.innerText);
+      if(!/2시즌이 시작됩니다/.test(ns)) errors.push('다음 시즌이 시작되지 않음: ' + ns.slice(0, 80));
+      await page.keyboard.press('8');
+      for(const k of ['1', '1', '2', '1', '5', '.', '3', '1', '4', '1', '5', '1', '6', '1', '7']) await page.keyboard.press(k);
+      const rec = await page.$eval('#say', e => e.innerText);
+      if(!/감독/.test(rec)) errors.push('내 감독 기록이 없음');
+      console.log(`${name}: 다음 시즌·기록실 / ${rec.split('\n').slice(0, 3).join(' / ')}`);
+      await page.keyboard.press('1'); await page.keyboard.press('.');
       await page.keyboard.press('9'); await page.keyboard.press('.'); await page.keyboard.press('.');
     }
     // 설정 화면: 글자 크기·화면 색 바꾸기

@@ -23,3 +23,17 @@ if(!L.champ) err.push('우승 팀 없음');
 console.log('저장 크기', (JSON.stringify(L).length / 1024).toFixed(0), 'KB');
 if(err.length){ console.log('오류:', err.join(', ')); process.exit(1); }
 console.log('오류 없음');
+// 여러 시즌: 은퇴·신인·명예의 전당·시즌 기록
+if(process.argv[3]){
+  const seasons = +process.argv[3], t1 = Date.now();
+  for(let s = 1; s < seasons; s++){ leagueNextSeason(L); let d = 0; while(L.phase !== 'done' && d++ < 1000) leagueAdvance(L, null); }
+  console.log(`${seasons}시즌까지 ${((Date.now() - t1) / 1000).toFixed(1)}초. 은퇴 ${L.retired.length}명, 명예의 전당 ${L.hof.length}명, 대기록 ${(L.feats || []).length}개, 저장 크기 ${(JSON.stringify(L).length / 1024).toFixed(0)}KB`);
+  console.log('역대 우승:', L.history.map(h => `${h.season}시즌 ${teamName(h.champ)}`).join(', '));
+  console.log('통산 홈런:', careerLeaders(L, 'hr', 3).map(x => `${x.name} ${x.v}${x.active ? '' : '(은퇴)'}`).join(', '));
+  console.log('통산 승리:', careerLeaders(L, 'w', 3).map(x => `${x.name} ${x.v}${x.active ? '' : '(은퇴)'}`).join(', '));
+  console.log('시즌 기록:', Object.entries(L.rec).map(([k, r]) => `${STAT_NAME[k]} ${r.name} ${statVal(k, r.v)}(${r.season}시즌)`).join(', '));
+  console.log('명예의 전당:', L.hof.slice(0, 5).map(h => `${h.name}(${teamName(h.team)})`).join(', '));
+  console.log('신인왕:', L.history.map(h => h.awards && h.awards.roy ? h.awards.roy.name : '-').join(', '));
+  console.log('대기록 예:', (L.feats || []).slice(0, 4).map(f => f.text).join(' / '));
+  const ages = Object.values(L.teams).flatMap(t => allPlayers(t).map(p => p.age)); console.log('평균 나이', (ages.reduce((a, b) => a + b, 0) / ages.length).toFixed(1));
+}

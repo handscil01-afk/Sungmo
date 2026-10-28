@@ -3,7 +3,7 @@
    리그 상태는 이 기기(localStorage 'bb_league')에 저장. 내 팀 경기는 고른 방식(간단·정밀·감독)으로 직접 하고,
    다른 경기와 넘긴 경기는 컴퓨터끼리 결과만 냄. 경기가 끝나면 그날의 다른 경기도 모두 진행함 */
 let LG_ = null;
-function LG(){ if(!LG_) LG_ = ls.get('bb_league', null); return LG_ && LG_.v === 1 ? LG_ : null; }
+function LG(){ if(!LG_){ LG_ = ls.get('bb_league', null); if(LG_ && LG_.v === 1) leagueFix(LG_); } return LG_ && LG_.v === 1 ? LG_ : null; }
 function saveLeague(){ if(LG_) ls.set('bb_league', LG_); }
 const LMODE = [['manager', null, '감독 모드'], ['detail', null, '정밀 모드'], ['simple', 'pitch', '간단 모드 (공 하나씩)'], ['simple', 'pa', '간단 모드 (타석 한 번에)']];
 const lmodeName = L => (LMODE.find(m => m[0] === L.mode && (m[0] !== 'simple' || m[1] === L.unit)) || LMODE[0])[2];
@@ -34,6 +34,7 @@ function awardLines(L){
   const A = L.awards || {}, out = [`${L.season}시즌 한국시리즈 우승: ${teamInfo(L.champ).name}!`];
   if(A.mvp) out.push(`정규 시즌 MVP: ${teamName(A.mvp.team)} ${A.mvp.name}.`);
   if(A.ksMvp) out.push(`한국시리즈 MVP: ${teamName(A.ksMvp.team)} ${A.ksMvp.name}.`);
+  if(A.roy) out.push(`신인왕: ${teamName(A.roy.team)} ${A.roy.name}.`);
   (A.titles || []).forEach(t => out.push(`${STAT_NAME[t.st]} 1위: ${teamName(t.team)} ${t.name}, ${statVal(t.st, t.v)}.`));
   return out;
 }
@@ -45,17 +46,50 @@ function leagueHome(){
     note:['10개 팀이 정규 시즌을 치르고, 상위 5팀이 와일드카드 결정전, 준플레이오프, 플레이오프, 한국시리즈를 치릅니다.', '내 팀 경기는 직접 하고, 다른 경기는 결과만 나옵니다. 선수 기록이 쌓이고 시즌이 끝나면 시상식을 합니다.'],
     opts:[{ n:1, t:'새 리그 만들기', act: v => { NEW.kind = 'league'; go(modeScreen, v); } }, { n:2, t:'백업 파일 불러오기', act: () => leagueImport() }] };
   const g = myGameToday(L), saved = isMineSaved(L), done = L.phase === 'done';
-  return { q: done ? '시즌이 끝났습니다. 무엇을 할까요?' : '무엇을 할까요?', back: v => go(homeScreen, v), note: leagueStatus(L), opts:[
-    { n:1, t: saved ? '진행 중인 경기 이어하기' : '오늘 경기 하기', hide: !g, s: saved ? situation(saved.G) : `${lmodeName(L)}로 합니다.`, act: v => saved ? resumeGame(v) : leaguePlay(v) },
+  return { q: done ? '시즌이 끝났습니다. 다음 시즌을 시작할까요?' : '무엇을 할까요?', back: v => go(homeScreen, v), note: leagueStatus(L), opts:[
+    done ? { n:1, t:'다음 시즌 시작', s:'선수들이 한 살씩 나이를 먹고, 성장하거나 은퇴하며 신인이 들어옵니다.', act: v => { leagueNextSeason(L); saveLeague(); go(leagueHome, v, leagueNews(L)); } }
+         : { n:1, t: saved ? '진행 중인 경기 이어하기' : '오늘 경기 하기', hide: !g, s: saved ? situation(saved.G) : `${lmodeName(L)}로 합니다.`, act: v => saved ? resumeGame(v) : leaguePlay(v) },
     { n:2, t: g ? '오늘 경기 결과만 보고 넘기기' : '다음 경기 결과 보기', hide: done, s: g ? '우리 팀 경기도 컴퓨터가 진행합니다.' : '', act: v => leagueRun(1, v) },
     { n:3, t:'여러 날 넘기기', hide: done, act: v => go(skipScreen, v) },
     { n:4, t:'순위표', act: v => go(standScreen, v) },
-    { n:5, t:'기록 순위', act: v => go(() => leadersScreen(null), v) },
+    { n:5, t:'이번 시즌 기록 순위', act: v => go(() => leadersScreen(null), v) },
     { n:6, t:'내 팀 선수', act: v => go(myTeamScreen, v) },
     { n:7, t: L.phase === 'post' || done ? '포스트시즌 결과' : '일정과 지난 결과', act: v => go(schedScreen, v) },
-    { n:8, t:'리그 설정', s:`경기 방식: ${lmodeName(L)}. 백업, 리그 지우기`, act: v => go(leagueSet, v) },
-    { n:9, t: done ? '새 리그 만들기' : '처음 화면으로', act: v => done ? openDlg('새 리그 만들기', ['지금 리그를 지우고 새 리그를 만들까요? 먼저 리그 설정에서 백업해 둘 수 있습니다.'], [{ label:'새로 만들기', act: () => { NEW.kind = 'league'; go(modeScreen, 'click'); } }, { label:'그만두기' }]) : go(homeScreen, v) },
+    { n:8, t:'기록실과 명예의 전당', s:'역대 우승, 통산 순위, 시즌 최고 기록, 명예의 전당, 대기록, 내 감독 기록', act: v => go(archiveScreen, v) },
+    { n:9, t:'리그 설정', s:`경기 방식: ${lmodeName(L)}. 백업, 새 리그, 리그 지우기`, act: v => go(leagueSet, v) },
   ] };
+}
+
+/* ---------- 기록실 · 명예의 전당 ---------- */
+const CAREER = [['hr', '홈런', '개'], ['h', '안타', '개'], ['rbi', '타점', '점'], ['sb', '도루', '개'], ['w', '승리', '승'], ['sv', '세이브', '세이브'], ['k', '탈삼진', '개']];
+function archiveScreen(){
+  const L = LG(), back = v => go(archiveScreen, v);
+  const show = (title, say, v) => go(() => ({ q:`${title}입니다. 위 글을 한 줄씩 읽어 보세요.`, say: say.length ? say : ['아직 기록이 없습니다.'], back, opts:[{ n:1, t:'기록실로 돌아가기', act: back }] }), v);
+  return { q:'기록실입니다. 무엇을 볼까요?', back: v => go(leagueHome, v), opts:[
+    { n:1, t:'역대 우승 팀', act: v => show('역대 우승 팀', (L.history || []).map(h => `${h.season}시즌: 우승 ${teamInfo(h.champ).name}, 정규 시즌 1위 ${teamName(h.first)}${h.awards && h.awards.mvp ? `, MVP ${h.awards.mvp.name}` : ''}. 우리 팀 ${h.my.rank}위${h.my.champ ? ', 우승' : h.my.post ? ', 포스트시즌 진출' : ''}.`), v) },
+    { n:2, t:'통산 기록 순위', s:'지금 뛰는 선수와 은퇴한 선수를 함께 봅니다.', act: v => go(() => careerScreen(null), v) },
+    { n:3, t:'시즌 최고 기록', act: v => show('한 시즌 최고 기록', Object.entries(L.rec || {}).map(([k, r]) => `${STAT_NAME[k]}: ${r.name}(${teamName(r.team)}), ${statVal(k, r.v)}, ${r.season}시즌.`), v) },
+    { n:4, t:'명예의 전당', act: v => show('명예의 전당', (L.hof || []).map(h => `${h.name}(${teamName(h.team)}, ${h.season}시즌 은퇴): ${careerText(h)}${h.awards.length ? `. 수상: ${h.awards.join(', ')}` : ''}.`), v) },
+    { n:5, t:'최근 은퇴 선수', act: v => show('최근 은퇴 선수', (L.retired || []).slice(-20).reverse().map(r => `${r.name}(${teamName(r.team)}, ${r.pos}, ${r.age}세, ${r.seasons}시즌): ${careerText(r)}${r.hof ? ', 명예의 전당' : ''}.`), v) },
+    { n:6, t:'대기록', s:'사이클링 히트, 노히트 노런, 퍼펙트게임, 통산 이정표', act: v => show('대기록', (L.feats || []).slice(-30).reverse().map(f => `${f.season}시즌 ${f.day}일째: ${f.text.replace(/^대기록! /, '')}`), v) },
+    { n:7, t:'내 감독 기록', act: v => show('내 감독 기록', myRecord(L), v) },
+  ] };
+}
+function careerText(r){ const c = r.cs || {}; return r.pit ? `통산 ${c.w || 0}승 ${c.l || 0}패 ${c.sv || 0}세이브, 평균자책점 ${c.out ? eraOf(c).toFixed(2) : '-'}, 탈삼진 ${c.k || 0}` : `통산 타율 ${avgText(avgOf(c))}, ${c.h || 0}안타, ${c.hr || 0}홈런, ${c.rbi || 0}타점`; }
+function careerScreen(stat){
+  const L = LG(), m = CAREER.find(x => x[0] === stat);
+  const say = m ? careerLeaders(L, stat, 10).map((x, i) => `${i + 1}위 ${x.name}(${teamName(x.team)}${x.active ? '' : ', 은퇴'}) ${x.v}${m[2]}`) : [];
+  return { q: m ? `통산 ${m[1]} 순위입니다. 다른 기록을 고르세요.` : '어떤 통산 기록을 볼까요?', say, back: v => go(archiveScreen, v),
+    opts: CAREER.map(([k, t], i) => ({ n: i + 1, t, act: v => go(() => careerScreen(k), v) })) };
+}
+function myRecord(L){
+  const h = L.history || [], me = L.me || {};
+  const w = h.reduce((a, x) => a + x.my.w, 0) + L.teams[L.my].w, l = h.reduce((a, x) => a + x.my.l, 0) + L.teams[L.my].l;
+  return [`${teamInfo(L.my).name} 감독, ${L.season}번째 시즌.`,
+    `정규 시즌 통산 ${w}승 ${l}패, 승률 ${(w + l ? w / (w + l) : 0).toFixed(3).replace(/^0/, '')}.`,
+    `한국시리즈 우승 ${h.filter(x => x.my.champ).length + (L.champ === L.my ? 1 : 0)}번, 포스트시즌 진출 ${h.filter(x => x.my.post).length + (L.post && L.post.seeds.includes(L.my) ? 1 : 0)}번.`,
+    `직접 한 경기 ${me.g || 0}경기, ${me.w || 0}승 ${me.l || 0}패${me.d ? ` ${me.d}무` : ''}.`,
+    ...h.map(x => `${x.season}시즌: ${x.my.rank}위, ${x.my.w}승 ${x.my.l}패${x.my.champ ? ', 한국시리즈 우승' : x.my.post ? ', 포스트시즌 진출' : ''}.`)];
 }
 
 /* ---------- 새 리그 ---------- */
@@ -96,6 +130,8 @@ function leaguePlay(via){
 function leagueAfterMine(G){
   const L = LG(), m = G.league;
   if(!L || L.season !== m.season || L.day !== m.day || L.phase !== m.phase || postN(L) !== m.n) return [{ s:'이미 지난 경기라 리그 기록에는 넣지 않았습니다.', k:'c' }];
+  const mi = G.teams.findIndex(T => T.key === L.my), d = runsOf(G.teams[mi]) - runsOf(G.teams[1 - mi]);
+  L.me ||= {}; L.me.g = (L.me.g || 0) + 1; L.me[d > 0 ? 'w' : d < 0 ? 'l' : 'd'] = (L.me[d > 0 ? 'w' : d < 0 ? 'l' : 'd'] || 0) + 1;
   const all = leagueAdvance(L, G), r = myRank(L);
   saveLeague();
   const lines = [{ s:`리그에 반영했습니다. 우리 팀 ${r.rank}위, ${r.T.w}승 ${r.T.l}패${r.T.d ? ` ${r.T.d}무` : ''}.`, k:'i' }];
@@ -157,8 +193,8 @@ function leadersScreen(stat){
   return { q: stat ? `${(LEAD_MENU.find(x => x[0] === stat) || [, ''])[1]} 순위입니다. 다른 기록을 고르세요.` : '어떤 기록 순위를 볼까요?', say, back: v => go(leagueHome, v),
     opts: LEAD_MENU.map(([k, t], i) => ({ n: i + 1, t, act: v => go(() => leadersScreen(k), v) })) };
 }
-function batLine(p){ const s = p.ss || {}; return `${p.name}(${POS[p.pos] || p.role}): 타율 ${avgText(avgOf(s))}, 홈런 ${s.hr || 0}, 타점 ${s.rbi || 0}, 안타 ${s.h || 0}, 도루 ${s.sb || 0}, ${s.pa || 0}타석.`; }
-function pitLine(p){ const s = p.ss || {}; return `${p.role} ${p.name}: ${s.w || 0}승 ${s.l || 0}패${s.sv ? ` ${s.sv}세이브` : ''}${s.hd ? ` ${s.hd}홀드` : ''}, 평균자책점 ${s.out ? eraOf(s).toFixed(2) : '-'}, ${ipText(s.out || 0)}, 탈삼진 ${s.k || 0}.`; }
+function batLine(p){ const s = p.ss || {}; return `${p.name}(${POS[p.pos] || p.role}, ${p.age}세${p.rookie ? ', 신인' : ''}): 타율 ${avgText(avgOf(s))}, 홈런 ${s.hr || 0}, 타점 ${s.rbi || 0}, 안타 ${s.h || 0}, 도루 ${s.sb || 0}, ${s.pa || 0}타석.`; }
+function pitLine(p){ const s = p.ss || {}; return `${p.role} ${p.name}(${p.age}세${p.rookie ? ', 신인' : ''}): ${s.w || 0}승 ${s.l || 0}패${s.sv ? ` ${s.sv}세이브` : ''}${s.hd ? ` ${s.hd}홀드` : ''}, 평균자책점 ${s.out ? eraOf(s).toFixed(2) : '-'}, ${ipText(s.out || 0)}, 탈삼진 ${s.k || 0}.`; }
 function myTeamScreen(){
   const L = LG(), T = L.teams[L.my];
   const say = ['타순.', ...T.bat.map((p, i) => `${i + 1}번 ${batLine(p)}`), '벤치.', ...T.bench.map(batLine), '투수.', ...T.sp.map(pitLine), ...T.rp.map(pitLine)];
@@ -189,6 +225,7 @@ function leagueSet(){
       L.mode = m[0]; if(m[1]) L.unit = m[1]; saveLeague(); stay(`경기 방식: ${m[2]}`); } },
     { n:2, t:'백업 파일 내려받기', s:'리그를 파일로 저장해 두면 다른 기기에서 불러오거나 되돌릴 수 있습니다.', act: v => leagueExport(v) },
     { n:3, t:'백업 파일 불러오기', act: () => leagueImport() },
+    { n:5, t:'새 리그 만들기', act: () => openDlg('새 리그 만들기', ['지금 리그를 지우고 새 리그를 만들까요? 먼저 백업해 둘 수 있습니다.'], [{ label:'새로 만들기', act: () => { NEW.kind = 'league'; go(modeScreen, 'click'); } }, { label:'그만두기' }]) },
     { n:4, t:'리그 지우기', act: () => openDlg('리그 지우기', ['지금 리그를 지울까요? 되돌릴 수 없습니다. 먼저 백업해 둘 수 있습니다.'], [
       { label:'지우기', act: () => { LG_ = null; ls.del('bb_league'); go(leagueHome, 'click', ['리그를 지웠습니다.']); } }, { label:'그만두기' }]) },
   ] };

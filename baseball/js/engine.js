@@ -307,6 +307,13 @@ function gameOver(G){
   G.teams.forEach(T => [...T.bat, ...(T.gone || [])].forEach(B => { const v = B.st.h + B.st.hr * 2 + B.st.rbi + B.st.bb * 0.3 + (T === win ? 0.5 : 0); if(v > bv){ bv = v; best = { T, B }; } }));
   if(best && bv > 0) emit(G, `오늘의 선수: ${best.T.short} ${best.B.name}, ${batterLine(best.B)}.`, 'i');
   decide(G);
+  // 노히트 노런 · 퍼펙트게임: 상대에게 안타를 하나도 맞지 않음 (볼넷·몸에 맞는 공·실책까지 없으면 퍼펙트)
+  if(G.inning >= G.innings) G.teams.forEach((T, ti) => {
+    const O = G.teams[1 - ti]; if(O.H > 0) return;
+    const used = T.pit.filter(p => p.used), perfect = O.BB === 0 && T.E === 0;
+    if(used.length === 1) feat(G, perfect ? 'perfect' : 'nohit', `대기록! ${T.short} ${used[0].name}, ${perfect ? '퍼펙트게임' : '노히트 노런'}을 달성했습니다!`, used[0], T);
+    else feat(G, 'teamnohit', `대기록! ${T.short} 투수진이 이어 던져 ${perfect ? '팀 퍼펙트게임' : '팀 노히트 노런'}을 합작했습니다!`, null, T);
+  });
   fx(G, 'end');
 }
 
@@ -327,6 +334,11 @@ function decide(G){
   const holds = W.pit.filter(p => p.used && !p.gs && p !== wp && p !== sv && p !== last && (p.entryLead || 0) >= 1 && (p.entryLead || 0) <= 3 && (p.exitLead || 0) >= 1 && p.st.out >= 1);
   G.decision = { w: wp.id, l: lp ? lp.id : null, s: sv ? sv.id : null, h: holds.map(p => p.id) };
   emit(G, `승리 투수 ${wp.name}${lp ? `, 패전 투수 ${lp.name}` : ''}${sv ? `, 세이브 ${sv.name}` : ''}${holds.length ? `, 홀드 ${holds.map(p => p.name).join(', ')}` : ''}.`, 'i');
+}
+
+function feat(G, kind, text, P, T){
+  (G.feats ||= []).push({ kind, text, id: P ? P.id : null, name: P ? P.name : '', team: T.key });
+  emit(G, text, 'i'); fx(G, 'hr');
 }
 
 /* ---------- 득점 · 주자 ---------- */
@@ -361,6 +373,13 @@ function forceWalk(G){
 // n루타 (4는 홈런). ev: 타구 힘(0~1). simple: 간단 모드(주자 발 빠르기 무시)
 function onHit(G, n, ev, simple){
   const T = batTeam(G), F = fieldTeam(G), b = G.bases, sc = [];
+  // 안타 종류를 세어 사이클링 히트(단타·2루타·3루타·홈런)를 알림
+  const B = T.bat[T.bi], key = 'b' + Math.min(4, n);
+  B.st[key] = (B.st[key] || 0) + 1;
+  if(!B.cycle && B.st.b1 && B.st.b2 && B.st.b3 && B.st.b4){
+    B.cycle = true;
+    feat(G, 'cycle', `대기록! ${T.short} ${B.name}, 사이클링 히트를 달성합니다!`, B, T);
+  }
   const spd = i => simple ? 55 : T.bat[i].spd;
   if(n >= 4){ for(let k = 2; k >= 0; k--) if(b[k] != null){ sc.push(b[k]); b[k] = null; } sc.push(T.bi); scoreRuns(G, sc, true); return; }
   const nb = [null, null, null], ofAdj = [-0.18, 0, 0.1][F.align.of];
