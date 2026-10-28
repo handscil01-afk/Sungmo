@@ -16,6 +16,8 @@ const rint = (G, a, b) => a + Math.floor(rnd(G) * (b - a + 1));
 const pickOne = (G, arr) => arr[Math.floor(rnd(G) * arr.length)];
 function gauss(G){ let u = 0; while(!u) u = rnd(G); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rnd(G)); }
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+// 능력치가 아주 높거나 낮을 때 효과를 조금 누그러뜨림 (50에서 멀수록 k배): 한 시즌 내내 뛰는 리그에서 기록이 터무니없이 튀지 않게
+const soft = (v, k) => 50 + (v - 50) * k;
 // 정밀 계산(능력치·바람·컨디션)을 쓰는 모드: 정밀 모드와 감독 모드
 const detailed = G => G.mode !== 'simple';
 // [[값, 무게], ...] 중에서 하나
@@ -114,6 +116,7 @@ function makeTeam(G, key, bias){
   for(let i = 0; i < 9; i++) T.bat.push(makeBatter(G, S, i, bias));
   T.pit.push(makePitcher(G, S, true, bias));
   for(let i = 0; i < 4; i++) T.pit.push(makePitcher(G, S, false, bias));
+  T.pit[1].role = '마무리';
   T.bench = BENCH_ROLES.map(b => makeBench(G, S, b, bias));
   T.gone = [];   // 경기 중에 교체되어 나간 선수 (기록은 남김)
   T.rev = 2;     // 비디오 판독 신청 기회 (판정이 뒤집히면 줄지 않음)
@@ -121,6 +124,19 @@ function makeTeam(G, key, bias){
   return T;
 }
 
+// 리그 명단으로 경기용 팀 만들기: R = { key, bat:[9], bench:[], pit:[오늘 선발, 쉬는 날이 아닌 불펜…] }
+const freshBat = () => ({ pa:0, ab:0, h:0, hr:0, rbi:0, bb:0, k:0, r:0, sb:0 });
+function rosterTeam(G, R){
+  const info = teamInfo(R.key), copy = p => JSON.parse(JSON.stringify(p));
+  const bat = R.bat.map(p => ({ ...copy(p), seen:false, st: freshBat() }));
+  const bench = R.bench.map(p => ({ ...copy(p), seen:false, st: freshBat() }));
+  const pit = R.pit.map((p, i) => ({ ...copy(p), starter: i === 0 ? true : p.starter, n:0, load:0, used: i === 0, warned:0, st:{ out:0, h:0, r:0, bb:0, k:0, hr:0 } }));
+  pit.forEach(p => { delete p.ss; delete p.cs; }); bat.concat(bench).forEach(p => { delete p.ss; delete p.cs; });
+  const T = { key: R.key, name: info.name, short: info.short, style: info.style, color: info.color,
+    bat, bench, pit, pi:0, bi:0, align:{ inf:1, of:1 }, R:[], H:0, E:0, BB:0, guess:null, lastSel:null, gone:[], rev:2 };
+  T.def = teamDef(T);
+  return T;
+}
 const teamDef = T => Math.round(T.bat.reduce((s, b) => s + b.def, 0) / 9 + STYLES[T.style].def);
 
 /* ---------- 경기 시작 ----------
@@ -137,7 +153,9 @@ function newGame(o){
     over:false, winner:null, prev:null, lastLoc:null, at: Date.now() };
   // 컴퓨터 난이도: 쉬움이면 컴퓨터 팀 능력치를 조금 낮추고, 어려움이면 조금 높임
   const cpuBias = [-6, 0, 5][G.diff] || 0;
-  G.teams = [0, 1].map(i => makeTeam(G, o.teams[i], G.ctrl[i] === 'cpu' && G.ctrl[1 - i] !== 'cpu' ? cpuBias : 0));
+  // 리그 경기는 리그의 선수 명단(rosters)을 그대로 씀
+  G.teams = [0, 1].map(i => o.rosters ? rosterTeam(G, o.rosters[i]) : makeTeam(G, o.teams[i], G.ctrl[i] === 'cpu' && G.ctrl[1 - i] !== 'cpu' ? cpuBias : 0));
+  G.leader = -1;
   // 홈 팀 구장: 담장·잔디·바람이 결과를 바꿈
   G.park = parkInfo(o.teams[1]);
   const pk = G.park;
@@ -152,6 +170,8 @@ function newGame(o){
 }
 function beginGame(G){
   G.pre = null;
+  // 선발 투수와 시작 타순을 기록 (승리 투수 자격, 리그의 타순 저장에 씀)
+  G.teams.forEach(T => { const P = T.pit[T.pi]; P.gs = true; P.entryLead = 0; T.startIds = T.bat.map(b => b.id); });
   const [A, H] = G.teams;
   emit(G, `오늘 경기는 원정 ${A.name}, 홈 ${H.name}의 대결입니다. ${G.innings}이닝 경기입니다.`, 'i');
   const pk = parkOf(G);
@@ -286,7 +306,27 @@ function gameOver(G){
   let best = null, bv = -1;
   G.teams.forEach(T => [...T.bat, ...(T.gone || [])].forEach(B => { const v = B.st.h + B.st.hr * 2 + B.st.rbi + B.st.bb * 0.3 + (T === win ? 0.5 : 0); if(v > bv){ bv = v; best = { T, B }; } }));
   if(best && bv > 0) emit(G, `오늘의 선수: ${best.T.short} ${best.B.name}, ${batterLine(best.B)}.`, 'i');
+  decide(G);
   fx(G, 'end');
+}
+
+// 승리·패전·세이브·홀드 투수 (간단히 한 KBO 규칙)
+// 승리: 결승점이 났을 때 우리 팀 투수. 선발이 5이닝(짧은 경기는 그만큼 줄여서)을 못 채웠으면 가장 많이 던진 불펜
+// 패전: 결승점을 내줄 때 마운드에 있던 투수 · 세이브: 마지막 투수가 3점 차 이내에 나와 1이닝 이상(또는 3이닝 이상) 지킴
+// 홀드: 3점 차 이내에 나와 앞선 채로 물러난 불펜
+function decide(G){
+  G.decision = null;
+  if(G.winner < 0 || !G.dec || G.dec.side !== G.winner) return;
+  const W = G.teams[G.winner], Lt = G.teams[1 - G.winner], by = (T, id) => T.pit.find(p => p.id === id);
+  let wp = by(W, G.dec.w);
+  const req = Math.min(15, Math.ceil(G.innings * 3 * 5 / 9));
+  if(wp && wp.gs && wp.st.out < req){ const rel = W.pit.filter(p => p.used && !p.gs).sort((a, b) => b.st.out - a.st.out); if(rel.length) wp = rel[0]; }
+  if(!wp) return;
+  const lp = by(Lt, G.dec.l), last = W.pit[W.pi];
+  const sv = last !== wp && !last.gs && (last.entryLead || 0) >= 1 && (((last.entryLead || 0) <= 3 && last.st.out >= 3) || last.st.out >= 9) ? last : null;
+  const holds = W.pit.filter(p => p.used && !p.gs && p !== wp && p !== sv && p !== last && (p.entryLead || 0) >= 1 && (p.entryLead || 0) <= 3 && (p.exitLead || 0) >= 1 && p.st.out >= 1);
+  G.decision = { w: wp.id, l: lp ? lp.id : null, s: sv ? sv.id : null, h: holds.map(p => p.id) };
+  emit(G, `승리 투수 ${wp.name}${lp ? `, 패전 투수 ${lp.name}` : ''}${sv ? `, 세이브 ${sv.name}` : ''}${holds.length ? `, 홀드 ${holds.map(p => p.name).join(', ')}` : ''}.`, 'i');
 }
 
 /* ---------- 득점 · 주자 ---------- */
@@ -298,7 +338,15 @@ function scoreRuns(G, list, rbi){
   emit(G, `${names} 홈인! ${list.length > 1 ? list.length + '점' : '1점'}. ${scoreText(G)}.`, 'r');
   fx(G, 'score');
   if(!G.top && G.inning >= G.innings && runsOf(G.teams[1]) > runsOf(G.teams[0])) G.walkoff = true;
+  // 앞서는 팀이 바뀌면 승리·패전 투수 후보를 기록 (그때 마운드에 있던 두 팀 투수)
+  const lead = runsOf(G.teams[0]) - runsOf(G.teams[1]), leader = lead > 0 ? 0 : lead < 0 ? 1 : -1;
+  if(leader !== G.leader){
+    if(leader >= 0){ const W = G.teams[leader], Lt = G.teams[1 - leader]; G.dec = { side: leader, w: W.pit[W.pi].id, l: Lt.pit[Lt.pi].id }; }
+    else G.dec = null;
+    G.leader = leader;
+  }
 }
+const leadFor = (G, ti) => runsOf(G.teams[ti]) - runsOf(G.teams[1 - ti]);
 function addOut(G, n = 1){ G.outs += n; curPitcher(G).st.out += n; }
 // 볼넷·몸에 맞는 공·고의 볼넷: 밀려서 가는 주자만 감
 function forceWalk(G){
@@ -539,7 +587,7 @@ function playPitch(G, Psel, Bsel){
 
   /* 휘두름 */
   const guess = Bsel.g ? (Bsel.g === 'fast') === pt.fast ? 9 : -7 : 0;
-  const bq = B.con + B.cond * 4 + ({ swing:0, power:-12, contact:10 })[k] + guess + timing;
+  const bq = soft(B.con, 0.7) + B.cond * 4 + ({ swing:0, power:-12, contact:10 })[k] + guess + timing;
   const cen = clamp(1 - zd, 0, 1);
   const pCon = 0.84 + (bq - pq) / 110 - (inZone ? 0.12 * (1 - cen) : 0.14 + (zd - 1) * 1.0);
   const chaseWord = inZone ? '' : '볼에 방망이가 나갑니다. ';
@@ -572,7 +620,7 @@ function playPitch(G, Psel, Bsel){
   }
   fx(G, 'bat');
   const q = clamp(rnd(G) * 0.75 + 0.08 + (bq - pq) / 220 + (inZone ? 0.18 * cen : -0.12), 0, 1);
-  const ev = clamp(0.45 * q + 0.45 * (B.pow + B.cond * 4) / 100 + ({ swing:0, power:0.07, contact:-0.07 })[k] + (pt.fast && vel >= 153 ? 0.02 : 0) + gauss(G) * 0.035, 0, 1.08);
+  const ev = clamp(0.45 * q + 0.45 * soft(B.pow + B.cond * 4, 0.5) / 100 + ({ swing:0, power:0.07, contact:-0.07 })[k] + (pt.fast && vel >= 153 ? 0.02 : 0) + gauss(G) * 0.035, 0, 1.08);
   emit(G, `판정 타구: 정확도 ${Math.round(q * 100)}, 힘 ${Math.round(ev * 100)}.`, 'd');
   G.hrun = hr;
   inPlay(G, { head: head + ' ' + chaseWord, x, y, q, ev, k, pt });
@@ -964,6 +1012,7 @@ function swapPitcher(G, ti, idx){
   const T = G.teams[ti], old = T.pit[T.pi], nw = T.pit[idx];
   if(!nw || nw.used) return;
   T.pi = idx; nw.used = true;
+  old.exitLead = leadFor(G, ti); nw.entryLead = leadFor(G, ti);
   emit(G, `${T.short} 투수 교체: ${old.name}에서 ${josa(nw.name, '으로', '로')} 바뀝니다. ${nw.name}, 최고 구속 ${nw.vel}킬로.`, 'c');
   fx(G, 'change');
 }
@@ -993,7 +1042,13 @@ function playManager(G, D, O){
 }
 // 타순 추천: 4번(장타) → 3번 → 1번(발·출루) → 5번 → 2번 → 나머지는 잘 치는 순서
 function recommendLineup(G, ti){
-  const T = G.teams[ti], left = T.bat.slice(), out = new Array(9);
+  const T = G.teams[ti];
+  T.bat = bestOrder(T.bat);
+  emit(G, `${T.short} 타순을 추천 타순으로 바꿨습니다.`, 'c');
+  return flush(G);
+}
+function bestOrder(bat){
+  const left = bat.slice(), out = new Array(9);
   const score = [
     b => b.spd + b.con * 0.8 + b.eye * 0.8, b => b.con + b.eye * 0.7 + b.spd * 0.4, b => b.con + b.pow * 0.8,
     b => b.pow * 1.3 + b.con * 0.4, b => b.pow + b.con * 0.6,
@@ -1001,9 +1056,7 @@ function recommendLineup(G, ti){
   const take = (slot, f) => { left.sort((a, b) => f(b) - f(a)); out[slot] = left.shift(); };
   [3, 2, 0, 4, 1].forEach(s => take(s, score[s]));
   left.sort((a, b) => (b.con + b.pow) - (a.con + a.pow)).forEach((b, i) => { out[5 + i] = b; });
-  T.bat = out;
-  emit(G, `${T.short} 타순을 추천 타순으로 바꿨습니다.`, 'c');
-  return flush(G);
+  return out;
 }
 function swapOrder(G, ti, i, j){
   const T = G.teams[ti], a = T.bat[i], b = T.bat[j];

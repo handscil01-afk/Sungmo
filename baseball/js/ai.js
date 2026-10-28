@@ -97,10 +97,17 @@ function aiManage(G){
   const ti = 1 - batIdx(G), T = G.teams[ti], P = curPitcher(G), B = curBatter(G);
   const f = fatigue(P), bench = benchPitchers(G, ti);
   const shelled = P.st.r >= (P.starter ? 5 : 3);
-  if(bench.length && (f > 0.55 || shelled)){
-    // 남은 투수 가운데 가장 좋은 투수
-    const best = bench.sort((a, b) => (b.p.ctl + b.p.stf) - (a.p.ctl + a.p.stf))[0];
-    swapPitcher(G, ti, best.i);
+  const lead = leadFor(G, ti), closer = bench.find(x => x.p.role === '마무리'), others = bench.filter(x => x.p.role !== '마무리');
+  const best = list => list.sort((a, b) => (b.p.ctl + b.p.stf) - (a.p.ctl + a.p.stf))[0];
+  const inningStart = G.outs === 0 && !G.bases.some(x => x != null);
+  // 마무리: 마지막 이닝(또는 연장)에 3점 차 이내로 앞서면
+  if(closer && inningStart && G.inning >= G.innings && lead >= 1 && lead <= 3 && P.role !== '마무리'){ swapPitcher(G, ti, closer.i); }
+  // 필승조: 마지막 이닝 앞에서 3점 차 이내로 앞서고 선발이 지쳐 가면
+  else if(others.length && inningStart && G.innings >= 5 && G.inning === G.innings - 1 && lead >= 1 && lead <= 3 && P.starter && P.load > P.sta * 0.7){ swapPitcher(G, ti, best(others).i); }
+  else if(bench.length && (f > 0.55 || shelled)){
+    // 지쳤거나 많이 맞으면 남은 투수 가운데 가장 좋은 투수 (마무리는 아껴 둠)
+    const pick = best(others.length ? others : bench);
+    swapPitcher(G, ti, pick.i);
   }
   let inf = 1, of = 1;
   if(G.bases[2] != null && G.outs < 2 && lateGame(G) && closeGame(G)) inf = 0;
@@ -121,7 +128,7 @@ function aiOrderOff(G){
   const B = curBatter(G), T = batTeam(G), S = STYLES[T.style], bs = G.bases;
   if(canSteal(G)){
     const r = bs[1] != null && bs[2] == null ? bs[1] : bs[0], R = T.bat[r];
-    if(R && R.spd >= 68 && rnd(G) < 0.25 * S.steal * (R.spd - 60) / 20) return { k:'steal' };
+    if(R && R.spd >= 68 && rnd(G) < Math.min(0.22, 0.08 * S.steal * (R.spd - 60) / 20)) return { k:'steal' };
     if(bs[0] != null && bs[2] == null && G.outs < 2 && B.con >= 60 && rnd(G) < 0.08 * S.steal) return { k:'hitrun' };
   }
   if(G.outs === 0 && (bs[0] != null || bs[1] != null) && bs[2] == null && B.pow < 55 && closeGame(G) && rnd(G) < 0.3 * S.bunt) return { k:'bunt' };

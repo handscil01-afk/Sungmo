@@ -10,11 +10,12 @@ function homeScreen(){
       { n:1, t:'혼자 하기', s:'컴퓨터 팀과 대결합니다.', act: v => { NEW.kind = '1p'; go(modeScreen, v); } },
       { n:2, t:'둘이 하기', s:'한 기기를 번갈아 쓰며 대결합니다.', act: v => { NEW.kind = '2p'; go(modeScreen, v); } },
       { n:3, t:'온라인 대전', s:'각자 휴대폰으로 만나 대결하고, 채팅과 음성 대화를 합니다.', act: v => go(onlineHome, v) },
-      { n:4, t:'컴퓨터끼리 관전', s:'컴퓨터 두 팀의 경기를 듣습니다.', act: v => { NEW.kind = 'watch'; go(modeScreen, v); } },
-      { n:5, t:'이어하기', hide: !sv, s: sv ? `${MODE_NAME[sv.G.mode]}, ${sv.G.pre ? '경기 전 준비 중' : situation(sv.G)}` : '', act: v => resumeGame(v) },
-      { n:6, t:'게임 방법과 키 안내', act: v => go(() => helpScreen(() => go(homeScreen, 'click')), v) },
-      { n:7, t:'설정', s:'글자 크기, 화면 색, 읽어 주기, 효과음, 진동', act: v => go(() => settingsScreen(() => go(homeScreen, 'click')), v) },
-      { n:8, t:'홈 화면에 설치하기', hide: !canInstall(), s:'아이콘으로 바로 열고 화면을 넓게 씁니다.', act: () => doInstall() },
+      { n:4, t:'리그', s: LG() ? `${teamInfo(LG().my).name}, ${LG().season}시즌` : '10개 팀 정규 시즌과 포스트시즌, 기록과 시상식', act: v => go(leagueHome, v) },
+      { n:5, t:'컴퓨터끼리 관전', s:'컴퓨터 두 팀의 경기를 듣습니다.', act: v => { NEW.kind = 'watch'; go(modeScreen, v); } },
+      { n:6, t:'이어하기', hide: !sv, s: sv ? `${MODE_NAME[sv.G.mode]}, ${sv.G.pre ? '경기 전 준비 중' : situation(sv.G)}` : '', act: v => resumeGame(v) },
+      { n:7, t:'게임 방법과 키 안내', act: v => go(() => helpScreen(() => go(homeScreen, 'click')), v) },
+      { n:8, t:'설정', s:'글자 크기, 화면 색, 읽어 주기, 효과음, 진동', act: v => go(() => settingsScreen(() => go(homeScreen, 'click')), v) },
+      { n:9, t:'홈 화면에 설치하기', hide: !canInstall(), s:'아이콘으로 바로 열고 화면을 넓게 씁니다.', act: () => doInstall() },
     ] };
 }
 
@@ -23,7 +24,7 @@ const MODE_NAME = { simple:'간단 모드', detail:'정밀 모드', manager:'감
 const NEW = { kind:'1p', mode:'simple', unit:'pitch', a:null, b:null, first:1, innings:3, diff:1 };
 const teamLabel = k => { const t = teamInfo(k); return `${t.name} (${STYLES[t.style].name})`; };
 function modeScreen(){
-  return { q:'어떤 방식으로 할까요?', back: v => go(NEW.kind === 'online' ? onlineHome : homeScreen, v), opts:[
+  return { q: NEW.kind === 'league' ? '내 팀 경기를 어떤 방식으로 할까요? 나중에 리그 설정에서 바꿀 수 있습니다.' : '어떤 방식으로 할까요?', back: v => go(NEW.kind === 'online' ? onlineHome : NEW.kind === 'league' ? leagueHome : homeScreen, v), opts:[
     { n:1, t:'간단 모드', s:'주사위로 결과를 정하는 쉬운 야구입니다. 처음 해 보는 분께 알맞습니다.', act: v => { NEW.mode = 'simple'; go(unitScreen, v); } },
     { n:2, t:'정밀 모드', s:'공 하나마다 구종, 코스, 세기를 고릅니다. 선수 능력치, 컨디션, 바람, 수비 위치가 결과를 바꿉니다.', act: v => { NEW.mode = 'detail'; go(() => teamScreen(0), v); } },
     { n:3, t:'감독 모드', s:'선수들이 알아서 던지고 치고, 감독은 타순, 선발 투수, 작전, 대타, 투수 교체만 지시합니다. 중요한 순간에만 묻습니다.', act: v => { NEW.mode = 'manager'; go(() => teamScreen(0), v); } },
@@ -37,14 +38,14 @@ function unitScreen(){
   ] };
 }
 function teamScreen(which, page = 0){
-  const q = NEW.kind === '1p' || NEW.kind === 'online' ? (which ? '상대 팀을 고르세요.' : '내 팀을 고르세요.')
+  const q = NEW.kind === '1p' || NEW.kind === 'online' || NEW.kind === 'league' ? (which ? '상대 팀을 고르세요.' : '내 팀을 고르세요.')
           : NEW.kind === '2p' ? (which ? '둘째 사람의 팀을 고르세요.' : '첫째 사람의 팀을 고르세요.')
           : (which ? '홈 팀을 고르세요.' : '원정 팀을 고르세요.');
   const taken = which ? NEW.a : null;
   const list = TEAMS.filter(t => t.key !== taken);
   const set = (k, v) => {
     if(which){ NEW.b = k; go(NEW.kind === 'watch' ? inningsScreen : sideScreen, v); }
-    else { NEW.a = k; go(() => teamScreen(1), v); }
+    else { NEW.a = k; go(NEW.kind === 'league' ? leagueLenScreen : () => teamScreen(1), v); }
   };
   // 10팀이라 한 쪽에 8팀씩: 9번은 다음 쪽 / 앞 쪽
   const desc = t => `${STYLES[t.style].name}. 홈구장 ${parkInfo(t.key).name}: ${parkInfo(t.key).desc}`;
@@ -223,6 +224,15 @@ const HELP = {
     '대타와 대주자로 나간 선수 대신 들어간 선수는 그 자리의 수비도 맡습니다. 바뀌어 나간 선수는 이번 경기에 다시 나오지 못합니다.',
     '중계는 처음에 타석 결과만 읽습니다. 더 보기에서 공 하나하나 읽기로 바꿀 수 있습니다.',
     '컴퓨터 감독도 경기 후반 접전에서는 대타, 대주자, 투수 교체를 씁니다. 온라인 대전에서도 감독 모드로 대결할 수 있습니다.',
+  ],
+  '리그': [
+    '처음 화면의 리그에서 새 리그를 만듭니다. 내 팀 경기 방식(감독, 정밀, 간단), 내 팀, 팀당 경기 수(18, 36, 72, 144), 이닝 수를 고릅니다.',
+    '10개 팀이 일정대로 경기합니다. 내 팀 경기는 직접 하거나 결과만 보고 넘길 수 있고, 여러 날을 한꺼번에 넘길 수도 있습니다. 다른 팀 경기는 결과만 나옵니다.',
+    '선수는 시즌 내내 같은 사람이고, 컨디션은 날마다 바뀝니다. 선발 투수 5명이 돌아가며 던지고, 불펜은 많이 던지거나 이틀 연속 던지면 하루 쉽니다.',
+    '순위표에는 승, 패, 무, 승률, 게임 차, 최근 10경기, 연승과 연패가 나옵니다. 기록 순위는 타율, 홈런, 타점, 안타, 도루, 평균자책점, 승리, 세이브, 홀드, 탈삼진입니다. 타율은 3할 1푼 2리처럼 읽어 줍니다.',
+    '정규 시즌이 끝나면 KBO처럼 5위까지 포스트시즌을 합니다. 와일드카드 결정전(4위가 1승을 안고 시작), 준플레이오프와 플레이오프(5전 3선승), 한국시리즈(7전 4선승).',
+    '한국시리즈가 끝나면 우승 팀, 정규 시즌 MVP, 한국시리즈 MVP, 기록별 1위를 발표합니다.',
+    '감독 모드로 경기 전 준비에서 바꾼 타순은 다음 경기에도 이어집니다. 리그는 이 기기에 저장되고, 리그 설정에서 백업 파일로 내려받거나 불러올 수 있습니다.',
   ],
   '앞으로 만들 것': [
     '그다음: 우리 센터 이름으로 팀과 선수 만들기, 시즌 기록, 히트 앤드 런과 견제구 같은 작전, 관중 소리.',

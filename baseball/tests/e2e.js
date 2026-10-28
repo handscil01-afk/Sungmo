@@ -64,7 +64,7 @@ const PORT = 8766;
     console.log(`${name}: 간단 둘이 3이닝 ${s2}번 만에 끝`);
     // 관전: 정밀 3이닝, 경기 끝까지
     await page.keyboard.press('4');
-    for(const k of ['4', '2', '3', '4', '2', '1']) await page.keyboard.press(k);
+    for(const k of ['5', '2', '1', '2', '2', '1']) await page.keyboard.press(k);
     await page.keyboard.press('4');
     await page.waitForFunction(() => document.querySelector('#q').textContent.includes('경기가 끝났습니다'));
     console.log(`${name}: 관전 끝`);
@@ -75,7 +75,7 @@ const PORT = 8766;
       await page.keyboard.press('9'); await page.keyboard.press('7');
       await page.keyboard.press('9'); await page.keyboard.press('9');
       if(!(await q(page)).includes('무엇을 할까요')) errors.push('그만하기 뒤 처음 화면이 아님');
-      await page.keyboard.press('5');
+      await page.keyboard.press('6');
       const s3 = await playToEnd(page, name + ' 이어하기', true);
       console.log(`${name}: 맡기기·이어하기 ${s3}번 만에 끝`);
       // 둘이 하기 정밀 모드 1이닝 (기기 넘기기 화면 포함)
@@ -117,14 +117,33 @@ const PORT = 8766;
       await shot(page, `${name}-manager-end`);
       // 감독 모드 관전
       await page.keyboard.press('4');
-      for(const k of ['4', '3', '3', '4', '2', '1']) await page.keyboard.press(k);
+      for(const k of ['5', '3', '1', '2', '2', '1']) await page.keyboard.press(k);
       await page.keyboard.press('4');
       await page.waitForFunction(() => document.querySelector('#q').textContent.includes('경기가 끝났습니다'));
       console.log(`${name}: 감독 모드 관전 끝`);
+      // 리그: 새 리그(간단 공 하나씩, 18경기, 3이닝) → 오늘 경기 → 순위표·기록 → 시즌 끝까지 넘기기 → 시상식
+      await page.keyboard.press('4'); await page.keyboard.press('4');
+      for(const k of ['1', '1', '1', '1', '1', '3']) await page.keyboard.press(k);
+      if(!(await q(page)).includes('무엇을 할까요')) errors.push('리그 첫 화면이 아님: ' + await q(page));
+      await shot(page, `${name}-league`);
+      await page.keyboard.press('1');
+      const ls1 = await playToEnd(page, name + ' 리그 경기', false);
+      const after = await page.$eval('#say', e => e.innerText);
+      if(!/리그에 반영했습니다/.test(after)) errors.push('리그 경기 결과가 반영되지 않음');
+      console.log(`${name}: 리그 경기 ${ls1}번 만에 끝 / ${after.split('\n').filter(l => /리그에 반영|다른 경기/.test(l)).join(' / ').slice(0, 160)}`);
+      await page.keyboard.press('1');
+      for(const k of ['4', '.', '5', '2', '.', '6', '.', '7', '.']) await page.keyboard.press(k);
+      await page.keyboard.press('3'); await page.keyboard.press('4');
+      await page.waitForFunction(() => document.querySelector('#q').textContent.includes('시즌이 끝났습니다'), null, { timeout:120000 });
+      const aw = await page.$eval('#note', e => e.innerText);
+      if(!/한국시리즈 우승/.test(aw)) errors.push('시상식 글이 없음');
+      console.log(`${name}: 리그 시즌 끝 / ${aw.split('\n').slice(1, 4).join(' / ')}`);
+      await shot(page, `${name}-league-done`);
+      await page.keyboard.press('9'); await page.keyboard.press('.'); await page.keyboard.press('.');
     }
     // 설정 화면: 글자 크기·화면 색 바꾸기
     await page.keyboard.press('4');
-    await page.keyboard.press('7');
+    await page.keyboard.press('8');
     for(const k of ['1', '2', '2', '1', '1', '1']) await page.keyboard.press(k);
     await shot(page, `${name}-settings`); await noOverflow(page, name + ' 설정');
     await page.keyboard.press('2'); await page.keyboard.press('1'); await page.keyboard.press('1');

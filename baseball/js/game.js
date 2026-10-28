@@ -90,7 +90,11 @@ function gameNext(via, res){
   const lines = visible(res ? res.lines : []);
   if(NET.on){ netNext(via, res, lines); return; }
   saveGame();
-  if(G.over){ ls.del('bb_game'); go(endScreen, via, lines); return; }
+  if(G.over){
+    // 리그 경기: 결과를 리그에 넣고 그날의 다른 경기도 진행
+    if(G.league && !G.league.done){ G.league.done = true; lines.push(...visible(leagueAfterMine(G))); }
+    ls.del('bb_game'); go(endScreen, via, lines); return;
+  }
   if(G.pre){ const ti = [0, 1].find(t => !G.pre.ready[t] && needs(t)); go(() => pregameScreen(ti), via, lines); return; }
   // 비디오 판독: 원심에 손해를 본 팀이 사람이면 묻고, 컴퓨터(또는 맡긴 쪽·기회 없음)면 바로 정함
   if(G.review){
@@ -423,6 +427,11 @@ function stopAutoPlay(say){
 /* ---------- 경기 끝 ---------- */
 function endScreen(){
   const o = GS.opts;
+  if(G.league) return { board:true, q:'경기가 끝났습니다. 무엇을 할까요?', opts:[
+    { n:1, t:'리그 화면으로', act: v => { G = null; go(leagueHome, v); } },
+    { n:2, t:'점수판', act: v => note(scoreboard(G), v) },
+    { n:3, t:'경기 기록 전체', act: v => go(() => logScreen(), v) },
+  ] };
   if(NET.on) return { board:true, q: NET.role === 'host' ? '경기가 끝났습니다. 한 판 더 할까요?' : '경기가 끝났습니다. 방장이 한 판 더를 고르면 새 경기가 시작됩니다.', opts:[
     { n:1, t:'한 판 더', hide: NET.role !== 'host', s:'같은 팀으로 새 경기를 시작합니다. 선수 능력치와 날씨는 새로 정해집니다.', act: v => netStartGame(v) },
     { n:2, t:'점수판', act: v => note(scoreboard(G), v) },

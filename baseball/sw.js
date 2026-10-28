@@ -1,7 +1,7 @@
-const CACHE = 'baseball-v5';
+const CACHE = 'baseball-v6';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png',
   './css/app.css',
-  './js/util.js', './js/data.js', './js/engine.js', './js/ai.js', './js/speech.js', './js/shell.js', './js/ui.js', './js/net.js', './js/voice.js', './js/game.js', './js/manager.js', './js/online.js', './js/app.js',
+  './js/util.js', './js/data.js', './js/engine.js', './js/ai.js', './js/league.js', './js/speech.js', './js/shell.js', './js/ui.js', './js/net.js', './js/voice.js', './js/game.js', './js/manager.js', './js/league-ui.js', './js/online.js', './js/app.js',
   './vendor/firebase-app.js', './vendor/firebase-auth.js', './vendor/firebase-database.js'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
