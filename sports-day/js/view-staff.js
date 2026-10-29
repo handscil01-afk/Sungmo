@@ -18,27 +18,45 @@ function presetList(){
     .sort((a,b) => (!!a.volunteer - !!b.volunteer) || String(a.label||'').localeCompare(String(b.label||''), 'ko'));
 }
 const presetUse = pid => Object.values(D.roles).filter(r => r && r.preset===pid).length;
+// 무전 채널·셔틀 역할 글: '📡 셔틀 · 🚌 운전자'
+function chText(ch, sr){
+  if(!ch) return '';
+  const c = chById(ch);
+  return `📡 ${c ? c.name : '지워진 채널'}${sr==='driver' ? ' · 🚌 운전자' : sr==='helper' ? ' · 🚌 보조' : ''}`;
+}
+// 담당자 명단 항목의 역할 글: 맡은 종목 + 무전 채널 (종목이 없으면 채널만)
+function presetRoleText(p){
+  const base = asRole(p), t = hasDuty(base) || base.board ? roleLabel(base) : '', c = chText(p.ch, p.shuttle);
+  return t && c ? `${t} · ${c}` : (t || c || roleLabel(base));
+}
+// 기기의 역할 글 (마스터의 접속 기기 목록용): 종목이 없고 채널만 있는 기기는 채널을 보여 줌
+function deviceRoleText(id){
+  const r = deviceRole(id), ci = chInfoOf(id), c = ci ? chText(ci.ch, ci.sr) : '';
+  if(r.role==='master') return roleLabel(r);
+  return r.role==='wait' ? (c || roleLabel(r)) : (c ? `${roleLabel(r)} · ${c}` : roleLabel(r));
+}
+const isWaitingDev = id => deviceRole(id).role==='wait' && !chInfoOf(id);
 
 /* ---------- 마스터: 접속자·역할 화면 ---------- */
 function peopleView(){
   const list = D.devices.slice().sort((a,b) => {
-    const wa = deviceRole(a.id).role==='wait', wb = deviceRole(b.id).role==='wait';
+    const wa = isWaitingDev(a.id), wb = isWaitingDev(b.id);
     return (wb-wa) || String(a.name||'').localeCompare(String(b.name||''),'ko');
   });
-  const waiting = list.filter(d => deviceRole(d.id).role==='wait').length;
+  const waiting = list.filter(d => isWaitingDev(d.id)).length;
   const rows = list.map(d => {
     const r = deviceRole(d.id), on = d.seenAt && now()-d.seenAt < ONLINE_MS, me = store && d.id===store.uid;
     const ps = D.roles[d.id] && D.roles[d.id].preset && D.presets[D.roles[d.id].preset];
     return `<div class="item tap devrow" data-a="roleSheet" data-v="${d.id}">
       <span class="tag ${on?'ok':''}">${on?'● 접속':'○ '+ago(d.seenAt)}</span>
       <span class="name">${esc(d.name||'(이름 없음)')}${me?' <span class="tag dark">이 기기</span>':''}
-        <span class="roleline ${roleTagCls(r)}">${esc(roleIcon(r))} ${esc(roleLabel(r))}</span>
+        <span class="roleline ${roleTagCls(r)}">${esc(roleIcon(r))} ${esc(deviceRoleText(d.id))}</span>
         <span class="sub">${esc(d.ua||'')}${ps?` · 📇 ${esc(ps.label)}`:''}${r.board && d.audio!=null ? (d.audio ? ' · 🔊 소리 켜짐' : ' · 🔇 소리 꺼짐') : ''}${on?'':' · 마지막 '+hm(d.seenAt)}</span></span></div>`;
   }).join('');
   const pl = presetList();
   const prow = p => { const use = presetUse(p.id);
     return `<div class="item tap" data-a="presetEdit" data-v="${p.id}"><span class="tag">${p.volunteer?'🙋 봉사자':'👤 담당자'}</span>
-      <span class="name">${esc(p.label||'')}<span class="sub">${esc(roleLabel(asRole(p)))}${p.cast?' · 📢 방송':''}</span></span><span class="tag ${use?'ok':''}">${use}대 사용</span></div>`; };
+      <span class="name">${esc(p.label||'')}<span class="sub">${esc(presetRoleText(p))}${p.cast?' · 📢 방송':''}</span></span><span class="tag ${use?'ok':''}">${use}대 사용</span></div>`; };
   const tabs = innerTabs('people', [['dev','📱','접속 기기', list.length], ['preset','📇','담당자 명단', pl.length], ['help','❓','역할 안내']]);
   const body = {
     dev: () => `<div class="card"><div class="row"><h2 class="grow h2" style="margin:0">접속한 기기 ${list.length}대</h2>${waiting?`<span class="tag warn">역할 대기 ${waiting}</span>`:''}</div>
@@ -95,7 +113,9 @@ let RD = null;
 function newDraft(src){
   const n = normRole(src), raw = src || {}, hide = (k, ok) => (Array.isArray(raw[k]) ? raw[k] : []).filter(e => !ok(e));
   // hid: 지금 꺼져 있어 화면에 안 보이는 종목 (저장할 때 그대로 되돌려 넣음)
-  return { ...pickRoleFields(src), monitor:!!n.monitor, voice:!!n.voice, events:[...n.events], helpers:[...n.helpers], timers:[...n.timers],
+  // ch·sr: 무전 채널과 셔틀 역할(driver·helper). 담당자 명단 항목에만 저장됨 (역할 문서에는 넣지 않음)
+  const ch = (src && src.ch) ? String(src.ch) : '', sr = (ch && src && (src.shuttle==='driver' || src.shuttle==='helper')) ? src.shuttle : '';
+  return { ...pickRoleFields(src), monitor:!!n.monitor, voice:!!n.voice, events:[...n.events], helpers:[...n.helpers], timers:[...n.timers], ch, sr,
     hid:{ events:hide('events', e => EVENTS[e]), helpers:hide('helpers', e => EVENTS[e]), timers:hide('timers', e => TIME_EVENTS.includes(e)) } };
 }
 function roleEditor(){
@@ -105,9 +125,21 @@ function roleEditor(){
     <div class="card"><h2>🚩 심판 <span class="sub">점수·승패를 입력합니다</span></h2>${chips('events', Object.keys(EVENTS))}</div>
     <div class="card"><h2>✏️ 기록 도우미 <span class="sub">심판과 똑같이 점수를 입력합니다</span></h2>${chips('helpers', Object.keys(EVENTS))}</div>
     <div class="card"><h2>⏱ 계시원 <span class="sub">시간을 재서 심판 화면으로 보냅니다</span></h2>${chips('timers', TIME_EVENTS)}</div>
-    <div class="card"><div class="list">${flag('monitor','🧭 운영 현황','센터장·사무국장 대행: 진행 현황을 보고 무전·문자를 쓰고 전체 인원 출석을 체크합니다.')}${RD.monitor ? flag('voice','중계 모드(보이스오버용 간단 화면)','그림 없이 큰 글자 단추만 있는 화면으로 바뀌고, 지금 상황을 글로 읽어 줍니다. 단체전 결과가 저장되면 보이스오버가 바로 읽어 줍니다.') : ''}${flag('board','📺 안내판','이 기기를 안내판 화면으로만 씁니다(다른 역할 화면은 숨겨집니다).')}${flag('cast','📢 음성 방송 권한','안내판 스피커로 말하는 방송 버튼이 생깁니다.')}</div></div>`;
+    <div class="card"><div class="list">${flag('monitor','🧭 운영 현황','센터장·사무국장 대행: 진행 현황을 보고 무전·문자를 쓰고 전체 인원 출석을 체크합니다.')}${RD.monitor ? flag('voice','중계 모드(보이스오버용 간단 화면)','그림 없이 큰 글자 단추만 있는 화면으로 바뀌고, 지금 상황을 글로 읽어 줍니다. 단체전 결과가 저장되면 보이스오버가 바로 읽어 줍니다.') : ''}${flag('board','📺 안내판','이 기기를 안내판 화면으로만 씁니다(다른 역할 화면은 숨겨집니다).')}${flag('cast','📢 음성 방송 권한','안내판 스피커로 말하는 방송 버튼이 생깁니다.')}</div></div>
+    ${channelCard()}`;
 }
-const draftEmpty = () => !RD.coach && !RD.events.length && !RD.helpers.length && !RD.timers.length && !RD.board && !RD.monitor;
+// 무전 채널 고르기: 채널을 고르면 맡은 종목이 없어도 무전을 쓰고, 그 채널의 말을 듣습니다
+function channelCard(){
+  const chs = channels(), fromPreset = RD.preset && D.presets[RD.preset] && D.presets[RD.preset].ch;
+  const sr = (k, l) => `<button class="chip ${(RD.sr||'')===k?'on':''}" data-a="rdSr" data-v="${k}">${l}</button>`;
+  return `<div class="card"><h2>📡 무전 채널 <span class="sub">셔틀처럼 따로 쓰는 무전</span></h2>
+    <div class="chips"><button class="chip ${!RD.ch?'on':''}" data-a="rdCh" data-v="">없음</button>${chs.map(c => `<button class="chip ${RD.ch===c.id?'on':''}" data-a="rdCh" data-v="${esc(c.id)}">${esc(c.name)}</button>`).join('')}</div>
+    ${chs.length ? '' : '<p class="sub">만들어 둔 채널이 없습니다. 명단·설정의 셔틀·채널 탭에서 만듭니다.</p>'}
+    ${RD.ch ? `<h3>셔틀 화면</h3><div class="chips">${sr('', '없음')}${sr('driver', '🚌 운전자')}${sr('helper', '🚌 보조')}</div>
+      <p class="sub">운전자: 남은 거리와 큰 무전 단추가 있는 화면이고, 정한 거리에 가까워지면 채널 사람과 운영진에게 알림을 보냅니다. 보조: 운전자 위치 신호와 최근 알림, 큰 무전 단추가 있는 화면입니다.</p>` : ''}
+    <p class="sub">채널을 고르면 맡은 종목이 없어도 무전을 쓸 수 있습니다. 그 채널의 말은 이 사람과 운영진만 듣고, 전체 무전도 함께 들립니다.${fromPreset && RD.preset ? ' (담당자 명단의 채널을 따릅니다.)' : ''}</p></div>`;
+}
+const draftEmpty = () => !RD.coach && !RD.events.length && !RD.helpers.length && !RD.timers.length && !RD.board && !RD.monitor && !RD.ch;
 const draftFields = () => { const h = RD.hid || {}, add = (a, b) => [...a, ...(b||[]).filter(e => !a.includes(e))];
   return { coach:RD.coach, events:add(RD.events.filter(e => EVENTS[e]), h.events), helpers:add(RD.helpers.filter(e => EVENTS[e]), h.helpers), timers:add(RD.timers.filter(e => TIME_EVENTS.includes(e)), h.timers), board:!!RD.board, cast:!!RD.cast, monitor: RD.monitor ? (RD.voice ? 'voice' : true) : false }; };
 
@@ -124,7 +156,7 @@ function roleSheet(){
   const r = deviceRole(id), me = id===store.uid, isM = r.role==='master';
   const pl = presetList();
   return `<h2>${esc(d.name||'(이름 없음)')} <span class="sub">${esc(d.ua||'')}</span></h2>
-    <p>지금 역할: <b>${esc(roleIcon(r))} ${esc(roleLabel(r))}</b></p>
+    <p>지금 역할: <b>${esc(roleIcon(r))} ${esc(deviceRoleText(id))}</b></p>
     ${isM && !DEMO ? '<div class="note">마스터 권한이 있는 기기입니다. 다른 역할을 주려면 먼저 마스터 권한을 빼 주세요.</div>' : ''}
     ${pl.length ? `<div class="card"><h2>📇 담당자 명단에서 고르기</h2><div class="chips">${pl.map(p => `<button class="chip ${RD.preset===p.id?'on':''}" data-a="rdPreset" data-v="${p.id}">${p.volunteer?'🙋':'👤'} ${esc(p.label)}</button>`).join('')}</div>
       <p class="sub">고르면 아래 역할이 그 담당자와 똑같이 채워집니다.</p></div>` : ''}
@@ -140,7 +172,7 @@ function roleSheet(){
 function presetPicker(){
   const ps = presetList(); if(!ps.length) return '';
   const named = ps.filter(p => !p.volunteer), vol = ps.filter(p => p.volunteer);
-  const btn = p => `<button class="pbtn" data-a="joinPreset" data-v="${p.id}"><b>${p.volunteer?'🙋':'👤'} ${esc(p.label)}</b><span>${esc(roleLabel(asRole(p)))}</span></button>`;
+  const btn = p => `<button class="pbtn" data-a="joinPreset" data-v="${p.id}"><b>${p.volunteer?'🙋':'👤'} ${esc(p.label)}</b><span>${esc(presetRoleText(p))}</span></button>`;
   return (named.length ? `<div class="card"><h2>👤 담당자로 들어오기</h2><p class="sub">자기 이름을 누르면 미리 정해 둔 역할로 바로 들어갑니다.</p><div class="pgrid">${named.map(btn).join('')}</div></div>` : '')
     + (vol.length ? `<div class="card"><h2>🙋 봉사자로 들어오기</h2><p class="sub">맡은 자리를 누르고 이름을 적으면 됩니다.</p><div class="pgrid">${vol.map(btn).join('')}</div></div>` : '');
 }
@@ -165,13 +197,26 @@ async function applyPresetToDevices(pid, fields){
   await Promise.all(Object.entries(D.roles).filter(([,r]) => r && r.preset===pid)
     .map(([id, r]) => put(['main','roles',id], { preset:pid, name:r.name||'', ...fields, by:UI.me, at:now() }, false)));
 }
+// 담당자 명단 없이 기기에 직접 정한 무전 채널은 config.radioCh[기기번호]에 저장 (마스터만). 명단을 고른 기기는 명단을 따르므로 비움
+function devChSave(id, clear){
+  if(!can.master()) return;
+  const cur = (D.config.radioCh || {})[id] || { ch:'', sr:'' };
+  const o = (clear || RD.preset || !RD.ch) ? { ch:'', sr:'' } : { ch:RD.ch, sr:RD.sr || '' };
+  if((cur.ch||'')===o.ch && (cur.sr||'')===o.sr) return;
+  setConfig({ radioCh:{ [id]: o } });
+}
 Object.assign(ACT, {
-  roleSheet: (el, v) => { RD = { id:v, preset:(D.roles[v]||{}).preset||'', ...newDraft(D.roles[v]) }; openSheet(roleSheet); return false; },
+  roleSheet: (el, v) => {
+    RD = { id:v, preset:(D.roles[v]||{}).preset||'', ...newDraft(D.roles[v]) };
+    const ci = chInfoOf(v); RD.ch = ci ? ci.ch : ''; RD.sr = ci ? ci.sr : '';       // 담당자 명단 또는 기기별로 정한 무전 채널
+    openSheet(roleSheet); return false; },
   presetNew: (el, v) => { RD = { id:'', label:'', volunteer: v==='vol', ...newDraft(null) }; openSheet(presetSheet); return false; },
   presetEdit: (el, v) => { const p = D.presets[v]; RD = { id:v, label:p.label||'', volunteer:!!p.volunteer, ...newDraft(p) }; openSheet(presetSheet); return false; },
   rdTog: (el, v) => { const a = RD[el.dataset.k]; a.includes(v) ? a.splice(a.indexOf(v),1) : a.push(v); RD.preset = ''; drawSheet(); return false; },
   rdCoach: (el, v) => { RD.coach = v; RD.preset = ''; drawSheet(); return false; },
   rdFlag: (el) => { const k = el.dataset.k; RD[k] = !RD[k]; if(k==='monitor' && !RD.monitor) RD.voice = false; if(k!=='volunteer') RD.preset = ''; drawSheet(); return false; },
+  rdCh: (el, v) => { RD.ch = v; if(!v) RD.sr = ''; RD.preset = ''; drawSheet(); return false; },
+  rdSr: (el, v) => { RD.sr = v === 'driver' || v === 'helper' ? v : ''; RD.preset = ''; drawSheet(); return false; },
   rdPreset: (el, v) => { const p = D.presets[v]; if(!p) return false; Object.assign(RD, newDraft(p), { preset:v }); drawSheet(); return false; },
   presetSave: async () => {
     if(!can.master()) return denied();
@@ -180,9 +225,10 @@ Object.assign(ACT, {
     if(draftEmpty()){ toast('맡을 역할을 하나 이상 골라 주세요.'); return false; }
     if(presetList().some(p => p.id!==RD.id && String(p.label).trim()===label)){ toast(`'${label}'은(는) 이미 담당자 명단에 있습니다.`); return false; }
     const id = RD.id || 'ps'+uid(), fields = draftFields();
-    if(!(await put(['main','presets',id], { label, volunteer:!!RD.volunteer, ...fields, by:UI.me, at:now() }, false))) return false;
+    const chf = { ch: RD.ch || '', shuttle: RD.ch ? (RD.sr || '') : '' };         // 무전 채널·셔틀 역할은 명단 항목에만 저장 (기기가 명단을 따라 찾아봄)
+    if(!(await put(['main','presets',id], { label, volunteer:!!RD.volunteer, ...fields, ...chf, by:UI.me, at:now() }, false))) return false;
     await applyPresetToDevices(id, fields);
-    closeSheet(); toast(`${label}: ${roleLabel(asRole(fields))}(으)로 저장했습니다.`);
+    closeSheet(); toast(`${label}: ${presetRoleText({ ...fields, ...chf })}(으)로 저장했습니다.`);
   },
   presetDel: async () => {
     if(!can.master()) return denied();
@@ -196,11 +242,13 @@ Object.assign(ACT, {
     const id = RD.id, d = D.devices.find(x => x.id===id), name = d?.name || (id===store.uid ? UI.me : '');
     if(D.masters[id] && !DEMO){ toast('먼저 마스터 권한을 빼 주세요.'); return false; }
     if(DEMO && D.masters[id] && !(await guard(store.del(['main','masters',id])))) return false;
-    if(draftEmpty()){ await guard(store.del(['main','roles',id])); closeSheet(); toast(`${name}: 역할을 없앴습니다.`); return; }
+    if(draftEmpty()){ await guard(store.del(['main','roles',id])); devChSave(id, true); closeSheet(); toast(`${name}: 역할을 없앴습니다.`); return; }
     const fields = draftFields();
-    if(await put(['main','roles',id], { preset:RD.preset||'', name, ...fields, by:UI.me, at:now() }, false)){ closeSheet(); toast(`${name}: ${roleLabel(asRole(fields))}(으)로 정했습니다.`); }
+    if(await put(['main','roles',id], { preset:RD.preset||'', name, ...fields, by:UI.me, at:now() }, false)){
+      devChSave(id, false);
+      closeSheet(); toast(`${name}: ${presetRoleText({ ...fields, ch:RD.ch, shuttle:RD.sr })}(으)로 정했습니다.`); }
   },
-  devClear: async () => { if(!canAssign()) return denied(); if(await guard(store.del(['main','roles',RD.id]))){ closeSheet(); toast('역할을 없앴습니다.'); } },
+  devClear: async () => { if(!canAssign()) return denied(); if(await guard(store.del(['main','roles',RD.id]))){ devChSave(RD.id, true); closeSheet(); toast('역할을 없앴습니다.'); } },
   grantMaster: async () => {
     if(!can.master()) return denied();
     const id = RD.id, d = D.devices.find(x => x.id===id);
@@ -224,7 +272,7 @@ Object.assign(ACT, {
     if(p.volunteer){
       name = await askText(`'${p.label}' 자리로 들어갑니다.\n이름을 적어 주세요.`, UI.me||'', '들어가기');
       if(!name || !name.trim()) return false; name = name.trim();
-    } else if(!(await ask(`${p.label}\n(${roleLabel(asRole(p))})\n이 이름으로 들어갈까요?`, '들어가기'))) return false;
+    } else if(!(await ask(`${p.label}\n(${presetRoleText(p)})\n이 이름으로 들어갈까요?`, '들어가기'))) return false;
     UI.me = name; idStore.set('udh5_me', name); touchDevice(true);
     if(await put(['main','roles',store.uid], { preset:v, name, ...pickRoleFields(p), at:now() }, false, D.amMaster ? undefined : RULES_OLD_MSG)) toast(`${name} 님, 들어왔습니다.`);
   },

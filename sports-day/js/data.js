@@ -325,7 +325,7 @@ const can = {
   record: ev => D.amMaster || refEvents().includes(ev),
   order: team => D.amMaster || myRole().coach===team,
   time: ev => D.amMaster || myRole().timers.includes(ev) || refEvents().includes(ev),
-  staff: () => D.amMaster || hasDuty(myRole()),
+  staff: () => D.amMaster || hasDuty(myRole()) || !!myCh(),             // 무전 채널(셔틀 등)에 속한 기기도 문자·무전을 씀
   abs: () => D.amMaster || (hasDuty(myRole()) && !monitorOnly(myRole())),     // 선수 불참 표시
   att: () => D.amMaster || myRole().role==='staff',                         // 전체 인원 출석 체크 (운영 현황 전용 기기도 가능, 안내판·역할 대기는 불가)
   ccall: team => D.amMaster || myRole().coach===team,                      // 감독이 자기 팀 선수 부르기

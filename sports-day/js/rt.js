@@ -1,7 +1,7 @@
 'use strict';
 /* ===================== 실시간 중계 (무전기·음성 안내방송) =====================
-   채널: 'radio'(진행요원 무전) · 'cast'(안내판 스피커 방송)
-   lock: 지금 말하는 사람 한 명 (먼저 누른 사람)
+   채널(경로 이름): 'radio'(진행요원 전체 무전) · 'rch/<채널번호>'(셔틀 같은 무전 채널) · 'cast'(안내판 스피커 방송)
+   lock: 지금 말하는 사람 한 명 (먼저 누른 사람). 채널마다 따로 있어서 다른 채널끼리는 동시에 말할 수 있음
    s/{시간순 키}: 잘게 자른 음성 { t:말하기 번호, u:보낸 기기, d:음성 }. 듣는 기기는 처음부터 이 줄을 계속 열어 두어,
    말을 시작할 때 새로 연결하느라 늦어지지 않게 함 */
 const RT_ROOT = 'undonghoe5';
@@ -69,8 +69,9 @@ async function firebaseRT(){
 function demoRT(){
   const KEY = 'udh5demo_rt', bc = ('BroadcastChannel' in window) ? new BroadcastChannel('udh5radio') : null;
   const state = () => ls.get(KEY, { locks:{} });
-  const subs = { radio:new Set(), cast:new Set() }, streamSubs = new Set();
-  const emit = kind => { const l = state().locks[kind] || null; subs[kind].forEach(cb => cb(l)); };
+  const subs = {}, streamSubs = new Set();   // subs[경로]: 그 경로의 잠금을 듣는 곳들 (채널이 늘어나도 되게 필요할 때 만듦)
+  const subsOf = kind => (subs[kind] ||= new Set());
+  const emit = kind => { const l = state().locks[kind] || null; subsOf(kind).forEach(cb => cb(l)); };
   const post = m => { try{ bc && bc.postMessage(m); }catch(e){} };
   if(bc) bc.onmessage = e => { const m = e.data;
     if(m.t==='lock') emit(m.kind);
@@ -84,7 +85,7 @@ function demoRT(){
     async refresh(kind, d){ const cur = state().locks[kind]; if(cur && cur.uid===d.uid) setLock(kind, { uid:d.uid, name:d.name, tid:d.tid, at:now() }); },
     async release(kind){ setLock(kind, null); },
     async forceRelease(kind){ setLock(kind, null); },
-    onLock(kind, cb){ subs[kind].add(cb); setTimeout(() => cb(state().locks[kind] || null), 0); return () => subs[kind].delete(cb); },
+    onLock(kind, cb){ subsOf(kind).add(cb); setTimeout(() => cb(state().locks[kind] || null), 0); return () => subsOf(kind).delete(cb); },
     async send(kind, tid, seq, d){ post({ t:'chunk', kind, tid, u:store.uid, d }); },
     onStream(kind, cb){ const s = { kind, cb }; streamSubs.add(s); return () => streamSubs.delete(s); },
     async dropTalk(){},

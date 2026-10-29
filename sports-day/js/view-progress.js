@@ -87,6 +87,7 @@ function progressView(){
       <div class="pc-bar"><div class="progress"><i style="width:${pct}%;background:${E.color}"></i></div><span class="pc-main">${esc(main)}</span>${sub ? `<span class="pc-sub" title="${esc(subFull)}">${esc(sub)}</span>` : ''}</div></div>`;
   };
   return `<div class="prog">
+    ${shuttleProgCard()}
     <div class="card progsum"><div class="row"><h2 class="grow h2" style="margin:0">🧭 진행 현황</h2><span class="sub">${hm(t)} 기준 · 완료 ${doneN}/${allN} 종목</span>
         <details class="pcalc"><summary aria-label="남은 시간 계산 방법">ⓘ</summary><p>남은 시간은 기록을 저장한 간격의 평균(15분보다 긴 간격은 쉬는 시간으로 보고 뺌)에 남은 사람·조·대결 수를 곱해 계산합니다. 단체전은 한 바퀴 기준이고, 심판이 결과를 확정하면 끝난 것으로 봅니다. 30초마다 새로 계산합니다.</p></details></div>
       <div class="pgrps">${grp('개인전', '세 종목 동시', iMs, iCalc, iDone)}${grp('단체전', '차례로 진행', tMs, tCalc, tDone)}</div>${attProgBtn()}</div>

@@ -9,7 +9,7 @@ function settingsView(){
       <div class="seg sm"><button class="${p.team==='blue'?'on blue':''}" data-a="setTeam" data-v="${p.id}" data-t="blue">${esc(teamShort('blue'))}</button><button class="${p.team==='red'?'on red':''}" data-a="setTeam" data-v="${p.id}" data-t="red">${esc(teamShort('red'))}</button><button class="${!p.team?'on':''}" data-a="setTeam" data-v="${p.id}" data-t="">미정</button></div>
       <button class="ibtn" data-a="renameP" data-v="${p.id}" aria-label="이름 고치기">✏️</button><button class="ibtn danger" data-a="delP" data-v="${p.id}" aria-label="삭제">🗑</button></div>`).join('');
   const und = ps.length-cnt.red-cnt.blue;
-  const tabs = innerTabs('settings', [['list','👥','명단', ps.length], ['add','➕','명단 넣기'], ['att','✅','출석 명단'], ['team','🏷','팀·점수'], ['events','🏅','종목'], ['report','🖨','보고서'], ['reset','🧹','초기화']]);
+  const tabs = innerTabs('settings', [['list','👥','명단', ps.length], ['add','➕','명단 넣기'], ['att','✅','출석 명단'], ['team','🏷','팀·점수'], ['events','🏅','종목'], ['shuttle','🚌','셔틀·채널'], ['report','🖨','보고서'], ['reset','🧹','초기화']]);
   const body = {
     list: () => `<div class="card"><div class="row"><h2 class="grow h2" style="margin:0">참여자 ${ps.length}명</h2><span class="tag blue">${esc(teamShort('blue'))} ${cnt.blue}</span><span class="tag red">${esc(teamShort('red'))} ${cnt.red}</span>${und?`<span class="tag warn">미정 ${und}</span>`:''}</div>
       <p class="sub">팀을 바로 바꿀 수 있습니다. 새로 넣을 사람은 '명단 넣기' 탭에서 붙여 넣습니다.</p>
@@ -33,6 +33,7 @@ function settingsView(){
     <div class="card"><h2>줄다리기 계획 판 수</h2>
       <div class="row"><span class="grow">진행 현황의 남은 시간 계산에 씁니다</span><div class="seg">${[1,3,5].map(n => `<button class="${s.tugRounds===n?'on':''}" data-a="setS" data-k="tugRounds" data-v="${n}">${n}판</button>`).join('')}</div></div></div>`,
     events: eventsTab,
+    shuttle: shuttleSettingsTab,
     report: () => `<div class="card"><h2>결과 보고서 · 내려받기</h2>
       <button class="btn primary wide" data-a="report">🖨 결과 보고서 보기 (인쇄·PDF 저장)</button>
       <div class="row" style="margin-top:10px"><button class="btn grow" data-a="csv" data-v="indiv">개인전 기록 (엑셀용 CSV)</button><button class="btn grow" data-a="csv" data-v="team">단체전 기록 (엑셀용 CSV)</button></div></div>`,

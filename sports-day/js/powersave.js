@@ -29,6 +29,7 @@ function psCanSleep(){
   if(typeof typing === 'function' && typing()) return false;        // 글자를 입력하는 중
   if(typeof DRAG !== 'undefined' && DRAG.active) return false;
   if(TALK.kind && !TALK.toggle) return false;                       // 누르고 말하는 중
+  if(typeof shuttleMode === 'function' && shuttleMode() === 'driver') return false;   // 셔틀 운전자는 남은 거리를 계속 봐야 함
   return true;
 }
 function psSleep(){
@@ -51,8 +52,7 @@ function psRefresh(){
   if(!PS.asleep || !PS.el) return;
   let h = '';
   if(TALK.kind && (TALK.phase === 'wait' || TALK.phase === 'live')) h += `<div class="tx">${TALK.phase === 'wait' ? '연결 중' : (TALK.kind === 'cast' ? '방송 중' : '송신 중')}</div>`;
-  const L = RADIO.lock.radio;
-  if(L && store && L.uid !== store.uid && RADIO.on && radioRoleOK()) h += `<div class="rx">${esc(L.name || '')} 말하는 중</div>`;
+  if(store && RADIO.on && radioRoleOK()) remoteLocks().filter(x => shouldPlay(x.key)).forEach(x => { h += `<div class="rx">${esc(scopeTag(x.key))}${esc(x.lock.name || '')} 말하는 중</div>`; });
   if(h !== PS.sig){ PS.sig = h; const st = document.getElementById('psstat'); if(st) st.innerHTML = h; }
 }
 

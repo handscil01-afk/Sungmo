@@ -1762,3 +1762,79 @@ td.score small{font-size:.7em;margin-left:2px;color:var(--sub);font-weight:700}
   .duel.compact .pcard .lbl{flex:0 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.02em}
   .duel.compact .pcard .nm{flex:0 0 auto;white-space:nowrap}
 }
+
+/* ===================== 무전 채널 · 셔틀 ===================== */
+/* 무전 창: 말할 곳 고르기 [셔틀에게] [전체에게] */
+.wktarget{display:flex;width:100%;max-width:340px;background:#1b212c;border-color:#3a4352}
+.wktarget button{flex:1;min-width:0;color:#e5e7eb;min-height:46px;font-size:17px;padding:4px 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wktarget button+button{border-left-color:#3a4352}
+.wktarget button.on{background:#fff;color:#000}
+.wktarget button:disabled:not(.on){opacity:.4}
+.wkstat .wkrow{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
+.wkstat .wkrow+.wkrow,.wkstat .ok+.wkrow,.wkstat .bad+.wkrow{margin-top:4px}
+.wkstat .wkrow .who{font-weight:900;color:#fff}
+@media (max-height:560px) and (orientation:landscape){ .wktarget{width:min(340px,46vw)} }
+#notice.shuttle .nbox{border-color:#0369a1}
+.item .roleline{display:block}
+
+/* 셔틀 운전자·보조 화면: 반 화면(약 360×330)에서도 스크롤 없이 */
+.shut{flex:1;min-height:0;width:100%;max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:clamp(4px,1.5vh,12px)}
+.shut>*{flex:none}
+.shdests{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.shdests button{flex:1 0 auto;min-height:clamp(34px,7vh,48px);border:2px solid var(--line2);background:var(--card);border-radius:12px;font-weight:800;font-size:clamp(14px,2.6vh,17px);padding:2px 10px;white-space:nowrap}
+.shdests button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.shdests.one{justify-content:center;font-size:clamp(15px,2.8vh,19px)}
+.shdist{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--card);border:2px solid var(--line);border-radius:16px;line-height:1.05;overflow:hidden}
+.shdist small{font-size:clamp(11px,2.2vh,16px);font-weight:800;color:var(--sub)}
+.shdist b{font-size:clamp(38px,15vh,104px);font-weight:900;font-variant-numeric:tabular-nums;letter-spacing:-.02em;white-space:nowrap}
+.shgps{text-align:center;font-size:clamp(11px,2vh,14px);color:var(--sub);font-weight:700;line-height:1.2}
+.shwarn{background:#d10f2f;color:#fff;border-radius:12px;padding:6px 10px;font-weight:900;font-size:clamp(13px,2.6vh,18px);line-height:1.25;text-align:center}
+.shwarn[hidden]{display:none}
+.shwarn small{display:block;font-weight:700;opacity:.92;font-size:clamp(11px,1.9vh,13px);margin-top:1px}
+.shut.warned .shdist small,.shut.warned .shgps{display:none}
+.shut.warned .shdist b{font-size:clamp(34px,11vh,80px)}
+.shptt{display:flex;gap:8px;align-items:stretch;height:clamp(56px,17vh,130px)}
+.shtg{flex-direction:column;width:clamp(80px,26vw,120px);flex:none}
+.shtg button{flex:1;min-height:0;padding:2px 6px;font-size:clamp(14px,2.6vh,17px)}
+.shtg button+button{border-left:0;border-top:2px solid var(--line2)}
+.wkbig.shbig{flex:1;width:auto;min-width:0;aspect-ratio:auto;border-radius:18px;border-width:4px;flex-direction:row;gap:10px;padding:0 10px}
+.shbig .ic{font-size:clamp(24px,6vh,44px)}
+.shbig .lb{font-size:clamp(17px,3.6vh,28px);max-width:none}
+.shbig .hint{display:none}
+.shbig.live{transform:none}
+.shhelp{border:0;background:none;color:var(--blue-ink);font-weight:800;font-size:clamp(12px,2.2vh,15px);text-decoration:underline;padding:0 4px;min-height:0;line-height:1.2}
+.shut.helper .shstat{display:flex;flex-direction:column;gap:6px}
+.shline{border-radius:14px;padding:clamp(8px,2vh,14px) 12px;font-weight:900;font-size:clamp(15px,3vh,22px);line-height:1.25;text-align:center;border:3px solid var(--line2);background:var(--card)}
+.shline small{font-size:.7em;opacity:.8}
+.shline.ok{border-color:var(--ok);background:var(--ok-soft);color:#064e2a}
+.shline.bad{border-color:var(--red);background:var(--red-soft);color:var(--red-ink)}
+.shline.off{color:var(--sub)}
+.shalerts{flex:1 1 auto;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:4px}
+.shalerts small{font-size:13px;font-weight:800;color:var(--sub)}
+.shal{display:flex;gap:8px;align-items:baseline;background:var(--card);border:2px solid var(--line);border-radius:10px;padding:4px 10px;font-size:clamp(14px,2.6vh,17px)}
+.shal span{color:var(--sub);font-weight:700;flex:none}
+.shal.none{color:var(--sub)}
+.shut.helper .shptt{height:clamp(64px,22vh,130px)}
+.shsteps{padding-left:22px;margin:8px 0;line-height:1.5}
+.shsteps li{margin-bottom:6px}
+.shprog .shstat{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.shprog .shline{font-size:17px;padding:8px 12px}
+
+/* 마스터: 셔틀·채널 설정 */
+.shset .shtop{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.shset .shtop h2{margin:0;font-size:20px}
+.shcols{display:grid;grid-template-columns:minmax(0,1fr);gap:0 10px}
+@media (min-width:760px){ .shcols{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);align-items:start} }
+@media (min-width:1000px){ .shset.bctl{max-width:1240px} .shcols{grid-template-columns:minmax(0,1fr) minmax(0,1.9fr)} }
+.shr1{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name del" "coord here";gap:6px;margin-bottom:6px;align-items:center}
+.shr1 .shi-name{grid-area:name}.shr1 .shi-del{grid-area:del}.shr1 .shi-coord{grid-area:coord}.shr1 .shi-here{grid-area:here;white-space:nowrap}
+@media (min-width:1000px){ .shr1{grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto auto;grid-template-areas:"name coord here del"} }
+.shdc .shcs{display:inline-flex;margin:0 4px 0 0}
+.shset .list .item{min-height:48px;padding:6px 4px}
+.shdc{padding:10px 12px!important}
+.shdc input{padding:8px 10px;min-height:42px}
+.shcs{margin:6px 0 4px}
+.shal-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.shnum{display:inline-flex;align-items:center;gap:3px}
+.shnum input{width:88px;padding:6px 8px;min-height:38px}
+.ibtn.xs{width:30px;height:30px;font-size:13px;border-radius:8px}
