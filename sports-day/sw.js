@@ -1,4 +1,4 @@
-const CACHE = 'sports-day-v20';
+const CACHE = 'sports-day-v21';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './roger.wav',
   './css/app.css',
   './js/config.js', './js/util.js', './js/store.js', './js/data.js', './js/shell.js',

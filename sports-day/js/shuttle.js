@@ -291,7 +291,7 @@ function shuttleSettingsTab(){
         <div class="card"><h2>📡 무전 채널</h2>
           <p class="sub">채널의 말은 그 채널 사람과 운영진(마스터·운영 현황)만 듣습니다. 채널은 담당자 명단에서 사람마다 정합니다.</p>
           <div class="list"><div class="item"><span class="name">전체<span class="sub">모든 진행요원 · 고정</span></span><span class="tag">고정</span></div>${chRows}</div>
-          <div class="row nowrap" style="margin-top:8px"><input id="chNew" placeholder="새 채널 이름 (예: 주차)" autocomplete="off"><button class="btn primary" data-a="chAdd">추가</button></div>
+          <div class="row nowrap" style="margin-top:8px"><input id="chNew" placeholder="새 채널 이름 (예: 주차)" autocomplete="off"><button class="btn primary" data-a="chAdd" style="white-space:nowrap;flex:none">추가</button></div>
           ${chs.length ? '<button class="btn danger wide" data-a="chClear" style="margin-top:8px">채널 모두 지우기</button>' : '<p class="sub">만든 채널이 없습니다. 전체 무전만 씁니다.</p>'}
         </div>
         <div class="card"><h2>이 알림은 이렇게 갑니다</h2>
