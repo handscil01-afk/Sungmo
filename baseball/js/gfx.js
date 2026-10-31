@@ -286,7 +286,8 @@ function drawFieldScene(G, A){
   const chase = bb.hit === 4 ? fm(ang, fenceAt(G, ang) - 3) : land;
   let near = 'CF', nd = 1e9;
   const pts = {}; Object.keys(FPOS).forEach(p => { pts[p] = fm(FPOS[p][0], FPOS[p][1]); const dd = Math.hypot(pts[p].x - chase.x, pts[p].y - chase.y); if(dd < nd){ nd = dd; near = p; } });
-  const people = Object.keys(FPOS).map(p => { const hp = pts[p], go = p === near ? Math.min(1, k * 1.15) : 0; return [hp.x + (chase.x - hp.x) * go, hp.y + (chase.y - hp.y) * go, F.color, p === near && go < 1 ? Math.floor(k * 12) : 0]; });
+  const people = Object.keys(FPOS).map(p => { const hp = pts[p], go = p === near ? Math.min(1, k * (bb.hit ? 0.8 : 1.15)) : 0;   // 아웃은 떨어지기 전에 잡고, 안타는 공이 떨어진 뒤에야 쫓아감
+    return [hp.x + (chase.x - hp.x) * go, hp.y + (chase.y - hp.y) * go, F.color, p === near && go < 1 ? Math.floor(k * 12) : 0]; });
   people.push([home.x, home.y + 12, F.color, 0]);   // 포수
   // 타자 주자: 1루로 뜀 / 결과가 나오면 지금 주자 자리
   if(A.ph === 'fly'){ const b1 = fm(...BASE_POL[0]), q = Math.min(1, k * 1.3); people.push([home.x + (b1.x - home.x) * q, home.y + (b1.y - home.y) * q, T.color, Math.floor(k * 12)]); }
