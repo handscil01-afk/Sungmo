@@ -8,16 +8,27 @@
 const GX = { W:256, H:224, cv:null, ctx:null, key:'', anim:null, queue:[], raf:0, img:{}, tinted:{}, meta:{}, cam:{ x:0, y:0 }, lastAnimN:null, lastPlayN:null };
 const PAL = { sky:'#5c94fc', stand:'#3c3c64', fence:'#00682c', grass:'#38a838', grass2:'#4cbc4c', dirt:'#c88850', dirt2:'#b87840', line:'#fcfcfc',
   skin:'#f8b878', white:'#fcfcfc', black:'#000000', glove:'#a85010', bat:'#e4a050', ball:'#fcfcfc', ink:'#fcfc54', red:'#f83800' };
-const GX_FILES = ['bg-pitch', 'bg-field', 'pitcher', 'batter', 'catcher', 'fielder', 'banners', 'banners2', 'umpire', 'umpire-s', 'runner', 'tv'];
+const GX_FILES = ['bg-pitch', 'bg-field', 'pitcher', 'batter', 'catcher', 'fielder', 'banners', 'banners2', 'umpire', 'umpire-s', 'runner', 'tv', 'fielder2', 'runner-s'];
 // 결과 글씨 (banners.png를 쓸 때는 이 순서로 한 줄에 하나씩, 128×32)
 const BANNERS = ['스트라이크!', '볼', '헛스윙!', '파울', '안타!', '2루타!', '3루타!', '홈런!', '아웃!', '삼진!', '볼넷', '세이프!', '몸에 맞는 공'];
 const BANNERS2 = ['비디오 판독', '판정 번복!', '원심 유지', '견제!', '도루!', '병살!', '끝내기!', '게임 셋!'];
+// 결과 글씨: 화면 해상도 그대로 글꼴로 그려 매끈하게 (두꺼운 검정 테두리 + 아래쪽 그림자). 홈런은 별 모양 바탕
 function banner(text, y, color, size){
-  for(const [file, list] of [['banners', BANNERS], ['banners2', BANNERS2]]){
-    const im = GX.img[file], m = GX.meta[file], i = list.indexOf(text);
-    if(im && m && i >= 0 && im.height >= (i + 1) * m.h){ const sc = m.scale || 1, w = m.w / sc, h = m.h / sc; GX.ctx.drawImage(im, 0, i * m.h, m.w, m.h, Math.round(128 - w / 2), Math.round(y + 12 - h / 2), w, h); return; }
+  const ctx = GX.ctx, fs = Math.round(size * 1.15);
+  ctx.save();
+  ctx.font = `900 ${fs}px 'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  const cy = y + 12;
+  if(text === '홈런!'){
+    const w = ctx.measureText(text).width / 2 + 16;
+    ctx.beginPath();
+    for(let i = 0; i < 28; i++){ const a = i / 28 * Math.PI * 2, r = i % 2 ? 0.72 : 1; ctx.lineTo(128 + Math.cos(a) * w * r, cy + Math.sin(a) * (fs * 0.95) * r); }
+    ctx.closePath(); ctx.fillStyle = '#fce000'; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = '#f83800'; ctx.stroke();
   }
-  pxText(text, 128, y, color, size);
+  ctx.lineWidth = fs * 0.28; ctx.strokeStyle = '#000';
+  ctx.strokeText(text, 128, cy + 1.5); ctx.strokeText(text, 128, cy);
+  ctx.fillStyle = color; ctx.fillText(text, 128, cy);
+  ctx.restore();
 }
 
 // img/index.json에 적힌 그림만 불러옴 (없는 파일을 찾느라 오류가 나지 않게)
@@ -52,21 +63,15 @@ function tinted(name, color){
 }
 const R = (x, y, w, h, c) => { GX.ctx.fillStyle = c; GX.ctx.fillRect(Math.round(x), Math.round(y), w, h); };
 // 도트 글씨: 글자를 그린 뒤 반투명한 테두리를 없애 또렷하게
-// 글씨: 그림판이 2배 해상도라 글씨는 2배 크기로 만들어 반으로 줄여 그림 (도트 그림보다 또렷하게)
+// 작은 글씨(점수판 등): 화면 해상도 그대로 글꼴로 그림
 function pxText(str, x, y, color, size = 10, center = true, outline = true){
-  const k = `t${str}${color}${size}${outline}`;
-  let c = GX.tinted[k];
-  if(!c){
-    const S = size * 2, font = `bold ${S}px 'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif`;
-    const m = document.createElement('canvas').getContext('2d'); m.font = font;
-    const w = Math.ceil(m.measureText(str).width) + 8, h = S + 10;
-    c = document.createElement('canvas'); c.width = w; c.height = h;
-    const t = c.getContext('2d'); t.font = font; t.textBaseline = 'top'; t.lineJoin = 'round';
-    if(outline){ t.strokeStyle = '#000'; t.lineWidth = 4; t.strokeText(str, 4, 4); }
-    t.fillStyle = color; t.fillText(str, 4, 4);
-    GX.tinted[k] = c;
-  }
-  GX.ctx.drawImage(c, center ? x - c.width / 4 : x, y, c.width / 2, c.height / 2);
+  const ctx = GX.ctx;
+  ctx.save();
+  ctx.font = `bold ${size}px 'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif`;
+  ctx.textAlign = center ? 'center' : 'left'; ctx.textBaseline = 'top'; ctx.lineJoin = 'round';
+  if(outline){ ctx.lineWidth = size * 0.22; ctx.strokeStyle = '#000'; ctx.strokeText(str, x, y + 1); }
+  ctx.fillStyle = color; ctx.fillText(str, x, y + 1);
+  ctx.restore();
 }
 
 /* ---------- 코드로 그린 사람 (그림 파일이 없을 때) ----------
@@ -97,7 +102,7 @@ function person(x, y, team, pose, flip){
   else if(pose === 'bunt'){ P(-2, 7, 2, 2, PAL.skin); P(-6, 6, 12, 2, PAL.bat); }
 }
 // 그림 파일의 동작 칸 (img/index.json의 칸 크기·줄 수). 발끝 가운데를 (x, foot)에 맞춰 그림
-const POSE_FRAME = { set:0, lift:1, throw:2, follow:3, stance:0, swing:1, swfollow:2, bunt:3, u0:0, u1:1, u2:2, u3:3, u4:4, run0:0, run1:1, slideH:2, slideF:3, tag0:4, tag1:5, throw0:6, throw1:7 };
+const POSE_FRAME = { set:0, lift:1, throw:2, follow:3, stance:0, swing:1, swfollow:2, bunt:3, u0:0, u1:1, u2:2, u3:3, u4:4, run0:0, run1:1, slideH:2, slideF:3, tag0:4, tag1:5, throw0:6, throw1:7, p0:0, p1:1, p2:2, p3:3 };
 function drawPerson(kind, x, foot, team, pose, flip, row = 0){
   const im = tinted(kind, team), m = GX.meta[kind];
   if(im && m){
@@ -177,7 +182,7 @@ function drawPitchScene(G, A){
   GX.ctx.lineWidth = 1;
   if(GX.meta.umpire && L === LAY_IMG){
     const call = A && ph === 'result' ? ({ '스트라이크!':'u1', '삼진!':'u1', '헛스윙!':'u1', '파울':'u3' })[A.banner] || 'u0' : 'u0';
-    if(call !== 'u0') drawPerson('umpire', 140, 238, '#ff00ff', call, false);   // 주심은 콜할 때만 보임
+    if(call !== 'u0') drawPerson('umpire', 150, 214, '#ff00ff', call, false);   // 주심은 콜할 때만, 포수 뒤(더 멀리)에 작게
   }
   drawPerson('catcher', L.catcher[0], L.catcher[1], F.color, 'squat', false);
   // 공: 투수 손에서 나와 구종에 따라 휘며 커짐 (왼손 투수는 반대쪽 손)
@@ -201,7 +206,8 @@ function drawPitchScene(G, A){
   if(A && (ph === 'flight' && A.t0 > 0.8 || ph === 'result')){ if(A.res === 'bunt') bPose = 'bunt'; else if(['whiff', 'foul', 'inplay'].includes(A.res)) bPose = ph === 'result' && A.t0 > 0.3 ? 'swfollow' : 'swing'; }
   const bp = left ? L.batL : L.batR;
   // 서 있는 자세만 반대로 뒤집음 (왼쪽 타석은 방망이를 오른쪽에 들고 섬). 휘두르는 그림은 원래 방향 그대로
-  drawPerson('batter', bp[0], bp[1], T.color, bPose, bPose === 'stance' ? !left : left);
+  // 왼쪽 타석(오른손): 방망이를 오른쪽에 들고 서서 왼쪽으로 휘두르고, 휘두른 뒤 방망이가 왼쪽 위로. 오른쪽 타석은 그 반대
+  drawPerson('batter', bp[0], bp[1], T.color, bPose, (bPose === 'stance' || bPose === 'swing') ? !left : left);
   scoreBar(G);
   if(A && ph === 'result' && A.banner) banner(A.banner, 112, A.bannerColor || PAL.ink, 22);
 }
@@ -253,8 +259,12 @@ function bgField(G){
 }
 const BASE_POL = [[0.785, 27.4], [0, 38.8], [-0.785, 27.4]];
 const FPOS = { P:[0, 18.4], '1B':[0.6, 30], '2B':[0.2, 39], SS:[-0.2, 39], '3B':[-0.6, 30], LF:[-0.5, 82], CF:[0, 94], RF:[0.5, 82] };
-function tinyPlayer(x, y, team, frame){
-  if(tinted('fielder', team) && GX.meta.fielder){ drawPerson('fielder', x, y, team, ['set', 'lift', 'throw', 'follow'][frame % 4], false); return; }
+// 수비 화면의 작은 사람. mode: ready 서 있음 · run 달림 · catch 공 잡음 · throw 던짐 · runner 주자 달림 · base 베이스 위 주자
+function tinyPlayer(x, y, team, mode, frame = 0, flip = false){
+  const has = n => GX.meta[n] && tinted(n, team);
+  if(mode === 'run' && has('fielder')) return drawPerson('fielder', x, y, team, ['set', 'lift', 'throw', 'follow'][frame % 4], false);
+  if((mode === 'runner' || mode === 'base') && has('runner-s')) return drawPerson('runner-s', x, y, team, mode === 'base' ? 'p0' : ['p0', 'p1'][frame % 2], flip);
+  if(has('fielder2')) return drawPerson('fielder2', x, y, team, { ready:'p1', catch:'p0', throw: frame % 2 ? 'p3' : 'p2' }[mode] || 'p1', flip);
   R(x - 2, y - 7, 4, 2, team); R(x - 2, y - 5, 4, 2, PAL.skin); R(x - 3, y - 3, 6, 4, PAL.white);
   R(x - 3 + (frame % 2), y + 1, 2, 2, PAL.white); R(x + 1 - (frame % 2), y + 1, 2, 2, PAL.white);
 }
@@ -286,12 +296,18 @@ function drawFieldScene(G, A){
   const chase = bb.hit === 4 ? fm(ang, fenceAt(G, ang) - 3) : land;
   let near = 'CF', nd = 1e9;
   const pts = {}; Object.keys(FPOS).forEach(p => { pts[p] = fm(FPOS[p][0], FPOS[p][1]); const dd = Math.hypot(pts[p].x - chase.x, pts[p].y - chase.y); if(dd < nd){ nd = dd; near = p; } });
-  const people = Object.keys(FPOS).map(p => { const hp = pts[p], go = p === near ? Math.min(1, k * (bb.hit ? 0.8 : 1.15)) : 0;   // 아웃은 떨어지기 전에 잡고, 안타는 공이 떨어진 뒤에야 쫓아감
-    return [hp.x + (chase.x - hp.x) * go, hp.y + (chase.y - hp.y) * go, F.color, p === near && go < 1 ? Math.floor(k * 12) : 0]; });
-  people.push([home.x, home.y + 12, F.color, 0]);   // 포수
+  // 공에 가장 가까운 야수만 쫓아감: 아웃은 떨어지기 전에 도착해 잡고, 안타는 공이 떨어진 뒤에야 도착해 던짐. 나머지는 서 있음
+  const people = Object.keys(FPOS).map(p => {
+    const hp = pts[p];
+    if(p !== near) return [hp.x, hp.y, F.color, 'ready', 0, hp.x < chase.x];
+    const go = Math.min(1, k * (bb.hit ? 0.8 : 1.15)), x = hp.x + (chase.x - hp.x) * go, y = hp.y + (chase.y - hp.y) * go;
+    const mode = go < 1 ? 'run' : bb.hit ? 'throw' : 'catch';
+    return [x, y, F.color, A.ph === 'fresult' ? (bb.hit ? 'throw' : 'catch') : mode, Math.floor(k * 12), x < home.x];
+  });
+  people.push([home.x, home.y + 12, F.color, 'ready', 0, false]);   // 포수
   // 타자 주자: 1루로 뜀 / 결과가 나오면 지금 주자 자리
-  if(A.ph === 'fly'){ const b1 = fm(...BASE_POL[0]), q = Math.min(1, k * 1.3); people.push([home.x + (b1.x - home.x) * q, home.y + (b1.y - home.y) * q, T.color, Math.floor(k * 12)]); }
-  else G.bases.forEach((r, i) => { if(r != null){ const b = fm(...BASE_POL[i]); people.push([b.x, b.y + 2, T.color, 0]); } });
+  if(A.ph === 'fly'){ const b1 = fm(...BASE_POL[0]), q = Math.min(1, k * 1.3); people.push([home.x + (b1.x - home.x) * q, home.y + (b1.y - home.y) * q, T.color, q < 1 ? 'runner' : 'base', Math.floor(k * 12), false]); }
+  else G.bases.forEach((r, i) => { if(r != null){ const b = fm(...BASE_POL[i]); people.push([b.x, b.y + 2, T.color, 'base', 0, false]); } });
   people.sort((p, q) => p[1] - q[1]).forEach(p => tinyPlayer(...p));   // 먼 사람부터 그려서 가까운 사람이 앞에
   // 심판: 결과가 나오면 1루심(세이프·아웃) 또는 주심(홈런)이 콜
   if(A.ph === 'fresult' && GX.meta['umpire-s']){
@@ -311,7 +327,7 @@ function drawFieldScene(G, A){
 function fireworks(now){
   const cols = [PAL.red, PAL.ink, '#3cbcfc', '#58d854', PAL.white];
   for(let i = 0; i < 4; i++){
-    const t = ((now / 900) + i * 0.27) % 1, cx = [50, 206, 90, 170][i], cy = [50, 56, 36, 40][i], r = 4 + t * 22;
+    const t = ((now / 900) + i * 0.27) % 1, cx = [50, 206, 90, 170][i], cy = [74, 80, 60, 64][i], r = 4 + t * 22;
     for(let j = 0; j < 10; j++){ const a = j / 10 * 6.283; R(cx + Math.cos(a) * r, cy + Math.sin(a) * r + t * 6, 2, 2, cols[(i + j) % cols.length]); }
   }
 }
@@ -538,6 +554,16 @@ function gfxTick(){
   else drawPitchScene(G, A.res === 'inplay' && A.ph === 'result' && A.bb ? { ...A, banner:null } : A);
   if(GX.anim) GX.raf = requestAnimationFrame(gfxTick);
 }
+// 그림판 내부 해상도 = 보이는 크기 × 기기 픽셀 비율. 그림은 언제나 256×224 좌표로 그림
+function gfxSize(){
+  const cv = GX.cv; if(!cv) return;
+  const w = Math.max(256, Math.round((cv.clientWidth || 256) * (window.devicePixelRatio || 1)));
+  const h = Math.round(w * 224 / 256);
+  if(cv.width !== w || cv.height !== h){ cv.width = w; cv.height = h; }
+  GX.ctx.setTransform(w / 256, 0, 0, h / 224, 0, 0);
+  GX.ctx.imageSmoothingEnabled = false;
+  if(!GX.raf) GX.raf = requestAnimationFrame(gfxTick);
+}
 // render()가 부름: 화면 모드일 때 상황판 자리에 그림판을 두고, 새 투구·플레이가 있으면 움직임을 시작
 function gfxRender(G, fx, lines){
   const bs = $('#boardSec');
@@ -545,8 +571,10 @@ function gfxRender(G, fx, lines){
   if(!wrap){
     wrap = document.createElement('div'); wrap.className = 'gfxwrap'; wrap.setAttribute('aria-hidden', 'true');
     wrap.innerHTML = '<canvas id="gfx" width="512" height="448"></canvas>';
-    GX.cv = wrap.firstChild; GX.ctx = GX.cv.getContext('2d'); GX.ctx.imageSmoothingEnabled = false; GX.key = '';
-    GX.ctx.setTransform(2, 0, 0, 2, 0, 0);   // 그림은 256×224 좌표로 그리고 2배로 (글씨는 2배 해상도 그대로)
+    GX.cv = wrap.firstChild; GX.ctx = GX.cv.getContext('2d'); GX.key = '';
+    gfxSize();
+    // 그림판 크기가 바뀌면 화면 실제 픽셀 수에 맞춰 다시 만듦 (늘려서 생기는 계단·자글거림을 없앰)
+    if(window.ResizeObserver) new ResizeObserver(() => gfxSize()).observe(GX.cv);
     if(!GX.img.__) gfxLoad();
   }
   bs.prepend(wrap);
