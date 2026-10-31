@@ -65,7 +65,7 @@ function mgrOff(){
     { n:2, t:'적극적으로 쳐라', s:'초구부터 노리고 장타를 노립니다. 삼진이 늘 수 있습니다.', act: order('aggr') },
     { n:3, t:'신중하게 골라라', s:'공을 많이 보고 볼넷을 노립니다. 장타는 줄어듭니다.', act: order('patient') },
     { n:4, t: bs[2] != null ? '스퀴즈 번트' : runners ? '희생 번트' : '기습 번트', s: runners ? '타자는 아웃되더라도 주자를 한 베이스 보냅니다.' : '빠른 발로 1루를 노립니다.', act: order('bunt') },
-    { n:5, t:'도루', hide: !runner || !canSteal(G), s: runner ? `${runner.name}, 스피드 ${runner.spd}. 첫 공에 뜁니다.` : '', act: order('steal') },
+    stealOpt(5, '첫 공에 뜁니다.', (from, v) => submit('off', { k:'steal', from }, v)),
     { n:6, t:'히트 앤드 런', hide: bs[0] == null || !canSteal(G), s:'1루 주자가 먼저 뛰고 타자는 꼭 맞힙니다. 병살을 피하고 한 베이스 더 갈 수 있지만, 헛스윙하면 주자가 잡힐 수 있습니다.', act: order('hitrun') },
     { n:7, t:'대타', hide: !bench || G.pitchNo > 0, s:`벤치 ${T.bench.length}명`, act: v => go(phScreen, v) },
     { n:8, t:'대주자', hide: !bench || !runners, act: v => go(() => prScreen(-1), v) },
@@ -84,6 +84,7 @@ function mgrDef(){
     { n:5, t:'투수 교체', s: bench.length ? `불펜 ${bench.length}명` : '바꿀 투수가 없습니다.', hide: !bench.length, act: v => go(bullpenScreen, v) },
     { n:6, t:'수비 위치', s:`지금 내야 ${ALIGN_IN[T.align.inf]}, 외야 ${ALIGN_OUT[T.align.of]}`, act: v => go(alignScreen, v) },
     { n:7, t:'투수 상태 듣기', act: v => note([pitcherInfo(G, T, T.pi, true)], v) },
+    pickOpt(8),
     { n:9, t:'더 보기', s:'점수판, 선수 정보, 묻는 때, 설정', act: v => go(moreScreen, v) },
   ] };
 }

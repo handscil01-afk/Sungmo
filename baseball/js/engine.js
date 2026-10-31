@@ -181,6 +181,7 @@ function beginGame(G){
     G.teams.forEach(T => { const P = T.pit[T.pi]; emit(G, `${T.short} 선발 투수 ${P.name}${P.cond >= 1 ? ', 몸이 가벼워 보입니다' : P.cond <= -1 ? ', 몸이 조금 무거워 보입니다' : ''}.`, 'n'); });
   }
   emit(G, `1회초, ${A.short}의 공격입니다.`, 'i');
+  fx(G, 'start');
   startPA(G);
 }
 const parkOf = G => G.park || parkInfo('star');
@@ -236,7 +237,7 @@ function pitcherInfo(G, T, i, own){
 
 /* ---------- 타석 시작 · 끝 ---------- */
 function startPA(G){
-  G.balls = 0; G.strikes = 0; G.pitchNo = 0; G.prev = null;
+  G.balls = 0; G.strikes = 0; G.pitchNo = 0; G.prev = null; G.held = {};
   if(G.ctrl[1 - batIdx(G)] === 'cpu' && typeof aiManage === 'function') aiManage(G);
   const T = batTeam(G), B = curBatter(G);
   B.st.pa++;
@@ -250,7 +251,7 @@ function startPA(G){
     else if(B.cond === -1) s += ' 컨디션이 썩 좋아 보이지 않습니다.';
     else if(B.cond <= -2) s += ' 오늘 몸이 무거워 보입니다.';
   }
-  emit(G, s, 'n');
+  emit(G, s, 'n'); fx(G, 'batter');
   if(G.mode === 'manager' && G.ctrl[batIdx(G)] === 'cpu' && typeof aiManageOff === 'function') aiManageOff(G);
   // 지친 투수 알림 (사람이 수비할 때 판단하도록)
   const P = curPitcher(G), f = fatigue(P);
@@ -420,15 +421,51 @@ const errorChance = F => clamp(0.018 + (60 - F.def) / 2000, 0.004, 0.05);
 
 /* ---------- 도루 ---------- */
 function canSteal(G){ const b = G.bases; return (b[0] != null && b[1] == null) || (b[1] != null && b[2] == null); }
+// 도루할 수 있는 경우: 0 1루→2루 · 1 2루→3루 · 'double' 1·2루 주자가 함께 · 2 3루→홈(홈스틸)
+function stealCands(G){
+  const b = G.bases, out = [];
+  if(b[0] != null && b[1] == null) out.push(0);
+  if(b[1] != null && b[2] == null) out.push(1);
+  if(b[0] != null && b[1] != null && b[2] == null) out.push('double');
+  if(b[2] != null) out.push(2);
+  return out;
+}
+function stealLabel(G, f){
+  const T = batTeam(G), b = G.bases, R = k => T.bat[b[k]];
+  if(f === 'double') return `더블 스틸: 2루 주자 ${josa(R(1).name, '과', '와')} 1루 주자 ${josa(R(0).name, '이', '가')} 함께 뜁니다`;
+  if(f === 2) return `홈스틸: 3루 주자 ${R(2).name}, 스피드 ${R(2).spd}. 성공하기 어렵습니다`;
+  return `${f + 1}루 주자 ${R(f).name}, ${f + 2}루 도루. 스피드 ${R(f).spd}`;
+}
 // allowRev: 아슬아슬하면 비디오 판독으로 넘김 (도루 뒤에 타석이 이어지는 경우만)
-function doSteal(G, simple, breaking, allowRev){
+// pick: 고른 주자 (0·1·2·'double'). 없으면 앞 주자 가운데 갈 수 있는 사람
+function doSteal(G, simple, breaking, allowRev, pick){
   const b = G.bases, T = batTeam(G), F = fieldTeam(G);
-  const from = (b[1] != null && b[2] == null) ? 1 : (b[0] != null && b[1] == null) ? 0 : -1;
-  if(from < 0) return;
+  const cands = stealCands(G);
+  let from = cands.includes(pick) ? pick : (b[1] != null && b[2] == null) ? 1 : (b[0] != null && b[1] == null) ? 0 : -1;
+  if(from === -1) return;
+  const dbl = from === 'double';
+  if(dbl) from = 1;   // 포수는 앞 주자(3루)로 던짐. 뒤 주자는 그사이 2루로 감
   const r = b[from], R = T.bat[r], C = F.bat.find(x => x.pos === 'C');
   const sp = simple ? 55 : R.spd, arm = simple ? 50 : (C ? C.def : 50);
-  const p = clamp(simple ? 0.6 : 0.64 + (sp - 55) / 90 - (arm - 50) / 250 - (from === 1 ? 0.1 : 0) + (breaking ? 0.06 : 0), 0, 1);
-  const to = from === 1 ? '3루' : '2루', th = Math.round(p * 100), d = rint(G, 1, 100), ok = d <= th;
+  const held = Math.min(0.16, ((G.held || {})[from] || 0) * 0.08);   // 견제를 받은 주자는 리드가 작아짐
+  let p = clamp(simple ? 0.6 : 0.64 + (sp - 55) / 90 - (arm - 50) / 250 - (from === 1 ? 0.1 : 0) + (breaking ? 0.06 : 0), 0, 1) - held;
+  if(from === 2) p = clamp((simple ? 0.2 : 0.18 + (sp - 55) / 150) - held, 0.03, 0.4);
+  if(dbl) p -= 0.05;
+  const to = from === 2 ? '홈' : from === 1 ? '3루' : '2루', th = Math.round(clamp(p, 0, 1) * 100), d = rint(G, 1, 100), ok = d <= th;
+  if(dbl){
+    emit(G, `더블 스틸! 1루 주자와 2루 주자가 함께 뜁니다. 판정 확률 ${th}퍼센트, 주사위 ${d}.`, 'd');
+    const r0 = b[0]; b[0] = null;
+    stealResult(G, 1, r, '3루', ok, simple);
+    if(G.bases[1] == null){ G.bases[1] = r0; T.bat[r0].st.sb++; emit(G, `1루 주자 ${josa(T.bat[r0].name, '은', '는')} 2루까지 갑니다.`, 'r'); }
+    return;
+  }
+  if(from === 2){
+    emit(G, `판정 홈스틸: 확률 ${th}퍼센트, 주사위 ${d}, ${ok ? '세이프' : '아웃'}.`, 'd');
+    b[2] = null;
+    if(ok){ R.st.sb++; emit(G, `${R.name}, 홈으로 파고듭니다! 홈스틸 성공!`, 'r'); fx(G, 'safe'); scoreRuns(G, [r], false); }
+    else { addOut(G); emit(G, `${R.name}, 홈으로 뛰었지만 포수 ${fielder(F, 'C').replace(/^포수 /, '')}에게 태그 아웃! ${G.outs}아웃.`, 'r'); fx(G, 'out'); }
+    return;
+  }
   emit(G, `판정 도루: 확률 ${th}퍼센트, 주사위 ${d}, ${ok ? '세이프' : '아웃'}.`, 'd');
   if(allowRev && Math.abs(d - th) <= 6){
     const call = ok ? 'safe' : 'out';
@@ -447,6 +484,36 @@ function stealResult(G, from, r, to, ok, simple){
     b[from] = null; addOut(G);
     emit(G, `${R.name}, ${to} 도루 실패. ${simple ? '포수' : fielder(F, 'C')}의 송구에 아웃됩니다. ${G.outs}아웃.`, 'r'); fx(G, 'out');
   }
+}
+
+/* ---------- 견제 ----------
+   수비 팀이 주자를 견제: 대부분 세이프지만 가끔 잡거나(아웃), 악송구로 주자가 나아감.
+   견제를 받은 주자는 리드가 작아져서 이번 타석의 도루 성공 확률이 줄어듦 */
+function pickoff(G, base){ doPickoff(G, base); if(!G.review && G.outs >= 3) endPA(G, true); return flush(G); }
+function doPickoff(G, base){
+  const T = batTeam(G), F = fieldTeam(G), P = curPitcher(G), r = G.bases[base];
+  if(r == null) return;
+  const R = T.bat[r], fld = fielder(F, ['1B', '2B', '3B'][base]);
+  P.load += 0.3;
+  (G.held ||= {})[base] = ((G.held || {})[base] || 0) + 1;
+  const lead = R.spd >= 70 ? 1.4 : R.spd >= 55 ? 1 : 0.7;   // 빠른 주자는 리드를 크게 잡아 잘 걸림
+  const p = clamp([0.06, 0.035, 0.02][base] * lead + (P.ctl - 50) / 1000, 0.01, 0.15), th = Math.round(p * 100), d = rint(G, 1, 100);
+  emit(G, `판정 견제: 잡을 확률 ${th}퍼센트, 주사위 ${d}.`, 'd');
+  const intro = pickOne(G, [`${P.name}, ${base + 1}루로 견제구!`, `빠른 동작으로 ${base + 1}루 견제!`, `투수가 돌아서며 ${base + 1}루로 던집니다!`]);
+  if(d > 97){   // 악송구: 주자들이 한 베이스씩
+    emit(G, `${intro} 아, 공이 뒤로 빠집니다! 견제 악송구, 주자들이 한 베이스씩 나아갑니다.`, 'r'); F.E++; fx(G, 'safe');
+    const b = G.bases, sc = []; if(b[2] != null) sc.push(b[2]);
+    G.bases = [null, b[0], b[1]]; scoreRuns(G, sc, false); return;
+  }
+  const ok = d <= th;
+  if(Math.abs(d - th) <= 2){
+    const call = ok ? 'out' : 'safe';
+    openReview(G, { kind:'pick', call, side: ok ? batIdx(G) : 1 - batIdx(G), p:0.4, data:{ base, r },
+      say: `${intro} ${R.name}, 몸을 날려 돌아갑니다… 아슬아슬! 원심은 ${callWord(call)}. ${ok ? `${R.name}, 손이 먼저 들어갔다며 강하게 어필합니다.` : `${josa(fld, '이', '가')} 태그가 먼저였다며 강하게 어필합니다.`}` });
+    return;
+  }
+  if(ok){ G.bases[base] = null; addOut(G); emit(G, `${intro} ${R.name}, 귀루가 늦었습니다! 견제사, 아웃! ${G.outs}아웃.`, 'r'); fx(G, 'out'); return; }
+  emit(G, pickOne(G, [`${intro} ${R.name}, 슬라이딩으로 돌아갑니다. 세이프.`, `${intro} 주자는 여유 있게 귀루합니다.`, `${intro} ${R.name}, 손이 먼저 들어갑니다. 세이프.`, `${intro} 주자를 묶어 둡니다. 세이프.`]), 'r');
 }
 
 /* ---------- 비디오 판독 ----------
@@ -478,6 +545,11 @@ function resolveReview(G, challenge){
 function applyReview(G, R, c){
   const T = batTeam(G), B = curBatter(G), P = curPitcher(G), d = R.data || {};
   if(R.kind === 'steal'){ stealResult(G, d.from, d.r, d.to, c === 'safe', d.simple); if(G.outs >= 3) endPA(G, true); return; }
+  if(R.kind === 'pick'){
+    if(c === 'out' && G.bases[d.base] === d.r){ G.bases[d.base] = null; addOut(G); emit(G, `견제사로 인정됩니다. ${G.outs}아웃.`, 'r'); fx(G, 'out'); if(G.outs >= 3) endPA(G, true); }
+    else emit(G, '세이프로 인정됩니다.', 'r');
+    return;
+  }
   if(R.kind === 'first'){
     B.st.ab++;
     if(c === 'safe'){ B.st.h++; T.H++; P.st.h++; emit(G, `${B.name}, 1루에서 세이프. 내야 안타!`, 'r'); fx(G, 'hit'); onHit(G, 1, 0.2, d.simple); }
@@ -487,7 +559,7 @@ function applyReview(G, R, c){
   if(R.kind === 'hr'){
     B.st.ab++; B.st.h++; T.H++; P.st.h++;
     if(c === 'hr'){ B.st.hr++; P.st.hr++; emit(G, `${B.name}의 홈런으로 인정됩니다!`, 'r'); fx(G, 'hr'); onHit(G, 4, d.ev, false); }
-    else { emit(G, `담장을 맞고 나온 2루타로 인정됩니다.`, 'r'); fx(G, 'xbh'); onHit(G, 2, d.ev, false); }
+    else { emit(G, `담장을 맞고 나온 2루타로 인정됩니다.`, 'r'); fx(G, 'b2'); onHit(G, 2, d.ev, false); }
     endPA(G);
   }
 }
@@ -514,6 +586,42 @@ function locText(x, y){
 const selText = s => s.k === 'ibb' ? '고의 볼넷' :
   `${PITCH[s.t].name}, ${ZONE_NAME[s.r][s.c]}${s.r === 1 && s.c === 1 ? '' : ', ' + EDGE[s.e || 'in'].name}, ${POWER[s.w || 2].name}`;
 
+/* ---------- 해설 문장 ----------
+   문장 앞부분(투구 동작·구종·구속·움직임)만 들어서는 결과를 알 수 없게 하고, 결과는 타격 방법에 따라 여러 문장 가운데 하나를 고름.
+   코스(어디로 들어갔는지)는 결과 뒤에 덧붙임 */
+const SAY = {
+  windup: ['와인드업,', '세트 포지션에서', '사인을 주고받고', '숨을 고른 뒤', '포수 미트를 바라보고', '힘차게 왼발을 들어'],
+  move: {
+    FB: ['쭉 뻗어 들어갑니다', '힘 있게 꽂아 넣습니다', '정면으로 붙습니다', '묵직하게 들어갑니다'],
+    SI: ['살짝 가라앉으며 들어갑니다', '꿈틀거리며 파고듭니다', '아래로 휘며 들어갑니다'],
+    CT: ['끝에서 짧게 꺾입니다', '날카롭게 파고듭니다', '타자 앞에서 살짝 휩니다'],
+    SL: ['옆으로 휘어 나갑니다', '미끄러지듯 꺾입니다', '날카롭게 휘어 들어갑니다'],
+    CU: ['크게 떨어집니다', '높이 떠올랐다가 뚝 떨어집니다', '느린 포물선을 그립니다'],
+    CH: ['느리게 가라앉습니다', '타자 앞에서 힘이 빠지며 떨어집니다', '직구처럼 오다가 가라앉습니다'],
+    FK: ['뚝 떨어집니다', '홈플레이트 앞에서 아래로 떨어집니다', '갑자기 밑으로 사라집니다'],
+  },
+  look:  ['그대로 지켜봅니다.', '꼼짝 않고 봅니다.', '방망이가 나오지 않습니다.', '서서 공을 흘려보냅니다.'],
+  ball:  ['볼.', '볼입니다.', '심판의 손은 올라가지 않습니다. 볼.'],
+  held:  ['나오던 방망이를 멈춥니다.', '끝까지 참아 냅니다.', '속지 않습니다.', '반쯤 나온 방망이를 거둡니다.'],
+  cstrike: ['스트라이크!', '스트라이크입니다.', '심판의 손이 올라갑니다. 스트라이크!'],
+  whiff: {
+    power:   ['힘껏 휘둘렀지만 공이 방망이 밑으로 지나갑니다. 헛스윙!', '풀스윙! 그러나 허공을 가릅니다. 헛스윙.', '크게 휘두른 방망이에 공이 닿지 않습니다. 헛스윙.', '온 힘을 실었지만 헛돕니다. 헛스윙!'],
+    contact: ['짧게 갖다 댔지만 빗나갑니다. 헛스윙.', '맞히려고 했지만 공이 더 움직입니다. 헛스윙.', '방망이를 짧게 냈지만 스칩니다. 헛스윙.'],
+    swing:   ['방망이가 나왔지만 헛스윙.', '타이밍이 맞지 않습니다. 헛스윙!', '방망이가 돌아갑니다. 헛스윙.', '따라 나갔지만 헛스윙.'],
+  },
+  foul: {
+    power:   ['힘껏 잡아당겼지만 3루 쪽 관중석으로 넘어가는 파울.', '크게 휘둘러 맞혔지만 뒤로 날아갑니다. 파울.', '쩡! 소리는 컸지만 1루 쪽 담장 밖으로 휘어 나가는 파울.'],
+    contact: ['끈질기게 걷어 냅니다. 파울.', '짧게 커트합니다. 파울.', '살짝 갖다 대어 뒤로 흘립니다. 파울.'],
+    swing:   ['3루 쪽으로 빗나가는 파울.', '1루 쪽 관중석으로 들어가는 파울.', '뒤로 튀는 파울.', '방망이 끝에 맞고 옆으로 빠지는 파울.'],
+  },
+  hit: {
+    power:   { good:['딱! 힘껏 잡아당깁니다.', '쩡! 제대로 걸렸습니다.', '풀스윙에 정확히 맞았습니다!'], bad:['힘껏 휘두릅니다!', '크게 휘두른 방망이에 맞습니다.', '풀스윙!'] },
+    contact: { good:['짧게 끊어 정확히 맞힙니다.', '부드럽게 받아칩니다.', '가볍게 밀어 칩니다.'], bad:['짧게 맞힙니다.', '툭 갖다 댑니다.', '방망이를 짧게 잡고 맞힙니다.'] },
+    swing:   { good:['딱!', '제대로 맞습니다!', '경쾌한 소리!'], bad:['맞았습니다.', '쳤습니다!', '방망이에 맞습니다.'] },
+  },
+};
+const pickSay = (G, arr) => arr[Math.floor(rnd(G) * arr.length)];
+
 /* ---------- 투구 한 개 (정밀 모드) ----------
    P(수비): { k:'pitch', t:구종, r:행, c:열, e:'in'|'edge'|'out', w:1~3 } 또는 { k:'ibb' }
    B(공격): { k:'swing'|'power'|'contact'|'take'|'bunt'|'steal', g:null|'fast'|'break' } */
@@ -526,7 +634,7 @@ function playPitch(G, Psel, Bsel){
     forceWalk(G); fx(G, 'ball'); endPA(G); return flush(G);
   }
   F.lastSel = { ...Psel };
-  G.pitchNo++; P.n++; P.load += POWER[Psel.w].cost;
+  G.pitchNo++; P.n++; P.load += POWER[Psel.w].cost; fx(G, 'pitch');
   const pt = PITCH[Psel.t], vel = expVel(P, Psel.t, Psel.w) + Math.round(gauss(G) * 0.8);
   const pq = 0.45 * P.stf + 0.35 * gradeOf(P, Psel.t) + (pt.fast ? (vel - 147) * 0.7 : 4) + POWER[Psel.w].q + P.cond * 4 - fatigue(P) * 14;
   // 제구: 겨냥한 곳에서 얼마나 벗어나는지
@@ -536,9 +644,10 @@ function playPitch(G, Psel, Bsel){
   const zd = Math.max(Math.abs(x), Math.abs(y)), inZone = zd <= 1;
   G.lastLoc = { x, y };
   emit(G, `판정 제구: 오차 ${Math.round(Math.hypot(x - aim.x, y - aim.y) * 100)}, ${inZone ? '스트라이크 존 안' : '존 밖'}.`, 'd');
-  let head = `제${G.pitchNo}구, ${pt.name} ${vel}킬로, ${locText(x, y)} 공.`;
-  if(Psel.e !== 'in' && zd < 0.42) head += ' 실투, 가운데로 몰렸습니다!';
-  else if(zd > 1.45 && Psel.e !== 'out') head += ' 제구가 크게 흔들립니다.';
+  // 앞부분: 투구 동작·구종·구속·움직임 (결과를 알 수 없게) / 뒷부분: 어디로 들어간 공이었는지
+  const head = `제${G.pitchNo}구, ${pickSay(G, SAY.windup)} ${pt.name} ${vel}킬로, ${pickSay(G, SAY.move[Psel.t])}…`;
+  const miss = Psel.e !== 'in' && zd < 0.42 ? ' 가운데로 몰린 실투였습니다.' : zd > 1.45 && Psel.e !== 'out' ? ' 제구가 크게 흔들렸습니다.' : '';
+  const tail = ` ${locText(x, y)} 공이었습니다.${miss}`;
   // 타이밍: 직전 공과 구속 차이가 크면 타자가 속음
   let timing = 0;
   if(G.prev){
@@ -556,24 +665,24 @@ function playPitch(G, Psel, Bsel){
   const taken = (why) => {
     // 몸쪽으로 크게 빠지면 몸에 맞을 수 있음
     if(x < -1.6 && rnd(G) < clamp(0.15 + (-1.6 - x) * 1.2, 0, 0.7)){
-      emit(G, `${head} 아, 몸에 맞습니다. 몸에 맞는 공으로 1루에 나갑니다.`, 'r');
+      emit(G, `${head} 아, 몸에 맞습니다! 몸에 맞는 공으로 1루에 나갑니다.`, 'r');
       B.st.bb++; T.BB++; P.st.bb++; forceWalk(G); fx(G, 'ball'); return 'end';
     }
-    const strike = strikeCall(), border = zd > 0.95 && zd < 1.05;
+    const strike = strikeCall(), border = zd > 0.95 && zd < 1.05, close = border ? '아슬아슬하게 ' : '';
     if(strike){
-      G.strikes++; fx(G, 'mitt');
+      G.strikes++; fx(G, 'strike');
       if(G.strikes >= 3){
-        emit(G, `${head} ${why}${border ? '아슬아슬하게 ' : ''}스트라이크! 루킹 삼진.`, 'r');
+        emit(G, `${head} ${why} ${close}${pickSay(G, ['스트라이크! 루킹 삼진.', '스트라이크 아웃! 루킹 삼진입니다.', '심판의 손이 올라갑니다. 루킹 삼진!'])}${tail}`, 'r');
         B.st.ab++; B.st.k++; P.st.k++; addOut(G); fx(G, 'k'); return 'end';
       }
-      emit(G, `${head} ${why}${border ? '아슬아슬하게 ' : ''}스트라이크. ${countText(G)}.`, 'p');
+      emit(G, `${head} ${why} ${close}${pickSay(G, SAY.cstrike)} ${countText(G)}.${tail}`, 'p');
     } else {
-      G.balls++; fx(G, 'mitt');
+      G.balls++; fx(G, 'ballc');
       if(G.balls >= 4){
-        emit(G, `${head} ${why}${border ? '아슬아슬하게 ' : ''}볼. 볼넷으로 1루에 나갑니다.`, 'r');
+        emit(G, `${head} ${why} ${close}볼넷! 1루로 걸어 나갑니다.${tail}`, 'r');
         B.st.bb++; T.BB++; P.st.bb++; forceWalk(G); fx(G, 'ball'); return 'end';
       }
-      emit(G, `${head} ${why}${border ? '아슬아슬하게 ' : ''}볼. ${countText(G)}.`, 'p');
+      emit(G, `${head} ${why} ${close}${pickSay(G, SAY.ball)} ${countText(G)}.${tail}`, 'p');
     }
     return 'go';
   };
@@ -593,10 +702,10 @@ function playPitch(G, Psel, Bsel){
     }
   }
   if(!swing){
-    const why = !swingIntent ? (inZone && zd < 0.5 ? '그대로 지켜봅니다. ' : '지켜봅니다. ') : '끝까지 참아 냅니다. ';
+    const why = pickSay(G, swingIntent ? SAY.held : SAY.look);
     const r = taken(why);
     const run = k === 'steal' || hr;
-    if(run && r !== 'end' && G.outs < 3) doSteal(G, false, breaking, true);
+    if(run && r !== 'end' && G.outs < 3) doSteal(G, false, breaking, true, Bsel.from);
     else if(run && r === 'end' && G.outs < 3 && G.strikes >= 3) doSteal(G, false, breaking);
     if(G.review) return flush(G);
     if(r === 'end') return end();
@@ -609,18 +718,18 @@ function playPitch(G, Psel, Bsel){
   const bq = soft(B.con, 0.7) + B.cond * 4 + ({ swing:0, power:-12, contact:10 })[k] + guess + timing;
   const cen = clamp(1 - zd, 0, 1);
   const pCon = 0.84 + (bq - pq) / 110 - (inZone ? 0.12 * (1 - cen) : 0.14 + (zd - 1) * 1.0);
-  const chaseWord = inZone ? '' : '볼에 방망이가 나갑니다. ';
+  const kk = ({ power:'power', contact:'contact' })[k] || 'swing';
   if(guess > 0) emit(G, '노리던 공이 들어옵니다.', 'd');
   if(timing < 0) emit(G, '느린 공에 타이밍을 빼앗깁니다.', 'd');
   if(!check(G, '맞히기', pCon, '맞힘', '헛스윙')){
     G.strikes++; fx(G, 'whiff');
     if(G.strikes >= 3){
-      emit(G, `${head} ${chaseWord}헛스윙! 삼진 아웃.`, 'r');
+      emit(G, `${head} ${pickSay(G, SAY.whiff[kk])} 삼진 아웃!${tail}`, 'r');
       B.st.ab++; B.st.k++; P.st.k++; addOut(G); fx(G, 'k');
       if(hr && G.outs < 3) doSteal(G, false, breaking);
       return end();
     }
-    emit(G, `${head} ${chaseWord}헛스윙. ${countText(G)}.`, 'p');
+    emit(G, `${head} ${pickSay(G, SAY.whiff[kk])} ${countText(G)}.${tail}`, 'p');
     if(hr){ doSteal(G, false, breaking, true); if(G.review) return flush(G); if(G.outs >= 3){ endPA(G, true); return flush(G); } }
     return flush(G);
   }
@@ -630,11 +739,11 @@ function playPitch(G, Psel, Bsel){
     fx(G, 'foul');
     if(rnd(G) < 0.03 * parkOf(G).foul){
       const pos = pickOne(G, ['C', '1B', '3B']);
-      emit(G, `${head} ${chaseWord}높이 뜬 파울, ${ga(fielder(F, pos))} 잡습니다. 파울 플라이 아웃.`, 'r');
+      emit(G, `${head} 높이 뜬 파울! ${ga(fielder(F, pos))} 끝까지 따라가 잡습니다. 파울 플라이 아웃.`, 'r');
       B.st.ab++; addOut(G); fx(G, 'out'); return end();
     }
     if(G.strikes < 2) G.strikes++;
-    emit(G, `${head} ${chaseWord}파울. ${countText(G)}.`, 'p');
+    emit(G, `${head} ${pickSay(G, SAY.foul[kk])} ${countText(G)}.${tail}`, 'p');
     return flush(G);
   }
   fx(G, 'bat');
@@ -642,7 +751,8 @@ function playPitch(G, Psel, Bsel){
   const ev = clamp(0.45 * q + 0.45 * soft(B.pow + B.cond * 4, 0.5) / 100 + ({ swing:0, power:0.07, contact:-0.07 })[k] + (pt.fast && vel >= 153 ? 0.02 : 0) + gauss(G) * 0.035, 0, 1.08);
   emit(G, `판정 타구: 정확도 ${Math.round(q * 100)}, 힘 ${Math.round(ev * 100)}.`, 'd');
   G.hrun = hr;
-  inPlay(G, { head: head + ' ' + chaseWord, x, y, q, ev, k, pt });
+  const hitWord = Psel.e !== 'in' && zd < 0.42 && q > 0.5 ? '가운데로 몰린 실투를 놓치지 않습니다!' : pickSay(G, SAY.hit[kk][q > 0.75 ? 'good' : 'bad']);
+  inPlay(G, { head: `${head} ${hitWord}`, x, y, q, ev, k, pt });
   G.hrun = false;
   if(G.review) return flush(G);
   return end();
@@ -653,7 +763,7 @@ function bunt(G, o){
   const { head, zd, inZone, vel, B, taken, end } = o;
   const F = fieldTeam(G), inf = F.align.inf;
   if(zd > 1.35){   // 너무 빠지면 방망이를 거둠
-    const r = taken('번트 자세에서 방망이를 거둡니다. ');
+    const r = taken('번트 자세에서 방망이를 거둡니다.');
     return r === 'end' ? end() : flush(G);
   }
   const pC = 0.74 + (B.con - 50) / 250 - (inZone ? 0 : (zd - 1) * 0.8) - (vel >= 151 ? 0.05 : 0);
@@ -689,15 +799,31 @@ function buntResult(G, head, simple){
   const lead = b[2] != null ? 2 : b[1] != null ? 1 : 0;
   if(r < pHit + 0.06 + 0.13 + (inf === 0 ? 0.15 : 0) && (lead < 2 || inf === 0)){
     const R = T.bat[b[lead]];
-    emit(G, `${head} ${ga(who)} 잡아 ${lead === 2 ? '홈으로' : (lead + 2) + '루로'} 던집니다. 앞 주자 ${R.name} 아웃, 타자는 1루에.`, 'r');
     B.st.ab++; addOut(G); fx(G, 'out');
+    emit(G, `${head} ${ga(who)} 잡아 ${lead === 2 ? '홈으로' : (lead + 2) + '루로'} 던집니다. 앞 주자 ${R.name} 아웃! ${G.outs >= 3 ? '3아웃, 공수 교대입니다.' : `타자는 1루에 삽니다. ${G.outs}아웃.`}`, 'r');
     const nb = [T.bi, null, null];
     for(let k = 0; k < 3; k++) if(b[k] != null && k !== lead){ const to = k + 1; if(to < 3) nb[to] = b[k]; }
     G.bases = nb; return;
   }
-  emit(G, `${head} ${ga(who)} 잡아 1루에서 아웃. 희생 번트 성공, 주자는 한 베이스씩 나아갑니다.`, 'r');
   addOut(G); fx(G, 'out');
+  // 2아웃에서 번트 아웃이면 3아웃으로 공수 교대: 주자는 나아가지 않음 (3루 주자의 득점도 인정되지 않음)
+  if(G.outs >= 3){ emit(G, `${head} ${ga(who)} 잡아 1루로. 아웃! 3아웃, 공수 교대입니다.`, 'r'); return; }
+  emit(G, `${head} ${ga(who)} 잡아 1루로. 타자는 아웃, 희생 번트 성공! ${G.outs}아웃.`, 'r');
+  const before = G.bases.slice();
   advanceOnOut(G, { all:true, hold3: inf === 0 && rnd(G) < 0.4 });
+  const mv = runnerMoves(G, before);
+  if(mv) emit(G, mv, 'r');
+}
+// 플레이 전후 주자 위치를 비교해 "김하늘 2루로, 박민준은 3루에 그대로"처럼 알림 (홈인은 따로 알림)
+function runnerMoves(G, before){
+  const T = batTeam(G), out = [];
+  before.forEach((r, k) => {
+    if(r == null) return;
+    const to = G.bases.indexOf(r), nm = T.bat[r].name;
+    if(to > k) out.push(`${nm} ${to + 1}루로`);
+    else if(to === k) out.push(`${josa(nm, '은', '는')} ${k + 1}루에 그대로`);
+  });
+  return out.length ? `주자: ${out.join(', ')}.` : '';
 }
 
 /* ---------- 인플레이 타구 (정밀 모드) ---------- */
@@ -715,7 +841,7 @@ function inPlay(G, o){
   const head = o.head.trim();
   const hit = (n, text) => {
     B.st.ab++; B.st.h++; T.H++; P.st.h++;
-    if(n === 4){ B.st.hr++; P.st.hr++; fx(G, 'hr'); } else fx(G, n >= 2 ? 'xbh' : 'hit');
+    if(n === 4){ B.st.hr++; P.st.hr++; fx(G, 'hr'); } else fx(G, n === 3 ? 'b3' : n === 2 ? 'b2' : 'hit');
     emit(G, `${head} ${text}`, 'r');
     onHit(G, n, ev, false);
   };
@@ -745,7 +871,7 @@ function inPlay(G, o){
     if(ok){
       if(slow){ hit(1, `느린 땅볼, ${ga(fielder(F, pos))} 달려 나와 던지지만 세이프! 내야 안타.`); return; }
       if(ev > 0.65 && fi !== 1 && rnd(G) < (pk.turf ? 0.42 : 0.3)){ hit(2, `빠른 땅볼이 ${josa(lineName, '으로', '로')} 빠져나갑니다. 2루타!`); return; }
-      hit(1, `땅볼이 ${fi === 0 ? '3루수와 유격수 사이' : fi === 2 ? '1루수와 2루수 사이' : '투수 옆'}를 빠져나갑니다. 안타!`); return;
+      hit(1, `땅볼이 ${fi === 0 ? '3루수와 유격수 사이를' : fi === 2 ? '1루수와 2루수 사이를' : '투수 옆을'} 빠져나갑니다. 안타!`); return;
     }
     if(rnd(G) < errorChance(F)){ B.st.ab++; onError(G, pos); return; }
     groundOut(G, head, pos, inf);
@@ -881,7 +1007,7 @@ function simpleTable(D, O, hrMul = 1){
   rows[rows.length - 1].to = 100;
   return rows;
 }
-function playSimple(G, D, O){
+function playSimple(G, D, O, from){
   if(G.over) return flush(G);
   const T = batTeam(G), F = fieldTeam(G), B = curBatter(G), P = curPitcher(G);
   if(D === 'ibb'){
@@ -889,7 +1015,7 @@ function playSimple(G, D, O){
     B.st.bb++; T.BB++; P.st.bb++; forceWalk(G); fx(G, 'ball'); endPA(G); return flush(G);
   }
   if(O === 'steal'){
-    if(canSteal(G)){ doSteal(G, true, false, true); if(!G.review && G.outs >= 3) endPA(G, true); }
+    if(stealCands(G).length){ doSteal(G, true, false, true, from); if(!G.review && G.outs >= 3) endPA(G, true); }
     return flush(G);
   }
   if(O === 'bunt'){ P.n++; buntResult(G, `${B.name}, 번트!`, true); endPA(G); return flush(G); }
@@ -904,7 +1030,7 @@ function playSimple(G, D, O){
 function simpleOutcome(G, k, head){
   const T = batTeam(G), B = curBatter(G), P = curPitcher(G);
   const fi = rint(G, 0, 2), fieldWord = ['왼쪽', '가운데', '오른쪽'][fi];
-  const hit = (n, text) => { B.st.ab++; B.st.h++; T.H++; P.st.h++; if(n === 4){ B.st.hr++; P.st.hr++; fx(G, 'hr'); } else fx(G, n >= 2 ? 'xbh' : 'hit'); emit(G, `${head} ${text}`, 'r'); onHit(G, n, 0.5, true); };
+  const hit = (n, text) => { B.st.ab++; B.st.h++; T.H++; P.st.h++; if(n === 4){ B.st.hr++; P.st.hr++; fx(G, 'hr'); } else fx(G, n === 3 ? 'b3' : n === 2 ? 'b2' : 'hit'); emit(G, `${head} ${text}`, 'r'); onHit(G, n, 0.5, true); };
   switch(k){
     case 'K': B.st.ab++; B.st.k++; P.st.k++; addOut(G); emit(G, `${head} 헛스윙 삼진! ${G.outs}아웃.`, 'r'); fx(G, 'k'); break;
     case 'BB': B.st.bb++; T.BB++; P.st.bb++; emit(G, `${head} 볼넷으로 1루에 걸어 나갑니다.`, 'r'); forceWalk(G); fx(G, 'ball'); break;
@@ -958,22 +1084,25 @@ function playSimplePitch(G, D, O){
   if(G.over) return flush(G);
   if(D === 'ibb' || O === 'steal') return playSimple(G, D, O);
   const T = batTeam(G), B = curBatter(G), P = curPitcher(G);
-  G.pitchNo++; P.n++;
+  G.pitchNo++; P.n++; fx(G, 'pitch');
   const zoneN = SP_ZONE[D] || 55, d1 = rint(G, 1, 100), inZone = d1 <= zoneN;
   emit(G, `판정 공 위치: 1~${zoneN} 스트라이크, 주사위 ${d1}.`, 'd');
-  const where = inZone ? pickOne(G, ['스트라이크 존으로 들어오는 공', '존 구석을 찌르는 공', '가운데로 몰린 공']) : pickOne(G, ['존을 벗어나는 공', '낮게 떨어지는 공', '바깥쪽으로 빠지는 공']);
-  const head = `제${G.pitchNo}구, 주사위 ${d1}: ${where}.`;
+  // 앞부분만 들어서는 결과를 모르게: 공이 어디로 갔는지와 주사위 숫자는 결과 뒤에 붙임
+  const where = inZone ? pickOne(G, ['스트라이크 존으로 들어온 공', '존 구석을 찌른 공', '가운데로 몰린 공']) : pickOne(G, ['존을 벗어난 공', '낮게 떨어진 공', '바깥쪽으로 빠진 공']);
+  const head = `제${G.pitchNo}구, ${pickSay(G, SAY.windup)} ${pickSay(G, ['힘껏 던집니다…', '빠른 공을 뿌립니다…', '변화구를 던집니다…', '공을 던집니다…'])}`;
+  const tail = ` ${where}이었습니다. (공 위치 주사위 ${d1})`;
+  const kk = ({ power:'power', contact:'contact' })[O] || 'swing';
   const strike = text => {
-    G.strikes++; fx(G, 'mitt');
-    if(G.strikes >= 3){ emit(G, `${head} ${text} 삼진 아웃! ${G.outs + 1}아웃.`, 'r'); B.st.ab++; B.st.k++; P.st.k++; addOut(G); fx(G, 'k'); endPA(G); return flush(G); }
-    emit(G, `${head} ${text} ${countText(G)}.`, 'p'); return flush(G);
+    G.strikes++; fx(G, 'strike');
+    if(G.strikes >= 3){ emit(G, `${head} ${text} 삼진 아웃! ${G.outs + 1}아웃.${tail}`, 'r'); B.st.ab++; B.st.k++; P.st.k++; addOut(G); fx(G, 'k'); endPA(G); return flush(G); }
+    emit(G, `${head} ${text} ${countText(G)}.${tail}`, 'p'); return flush(G);
   };
   const ball = text => {
-    G.balls++; fx(G, 'mitt');
-    if(G.balls >= 4){ emit(G, `${head} ${text} 볼넷으로 1루에 걸어 나갑니다.`, 'r'); B.st.bb++; T.BB++; P.st.bb++; forceWalk(G); fx(G, 'ball'); endPA(G); return flush(G); }
-    emit(G, `${head} ${text} ${countText(G)}.`, 'p'); return flush(G);
+    G.balls++; fx(G, 'ballc');
+    if(G.balls >= 4){ emit(G, `${head} ${text} 볼넷으로 1루에 걸어 나갑니다.${tail}`, 'r'); B.st.bb++; T.BB++; P.st.bb++; forceWalk(G); fx(G, 'ball'); endPA(G); return flush(G); }
+    emit(G, `${head} ${text} ${countText(G)}.${tail}`, 'p'); return flush(G);
   };
-  if(O === 'take') return inZone ? strike('지켜봅니다. 스트라이크.') : ball('지켜봅니다. 볼.');
+  if(O === 'take') return inZone ? strike(`${pickSay(G, SAY.look)} ${pickSay(G, SAY.cstrike)}`) : ball(`${pickSay(G, SAY.look)} ${pickSay(G, SAY.ball)}`);
   if(O === 'bunt'){
     if(!inZone && rnd(G) < 0.6) return ball('번트 자세에서 방망이를 거둡니다. 볼.');
     if(!check(G, '번트', inZone ? 0.75 : 0.5, '공을 굴림', '파울')){
@@ -986,17 +1115,16 @@ function playSimplePitch(G, D, O){
   if(!inZone){
     const hold = { power:32, normal:50, contact:62 }[O] || 50, dh = rint(G, 1, 100);
     emit(G, `판정 참기: 1~${hold} 참음, 주사위 ${dh}.`, 'd');
-    if(dh <= hold) return ball('방망이를 멈추고 끝까지 참아 냅니다. 볼.');
+    if(dh <= hold) return ball(`${pickSay(G, SAY.held)} ${pickSay(G, SAY.ball)}`);
   }
   const [wh, fo] = SP_SWING[inZone ? 'in' : 'out'][O] || SP_SWING.in.normal;
   const d2 = rint(G, 1, 100);
   emit(G, `판정 스윙: 1~${wh} 헛스윙, ${wh + 1}~${wh + fo} 파울, ${wh + fo + 1}~100 인플레이, 주사위 ${d2}.`, 'd');
-  const chase = inZone ? '' : '볼에 방망이가 나갑니다. ';
-  if(d2 <= wh){ fx(G, 'whiff'); return strike(`${chase}헛스윙!`); }
+  if(d2 <= wh){ fx(G, 'whiff'); return strike(pickSay(G, SAY.whiff[kk])); }
   if(d2 <= wh + fo){
     fx(G, 'foul');
     if(G.strikes < 2) G.strikes++;
-    emit(G, `${head} ${chase}파울. ${countText(G)}.`, 'p'); return flush(G);
+    emit(G, `${head} ${pickSay(G, SAY.foul[kk])} ${countText(G)}.${tail}`, 'p'); return flush(G);
   }
   // 인플레이: 안타·홈런·땅볼·뜬공 표를 한 번 더 굴림 (존 밖 공을 치면 약한 타구가 많음)
   fx(G, 'bat');
@@ -1007,7 +1135,7 @@ function playSimplePitch(G, D, O){
   let acc = 0, k = 'GO';
   for(const key of Object.keys(w)){ acc += w[key] / tot * 100; if(d3 <= Math.round(acc)){ k = key; break; } }
   emit(G, `판정 타구: 주사위 ${d3}, ${SIMPLE_NAME[k]}.`, 'd');
-  simpleOutcome(G, k, `${head} ${chase}딱!`);
+  simpleOutcome(G, k, `${head} ${pickSay(G, SAY.hit[kk][['HR', 'S2', 'S3', 'S1'].includes(k) ? 'good' : 'bad'])}`);
   if(!G.review) endPA(G);
   return flush(G);
 }
@@ -1033,7 +1161,7 @@ function swapPitcher(G, ti, idx){
   T.pi = idx; nw.used = true;
   old.exitLead = leadFor(G, ti); nw.entryLead = leadFor(G, ti);
   emit(G, `${T.short} 투수 교체: ${old.name}에서 ${josa(nw.name, '으로', '로')} 바뀝니다. ${nw.name}, 최고 구속 ${nw.vel}킬로.`, 'c');
-  fx(G, 'change');
+  fx(G, 'pchange');
 }
 
 /* ---------- 감독 모드 ----------
@@ -1050,7 +1178,7 @@ function playManager(G, D, O){
   while(!G.over && !G.review && G.pa === pa && G.half === half && guard++ < 40){
     const P = aiPitch(G, D.k);
     let B = aiBat(G, O.k);
-    if(first && O.k === 'steal' && canSteal(G)) B = { k:'steal', g:null };
+    if(first && O.k === 'steal' && stealCands(G).length) B = { k:'steal', g:null, from:O.from };
     if(first && O.k === 'hitrun' && G.bases[0] != null && canSteal(G)) B = { k:'hitrun', g:null };
     if(O.k === 'bunt' && G.strikes < 2) B = { k:'bunt', g:null };
     first = false;
@@ -1110,7 +1238,7 @@ function benchIn(G, ti, slot, b, kind){
     }
   }
   T.def = teamDef(T);
-  fx(G, 'change');
+  fx(G, 'sub');
 }
 // 중요한 순간: 감독에게 작전을 물을 때 (ti 팀 기준)
 function mgrImportant(G, ti){

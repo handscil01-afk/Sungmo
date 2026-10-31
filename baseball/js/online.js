@@ -203,7 +203,7 @@ function onGuest(v){
 // 방장: 손님의 선택·작전 확인
 const VALID_PITCH = c => c && (c.k === 'ibb' || (c.k === 'pitch' && PITCH[c.t] && curPitcher(G).pitches.some(x => x.t === c.t)
   && [0, 1, 2].includes(c.r) && [0, 1, 2].includes(c.c) && ['in', 'edge', 'out'].includes(c.e) && [1, 2, 3].includes(c.w)));
-const VALID_BAT = c => c && ['swing', 'power', 'contact', 'take', 'bunt', 'steal'].includes(c.k) && [null, 'fast', 'break'].includes(c.g ?? null) && (c.k !== 'steal' || canSteal(G));
+const VALID_BAT = c => c && ['swing', 'power', 'contact', 'take', 'bunt', 'steal'].includes(c.k) && [null, 'fast', 'break'].includes(c.g ?? null) && (c.k !== 'steal' || stealCands(G).includes(c.from));
 function onAct(v){
   if(NET.role !== 'host' || !G || G.over) return;
   let a; try{ a = JSON.parse(v.c); }catch(e){ return; }
@@ -217,10 +217,11 @@ function onAct(v){
     let c = a.c;
     if(G.mode === 'manager'){
       if(!c || !(role === 'def' ? ORDER_DEF : ORDER_OFF)[c.k]) return;
-      if((c.k === 'steal' || c.k === 'hitrun') && !canSteal(G)) return;
-      c = { k:c.k };
+      if(c.k === 'steal' && !stealCands(G).includes(c.from)) return;
+      if(c.k === 'hitrun' && !canSteal(G)) return;
+      c = c.k === 'steal' ? { k:'steal', from:c.from } : { k:c.k };
     }
-    else if(G.mode === 'detail'){ if(role === 'def' ? !VALID_PITCH(c) : !VALID_BAT(c)) return; c = role === 'def' ? (c.k === 'ibb' ? { k:'ibb' } : { k:'pitch', t:c.t, r:c.r, c:c.c, e:c.e, w:c.w }) : { k:c.k, g:c.g ?? null }; }
+    else if(G.mode === 'detail'){ if(role === 'def' ? !VALID_PITCH(c) : !VALID_BAT(c)) return; c = role === 'def' ? (c.k === 'ibb' ? { k:'ibb' } : { k:'pitch', t:c.t, r:c.r, c:c.c, e:c.e, w:c.w }) : { k:c.k, g:c.g ?? null, from:c.from }; }
     else if(!(role === 'def' ? ['attack', 'nibble', 'ibb'] : ['power', 'normal', 'contact', 'bunt', ...(G.unit === 'pitch' ? ['take'] : [])]).includes(c)) return;
     GS.pend[role] = c;
     if(!tryResolve('auto')) netPushState(null);
@@ -253,8 +254,12 @@ function onAct(v){
   if(a.k === 'pitcher' && role === 'def' && detailed(G) && G.teams[side].pit[a.idx] && !G.teams[side].pit[a.idx].used){
     const r = changePitcher(G, side, a.idx); gameNext('auto', r); return;
   }
-  if(a.k === 'steal' && role === 'off' && G.mode === 'simple' && canSteal(G)){
-    const r = playSimple(G, null, 'steal'); gameNext('auto', r);
+  if(a.k === 'steal' && role === 'off' && G.mode === 'simple' && stealCands(G).includes(a.from)){
+    const r = playSimple(G, null, 'steal', a.from); gameNext('auto', r);
+  }
+  // 손님 팀이 수비일 때 견제 (주자가 있는 베이스만)
+  if(a.k === 'pick' && role === 'def' && [0, 1, 2].includes(a.base) && G.bases[a.base] != null){
+    const r = pickoff(G, a.base); gameNext('auto', r);
   }
 }
 // 손님: 방장이 보낸 경기 상태

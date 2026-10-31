@@ -13,8 +13,9 @@
 const UI = { make:null, S:null, say:[], logN:0 };
 
 function go(make, via = 'init', lines = []){
-  UI.make = make; UI.say = lines || [];
+  UI.make = make; UI.say = lines || []; UI.note = null;
   UI.S = make(); if(UI.say.length || !UI.S.say) UI.S.say = UI.say;
+  addStatusOpt(UI.S);
   render();
   const say = UI.S.say.map(l => l.s || l);
   const msg = [...say, UI.S.q].filter(Boolean).join(' ');
@@ -24,7 +25,12 @@ function go(make, via = 'init', lines = []){
   } else if(via === 'key' || via === 'auto') speak(msg);
 }
 // 같은 화면을 다시 그림 (설정을 바꿨을 때, 설치 단추가 생겼을 때). 초점은 그대로
-function rerender(){ if(!UI.make) return; UI.S = UI.make(); if(UI.say.length || !UI.S.say) UI.S.say = UI.say; render(); }
+function rerender(){ if(!UI.make) return; UI.S = UI.make(); if(UI.say.length || !UI.S.say) UI.S.say = UI.say; addStatusOpt(UI.S); render(); }
+// 경기 화면에는 언제나 "지금 상황 확인" 단추(0번)를 둠: 아웃·볼카운트·주자·점수를 한 번에 들음
+function addStatusOpt(S){
+  if(!S.board || typeof G === 'undefined' || !G || S.input) return;
+  S.opts = [...(S.opts || []), { n:0, key:'status', t:'지금 상황 확인', s:'점수, 아웃, 볼카운트, 주자 위치, 타자와 투수를 알려 줍니다. 0번 키와 같습니다.', act: v => note(gameStatus(), v) }];
+}
 function stay(msg){ rerender(); speak(msg); }
 
 function render(){
@@ -36,7 +42,9 @@ function render(){
   else { bs.hidden = true; bs.innerHTML = ''; }
   $('#say').innerHTML = (S.say || []).map(l => `<p class="${l.k ? 'k-' + l.k : ''}">${esc(l.s || l)}</p>`).join('');
   $('#say').hidden = !(S.say || []).length;
-  const nt = $('#note'); nt.innerHTML = (S.note || []).map(l => `<p>${esc(l)}</p>`).join(''); nt.hidden = !(S.note || []).length;
+  // 메모: 화면이 정한 글, 없으면 방금 note()로 띄운 글 (전체화면 전환 같은 다시 그리기에도 남음)
+  const nl = S.note || UI.note || [];
+  const nt = $('#note'); nt.innerHTML = nl.map(l => `<p>${esc(l)}</p>`).join(''); nt.hidden = !nl.length;
   $('#q').textContent = S.q || '';
   renderOpts(S);
   const ex = $('#extra');
@@ -103,6 +111,7 @@ function back(via){
 }
 // 메모: 상황·점수판 같은 정보를 결과 글 아래에 보여 주고 읽어 줌
 function note(lines, via){
+  UI.note = lines;
   const nt = $('#note');
   nt.innerHTML = lines.map(l => `<p>${esc(l)}</p>`).join(''); nt.hidden = false;
   if(via === 'click'){ setTimeout(() => nt.focus(), 40); if(SET.voice === 'tts') ttsSay(lines.join(' ')); }
@@ -113,7 +122,7 @@ function optionsText(){
 }
 const KEY_HELP = [
   '숫자 1부터 9: 선택지 고르기.',
-  '0: 지금 상황 듣기.',
+  '0: 지금 상황 듣기. 경기 화면마다 있는 "지금 상황 확인" 단추와 같습니다. 점수, 아웃, 볼카운트, 주자 위치와 이름, 타자와 투수를 알려 줍니다.',
   '점(.) 또는 백스페이스: 뒤로.',
   '더하기(+): 점수판 듣기.',
   '빼기(-): 지금 타자와 투수 정보 듣기.',

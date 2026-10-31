@@ -68,7 +68,16 @@ function boardHTML(){
   </div><p id="sit" class="sr-only">${esc(situation(G))}</p>`;
 }
 function gameStatus(){
-  const out = [situation(G)];
+  if(G.over) return [situation(G)];
+  const T = batTeam(G), P = curPitcher(G), B = curBatter(G), b = G.bases;
+  const runners = [0, 1, 2].filter(k => b[k] != null).map(k => `${k + 1}루 ${T.bat[b[k]].name}`);
+  const out = [
+    `${halfName(G)}, ${T.short} 공격. 점수 ${scoreText(G)}.`,
+    `${G.outs}아웃, 볼카운트 ${countText(G)}.`,
+    runners.length ? `주자: ${runners.join(', ')}.` : '주자 없음.',
+    `타자: ${T.bi + 1}번 ${B.name}, 오늘 ${batterLine(B)}. 투수: ${P.name}${detailed(G) ? `, 투구 수 ${P.n}개` : ''}.`,
+  ];
+  if(G.mode === 'manager' || detailed(G)) out.push(`비디오 판독 남은 기회: ${G.teams[0].short} ${reviewLeft(G, 0)}번, ${G.teams[1].short} ${reviewLeft(G, 1)}번.`);
   if(detailed(G)){
     const F = fieldTeam(G);
     out.push(`수비 위치: 내야 ${ALIGN_IN[F.align.inf]}, 외야 ${ALIGN_OUT[F.align.of]}. 날씨: ${windText(G)}.`);
@@ -140,7 +149,11 @@ function autoDone(){
   if(a.scope === 'half') return G.half !== a.half;
   return false;
 }
-function stepAI(){ return playStep(G, aiDefChoice(G), aiOffChoice(G)); }
+function stepAI(){
+  const pb = aiPickoff(G);
+  if(pb >= 0){ doPickoff(G, pb); if(!G.review && G.outs >= 3) endPA(G, true); return flush(G); }
+  return playStep(G, aiDefChoice(G), aiOffChoice(G));
+}
 function runSteps(stop){
   const acc = { lines:[], fx:[] }; let guard = 0;
   while(!G.over && !stop() && guard++ < 4000){ const r = G.review ? resolveReview(G, aiChallenge(G)) : stepAI(); acc.lines.push(...r.lines); acc.fx.push(...r.fx); }
@@ -159,10 +172,22 @@ function tryResolve(via){
   const off = batIdx(G), def = 1 - off;
   if(!GS.pend.def && (needs(def) || remote(def))) return false;
   if(!GS.pend.off && (needs(off) || remote(off))) return false;
+  // 컴퓨터가 수비하면 공을 던지기 전에 가끔 견제 (견제로 이닝이 끝나면 고른 것은 쓰지 않음)
+  let pre = null;
+  if(!needs(def) && !remote(def)){
+    const pb = aiPickoff(G);
+    if(pb >= 0){
+      const pa = G.pa, half = G.half;
+      doPickoff(G, pb); if(!G.review && G.outs >= 3) endPA(G, true);
+      if(G.review || G.pa !== pa || G.half !== half || G.over){ GS.pend = { def:null, off:null }; gameNext(via, flush(G)); return true; }
+      pre = flush(G);
+    }
+  }
   const D = GS.pend.def || aiDefChoice(G);
   const O = GS.pend.off || aiOffChoice(G);
   GS.pend = { def:null, off:null };
   const res = playStep(G, D, O);
+  if(pre){ res.lines = [...pre.lines, ...res.lines]; res.fx = [...pre.fx, ...res.fx]; }
   gameNext(via, res);
   return true;
 }
@@ -217,7 +242,7 @@ function defMain(){
   opts.push({ n:5, t:'지난 공 그대로', s: last ? selText(last) : '아직 던진 공이 없습니다.', hide: !last, act: v => submit('def', { ...last }, v) });
   opts.push({ n:6, t:'포수 사인대로 던지기', s:'이번 공은 컴퓨터 포수가 골라 줍니다.', act: v => submit('def', aiPitch(G), v) });
   opts.push({ n:7, t:'수비 위치 바꾸기', s:`지금 내야 ${ALIGN_IN[T.align.inf]}, 외야 ${ALIGN_OUT[T.align.of]}`, act: v => go(alignScreen, v) });
-  opts.push({ n:8, t:'작전: 고의 볼넷 · 투수 교체', s:`투수 ${P.name} 투구 수 ${P.n}개, 체력 ${Math.round(clamp(1 - P.load / P.sta, 0, 1) * 100)}퍼센트`, act: v => go(tacticScreen, v) });
+  opts.push({ n:8, t: G.bases.some(x => x != null) ? '작전: 견제 · 고의 볼넷 · 투수 교체' : '작전: 고의 볼넷 · 투수 교체', s:`투수 ${P.name} 투구 수 ${P.n}개, 체력 ${Math.round(clamp(1 - P.load / P.sta, 0, 1) * 100)}퍼센트`, act: v => go(tacticScreen, v) });
   opts.push({ n:9, t:'더 보기', s:'점수판, 선수 정보, 맡기기, 설정', act: v => go(moreScreen, v) });
   return { board:true, q:`${whoLabel(ti)}수비. 타자 ${B.name}, 제${G.pitchNo + 1}구 ${countText(G)}. 어떤 공을 던질까요?`, opts };
 }
@@ -268,7 +293,35 @@ function tacticScreen(){
     { n:1, t:'고의 볼넷', s:'이번 타자를 그냥 1루로 내보냅니다.', act: v => submit('def', G.mode === 'detail' ? { k:'ibb' } : 'ibb', v) },
     { n:2, t:'투수 교체', s: bench.length ? `불펜에 ${bench.length}명이 남았습니다.` : '바꿀 투수가 없습니다.', hide: G.mode !== 'detail', act: v => bench.length ? go(bullpenScreen, v) : speak('바꿀 투수가 없습니다.') },
     { n:3, t:'지금 투수 상태 듣기', hide: G.mode !== 'detail', act: v => note([pitcherInfo(G, G.teams[ti], G.teams[ti].pi, true)], v) },
+    pickOpt(4),
   ] };
+}
+/* ---------- 견제 · 도루할 주자 고르기 ---------- */
+// 견제 선택지: 주자가 한 명이면 바로, 여러 명이면 누구를 견제할지 고름. 공 하나를 쓰지 않음
+function pickOpt(n){
+  const on = [0, 1, 2].filter(k => G.bases[k] != null), T = batTeam(G);
+  return { n, t:'견제', hide: !on.length, s: on.length === 1 ? `${on[0] + 1}루 주자 ${T.bat[G.bases[on[0]]].name}에게 견제구를 던집니다. 공 하나를 쓰지 않습니다.` : `주자 ${on.length}명 가운데 누구를 견제할지 고릅니다.`,
+    act: v => on.length === 1 ? doPick(on[0], v) : go(pickScreen, v) };
+}
+function pickScreen(){
+  const T = batTeam(G), on = [0, 1, 2].filter(k => G.bases[k] != null);
+  return { board:true, sub:true, q:'누구를 견제할까요?', back: v => go(defMain, v),
+    opts: on.map(k => { const R = T.bat[G.bases[k]]; return { n: k + 1, t:`${k + 1}루 주자 ${R.name}`, s: detailed(G) ? `스피드 ${ownTeam(batIdx(G)) ? R.spd : gradeWord(R.spd)}. 견제를 받은 주자는 리드가 작아져 도루하기 어려워집니다.` : '견제를 받은 주자는 도루하기 어려워집니다.', act: v => doPick(k, v) }; }) };
+}
+function doPick(base, v){
+  if(NET.on && NET.role === 'guest'){ netSendAct({ k:'pick', base }); go(defMain, v, ['견제를 요청했습니다.']); return; }
+  const r = pickoff(G, base); saveGame();
+  gameNext(v, r);
+}
+// 도루: 갈 수 있는 주자가 여럿이면(더블 스틸·홈스틸 포함) 고름. go(fn)으로 고른 값을 넘김
+function stealOpt(n, sub, fn){
+  const c = stealCands(G);
+  return { n, t:'도루', hide: !c.length, s: c.length === 1 ? `${stealLabel(G, c[0])}. ${sub}` : `주자 가운데 누구를 뛰게 할지 고릅니다. ${sub}`,
+    act: v => c.length === 1 ? fn(c[0], v) : go(() => stealScreen(fn), v) };
+}
+function stealScreen(fn){
+  return { board:true, sub:true, q:'누구를 뛰게 할까요?', back: v => gameNext(v, null),
+    opts: stealCands(G).map((f, i) => ({ n: i + 1, t: stealLabel(G, f), act: v => fn(f, v) })) };
 }
 function bullpenScreen(){
   const ti = 1 - batIdx(G), T = G.teams[ti];
@@ -295,7 +348,7 @@ function offMain(){
     { n:3, t:'맞히기', s:'짧게 맞힙니다. 공을 더 잘 보지만 타구 힘은 약합니다.', act: bat('contact') },
     { n:4, t:'지켜보기', s:'이번 공은 치지 않습니다.', act: bat('take') },
     { n:5, t: runners ? '번트' : '기습 번트', s: runners ? '타자는 아웃되더라도 주자를 한 베이스 보냅니다.' : '발로 1루를 노립니다.', act: bat('bunt') },
-    { n:6, t:'도루', hide: !runner || !canSteal(G), s: runner ? `${runner.name}${G.mode === 'detail' ? `(스피드 ${isHuman(ti) ? runner.spd : gradeWord(runner.spd)})` : ''}, 다음 베이스로 뜁니다. 타자는 지켜봅니다.` : '', act: bat('steal') },
+    stealOpt(6, '타자는 이번 공을 지켜봅니다.', (from, v) => submit('off', { k:'steal', g, from }, v)),
     { n:7, t:`노림수: ${g ? GUESS[g] : '없음'}`, s:'맞으면 잘 맞고, 틀리면 맞히기 어렵습니다. 이번 타석 동안 유지됩니다.', act: v => go(guessScreen, v) },
     { n:8, t:'코치에게 맡기기', s:'이번 공은 컴퓨터가 골라 줍니다.', act: v => submit('off', aiBat(G), v) },
     { n:9, t:'더 보기', s:'점수판, 선수 정보, 맡기기, 설정', act: v => go(moreScreen, v) },
@@ -322,6 +375,7 @@ function simpleDef(){
     { n:1, t:'스트라이크로 승부', s: spZone('attack') + '. 볼넷은 줄지만 맞기 쉽습니다.', act: v => submit('def', 'attack', v) },
     { n:2, t:'유인구', s: spZone('nibble') + '. 속으면 헛스윙, 참으면 볼입니다.', act: v => submit('def', 'nibble', v) },
     { n:3, t:'고의 볼넷', s:'타자를 그냥 1루로 내보냅니다.', act: v => submit('def', 'ibb', v) },
+    pickOpt(4),
     { n:8, t:'맡기기', s:'이번 공은 컴퓨터가 골라 줍니다.', act: v => submit('def', aiSPDef(G), v) },
     { n:9, t:'더 보기', s:'점수판, 맡기기, 설정', act: v => go(moreScreen, v) },
   ] };
@@ -329,15 +383,16 @@ function simpleDef(){
     { n:1, t:'정면 승부', s:'볼넷이 줄고 안타가 조금 늘어납니다. ' + simpleOdds('attack', 'normal'), act: v => submit('def', 'attack', v) },
     { n:2, t:'유인구 승부', s:'삼진이 늘지만 볼넷도 늘어납니다. ' + simpleOdds('nibble', 'normal'), act: v => submit('def', 'nibble', v) },
     { n:3, t:'고의 볼넷', s:'타자를 그냥 1루로 내보냅니다.', act: v => submit('def', 'ibb', v) },
+    pickOpt(4),
     { n:8, t:'맡기기', s:'이번 타석은 컴퓨터가 골라 줍니다.', act: v => submit('def', aiSimpleDef(G), v) },
     { n:9, t:'더 보기', s:'점수판, 맡기기, 설정', act: v => go(moreScreen, v) },
   ] };
 }
 function simpleOff(){
   const ti = batIdx(G), B = curBatter(G), runners = G.bases.some(x => x != null);
-  const steal = { n:6, t:'도루', s:'주자가 다음 베이스로 뜁니다. 성공 확률 60%. 타석은 그대로 이어집니다.', hide: !canSteal(G), act: v => {
-    if(NET.on && NET.role === 'guest'){ netSendAct({ k:'steal' }); speak('도루를 보냈습니다.'); return; }
-    const r = playSimple(G, null, 'steal'); gameNext(v, r); } };
+  const steal = stealOpt(6, '도루 성공 확률 60%(홈스틸 20%). 타석은 그대로 이어집니다.', (from, v) => {
+    if(NET.on && NET.role === 'guest'){ netSendAct({ k:'steal', from }); go(offMain, v, ['도루를 보냈습니다.']); return; }
+    const r = playSimple(G, null, 'steal', from); gameNext(v, r); });
   if(G.unit === 'pitch') return { board:true, q:`${whoLabel(ti)}공격. 타자 ${batTeam(G).bi + 1}번 ${B.name}, 제${G.pitchNo + 1}구 ${countText(G)}. 어떻게 할까요?`, opts:[
     { n:1, t:'강하게 치기', s: spSwing('power') + '. 맞으면 장타가 잘 나옵니다.', act: v => submit('off', 'power', v) },
     { n:2, t:'보통 치기', s: spSwing('normal'), act: v => submit('off', 'normal', v) },

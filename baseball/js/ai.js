@@ -152,6 +152,14 @@ function aiChallenge(G){
   return R.p >= 0.42 || (lateGame(G) && closeGame(G) && R.p >= 0.3);
 }
 
+// 컴퓨터 수비의 견제: 발 빠른 1루 주자에게 가끔, 이미 견제했으면 덜 던짐. 견제할 베이스(0·1) 또는 -1
+function aiPickoff(G){
+  const b = G.bases, T = batTeam(G), held = G.held || {};
+  if(b[0] != null && b[1] == null){ const R = T.bat[b[0]]; if(rnd(G) < (R.spd >= 65 ? 0.12 : 0.03) / (1 + (held[0] || 0) * 2)) return 0; }
+  if(b[1] != null && b[2] == null && rnd(G) < 0.02 / (1 + (held[1] || 0) * 2)) return 1;
+  return -1;
+}
+
 /* ---------- 모드에 맞게 컴퓨터가 고르기 · 한 걸음 진행 ---------- */
 const spUnit = G => G.mode === 'simple' && G.unit === 'pitch';
 const aiDefChoice = G => G.mode === 'manager' ? aiOrderDef(G) : spUnit(G) ? aiSPDef(G) : G.mode === 'simple' ? aiSimpleDef(G) : aiPitch(G);
