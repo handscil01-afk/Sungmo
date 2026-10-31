@@ -182,7 +182,7 @@ function drawPitchScene(G, A){
   GX.ctx.lineWidth = 1;
   if(GX.meta.umpire && L === LAY_IMG){
     const call = A && ph === 'result' ? ({ '스트라이크!':'u1', '삼진!':'u1', '헛스윙!':'u1', '파울':'u3' })[A.banner] || 'u0' : 'u0';
-    if(call !== 'u0') drawPerson('umpire', 150, 214, '#ff00ff', call, false);   // 주심은 콜할 때만, 포수 뒤(더 멀리)에 작게
+    if(call !== 'u0') drawPerson('umpire', 128, 212, '#ff00ff', call, false);   // 주심은 콜할 때만, 포수 뒤(더 멀리)에 작게
   }
   drawPerson('catcher', L.catcher[0], L.catcher[1], F.color, 'squat', false);
   // 공: 투수 손에서 나와 구종에 따라 휘며 커짐 (왼손 투수는 반대쪽 손)
@@ -601,3 +601,27 @@ function gfxRender(G, fx, lines){
 
 // 화면 모드면 시작하자마자 그림을 미리 불러옴 (처음 경기 화면에서 임시 그림이 보이지 않게)
 if(typeof SET !== 'undefined' && SET.view === 'gfx') gfxLoad();
+
+/* ---------- 지금 타자·투수 능력치 게이지 (화면 보며 하기, 선택지 아래 빈자리) ----------
+   우리 팀은 숫자와 길이 그대로, 상대 팀은 등급(5단계)만 보이게 해서 글로 듣는 정보와 같은 만큼만 알려 줌 */
+function gstatRender(G){
+  let box = $('#gstat');
+  if(!box){ box = document.createElement('div'); box.id = 'gstat'; box.setAttribute('aria-hidden', 'true'); $('#opts').after(box); }
+  if(!G || G.over || G.pre){ box.hidden = true; return; }
+  const bi = G.top ? 0 : 1, fi = 1 - bi, B = curBatter(G), P = curPitcher(G);
+  const own = typeof ownTeam === 'function' ? ownTeam : () => true;
+  const lvl = v => v >= 80 ? 5 : v >= 65 ? 4 : v >= 45 ? 3 : v >= 32 ? 2 : 1;
+  const bar = (label, v, mine, color) => {
+    const w = mine ? Math.max(4, Math.min(100, v)) : lvl(v) * 20;
+    return `<div class="gs-row"><span class="gs-l">${label}</span><span class="gs-bar"><i style="width:${w}%;background:${color}"></i></span><span class="gs-v">${mine ? v : gradeWord(v)}</span></div>`;
+  };
+  const mb = own(bi), mp = own(fi), left = Math.round(clamp(1 - P.load / P.sta, 0, 1) * 100);
+  const staCol = left > 60 ? '#58d854' : left > 30 ? '#f8b800' : '#f83800';
+  box.hidden = false;
+  box.innerHTML = `
+    <div class="gs-card" style="--tc:${G.teams[bi].color}"><div class="gs-h"><b>타자</b> ${esc(B.name)} <small>${B.hand === 'L' ? '좌타' : '우타'} · ${esc(batterLine(B))}</small></div>
+      ${bar('컨택', B.con, mb, '#3cbcfc')}${bar('파워', B.pow, mb, '#f87858')}${bar('선구안', B.eye, mb, '#b8f818')}${bar('스피드', B.spd, mb, '#f8d878')}</div>
+    <div class="gs-card" style="--tc:${G.teams[fi].color}"><div class="gs-h"><b>투수</b> ${esc(P.name)} <small>${P.hand === 'L' ? '좌투' : '우투'} · ${P.n}구 · 최고 ${P.vel}km</small></div>
+      ${bar('제구', P.ctl, mp, '#3cbcfc')}${bar('구위', P.stf, mp, '#f87858')}
+      <div class="gs-row"><span class="gs-l">체력</span><span class="gs-bar"><i style="width:${Math.max(3, left)}%;background:${staCol}"></i></span><span class="gs-v">${left}%</span></div></div>`;
+}

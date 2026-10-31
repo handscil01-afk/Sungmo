@@ -58,6 +58,7 @@ function render(){
   if(gg && qs.length > 2) $('#q').innerHTML = `<span class="qt">${esc(qs[0])} ${esc(qs[qs.length - 1])}</span> <span class="qd">${esc(qs.slice(1, -1).join(' '))}</span>`;
   else $('#q').textContent = S.q || '';
   renderOpts(S);
+  if(typeof gstatRender === 'function'){ if(gg) gstatRender(G); else if($('#gstat')) $('#gstat').hidden = true; }
   const ex = $('#extra');
   ex.innerHTML = S.back ? '<button type="button" class="btn back" id="backBtn">뒤로<span class="kh" aria-hidden="true"> (점 키)</span></button>' : '';
   $('#logSec').hidden = !S.board;

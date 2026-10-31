@@ -107,7 +107,9 @@ function recLoad(name){
     .then(ab => new Promise((ok, no) => { const p = c.decodeAudioData(ab, ok, no); if(p && p.then) p.then(ok, no); }))
     .then(buf => { RECBUF[name] = buf; }).catch(() => { delete RECLOAD[name]; });
 }
-function recPreload(){ [...new Set(Object.values(REC).flat())].forEach(recLoad); }
+// 화면 보며 하기용: 앞부분의 방망이 소리를 잘라 낸 결과 소리 (타격음은 그림에 맞춰 따로 냄)
+const REC_NB = new Set(['hit', 'double', 'triple', 'foul', 'out']);
+function recPreload(){ [...new Set(Object.values(REC).flat()), ...[...REC_NB].map(n => n + '-nb')].forEach(recLoad); }
 ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { if(SET.snd && SET.sndKind !== 'synth') recPreload(); }, { capture:true, once:true }));
 function recStopAll(c){
   RECNOW.splice(0).forEach(x => { try{ x.g.gain.setTargetAtTime(0, c.currentTime, 0.08); x.s.stop(c.currentTime + 0.4); }catch(e){} });
@@ -141,7 +143,12 @@ function playRec(c, uniq){
     if(contact){ recPlay(c, recPick(contact), t, 0.9); t += contact === 'batBig' ? 0.45 : 0.3; }
   }
   // 화면 보며 하기: 아웃은 녹음 파일(방망이 소리가 섞여 있음) 대신 글러브에 공이 꽂히는 소리
-  if(main === 'out' && gx){ try{ SOUNDS.mitt(c, c.currentTime + t); }catch(e){} t += 0.4; }
+  // 화면 보며 하기: 결과 소리는 방망이 소리를 잘라 낸 것으로 (아웃은 글러브 소리 뒤에 관중 반응)
+  if(main && gx){
+    if(main === 'out'){ try{ SOUNDS.mitt(c, c.currentTime + t); }catch(e){} }
+    let nm = recPick(main); if(REC_NB.has(nm)) nm += '-nb';
+    const d = recPlay(c, nm, t + (main === 'out' ? 0.15 : 0), 0.85, main === 'hr' ? 10 : 4); t += Math.min(d || 1, 2.5);
+  }
   else if(main){ const d = recPlay(c, recPick(main), t, 0.85, main === 'hr' ? 10 : 4); t += Math.min(d || 1, 2.5); }
   if(change) recPlay(c, 'change', t, 0.7, 4);
   else if(!pitch && !main && !contact && uniq.includes('batter')) recPlay(c, 'atbat', t, 0.6, 3);

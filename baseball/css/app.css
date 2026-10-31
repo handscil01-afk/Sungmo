@@ -180,3 +180,25 @@ html.gfxgame #q .qd{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orie
   html.gfxgame .opts:not(.grid){ grid-template-columns:repeat(2, minmax(0, 1fr)); }
   html.gfxgame .opt b{ font-size:0.9rem; }
 }
+/* 능력치 게이지 (자리가 넉넉할 때만) */
+#gstat{ display:none; }
+html.gfxgame #gstat:not([hidden]){ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px; margin-top:2px; }
+.gs-card{ background:#0d1430; border:2px solid var(--line); border-top:4px solid var(--tc); border-radius:10px; padding:6px 8px; font-size:0.72rem; color:#fff; min-width:0; }
+.gs-h{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:4px; }
+.gs-h b{ color:var(--acc); margin-right:2px; } .gs-h small{ color:#aab4d8; font-size:0.66rem; }
+.gs-row{ display:grid; grid-template-columns:2.6rem 1fr 3.2rem; align-items:center; gap:4px; margin:3px 0; }
+.gs-l{ color:#c9d3f0; } .gs-v{ text-align:right; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.gs-bar{ height:8px; background:#2a3358; border-radius:4px; overflow:hidden; border:1px solid #000; }
+.gs-bar i{ display:block; height:100%; border-radius:3px; }
+@media (max-height:779px) and (orientation:portrait), (max-height:699px) and (orientation:landscape){ html.gfxgame #gstat{ display:none !important; } }
+/* 게이지가 보일 때: 능력치 문장은 게이지와 겹치니 숨기고, 선택지·게이지를 촘촘하게 */
+@media (orientation:portrait) and (min-height:780px), (orientation:landscape) and (min-height:700px){
+  html.gfxgame #q .qd{ display:none; }
+  html.gfxgame .opt{ min-height:40px; padding:3px 6px; }
+  html.gfxgame .opt b{ font-size:0.85rem; }
+  html.gfxgame #say p:last-child{ -webkit-line-clamp:2; }
+  .gs-card{ padding:4px 7px; }
+  .gs-h{ margin-bottom:2px; }
+  .gs-row{ margin:1px 0; font-size:0.68rem; }
+  .gs-bar{ height:7px; }
+}
