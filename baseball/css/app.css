@@ -202,3 +202,14 @@ html.gfxgame #gstat:not([hidden]){ display:grid; grid-template-columns:repeat(2,
   .gs-row{ margin:1px 0; font-size:0.68rem; }
   .gs-bar{ height:7px; }
 }
+/* 낮은 가로 화면(휴대폰 가로): 글 상자·질문·선택지를 더 작게 */
+@media (orientation:landscape) and (max-height:500px){
+  html.gfxgame #turn{ padding-top:30px; gap:4px; }
+  html.gfxgame #say p:last-child{ -webkit-line-clamp:2; font-size:0.78rem; padding:4px 8px; }
+  html.gfxgame #q .qt{ font-size:0.88rem; }
+  html.gfxgame #q .qd{ display:none; }
+  html.gfxgame .opts:not(.grid){ gap:4px; }
+  html.gfxgame .opt{ min-height:36px; padding:2px 6px; }
+  html.gfxgame .opt b{ font-size:0.8rem; }
+  html.gfxgame .opt .num{ width:1.3rem; height:1.3rem; font-size:0.72rem; }
+}
