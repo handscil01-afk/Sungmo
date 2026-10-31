@@ -8,7 +8,7 @@
 const GX = { W:256, H:224, cv:null, ctx:null, key:'', anim:null, queue:[], raf:0, img:{}, tinted:{}, meta:{}, cam:{ x:0, y:0 }, lastAnimN:null, lastPlayN:null };
 const PAL = { sky:'#5c94fc', stand:'#3c3c64', fence:'#00682c', grass:'#38a838', grass2:'#4cbc4c', dirt:'#c88850', dirt2:'#b87840', line:'#fcfcfc',
   skin:'#f8b878', white:'#fcfcfc', black:'#000000', glove:'#a85010', bat:'#e4a050', ball:'#fcfcfc', ink:'#fcfc54', red:'#f83800' };
-const GX_FILES = ['bg-pitch', 'bg-field', 'pitcher', 'batter', 'catcher', 'fielder', 'banners', 'banners2', 'umpire', 'umpire-s', 'runner', 'tv', 'fielder2', 'runner-s'];
+const GX_FILES = ['bg-pitch', 'bg-field', 'pitcher', 'batter', 'catcher', 'fielder', 'banners', 'banners2', 'umpire', 'umpire-s', 'runner', 'tv', 'fielder2', 'runner-s', 'fielder-set'];
 // 결과 글씨 (banners.png를 쓸 때는 이 순서로 한 줄에 하나씩, 128×32)
 const BANNERS = ['스트라이크!', '볼', '헛스윙!', '파울', '안타!', '2루타!', '3루타!', '홈런!', '아웃!', '삼진!', '볼넷', '세이프!', '몸에 맞는 공'];
 const BANNERS2 = ['비디오 판독', '판정 번복!', '원심 유지', '견제!', '도루!', '병살!', '끝내기!', '게임 셋!'];
@@ -265,6 +265,8 @@ function tinyPlayer(x, y, team, mode, frame = 0, flip = false){
   const has = n => GX.meta[n] && tinted(n, team);
   if(mode === 'run' && has('fielder')) return drawPerson('fielder', x, y, team, ['set', 'lift', 'throw', 'follow'][frame % 4], false);
   if((mode === 'runner' || mode === 'base') && has('runner-s')) return drawPerson('runner-s', x, y, team, mode === 'base' ? 'p0' : ['p0', 'p1'][frame % 2], flip);
+  // 서 있거나 잡거나 던질 때: 투수의 준비 자세(글러브를 가슴에)를 작게. 공 그림이 섞이지 않아 깔끔함
+  if(has('fielder-set')) return drawPerson('fielder-set', x, y, team, 'p0', false);
   if(has('fielder2')) return drawPerson('fielder2', x, y, team, { ready:'p1', catch:'p0', throw: frame % 2 ? 'p3' : 'p2' }[mode] || 'p1', flip);
   R(x - 2, y - 7, 4, 2, team); R(x - 2, y - 5, 4, 2, PAL.skin); R(x - 3, y - 3, 6, 4, PAL.white);
   R(x - 3 + (frame % 2), y + 1, 2, 2, PAL.white); R(x + 1 - (frame % 2), y + 1, 2, 2, PAL.white);
@@ -494,6 +496,7 @@ function gfxStart(G, fx, lines, pre){
   const list = [];
   if(newPitch){
     document.documentElement.classList.add('gfxhold');   // 결과 글은 공을 잡거나 떨어질 때 보여 줌
+    if(G.over) document.documentElement.classList.add('gfxholdall');   // 마지막 공: 잡히기 전에는 '경기가 끝났습니다'와 선택지도 숨김
     // 도루·견제의 세이프·아웃은 뒤의 베이스 장면에서 보여 줌
     const pfx = newPlay && G.anim.res !== 'inplay' ? fx.filter(n => n !== 'safe' && n !== 'out') : fx;
     let bn = bannerOf(pfx, text);
@@ -550,7 +553,7 @@ function gfxDraw(){
   let A = GX.anim;
   while(A && !stepAnim(A, (now - A.start) * (REDUCED() ? 3 : 1))){ A = GX.anim = GX.queue.shift() || null; if(A){ A.start = now; } }
   // 결과가 나오는 순간(또는 움직임이 없을 때) 아래 결과 글을 보여 줌
-  if(!A || A.kind !== 'pitch' || A.ph === 'fresult' || (A.ph === 'result' && !(A.res === 'inplay' && A.bb))) document.documentElement.classList.remove('gfxhold');
+  if(!A || A.kind !== 'pitch' || A.ph === 'fresult' || (A.ph === 'result' && !(A.res === 'inplay' && A.bb))) document.documentElement.classList.remove('gfxhold', 'gfxholdall');
   if(GX.pending > 0){ R(0, 0, 256, 224, '#000'); pxText('그림 불러오는 중…', 128, 104, PAL.white, 12); return; }
   if(!A) drawPitchScene(G, null);
   else if(A.kind === 'banner'){ drawPitchScene(G, null); banner(A.banner, 112, A.bannerColor || PAL.ink, 22); }
