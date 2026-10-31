@@ -486,7 +486,7 @@ function bannerOf(fx, text){
   return null;
 }
 // 새 투구·새 플레이가 있으면 차례대로 보여 줌 (투구 → 도루·견제·판독)
-function gfxStart(G, fx, lines){
+function gfxStart(G, fx, lines, pre){
   const now = performance.now(), text = (lines || []).map(l => l.s || l).join(' ');
   const newPitch = !!(G.anim && G.anim.n !== GX.lastAnimN), newPlay = !!(G.play && G.play.n !== GX.lastPlayN);
   GX.lastAnimN = G.anim ? G.anim.n : null; GX.lastPlayN = G.play ? G.play.n : null;
@@ -510,7 +510,7 @@ function gfxStart(G, fx, lines){
   else if((fx || []).includes('change')) list.push({ kind:'card', mode:'change' });
   if(!list.length){ const bn = bannerOf(fx || [], text); if(bn) list.push({ kind:'banner', ph:'result', t0:1, banner: bn[0], bannerColor: bn[1], hr: bn[2] }); }
   if(!list.length) return;
-  list.forEach(a => a.start = now);
+  list.forEach(a => { a.start = now; if(a.kind !== 'card') a.pre = pre; });
   GX.anim = list.shift(); GX.queue = list;
   if(!GX.raf && GX.cv) GX.raf = requestAnimationFrame(gfxTick);
 }
@@ -531,9 +531,20 @@ function stepAnim(A, el){
   A.ph = 'fresult'; A.t0 = 1; return el < 1000 + fly + 1500;
 }
 const REDUCED = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+// 그림에 쓸 경기 상태: 마지막 공으로 공수가 바뀌었거나 경기가 끝났으면, 움직임이 끝날 때까지 공을 던지기 전 상태(팀 색·타자·투수·주자)로 그림
+function viewOf(A){
+  const p = A && A.pre;
+  return p && (p.top !== G.top || p.inning !== G.inning || (G.over && !p.over)) ? p : G;
+}
+const snapOf = G => ({ ...G, teams: G.teams.map(T => ({ ...T, R: [...T.R] })), bases: [...G.bases] });
 function gfxTick(){
   GX.raf = 0;
   if(!GX.cv || !document.contains(GX.cv) || !G) return;
+  const real = G;
+  try{ G = viewOf(GX.anim); gfxDraw(); } finally { G = real; }
+  if(GX.anim) GX.raf = requestAnimationFrame(gfxTick);
+}
+function gfxDraw(){
   const now = performance.now();
   let A = GX.anim;
   while(A && !stepAnim(A, (now - A.start) * (REDUCED() ? 3 : 1))){ A = GX.anim = GX.queue.shift() || null; if(A){ A.start = now; } }
@@ -552,7 +563,6 @@ function gfxTick(){
   else if(A.kind === 'reviewEnd') drawReview(A.o, A.t0, A.phase);
   else if(A.ph === 'fly' || A.ph === 'fresult') drawFieldScene(G, A);
   else drawPitchScene(G, A.res === 'inplay' && A.ph === 'result' && A.bb ? { ...A, banner:null } : A);
-  if(GX.anim) GX.raf = requestAnimationFrame(gfxTick);
 }
 // 그림판 내부 해상도 = 보이는 크기 × 기기 픽셀 비율. 그림은 언제나 256×224 좌표로 그림
 function gfxSize(){
@@ -582,9 +592,10 @@ function gfxRender(G, fx, lines){
   if(key !== GX.key){
     const fresh = GX.key && GX.key.split(':')[0] === String(G.at);
     GX.key = key;
-    if(fresh) gfxStart(G, fx || [], lines);
+    if(fresh) gfxStart(G, fx || [], lines, GX.lastSnap);
     else { GX.lastAnimN = G.anim ? G.anim.n : null; GX.lastPlayN = G.play ? G.play.n : null; GX.anim = null; GX.queue = []; }
   }
+  GX.lastSnap = snapOf(G);   // 다음 움직임에서 '던지기 전 상태'로 씀
   if(!GX.raf) GX.raf = requestAnimationFrame(gfxTick);
 }
 

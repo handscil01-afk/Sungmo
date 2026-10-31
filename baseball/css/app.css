@@ -170,3 +170,13 @@ html.gfxgame #chatSec{ max-height:20vh; overflow:auto; }
   html.gfxgame .opts:not(.grid){ grid-template-columns:repeat(2, minmax(0, 1fr)); }
 }
 html.gfxgame.gfxhold #say{ visibility:hidden; }
+/* 화면 보며 하기: 방금 결과는 게임 대화 상자처럼, 질문은 할 일을 크게 */
+html.gfxgame #say p:last-child{ background:#0d1430; border:2px solid #f8d030; border-radius:10px; padding:6px 10px; color:#fff; font-size:0.9rem; font-weight:600; line-height:1.4; -webkit-line-clamp:3; box-shadow:0 2px 0 #000; }
+[data-theme="light"] html.gfxgame #say p:last-child, html.gfxgame[data-theme="light"] #say p:last-child{ background:#fff; color:#0b1020; }
+html.gfxgame #q .qt{ display:block; font-size:1rem; color:var(--acc); }
+html.gfxgame #q .qd{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; font-size:0.78rem; font-weight:500; color:var(--ink2); margin-top:2px; }
+/* 세로로 넉넉한 휴대폰은 선택지를 두 줄로 (글자가 중간에 끊기지 않게) */
+@media (orientation:portrait) and (min-height:740px){
+  html.gfxgame .opts:not(.grid){ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  html.gfxgame .opt b{ font-size:0.9rem; }
+}

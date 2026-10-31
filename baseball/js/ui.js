@@ -53,7 +53,10 @@ function render(){
   // 메모: 화면이 정한 글, 없으면 방금 note()로 띄운 글 (전체화면 전환 같은 다시 그리기에도 남음)
   const nl = S.note || UI.note || [];
   const nt = $('#note'); nt.innerHTML = nl.map(l => `<p>${esc(l)}</p>`).join(''); nt.hidden = !nl.length;
-  $('#q').textContent = S.q || '';
+  // 화면 보며 하기: 긴 질문은 '무엇을 할지'(첫 문장 + 마지막 질문)를 크게, 나머지 설명은 작게
+  const qs = gg ? (S.q || '').split(/(?<=[.?!])\s+/) : [];
+  if(gg && qs.length > 2) $('#q').innerHTML = `<span class="qt">${esc(qs[0])} ${esc(qs[qs.length - 1])}</span> <span class="qd">${esc(qs.slice(1, -1).join(' '))}</span>`;
+  else $('#q').textContent = S.q || '';
   renderOpts(S);
   const ex = $('#extra');
   ex.innerHTML = S.back ? '<button type="button" class="btn back" id="backBtn">뒤로<span class="kh" aria-hidden="true"> (점 키)</span></button>' : '';

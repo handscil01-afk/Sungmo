@@ -140,7 +140,9 @@ function playRec(c, uniq){
     if(pitch){ recPlay(c, 'pitch', t, 0.6); t += 0.35; }
     if(contact){ recPlay(c, recPick(contact), t, 0.9); t += contact === 'batBig' ? 0.45 : 0.3; }
   }
-  if(main){ const d = recPlay(c, recPick(main), t, 0.85, main === 'hr' ? 10 : 4); t += Math.min(d || 1, 2.5); }
+  // 화면 보며 하기: 아웃은 녹음 파일(방망이 소리가 섞여 있음) 대신 글러브에 공이 꽂히는 소리
+  if(main === 'out' && gx){ try{ SOUNDS.mitt(c, c.currentTime + t); }catch(e){} t += 0.4; }
+  else if(main){ const d = recPlay(c, recPick(main), t, 0.85, main === 'hr' ? 10 : 4); t += Math.min(d || 1, 2.5); }
   if(change) recPlay(c, 'change', t, 0.7, 4);
   else if(!pitch && !main && !contact && uniq.includes('batter')) recPlay(c, 'atbat', t, 0.6, 3);
   return true;
