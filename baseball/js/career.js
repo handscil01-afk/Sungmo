@@ -45,7 +45,7 @@ function careerNew(){
     for(const k in m) p[k] = clamp(p[k] + m[k], 25, 90);
   }
   p.name = NEWC.name; p.age = 20; p.rookie = true; p.cond = 0;
-  L.career = { id:p.id, p, where:'minor', pit:NEWC.pit, type:NEWC.type, pts:{}, fame:0, trained:-1, minor:{}, ach:[], hurt:0, slump:0 };
+  L.career = { id:p.id, p, where:'minor', pit:NEWC.pit, type:NEWC.type, pts:{}, fame:0, trained:-1, minor:{}, ach:[], hurt:0, slump:0, money:300, salary:3000, equip:{}, goods:{ drink:1 }, owned:[] };
   crLog(L, `${p.name}, ${teamInfo(NEWC.team).name}에 입단했습니다! 퓨처스리그(2군)에서 시작합니다.`);
   return L;
 }
@@ -100,6 +100,7 @@ function careerStatus(L){
   const s = p.ss || {}, m = c.minor || {};
   if(c.where !== 'minor') out.push(isPit(p) ? `이번 시즌 1군: ${pitLine(p).replace(/^[^:]+: /, '')}` : `이번 시즌 1군: ${batLine(p).replace(/^[^:]+: /, '')}`);
   if(m.g) out.push(isPit(p) ? `퓨처스리그: ${m.g}경기 ${m.w || 0}승, ${ipText(m.out || 0)}, 평균자책점 ${m.out ? (m.r * 27 / m.out).toFixed(2) : '-'}.` : `퓨처스리그: ${m.g}경기 타율 ${avgText(m.ab ? m.h / m.ab : 0)}, 홈런 ${m.hr || 0}.`);
+  life(L); out.push(`연봉 ${won(c.salary)}, 가진 돈 ${won(c.money)}. 장비: ${equipText(L)}.`);
   if(L.phase === 'season') out.push(`${L.season}시즌 ${L.day + 1}일째. 팀은 ${myRank(L).rank}위, ${T.w}승 ${T.l}패.`);
   else if(L.phase === 'post') out.push(seriesText(L));
   else out.push(...awardLines(L));
@@ -112,6 +113,7 @@ function careerHome(){
     note:['내 선수 한 명을 만들어 신인으로 입단합니다. 2군에서 훈련하며 실력을 키워 1군 주전이 되고, 타이틀과 우승, 명예의 전당을 노립니다.', '1군 경기에서는 내 선수의 타석(투수라면 내 선수가 던지는 동안)만 직접 하고, 나머지는 빠르게 진행합니다.'],
     opts:[{ n:1, t:'새 선수 만들기', act: v => go(careerNameScreen, v) }] };
   const c = C(L), p = myP(L), done = L.phase === 'done', g = myGameToday(L);
+  if(!c.retired){ life(L); if(c.event) return eventScreen(); }
   if(c.retired) return { q:'은퇴한 선수입니다. 새 선수를 만들까요?', back: v => go(homeScreen, v), note: c.final || [], opts:[
     { n:1, t:'새 선수 만들기', act: v => go(careerNameScreen, v) }, { n:7, t:'업적과 경력', act: v => go(careerLogScreen, v) }, { n:8, t:'기록실과 명예의 전당', act: v => go(archiveScreen, v) }] };
   const saved = (() => { const s = loadSaved(); return s && s.G.career && s.G.career.day === L.day && s.G.career.phase === L.phase && s.G.career.season === L.season ? s : null; })();
@@ -123,9 +125,10 @@ function careerHome(){
   return { q: done ? '시즌이 끝났습니다. 다음 시즌을 시작할까요?' : '오늘은 무엇을 할까요?', back: v => go(homeScreen, v), note: careerStatus(L), opts:[
     done ? { n:1, t:'다음 시즌 시작', s:'한 살 더 먹고, 나이에 따라 능력치가 바뀝니다.', act: v => careerNextSeason(v) }
       : { n:1, t: saved ? '진행 중인 경기 이어하기' : c.hurt > 0 ? '쉬면서 회복하기' : offDay ? '오늘 경기 보기 (등판 차례 아님)' : first ? (g ? '오늘 1군 경기 하기' : '포스트시즌 결과 보기') : '퓨처스리그(2군) 경기 하기',
-          s: saved ? situation(saved.G) : offDay ? '선발 로테이션 차례가 아니라 결과만 봅니다.' : first && g ? '내 선수 차례만 직접 합니다.' : '', act: v => saved ? resumeGame(v) : c.hurt > 0 ? careerRest(v) : offDay ? careerSimDay(v) : first && g ? careerPlay(v) : careerMinorDay(v) },
+          s: saved ? situation(saved.G) : offDay ? '선발 로테이션 차례가 아니라 결과만 봅니다.' : c.hurt > 0 ? '' : '직접 하기 · 맡기고 결과 듣기 · 건너뛰기 가운데 고릅니다.',
+          act: v => saved ? resumeGame(v) : c.hurt > 0 ? careerRest(v) : offDay ? careerSimDay(v) : first && g ? go(() => careerGameChoice(false), v) : L.phase === 'season' ? go(() => careerGameChoice(true), v) : careerMinorDay(v) },
     { n:2, t: trained ? '오늘 훈련은 마쳤습니다' : '훈련하기', hide: done || c.hurt > 0, s:'경기 전에 하루 한 번 훈련합니다.', act: v => trained ? speak('오늘 훈련은 이미 했습니다.') : go(trainScreen, v) },
-    { n:3, t:'오늘 경기 결과만 보기', hide: done || !first || !g, s:'내 선수 경기도 컴퓨터가 진행하고 내 기록만 알려 줍니다.', act: v => careerSimDay(v) },
+    { n:3, t:'어디 가기', s:`용품점, 내 가방, 팬 사인회, 특별 코치, ${c.hurt > 0 ? '재활 센터' : '마사지 숍'}. 가진 돈 ${won(c.money || 0)}`, act: v => go(visitScreen, v) },
     { n:4, t:'내 선수 정보', act: v => go(careerInfoScreen, v) },
     { n:5, t:'팀 순위', act: v => go(standScreen, v) },
     { n:6, t:'기록 순위', act: v => go(() => leadersScreen(null), v) },
@@ -158,11 +161,14 @@ function doTrain(k, nm, via){
   let say;
   if(!k){ p.cond = Math.min(2, p.cond + 1); say = [`푹 쉬었습니다. 컨디션 ${COND[p.cond]}.`]; }
   else {
-    const up = grow(L, k, 4 + rnd(L) * 3);
+    // 대성공(15%): 두 배, 보약을 먹었으면 또 두 배. 컨디션이 좋으면 조금 더
+    const great = rnd(L) < 0.15, tonic = !!c.tonic; c.tonic = false;
+    const amt = (4 + rnd(L) * 3) * (great ? 2 : 1) * (tonic ? 2 : 1) * (1 + (p.cond || 0) * 0.08);
+    const up = grow(L, k, amt);
     if(rnd(L) < 0.2){ p.cond = Math.max(-2, p.cond - 1); up.push('훈련이 힘들어 몸이 조금 무겁습니다.'); }
-    say = [`${nm} 훈련을 했습니다. 성장 점수 ${Math.round(c.pts[k])}/10.`, ...up];
+    say = [`${great ? '대성공! ' : ''}${nm} 훈련을 했습니다.${tonic ? ' 보약 덕분에 효과가 두 배!' : ''} 성장 점수 ${Math.round(c.pts[k])}/10.`, ...up];
   }
-  saveLeague(); go(careerHome, via, say);
+  saveLeague(); go(() => sceneScreen(k || 'rest', k ? `${nm} 훈련` : '푹 쉬기'), via, say);
 }
 
 /* ---------- 경기 ---------- */
@@ -184,6 +190,14 @@ function careerPlay(via){
 function careerAfterGame(G){
   const L = CR(), m = G.career;
   if(!L || L.season !== m.season || L.day !== m.day || L.phase !== m.phase) return [{ s:'이미 지난 경기라 기록에 넣지 않았습니다.', k:'c' }];
+  if(m.minor){
+    const lines = [`퓨처스리그 경기: ${teamName(L.my)} ${runsOf(G.teams[0])} 대 ${runsOf(G.teams[1])} ${teamName(m.opp)}.`, ...careerGrowFromGame(L, G, true)];
+    const all = leagueAdvance(L, null), mine = all.find(x => x.includes(teamName(L.my)));
+    if(mine) lines.push(`오늘 1군 경기: ${mine}.`);
+    lines.push(...careerAfterDay(L));
+    saveLeague();
+    return lines.map(s => ({ s, k:'i' }));
+  }
   const lines = careerGrowFromGame(L, G, false);
   leagueAdvance(L, G);
   lines.push(...careerAfterDay(L));
@@ -221,6 +235,7 @@ function careerGrowFromGame(L, G, minor){
     }
     if(!minor && (dec.w === c.id || dec.s === c.id) && s.r === 0) out.push(...interview(L, p, dec.w === c.id ? '무실점 승리' : '세이브'));
   }
+  out.push(...gameBonus(L, ln, G, minor));
   if(minor){ const mm = c.minor; mm.g = (mm.g || 0) + 1; ['ab', 'h', 'hr', 'out', 'r'].forEach(k => { mm[k] = (mm[k] || 0) + (s[k] || 0); }); if((G.decision || {}).w === c.id) mm.w = (mm.w || 0) + 1; }
   return out;
 }
@@ -239,6 +254,8 @@ function careerAfterDay(L){
   else if(rnd(L) < 0.006){ c.hurt = 3 + Math.floor(rnd(L) * 8); out.push(`아, 경기 중에 몸을 다쳤습니다. ${c.hurt}일 동안 쉬어야 합니다.`); crLog(L, `${p.name}, 부상으로 ${c.hurt}일 쉼.`); }
   else if(rnd(L) < 0.02){ p.cond = -2; out.push('요즘 슬럼프입니다. 몸이 무겁습니다. 훈련하거나 푹 쉬어 보세요.'); }
   if(c.where === 'minor' && L.phase === 'season') out.push(...promote(L));
+  out.push(...payDay(L));
+  rollEvent(L);
   out.push(...leagueNews(L));
   return out;
 }
@@ -264,20 +281,50 @@ function promote(L){
   return ['축하합니다! 실력을 인정받아 1군에 올라갑니다. 이제 1군 경기에 나갑니다.'];
 }
 // 2군 날: 퓨처스리그 경기(컴퓨터가 진행, 리그 기록에는 넣지 않음) 뒤 1군 리그 하루 진행
-function careerMinorDay(via){
+// 퓨처스리그 경기 설정: 내 선수를 넣은 2군 명단 (투수는 선발 차례·불펜 대기)
+function minorGameOpts(L, mode){
+  const p = myP(L), opp = TEAMS.map(t => t.key).filter(k => k !== L.my)[Math.floor(rnd(L) * 9)];
+  const R = gameRoster(L, L.my), O = gameRoster(L, opp);
+  if(isPit(p)){ if(p.role === '선발' && rnd(L) < 0.25) R.pit = [p, ...R.pit.slice(1)]; else if(p.role !== '선발') R.pit = [R.pit[0], p, ...R.pit.slice(1)]; else R.pit = [R.pit[0], ...R.pit.slice(1), p]; }
+  else { const bat = R.bat.slice(), i = bat.findIndex(b => b.pos === p.pos); bat[i >= 0 ? i : 4] = p; R.bat = bat; }
+  return { opp, o:{ mode, unit:'pitch', innings:9, teams:[L.my, opp], ctrl:['cpu', 'cpu'], rosters:[R, O], seed:(rnd(L) * 4294967296) >>> 0 } };
+}
+// 컴퓨터끼리 끝까지 (내 선수가 나온 타석·투구 결과를 모아 둠)
+function simMine(G2, id){
+  const mine = []; let guard = 0;
+  while(!G2.over && guard++ < 3000){
+    const me = curBatter(G2).id === id || curPitcher(G2).id === id, pa = G2.pa, inn = G2.inning;
+    const r = G2.review ? resolveReview(G2, aiChallenge(G2)) : playStep(G2, aiDefChoice(G2), aiOffChoice(G2));
+    if(me && G2.pa !== pa){ const last = (r.lines || []).filter(l => l.k === 'r').pop(); if(last) mine.push(`${inn}회: ${last.s.split('… ').pop()}`); }
+  }
+  flush(G2);
+  return mine.length > 10 ? [...mine.slice(0, 10), `그 밖에 ${mine.length - 10}타석.`] : mine;
+}
+// 2군 경기를 직접: 내 차례만 직접 하고 나머지는 빠르게 (리그 기록에는 넣지 않음)
+function careerMinorPlay(via){
+  const L = CR(), c = C(L), p = myP(L);
+  const { opp, o } = minorGameOpts(L, L.mode === 'simple' ? 'simple' : 'detail');
+  G = newGame(o);
+  G.focus = c.id; G.focusTeam = 0;
+  G.career = { season:L.season, day:L.day, phase:L.phase, minor:true, opp, label:`${L.season}시즌 ${L.day + 1}일째 퓨처스리그` };
+  saveLeague();
+  GS.opts = null; GS.pend = { def:null, off:null }; GS.auto = null; GS.holder = -1; GS.sel = null; UI.logG = null;
+  const r = flush(G);
+  const pre = isPit(p) ? (G.teams[0].pit[0].id === c.id ? '오늘은 내가 선발 투수입니다.' : '불펜에서 대기합니다. 감독이 부르면 마운드에 오릅니다.') : `${G.teams[0].bat.findIndex(b => b.id === c.id) + 1}번 타자로 나갑니다.`;
+  gameNext(via, { lines:[{ s:`${G.career.label}. ${pre}`, k:'i' }, ...r.lines], fx: r.fx });
+}
+function careerMinorDay(via, listen){
   const L = CR(), c = C(L), p = myP(L), out = [];
   if(L.phase === 'season'){
-    const opp = TEAMS.map(t => t.key).filter(k => k !== L.my)[Math.floor(rnd(L) * 9)];
-    const R = gameRoster(L, L.my), O = gameRoster(L, opp);
-    if(isPit(p)){ if(p.role === '선발' && rnd(L) < 0.25) R.pit = [p, ...R.pit.slice(1)]; else if(p.role !== '선발') R.pit = [R.pit[0], p, ...R.pit.slice(1)]; }
-    else { const bat = R.bat.slice(), i = bat.findIndex(b => b.pos === p.pos); bat[i >= 0 ? i : 4] = p; R.bat = bat; }
-    const G2 = newGame({ mode:'detail', innings:9, teams:[L.my, opp], ctrl:['cpu', 'cpu'], rosters:[R, O], seed:(rnd(L) * 4294967296) >>> 0 });
-    let guard = 0;
-    while(!G2.over && guard++ < 2000){ if(G2.review) resolveReview(G2, aiChallenge(G2)); else playStep(G2, aiDefChoice(G2), aiOffChoice(G2)); }
-    out.push(`퓨처스리그 경기: ${teamName(L.my)} ${runsOf(G2.teams[0])} 대 ${runsOf(G2.teams[1])} ${teamName(opp)}.`, ...careerGrowFromGame(L, G2, true));
+    const { opp, o } = minorGameOpts(L, 'detail');
+    const G2 = newGame(o);
+    const mine = simMine(G2, c.id);
+    out.push(`퓨처스리그 경기: ${teamName(L.my)} ${runsOf(G2.teams[0])} 대 ${runsOf(G2.teams[1])} ${teamName(opp)}.`);
+    if(listen) out.push(...(mine.length ? mine : ['오늘은 내 차례가 없었습니다.']));
+    out.push(...careerGrowFromGame(L, G2, true));
     const all = leagueAdvance(L, null);
-    const mine = all.find(x => x.includes(teamName(L.my)));
-    if(mine) out.push(`오늘 1군 경기: ${mine}.`);
+    const today = all.find(x => x.includes(teamName(L.my)));
+    if(today) out.push(`오늘 1군 경기: ${today}.`);
   } else {
     out.push(...leagueAdvance(L, null).map(x => `포스트시즌: ${x}.`));
   }
@@ -292,13 +339,13 @@ function careerRest(via){
   saveLeague(); go(careerHome, via, out);
 }
 // 1군 경기를 컴퓨터가 진행하고 내 기록만 알려 줌
-function careerSimDay(via){
+function careerSimDay(via, listen){
   const L = CR(), g = myGameToday(L), c = C(L); if(!g) return;
-  const G2 = newGame(leagueGameOpts(L, g.a, g.h, ['cpu', 'cpu'], 'manager'));
-  let guard = 0;
-  while(!G2.over && guard++ < 2000){ if(G2.review) resolveReview(G2, aiChallenge(G2)); else playStep(G2, aiDefChoice(G2), aiOffChoice(G2)); }
-  flush(G2);
-  const out = [`${g.label || `${L.day + 1}일째`}: ${teamName(g.a)} ${runsOf(G2.teams[0])} 대 ${runsOf(G2.teams[1])} ${teamName(g.h)}.`, ...careerGrowFromGame(L, G2, false)];
+  const G2 = newGame(leagueGameOpts(L, g.a, g.h, ['cpu', 'cpu'], listen ? 'detail' : 'manager', 'pitch'));
+  const mine = simMine(G2, c.id);
+  const out = [`${g.label || `${L.day + 1}일째`}: ${teamName(g.a)} ${runsOf(G2.teams[0])} 대 ${runsOf(G2.teams[1])} ${teamName(g.h)}.`];
+  if(listen) out.push(...(mine.length ? mine : ['오늘은 내 차례가 없었습니다.']));
+  out.push(...careerGrowFromGame(L, G2, false));
   leagueAdvance(L, G2);
   out.push(...careerAfterDay(L));
   saveLeague(); go(careerHome, via, out);
@@ -309,7 +356,7 @@ function careerNextSeason(via){
   leagueNextSeason(L);
   c.minor = {};
   const p = myP(L), out = leagueNews(L);
-  out.unshift(`${L.season}시즌이 시작됩니다. ${p.name}, ${p.age}세가 되었습니다.`);
+  out.unshift(`${L.season}시즌이 시작됩니다. ${p.name}, ${p.age}세가 되었습니다.`, ...negotiate(L));
   if(p.age >= 40){ saveLeague(); careerRetire(via, '마흔 살이 되어 은퇴합니다.'); return; }
   saveLeague(); go(careerHome, via, out);
 }

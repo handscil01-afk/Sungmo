@@ -164,14 +164,29 @@ const PORT = 8766;
       for(const k of ['1', '5', '1', '1', '4', '1']) await page.keyboard.press(k);
       if(!(await q(page)).includes('오늘은 무엇을')) errors.push('육성 첫 화면이 아님: ' + await q(page));
       await shot(page, `${name}-career`);
+      const skipEvent = async () => { for(let i = 0; i < 3 && (await q(page)).includes('이벤트'); i++) await page.keyboard.press('1'); };
+      // 훈련 → 훈련 장면 → 확인
       await page.keyboard.press('2'); await page.keyboard.press('1');
+      if(!(await q(page)).includes('훈련')) errors.push('훈련 장면이 아님: ' + await q(page));
+      await shot(page, `${name}-train`);
+      await page.keyboard.press('1'); await skipEvent();
+      // 어디 가기 → 팬 사인회 → 확인, 용품점에서 배트 사기
+      await page.keyboard.press('3'); await page.keyboard.press('3'); await page.keyboard.press('1'); await skipEvent();
+      await page.evaluate(() => { const L = CR(); life(L).money = 5000; saveLeague(); });
+      await page.keyboard.press('3'); await page.keyboard.press('1'); await page.keyboard.press('2');
+      await page.waitForSelector('#dlg.open'); await page.click('#dlg [data-dlg="0"]');
+      const eq = await page.evaluate(() => { const L = CR(); return [life(L).equip.bat, myP(L).pow]; });
+      if(eq[0] !== 'bat2') errors.push('배트 장착이 안 됨 ' + JSON.stringify(eq));
+      await page.keyboard.press('.'); await page.keyboard.press('.'); await skipEvent();
       await page.evaluate(() => { const L = CR(); const p = myP(L); p.con = 95; p.pow = 90; p.eye = 85; p.def = 85; saveLeague(); });
-      await page.keyboard.press('1');
+      // 2군 경기: 맡기고 내 결과 듣기
+      await page.keyboard.press('1'); await page.keyboard.press('2');
       const up = await page.$eval('#say', e => e.innerText);
+      await skipEvent();
       if(!/퓨처스리그/.test(up)) errors.push('퓨처스리그 경기 결과가 없음');
       console.log(`${name}: 육성 2군 / ${up.split('\n').filter(Boolean).slice(0, 2).join(' / ').slice(0, 150)}`);
       if(!/1군에 올라갑니다/.test(up)) errors.push('1군 승격이 안 됨: ' + up.slice(0, 120));
-      await page.keyboard.press('1');
+      await page.keyboard.press('1'); await page.keyboard.press('1');   // 1군 경기, 내 차례만 직접
       let myTurns = 0;
       for(let i = 0; i < 600; i++){
         const qq = await q(page);
@@ -184,7 +199,7 @@ const PORT = 8766;
       const endS = await page.$eval('#say', e => e.innerText);
       if(!(await q(page)).includes('경기가 끝났습니다')) errors.push('육성 1군 경기가 끝나지 않음');
       console.log(`${name}: 육성 1군 경기 끝, 내가 고른 공 ${myTurns}번 / ${endS.split('\n').filter(l => /내 기록/.test(l)).join('')}`);
-      await page.keyboard.press('1');
+      await page.keyboard.press('1'); await skipEvent();
       await page.keyboard.press('9'); await page.keyboard.press('1');
       await page.waitForSelector('#dlg.open'); await page.click('#dlg [data-dlg="0"]');
       const fin = await page.$eval('#say', e => e.innerText);

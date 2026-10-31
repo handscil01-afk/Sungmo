@@ -543,7 +543,13 @@ function viewOf(A){
 const snapOf = G => ({ ...G, teams: G.teams.map(T => ({ ...T, R: [...T.R] })), bases: [...G.bases] });
 function gfxTick(){
   GX.raf = 0;
-  if(!GX.cv || !document.contains(GX.cv) || !G) return;
+  if(!GX.cv || !document.contains(GX.cv)) return;
+  if(GX.scene){   // 육성 장면은 경기 상태 없이 그림
+    if(GX.pending > 0){ R(0, 0, 256, 224, '#000'); pxText('그림 불러오는 중…', 128, 104, PAL.white, 12); }
+    else drawScene(GX.scene, (performance.now() - GX.scene.start) / 1000);
+    GX.raf = requestAnimationFrame(gfxTick); return;
+  }
+  if(!G) return;
   const real = G;
   try{ G = viewOf(GX.anim); gfxDraw(); } finally { G = real; }
   if(GX.anim) GX.raf = requestAnimationFrame(gfxTick);
@@ -580,6 +586,7 @@ function gfxSize(){
 }
 // render()가 부름: 화면 모드일 때 상황판 자리에 그림판을 두고, 새 투구·플레이가 있으면 움직임을 시작
 function gfxRender(G, fx, lines){
+  GX.scene = null;
   const bs = $('#boardSec');
   let wrap = bs.querySelector('.gfxwrap');
   if(!wrap){
@@ -628,4 +635,92 @@ function gstatRender(G){
     <div class="gs-card" style="--tc:${G.teams[fi].color}"><div class="gs-h"><b>투수</b> ${esc(P.name)} <small>${P.hand === 'L' ? '좌투' : '우투'} · ${P.n}구 · 최고 ${P.vel}km</small></div>
       ${bar('제구', P.ctl, mp, '#3cbcfc')}${bar('구위', P.stf, mp, '#f87858')}
       <div class="gs-row"><span class="gs-l">체력</span><span class="gs-bar"><i style="width:${Math.max(3, left)}%;background:${staCol}"></i></span><span class="gs-v">${left}%</span></div></div>`;
+}
+
+/* ---------- 선수 육성 장면 (훈련·방문). S.scene = { kind, title, color } ---------- */
+function gfxScene(bs, sc){
+  let wrap = bs.querySelector('.gfxwrap');
+  if(!wrap){
+    bs.innerHTML = '';
+    wrap = document.createElement('div'); wrap.className = 'gfxwrap'; wrap.setAttribute('aria-hidden', 'true');
+    wrap.innerHTML = '<canvas id="gfx" width="512" height="448"></canvas>';
+    bs.appendChild(wrap);
+    GX.cv = wrap.firstChild; GX.ctx = GX.cv.getContext('2d'); GX.key = '';
+    gfxSize();
+    if(window.ResizeObserver) new ResizeObserver(() => gfxSize()).observe(GX.cv);
+    gfxLoad();
+  }
+  if(!GX.scene || GX.scene.kind !== sc.kind || GX.scene.title !== sc.title) GX.scene = { ...sc, start: performance.now() };
+  if(!GX.raf) GX.raf = requestAnimationFrame(gfxTick);
+}
+// 2배로 키워 그리기
+function big(fn, x, y, s = 2){ const ctx = GX.ctx; ctx.save(); ctx.translate(x, y); ctx.scale(s, s); fn(); ctx.restore(); }
+function drawScene(sc, t){
+  const col = sc.color || '#facc15', k = sc.kind, loop = t % 1.2, ctx = GX.ctx;
+  const batting = ['con', 'eye'].includes(k), pitching = ['vel', 'ctl', 'stf'].includes(k);
+  if(batting || pitching){
+    bgPitch();
+    if(batting){
+      // 피칭 머신에서 공이 날아오고 타자가 침 (선구안 훈련은 빠지는 공을 골라냄)
+      R(118, 104, 20, 12, '#7c7c7c'); R(122, 100, 12, 4, '#5c5c5c');
+      const n = Math.floor(t / 1.2), off = k === 'eye' && n % 2 === 1, z = lay().zone;
+      const tx = z[0] + (off ? 22 : 0), ty = z[1] + (off ? 10 : 0), q = Math.min(1, loop / 0.5);
+      const swing = !off && loop > 0.45, after = loop - 0.5;
+      if(loop < 0.5) ball(128 + (tx - 128) * q, 110 + (ty - 110) * q, 1.5 + q * 2.5);
+      else if(!off) ball(tx - after * 120, ty - after * 160, 3);
+      else ball(tx, ty, 4);
+      drawPerson('batter', lay().batR[0], lay().batR[1], col, swing ? (loop < 0.6 ? 'swing' : 'swfollow') : 'stance', swing ? loop < 0.6 : true);
+      if(off && loop > 0.55) pxText('볼! 잘 골라냈습니다', 128, 130, '#58d854', 11);
+    } else {
+      // 투구 훈련: 포수 미트로 계속 던짐 (구속은 스피드건, 제구는 과녁, 구위는 휘는 공)
+      const pose = loop < 0.25 ? 'set' : loop < 0.45 ? 'lift' : loop < 0.55 ? 'throw' : 'follow';
+      drawPerson('pitcher', lay().pitcher[0], lay().pitcher[1], col, pose, false, 0);
+      drawPerson('catcher', lay().catcher[0], lay().catcher[1], '#888888', 'squat', false);
+      const z = lay().zone, q = Math.max(0, Math.min(1, (loop - 0.5) / 0.35));
+      if(k === 'ctl'){ GX.ctx.strokeStyle = PAL.red; GX.ctx.lineWidth = 1.5; GX.ctx.beginPath(); GX.ctx.arc(z[0] + 8, z[1] + 6, 5, 0, 6.3); GX.ctx.stroke(); GX.ctx.lineWidth = 1; }
+      if(loop >= 0.5){
+        const ex = z[0] + (k === 'ctl' ? 8 : 0), ey = z[1] + (k === 'ctl' ? 6 : 0), bend = k === 'stf' ? Math.sin(q * Math.PI) * 14 : 0;
+        ball(124 + (ex - 124) * q + bend, 90 + (ey - 90) * q, 1.5 + q * 2.5);
+      }
+      if(k === 'vel' && loop > 0.85){ R(196, 40, 54, 18, '#000'); pxText(`${140 + Math.floor((t * 7) % 15)}km`, 223, 43, PAL.red, 11); }
+    }
+  } else if(k === 'pow'){
+    // 힘 훈련: 체육관에서 역기 들기
+    R(0, 0, 256, 224, '#3c2c1c'); for(let x = 0; x < 256; x += 32) R(x, 0, 2, 150, '#2c1c0c');
+    R(0, 150, 256, 74, '#5c4c3c'); R(20, 60, 50, 60, '#2c2c3c'); R(186, 60, 50, 60, '#2c2c3c');
+    const up = Math.sin(t * 4) > 0, by = up ? 82 : 108;
+    big(() => drawPerson('pitcher', 0, 0, col, 'set', false, 0), 128, 196, 2.4);
+    R(70, by, 116, 4, '#c0c0c0'); R(62, by - 10, 10, 24, '#202020'); R(184, by - 10, 10, 24, '#202020');
+    if(up) pxText('하나! 둘!', 128, 40, PAL.ink, 12);
+  } else if(k === 'spd' || k === 'sta' || k === 'def'){
+    // 달리기·수비: 잔디 위에서
+    for(let y = 0; y < 224; y += 16) R(0, y, 256, 8, PAL.grass), R(0, y + 8, 256, 8, PAL.grass2);
+    const sc2 = (t * 120) % 64;
+    for(let x = -64; x < 256; x += 64) R(x + (k === 'def' ? 0 : -sc2) + 64, 150, 30, 2, '#ffffff88');
+    if(k === 'def'){
+      const n = Math.floor(t / 1.4), q = (t % 1.4) / 1.4, fx = 80 + (n % 2) * 96;
+      const bx = 128 + (fx - 128) * Math.min(1, q * 1.2), bh = Math.sin(Math.min(1, q * 1.2) * Math.PI) * 60;
+      big(() => drawPerson(q < 0.8 ? 'fielder' : 'fielder-set', 0, 0, col, ['set', 'lift', 'throw', 'follow'][Math.floor(t * 10) % 4], false), 128 + (fx - 128) * Math.min(1, q * 1.3), 170, 2.4);
+      ball(bx, 150 - bh, 3 + bh / 20);
+    } else {
+      big(() => drawPerson('runner-s', 0, 0, col, Math.floor(t * 8) % 2 ? 'p1' : 'p0', false), 128, 180, 3);
+      for(let i = 0; i < 3; i++) R(70 - i * 10 - (t * 60) % 10, 172 + i % 2 * 3, 3, 3, '#e8d8a8');
+      if(k === 'sta') pxText(`${(t * 0.12).toFixed(1)}km`, 128, 40, PAL.white, 11);
+    }
+  } else if(k === 'fans'){
+    // 팬 사인회: 탁자 앞에 팬들이 줄을 섬
+    R(0, 0, 256, 224, '#1c2c5c'); for(let i = 0; i < 120; i++) R((i * 37) % 256, (i * 53) % 110, 2, 2, ['#fcfcfc', '#f87858', '#f8b800', '#3cbcfc'][i % 4]);
+    R(40, 140, 176, 20, '#a85010'); R(40, 140, 176, 3, '#c87030');
+    big(() => drawPerson('pitcher', 0, 0, col, 'set', false, 0), 128, 142, 1.6);
+    ['#f83800', '#3cbcfc', '#58d854', '#f8b800'].forEach((c2, i) => { const x = 40 + i * 30 + Math.sin(t * 3 + i) * 2; drawPerson('fielder-set', x, 210, c2, 'p0', false); });
+    for(let i = 0; i < 3; i++){ const hy = 120 - ((t * 30 + i * 25) % 70); pxText('♥', 150 + i * 18, hy, PAL.red, 10, true, false); }
+  } else {
+    // 쉬기: 밤, 창밖의 달, 쿨쿨
+    R(0, 0, 256, 224, '#0c1838'); R(170, 40, 60, 50, '#1c2c5c'); R(198, 40, 2, 50, '#3c4c7c'); R(170, 64, 60, 2, '#3c4c7c');
+    ctx.fillStyle = '#fce890'; ctx.beginPath(); ctx.arc(188, 56, 8, 0, 6.3); ctx.fill();
+    R(40, 150, 130, 24, '#a87850'); R(40, 140, 40, 14, '#fcfcfc'); R(70, 144, 100, 16, col);
+    for(let i = 0; i < 3; i++){ const zy = 130 - ((t * 20 + i * 18) % 50); pxText('Z', 80 + i * 14 + Math.sin(t + i) * 3, zy, PAL.white, 8 + i * 2, true, false); }
+  }
+  // 제목 띠
+  R(0, 0, 256, 24, 'rgba(0,0,0,0.75)'); pxText(sc.title || '', 128, 5, PAL.ink, 12);
 }
