@@ -116,7 +116,7 @@ function drawPerson(kind, x, foot, team, pose, flip, row = 0){
 // 투수 폼: 투수마다 정해짐 (오버핸드 60%, 사이드암 25%, 언더핸드 15%). 그림 줄 번호
 function armSlot(P){ let h = 7; for(const c of String(P.name) + P.id) h = (h * 31 + c.charCodeAt(0)) | 0; const v = Math.abs(h) % 20; return v < 12 ? 0 : v < 17 ? 1 : 2; }
 // 화면 배치: 그림 파일 배경과 코드로 그린 배경의 자리가 다름
-const LAY_IMG = { pitcher:[128, 121], batR:[86, 214], batL:[170, 214], catcher:[128, 244], zone:[128, 160, 12, 11], release:[[121, 88], [114, 96], [118, 108]] };
+const LAY_IMG = { pitcher:[128, 121], batR:[76, 214], batL:[180, 214], catcher:[128, 244], zone:[128, 160, 12, 11], release:[[121, 88], [114, 96], [118, 108]] };
 const LAY_CODE = { pitcher:[128, 102], batR:[106, 202], batL:[150, 202], catcher:[128, 218], zone:[128, 186, 10, 9], release:[[130, 92], [126, 96], [128, 100]] };
 const lay = () => GX.img['bg-pitch'] && GX.meta.pitcher ? LAY_IMG : LAY_CODE;
 
@@ -200,7 +200,7 @@ function drawPitchScene(G, A){
   let bPose = 'stance';
   if(A && (ph === 'flight' && A.t0 > 0.8 || ph === 'result')){ if(A.res === 'bunt') bPose = 'bunt'; else if(['whiff', 'foul', 'inplay'].includes(A.res)) bPose = ph === 'result' && A.t0 > 0.3 ? 'swfollow' : 'swing'; }
   const bp = left ? L.batL : L.batR;
-  drawPerson('batter', bp[0], bp[1], T.color, bPose, left);
+  drawPerson('batter', bp[0], bp[1], T.color, bPose, !left);   // 홈플레이트 쪽으로 몸을 돌린 모습: 왼쪽 타석은 방망이가 오른쪽에서 왼쪽으로
   scoreBar(G);
   if(A && ph === 'result' && A.banner) banner(A.banner, 112, A.bannerColor || PAL.ink, 22);
 }
