@@ -428,6 +428,32 @@ function drawReview(o, k, phase){
   else if(Math.floor(performance.now() / 500) % 2 || phase === 'replay') banner('비디오 판독', 186, PAL.ink, 20);
 }
 
+/* ---------- 공수 교대·경기 끝 카드 (TV 중계처럼 이닝별 점수) ---------- */
+function drawCard(A){
+  drawPitchScene(G, null);
+  const ctx = GX.ctx, k = A.t0, y0 = 50 + (1 - k) * 30;
+  ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 32, 256, 192);
+  R(10, y0, 236, 120, '#000'); R(10, y0, 236, 2, PAL.ink); R(10, y0 + 118, 236, 2, PAL.ink);
+  // 제목
+  if(A.mode === 'end') banner(G.walkoff ? '끝내기!' : '게임 셋!', y0 - 2, PAL.ink, 18);
+  else pxText('공수 교대', 128, y0 + 6, PAL.ink, 16);
+  // 이닝별 점수: 마지막 9이닝까지, 그리고 R(점수)·H(안타)
+  const n = Math.max(G.innings, G.inning), first = Math.max(1, n - 8), cols = n - first + 1;
+  const cx = i => 66 + i * 14, top = y0 + 38;
+  for(let i = 0; i < cols; i++) pxText(String(first + i), cx(i) + 4, top, '#9c9c9c', 8, true, false);
+  pxText('R', 66 + cols * 14 + 8, top, PAL.ink, 8, true, false); pxText('H', 66 + cols * 14 + 26, top, PAL.ink, 8, true, false);
+  G.teams.forEach((T, r) => {
+    const y = top + 14 + r * 18;
+    R(14, y - 1, 4, 13, T.color); pxText(T.short, 21, y, PAL.white, 10, false, false);
+    for(let i = 0; i < cols; i++){ const v = T.R[first + i - 1]; pxText(v == null ? '' : String(v), cx(i) + 4, y + 1, PAL.white, 9, true, false); }
+    pxText(String(runsOf(T)), 66 + cols * 14 + 8, y, PAL.ink, 10, true, false);
+    pxText(String(T.H || 0), 66 + cols * 14 + 26, y + 1, PAL.white, 9, true, false);
+  });
+  // 다음 이닝 안내
+  const msg = A.mode === 'end' ? (G.winner >= 0 ? `${G.teams[G.winner].short} 승리!` : '무승부') : `${G.inning}회${G.top ? '초' : '말'} · ${batTeam(G).short} 공격`;
+  pxText(msg, 128, y0 + 98, PAL.white, 11);
+}
+
 /* ---------- 움직임 ---------- */
 // 결과 글씨: 이번에 생긴 효과음 사건과 중계 문장으로 정함
 function bannerOf(fx, text){
@@ -460,6 +486,9 @@ function gfxStart(G, fx, lines){
     else if(p.k === 'review') list.push({ kind:'review', o: p, t0:0 });
     else if(p.k === 'reviewEnd') list.push({ kind:'reviewEnd', o: p, t0:0 });
   }
+  // 공수 교대·경기 끝: 이닝별 점수판 카드를 이어서 보여 줌
+  if(G.over && GX.overShown !== G.at){ GX.overShown = G.at; list.push({ kind:'card', mode:'end' }); }
+  else if((fx || []).includes('change')) list.push({ kind:'card', mode:'change' });
   if(!list.length){ const bn = bannerOf(fx || [], text); if(bn) list.push({ kind:'banner', ph:'result', t0:1, banner: bn[0], bannerColor: bn[1], hr: bn[2] }); }
   if(!list.length) return;
   list.forEach(a => a.start = now);
@@ -469,6 +498,7 @@ function gfxStart(G, fx, lines){
 // 시간이 흐른 만큼 단계를 정함. 끝났으면 false
 function stepAnim(A, el){
   if(A.kind === 'banner') return el < 1200;
+  if(A.kind === 'card'){ A.t0 = Math.min(1, el / 250); return A.mode === 'end' || el < 2600; }   // 경기 끝 카드는 계속 둠
   if(A.kind === 'base'){ A.t0 = Math.min(1, el / 1500); return el < 2400; }
   if(A.kind === 'review'){ A.t0 = (el % 2600) / 2600; return true; }   // 판독을 고르는 동안 계속 다시 보여 줌
   if(A.kind === 'reviewEnd'){ A.t0 = Math.min(1, el / 2600); A.phase = el < 2600 ? 'replay' : 'end'; return el < 4400; }
@@ -496,6 +526,7 @@ function gfxTick(){
     if(A.intro && A.t0 < 0.45) banner(A.intro, 40, PAL.ink, 22);
     if(A.t0 >= 1) banner(A.banner, 40, A.o.safe ? PAL.ink : '#3cbcfc', 22);
   }
+  else if(A.kind === 'card') drawCard(A);
   else if(A.kind === 'review') drawReview(A.o, A.t0, 'wait');
   else if(A.kind === 'reviewEnd') drawReview(A.o, A.t0, A.phase);
   else if(A.ph === 'fly' || A.ph === 'fresult') drawFieldScene(G, A);
