@@ -8,7 +8,7 @@
 const GX = { W:256, H:224, cv:null, ctx:null, key:'', anim:null, queue:[], raf:0, img:{}, tinted:{}, meta:{}, cam:{ x:0, y:0 }, lastAnimN:null, lastPlayN:null };
 const PAL = { sky:'#5c94fc', stand:'#3c3c64', fence:'#00682c', grass:'#38a838', grass2:'#4cbc4c', dirt:'#c88850', dirt2:'#b87840', line:'#fcfcfc',
   skin:'#f8b878', white:'#fcfcfc', black:'#000000', glove:'#a85010', bat:'#e4a050', ball:'#fcfcfc', ink:'#fcfc54', red:'#f83800' };
-const GX_FILES = ['bg-pitch', 'bg-field', 'pitcher', 'batter', 'catcher', 'fielder', 'banners', 'banners2', 'umpire', 'umpire-s', 'runner', 'tv', 'fielder2', 'runner-s', 'fielder-set'];
+const GX_FILES = ['bg-pitch', 'bg-field', 'pitcher', 'batter', 'catcher', 'fielder', 'banners', 'banners2', 'umpire', 'umpire-s', 'runner', 'tv', 'fielder2', 'runner-s', 'fielder-set', 'cr-cage', 'cr-gym', 'cr-bullpen', 'cr-track', 'cr-room', 'cr-shop', 'cr-fansign', 'cr-rehab', 'cr-train', 'cr-life', 'cr-people', 'cr-props'];
 // 결과 글씨 (banners.png를 쓸 때는 이 순서로 한 줄에 하나씩, 128×32)
 const BANNERS = ['스트라이크!', '볼', '헛스윙!', '파울', '안타!', '2루타!', '3루타!', '홈런!', '아웃!', '삼진!', '볼넷', '세이프!', '몸에 맞는 공'];
 const BANNERS2 = ['비디오 판독', '판정 번복!', '원심 유지', '견제!', '도루!', '병살!', '끝내기!', '게임 셋!'];
@@ -57,7 +57,7 @@ function tinted(name, color){
   const x = c.getContext('2d'); x.drawImage(im, 0, 0);
   const d = x.getImageData(0, 0, c.width, c.height), p = d.data;
   const r = parseInt(color.slice(1, 3), 16), g = parseInt(color.slice(3, 5), 16), b = parseInt(color.slice(5, 7), 16);
-  for(let i = 0; i < p.length; i += 4) if(p[i + 3] > 0 && p[i] > 180 && p[i + 2] > 180 && p[i + 1] < 90){ p[i] = r; p[i + 1] = g; p[i + 2] = b; }
+  for(let i = 0; i < p.length; i += 4) if(p[i + 3] > 0 && p[i] > 150 && p[i + 2] > 110 && p[i + 1] < 90 && p[i + 2] > p[i + 1] + 60){ p[i] = r; p[i + 1] = g; p[i + 2] = b; }
   x.putImageData(d, 0, 0);
   return (GX.tinted[k] = c);
 }
@@ -637,6 +637,98 @@ function gstatRender(G){
       <div class="gs-row"><span class="gs-l">체력</span><span class="gs-bar"><i style="width:${Math.max(3, left)}%;background:${staCol}"></i></span><span class="gs-v">${left}%</span></div></div>`;
 }
 
+/* ---------- 선수 육성 장면: GPT 그림(배경 cr-*, 동작 cr-train·cr-life, 사람 cr-people, 소품 cr-props) ----------
+   cell(그림, 칸 번호, x, 발끝 y, 팀 색, 좌우 뒤집기, 배율): 칸 번호는 왼쪽 위부터 0 (한 줄에 meta.n칸) */
+function cell(name, i, x, foot, color, flip = false, sc = 1){
+  const m = GX.meta[name], im = m && tinted(name, color || '#ff00ff');
+  if(!im) return;
+  const fx = (i % m.n) * m.w, fy = Math.floor(i / m.n) * m.h, ctx = GX.ctx;
+  ctx.save(); ctx.translate(Math.round(x), Math.round(foot)); ctx.scale(flip ? -sc : sc, sc);
+  ctx.drawImage(im, fx, fy, m.w, m.h, -m.w / 2, -m.h, m.w, m.h);
+  ctx.restore();
+}
+function bgImg(name, color){ const im = color ? tinted(name, color) : GX.img[name]; if(!im) return false; GX.ctx.drawImage(im, 0, 0); return true; }
+// 서 있는 내 선수: 투수 준비 자세 그림
+const standMe = (x, foot, col, sc = 1.6) => big(() => drawPerson('pitcher', 0, 0, col, 'set', false, 0), x, foot, sc);
+function drawSceneImg(sc, t){
+  const col = sc.color || '#facc15', k = sc.kind, loop = t % 1.2;
+  if(!GX.img['cr-cage'] || !GX.meta['cr-train']) return false;
+  const title = () => { R(0, 0, 256, 24, 'rgba(0,0,0,0.75)'); pxText(sc.title || '', 128, 5, PAL.ink, 12); };
+  const bob = Math.round(Math.sin(t * 6) * 1.5);
+  if(k === 'con' || k === 'eye'){
+    bgImg('cr-cage');
+    // 피칭 머신(배경 가운데)에서 공이 날아오고 타자가 침. 선구안 훈련은 빠지는 공을 골라냄
+    const n = Math.floor(t / 1.2), off = k === 'eye' && n % 2 === 1, q = Math.min(1, loop / 0.5);
+    const sx = 128, sy = 100, tx = off ? 170 : 132, ty = off ? 190 : 168;
+    const swing = !off && loop > 0.45, after = loop - 0.5;
+    drawPerson('batter', 92, 216, col, swing ? (loop < 0.6 ? 'swing' : 'swfollow') : 'stance', swing ? loop < 0.6 : true);
+    if(loop < 0.5) ball(sx + (tx - sx) * q, sy + (ty - sy) * q, 1.5 + q * 3);
+    else if(!off) ball(tx + after * 60, ty - after * 260, 4 - after * 3);
+    else ball(tx, ty, 4.5);
+    if(off && loop > 0.55) pxText('볼! 잘 골라냈습니다', 128, 40, '#58d854', 12);
+  } else if(k === 'pow'){
+    bgImg('cr-gym');
+    cell('cr-train', Math.floor(t * 1.6) % 2, 128, 214, col, false, 1.8);
+    if(Math.floor(t * 1.6) % 2) pxText('으라차!', 128, 40, PAL.ink, 13);
+  } else if(k === 'spd'){
+    bgImg('cr-track');
+    const x = 40 + ((t * 70) % 200);
+    cell('cr-train', 4 + Math.floor(t * 8) % 2, x, 212 + bob, col, false, 1.6);
+    for(let i = 0; i < 3; i++) R(x - 30 - i * 9, 206 + (i % 2) * 4, 3, 3, '#e8d8a8');
+  } else if(k === 'sta'){
+    bgImg('cr-track');
+    const pushup = Math.floor(t / 2) % 2;
+    cell('cr-train', pushup ? 3 : 2, 128, 212 + (pushup ? 0 : -Math.abs(Math.round(Math.sin(t * 8) * 8))), col, false, 1.7);
+    pxText(pushup ? '팔굽혀펴기' : '줄넘기', 128, 40, PAL.white, 12);
+  } else if(k === 'def'){
+    bgImg('cr-track');
+    const q = (t % 1.4) / 1.4, fx = 70 + (Math.floor(t / 1.4) % 2) * 116, k2 = Math.min(1, q * 1.2), h = Math.sin(k2 * Math.PI) * 70;
+    big(() => drawPerson(q < 0.8 ? 'fielder' : 'fielder-set', 0, 0, col, ['set', 'lift', 'throw', 'follow'][Math.floor(t * 10) % 4], false), 128 + (fx - 128) * Math.min(1, q * 1.3), 212, 2.6);
+    ball(128 + (fx - 128) * k2, 180 - h, 3 + h / 18);
+  } else if(k === 'vel' || k === 'ctl' || k === 'stf'){
+    bgImg('cr-bullpen');
+    // 왼쪽 마운드에서 저 멀리 포수 자리(홈플레이트)로
+    const pose = loop < 0.25 ? 'set' : loop < 0.45 ? 'lift' : loop < 0.55 ? 'throw' : 'follow';
+    const hx = 68, hy = 76, q = Math.max(0, Math.min(1, (loop - 0.5) / 0.4));
+    if(k === 'ctl'){ GX.ctx.strokeStyle = PAL.red; GX.ctx.lineWidth = 1.5; GX.ctx.beginPath(); GX.ctx.arc(hx, hy, 5, 0, 6.3); GX.ctx.stroke(); GX.ctx.lineWidth = 1; }
+    if(loop >= 0.5){ const bend = k === 'stf' ? Math.sin(q * Math.PI) * 18 : 0; ball(70 + (hx - 70) * q + bend, 150 + (hy - 150) * q, 4 - q * 2.5); }
+    big(() => drawPerson('pitcher', 0, 0, col, pose, false, 0), 70, 140, 1.6);
+    if(k === 'vel' && loop > 0.85){ R(176, 34, 70, 22, '#000'); pxText(`${140 + Math.floor((t * 7) % 15)}km`, 211, 38, PAL.red, 13); }
+  } else if(k === 'rest'){
+    bgImg('cr-room');
+    cell('cr-life', 3, 150, 214, col, false, 1.4);
+  } else if(k === 'clinic' || k === 'massage'){
+    bgImg('cr-rehab');
+    cell('cr-people', 6, 70, 214, null, true, 1.6);
+    cell('cr-life', k === 'clinic' ? 5 : 3, 170, 214, col, false, 1.5);
+  } else if(k === 'fans'){
+    bgImg('cr-fansign', col);
+    cell('cr-life', 0, 128, 150, col, false, 1.1);
+    cell('cr-people', 0, 60, 222, null, false, 1.5); cell('cr-people', 1, 200, 222, null, true, 1.5);
+    for(let i = 0; i < 3; i++){ const hy = 110 - ((t * 30 + i * 25) % 70); pxText('♥', 150 + i * 18, hy, PAL.red, 12, true, false); }
+  } else if(k === 'shop'){
+    bgImg('cr-shop', col);
+    cell('cr-people', 5, 206, 160, null, false, 1.3);
+    standMe(80, 218 + bob, col);
+  } else if(k.startsWith('ev-')){
+    const e = k.slice(3), me = (x, f) => standMe(x, f, col);
+    if(e === 'senior' || e === 'rival' || e === 'coach'){
+      bgImg('cr-cage');
+      cell('cr-people', e === 'coach' ? 4 : 7, 78, 216, e === 'coach' ? null : col, false, 1.6);
+      me(184, 216);
+      if(e === 'rival') cell('cr-props', 7, 128, 120 + bob, null, false, 1.3);
+    } else if(e === 'fan'){ bgImg('cr-fansign', col); cell('cr-people', 0, 80, 218, null, false, 1.6); me(180, 218); }
+    else if(e === 'sponsor'){ bgImg('cr-shop', col); cell('cr-props', 5, 70, 216, null, false, 1.6); cell('cr-people', 2, 128, 216, null, false, 1.5); cell('cr-train', 7, 196, 216, col, false, 1.4); }
+    else if(e === 'press'){ bgImg('cr-fansign', col); cell('cr-life', 1, 128, 196, col, false, 1.3); cell('cr-people', 3, 50, 222, null, false, 1.4); cell('cr-people', 2, 208, 222, null, true, 1.4); if(Math.floor(t * 3) % 3 === 0) R(0, 0, 256, 224, 'rgba(255,255,255,0.25)'); }
+    else if(e === 'cold'){ bgImg('cr-room'); cell('cr-life', 4, 130, 214, col, false, 1.6); cell('cr-props', 6, 210, 200, null, false, 1.2); }
+    else if(e === 'birthday'){ bgImg('cr-room'); cell('cr-life', 6, 128, 214, col, false, 1.6); cell('cr-props', 1, 50, 214, null, false, 1.2); cell('cr-props', 2, 210, 110 + bob, null, false, 1.2); }
+    else if(e === 'family'){ bgImg('cr-room'); cell('cr-life', 2, 128, 214, col, false, 1.6); }
+    else { bgImg('cr-room'); me(128, 214); }
+  } else return false;
+  title();
+  return true;
+}
+
 /* ---------- 선수 육성 장면 (훈련·방문). S.scene = { kind, title, color } ---------- */
 function gfxScene(bs, sc){
   let wrap = bs.querySelector('.gfxwrap');
@@ -656,6 +748,7 @@ function gfxScene(bs, sc){
 // 2배로 키워 그리기
 function big(fn, x, y, s = 2){ const ctx = GX.ctx; ctx.save(); ctx.translate(x, y); ctx.scale(s, s); fn(); ctx.restore(); }
 function drawScene(sc, t){
+  if(drawSceneImg(sc, t)) return;
   const col = sc.color || '#facc15', k = sc.kind, loop = t % 1.2, ctx = GX.ctx;
   const batting = ['con', 'eye'].includes(k), pitching = ['vel', 'ctl', 'stf'].includes(k);
   if(batting || pitching){

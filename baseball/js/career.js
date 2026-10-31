@@ -122,7 +122,7 @@ function careerHome(){
   // 선발 투수는 로테이션 차례가 아닌 날엔 경기를 지켜봄
   const offDay = first && g && isPit(p) && p.role === '선발' && T0().sp[T0().rot % T0().sp.length].id !== c.id;
   function T0(){ return L.teams[L.my]; }
-  return { q: done ? '시즌이 끝났습니다. 다음 시즌을 시작할까요?' : '오늘은 무엇을 할까요?', back: v => go(homeScreen, v), note: careerStatus(L), opts:[
+  return { top: careerTop(L), q: done ? '시즌이 끝났습니다. 다음 시즌을 시작할까요?' : '오늘은 무엇을 할까요?', back: v => go(homeScreen, v), note: careerStatus(L), opts:[
     done ? { n:1, t:'다음 시즌 시작', s:'한 살 더 먹고, 나이에 따라 능력치가 바뀝니다.', act: v => careerNextSeason(v) }
       : { n:1, t: saved ? '진행 중인 경기 이어하기' : c.hurt > 0 ? '쉬면서 회복하기' : offDay ? '오늘 경기 보기 (등판 차례 아님)' : first ? (g ? '오늘 1군 경기 하기' : '포스트시즌 결과 보기') : '퓨처스리그(2군) 경기 하기',
           s: saved ? situation(saved.G) : offDay ? '선발 로테이션 차례가 아니라 결과만 봅니다.' : c.hurt > 0 ? '' : '직접 하기 · 맡기고 결과 듣기 · 건너뛰기 가운데 고릅니다.',

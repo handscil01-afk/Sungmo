@@ -92,8 +92,8 @@ function shopScreen(msg){
   const L = CR(), c = life(L), p = myP(L);
   const list = ITEMS.filter(it => fits(it, p));
   const pageItems = list.slice(0, 6);
-  return { q:`스포츠 용품점입니다. 가진 돈 ${won(c.money)}. 무엇을 살까요?`, say: msg, back: v => go(visitScreen, v), opts:[
-    ...pageItems.map((it, i) => ({ n: i + 1, t:`${it.name} ${won(it.price)}${c.owned.includes(it.id) ? ' (가지고 있음)' : ''}`, s:`${SLOT_NAME[it.slot]} · ${fxText(it, p)}`, act: v => buyItem(it, v) })),
+  return { q:`스포츠 용품점입니다. 가진 돈 ${won(c.money)}. 무엇을 살까요?`, say: msg, scene:{ kind:'shop', title:'스포츠 용품점', color: teamInfo(L.my).color }, back: v => go(visitScreen, v), opts:[
+    ...pageItems.map((it, i) => ({ n: i + 1, icon:['icons', ITEMS.indexOf(it)], t:`${it.name} ${won(it.price)}${c.owned.includes(it.id) ? ' (가지고 있음)' : ''}`, s:`${SLOT_NAME[it.slot]} · ${fxText(it, p)}`, act: v => buyItem(it, v) })),
     { n:7, t:'장비 더 보기', hide: list.length <= 6, s:`${list.slice(6).map(x => x.name).join(', ')}`, act: v => go(() => shopMore(), v) },
     { n:8, t:'소모품 (음료·테이핑·보약)', act: v => go(goodsShop, v) },
     { n:9, t:'내 가방 (장착·사용)', act: v => go(bagScreen, v) },
@@ -101,7 +101,7 @@ function shopScreen(msg){
 }
 function shopMore(){
   const L = CR(), c = life(L), p = myP(L), list = ITEMS.filter(it => fits(it, p)).slice(6);
-  return { q:`장비 더 보기. 가진 돈 ${won(c.money)}.`, back: v => go(shopScreen, v), opts: list.slice(0, 8).map((it, i) => ({ n: i + 1, t:`${it.name} ${won(it.price)}${c.owned.includes(it.id) ? ' (가지고 있음)' : ''}`, s:`${SLOT_NAME[it.slot]} · ${fxText(it, p)}`, act: v => buyItem(it, v) })) };
+  return { q:`장비 더 보기. 가진 돈 ${won(c.money)}.`, back: v => go(shopScreen, v), opts: list.slice(0, 8).map((it, i) => ({ n: i + 1, icon:['icons', ITEMS.indexOf(it)], t:`${it.name} ${won(it.price)}${c.owned.includes(it.id) ? ' (가지고 있음)' : ''}`, s:`${SLOT_NAME[it.slot]} · ${fxText(it, p)}`, act: v => buyItem(it, v) })) };
 }
 function buyItem(it, via){
   const L = CR(), c = life(L), p = myP(L);
@@ -127,7 +127,7 @@ function unequip(L, slot){
 }
 function goodsShop(){
   const L = CR(), c = life(L);
-  return { q:`소모품입니다. 가진 돈 ${won(c.money)}.`, back: v => go(shopScreen, v), opts: GOODS.map((g, i) => ({ n: i + 1, t:`${g.name} ${won(g.price)} (가진 것 ${c.goods[g.id] || 0}개)`, s: g.desc, act: () => {
+  return { q:`소모품입니다. 가진 돈 ${won(c.money)}.`, back: v => go(shopScreen, v), opts: GOODS.map((g, i) => ({ n: i + 1, icon:['icons2', i], t:`${g.name} ${won(g.price)} (가진 것 ${c.goods[g.id] || 0}개)`, s: g.desc, act: () => {
     if(c.money < g.price){ stay('돈이 모자랍니다.'); return; }
     c.money -= g.price; c.goods[g.id] = (c.goods[g.id] || 0) + 1; saveLeague(); stay(`${g.name}을 샀습니다. 가진 돈 ${won(c.money)}.`);
   } })) };
@@ -137,7 +137,7 @@ function bagScreen(msg){
   const owned = c.owned.map(itemOf).filter(Boolean);
   owned.slice(0, 7).forEach((it, i) => {
     const on = c.equip[it.slot] === it.id;
-    opts.push({ n: i + 1, t:`${on ? '장착 중: ' : ''}${it.name}`, s:`${SLOT_NAME[it.slot]} · ${fxText(it, p)}. 고르면 ${on ? '벗습니다' : '장착합니다'}.`,
+    opts.push({ n: i + 1, icon:['icons', ITEMS.indexOf(it)], t:`${on ? '장착 중: ' : ''}${it.name}`, s:`${SLOT_NAME[it.slot]} · ${fxText(it, p)}. 고르면 ${on ? '벗습니다' : '장착합니다'}.`,
       act: v => { const say = on ? unequip(L, it.slot) : equip(L, it); saveLeague(); go(bagScreen, v, say); } });
   });
   opts.push({ n:8, t:'소모품 쓰기', s: GOODS.map(g => `${g.name} ${c.goods[g.id] || 0}개`).join(', '), act: v => go(useGoods, v) });
@@ -191,7 +191,7 @@ function clinic(via){
   let say;
   if(c.hurt > 0){ c.hurt = Math.max(0, c.hurt - 2); say = [c.hurt ? `재활 치료를 받았습니다. ${c.hurt}일 뒤 돌아옵니다.` : '재활 치료로 다 나았습니다!']; }
   else { p.cond = Math.min(2, p.cond + 1); say = [`마사지를 받았습니다. 컨디션 ${COND[p.cond]}.`]; }
-  saveLeague(); go(() => sceneScreen('rest', c.hurt > 0 ? '재활 센터' : '마사지 숍'), via, say);
+  saveLeague(); go(() => sceneScreen(cost === 100 ? 'clinic' : 'massage', cost === 100 ? '재활 센터' : '마사지 숍'), via, say);
 }
 
 /* ---------- 훈련·방문 장면 (화면 보며 하기에서는 그림, 소리와 글 방식에서는 글과 효과음) ---------- */
@@ -241,7 +241,7 @@ function rollEvent(L){
 function eventScreen(){
   const L = CR(), c = life(L), p = myP(L), e = EVENTS.find(x => x.id === c.event);
   if(!e){ delete c.event; return careerHome(); }
-  return { q:`이벤트! ${e.q(L, p)} 어떻게 할까요?`, opts: e.opts.map(([t, fn], i) => ({ n: i + 1, t, act: v => { delete c.event; const say = fn(L, c, p); saveLeague(); go(careerHome, v, say); } })) };
+  return { q:`이벤트! ${e.q(L, p)} 어떻게 할까요?`, scene:{ kind:'ev-' + e.id, title:'이벤트!', color: teamInfo(L.my).color }, opts: e.opts.map(([t, fn], i) => ({ n: i + 1, t, act: v => { delete c.event; const say = fn(L, c, p); saveLeague(); go(careerHome, v, say); } })) };
 }
 
 /* ---------- 경기 방식 고르기 ---------- */
@@ -256,4 +256,11 @@ function careerGameChoice(minor){
 // 컴퓨터끼리 끝낸 경기에서 내 선수가 나온 장면만 골라냄
 function myPlays(G2, name){
   return (G2.log || []).filter(l => l.k === 'r' && l.s.includes(name)).map(l => l.s).slice(0, 8);
+}
+
+// 첫 화면 위쪽 상태 칸: 돈·인기·컨디션 (아이콘)
+function careerTop(L){
+  const c = life(L), p = myP(L), face = [15, 14, 14, 13, 12][(p.cond ?? 0) + 2];
+  const ic = (sheet, i) => `<span class="oicon" aria-hidden="true" style="--ix:${i % 4};--iy:${Math.floor(i / 4)};background-image:url(img/${sheet}.png)"></span>`;
+  return `<div class="crtop">${ic('icons2', 3)}<b>${won(c.money)}</b>${ic('icons2', 9)}<b>인기 ${c.fame || 0}</b>${ic('icons2', face)}<b>${COND[p.cond ?? 0]}</b></div>`;
 }

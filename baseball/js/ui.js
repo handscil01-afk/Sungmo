@@ -82,7 +82,8 @@ function renderOpts(S){
     else { el = document.createElement('button'); el.type = 'button'; el.dataset.k = k; }
     el.className = 'opt' + (o.cls ? ' ' + o.cls : '');
     el.dataset.n = o.n;
-    const html = `<span class="num">${o.n}<span class="sr-only">번. </span></span><span class="tx"><b>${esc(o.t)}</b>${o.s ? `<span class="sr-only">. </span><small>${esc(o.s)}</small>` : ''}</span>`;
+    const ico = o.icon ? `<span class="oicon" aria-hidden="true" style="--ix:${o.icon[1] % 4};--iy:${Math.floor(o.icon[1] / 4)};background-image:url(img/${o.icon[0]}.png)"></span>` : '';
+    const html = `<span class="num">${o.n}<span class="sr-only">번. </span></span>${ico}<span class="tx"><b>${esc(o.t)}</b>${o.s ? `<span class="sr-only">. </span><small>${esc(o.s)}</small>` : ''}</span>`;
     if(el.__h !== html){ el.innerHTML = html; el.__h = html; }
     if(box.children[i] !== el) box.insertBefore(el, box.children[i] || null);
   });

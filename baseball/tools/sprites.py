@@ -226,6 +226,43 @@ def picture(name, im, width):
     print(name, f.size, 'screen', scr)
     return { 'w': f.width, 'h': f.height, 'n': 1, 'rows': 1, 'screen': scr }
 
+def bgfill(name, im, wipe=None):
+    """장면 배경: 256x224를 꽉 채우게 키워 가운데를 자름. wipe=[x0,y0,x1,y1]은 워터마크 자리를 왼쪽 옆 색으로 덮음"""
+    im = im.convert('RGB')
+    if wipe:
+        a = np.array(im); x0, y0, x1, y1 = wipe
+        for y in range(y0, y1): a[y, x0:x1] = a[y, max(0, x0 - 12)]
+        im = Image.fromarray(a)
+    s = max(256 / im.width, 224 / im.height)
+    w, h = round(im.width * s), round(im.height * s)
+    big = im.resize((w, h), Image.BOX)
+    bg = big.crop(((w - 256) // 2, h - 224, (w - 256) // 2 + 256, h))
+    bg = bg.quantize(48, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).convert('RGB')
+    bg.save(os.path.join(OUT, name + '.png'))
+    print(name, bg.size)
+    return { 'w': 256, 'h': 224, 'n': 1, 'rows': 1 }
+
+def icons(name, im, cols, rows, size=32):
+    """아이콘 표: 칸마다 가장 큰 덩어리 줄(그림)만 남기고 아래 글자 줄은 버림. size x size 칸으로"""
+    cw, ch = im.width / cols, im.height / rows
+    out = Image.new('RGBA', (size * cols, size * rows), (0, 0, 0, 0))
+    for j in range(rows):
+        for i in range(cols):
+            cell = im.crop((round(i * cw), round(j * ch), round((i + 1) * cw), round((j + 1) * ch)))
+            al = np.array(cell)[..., 3] > 128
+            bands = runs(al.sum(1) > 1, 4)
+            if not bands: continue
+            y0, y1 = max(bands, key=lambda b: (al[b[0]:b[1]].sum()))
+            sub = cell.crop((0, y0, cell.width, y1))
+            xs = np.where(np.array(sub)[..., 3].sum(0) > 0)[0]
+            sub = sub.crop((xs[0], 0, xs[-1] + 1, sub.height))
+            sc = (size - 2) / max(sub.width, sub.height)
+            f = tidy(shrink(sub, sc), 24)
+            out.paste(f, (i * size + (size - f.width) // 2, j * size + (size - f.height) // 2), f)
+    out.save(os.path.join(OUT, name + '.png'))
+    print(name, out.size)
+    return { 'w': size, 'h': size, 'n': cols, 'rows': rows }
+
 meta = {}
 cfg = json.load(open(os.path.join(SRC, 'sprites.json')))
 for name, c in cfg.items():
@@ -236,10 +273,22 @@ for name, c in cfg.items():
     if kind == 'bg': meta[name] = background(name, im)
     elif kind == 'bgwide': meta[name] = bgwide(name, im, c['size'])
     elif kind == 'picture': meta[name] = picture(name, im, c['width'])
+    elif kind == 'bgfill': meta[name] = bgfill(name, im, c.get('wipe'))
+    elif kind == 'icons': meta[name] = icons(name, im, c['cols'], c['rows'], c.get('size', 32))
     elif kind == 'banners': meta[name] = banners(name, im, c['n'])
     else:
-        rr = rows(im) if c.get('rows', 1) > 1 else [im]
-        fr = [frames(r) for r in rr]
+        if c.get('grid'):   # 같은 크기 칸으로 나눔 (한 칸에 조각이 여럿인 소품)
+            gc, gr = c['grid']; cw, ch = im.width / gc, im.height / gr; fr = []
+            for j in range(gr):
+                row = []
+                for i in range(gc):
+                    cell = im.crop((round(i * cw), round(j * ch), round((i + 1) * cw), round((j + 1) * ch)))
+                    al = np.array(cell)[..., 3] > 128; ys = np.where(al.sum(1) > 0)[0]; xs = np.where(al.sum(0) > 0)[0]
+                    row.append(cell.crop((xs[0], ys[0], xs[-1] + 1, ys[-1] + 1)))
+                fr.append(row)
+        else:
+            rr = rows(im) if c.get('rows', 1) > 1 else [im]
+            fr = [frames(r) for r in rr]
         if c.get('pick'): fr = [[row[i] for i in c['pick']] for row in fr]
         print(name, [len(r) for r in fr])
         meta[name] = sheet(name, fr, c['height'])

@@ -217,3 +217,7 @@ html.gfxgame #gstat:not([hidden]){ display:grid; grid-template-columns:repeat(2,
 html.gfxgame #say:not([hidden]){ background:#0d1430; border:2px solid #f8d030; border-radius:10px; padding:6px 10px; box-shadow:0 2px 0 #000; }
 html.gfxgame #say p:last-child{ background:none !important; border:0 !important; padding:0 !important; box-shadow:none !important; }
 html.gfxgame.gfxholdall #q, html.gfxgame.gfxholdall #opts, html.gfxgame.gfxholdall #extra, html.gfxgame.gfxholdall #gstat{ visibility:hidden; }
+/* 아이템 아이콘 (32px 칸 4×4 표에서 잘라 씀) */
+.oicon{ flex:none; width:36px; height:36px; background-size:144px 144px; background-position:calc(var(--ix) * -36px) calc(var(--iy) * -36px); image-rendering:pixelated; }
+.crtop{ display:flex; align-items:center; gap:4px 8px; flex-wrap:wrap; background:var(--panel); border:2px solid var(--line); border-radius:12px; padding:4px 10px; margin-bottom:8px; }
+.crtop b{ margin-right:8px; }

@@ -1,6 +1,6 @@
-const CACHE = 'baseball-v27';
+const CACHE = 'baseball-v29';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png',
-  './css/app.css', './img/index.json', ...['bg-pitch', 'bg-field', 'pitcher', 'batter', 'catcher', 'fielder', 'banners', 'banners2', 'umpire', 'umpire-s', 'runner', 'tv', 'fielder2', 'runner-s', 'fielder-set'].map(n => './img/' + n + '.png'),
+  './css/app.css', './img/index.json', ...['bg-pitch', 'bg-field', 'pitcher', 'batter', 'catcher', 'fielder', 'banners', 'banners2', 'umpire', 'umpire-s', 'runner', 'tv', 'fielder2', 'runner-s', 'fielder-set', 'cr-cage', 'cr-gym', 'cr-bullpen', 'cr-track', 'cr-room', 'cr-shop', 'cr-fansign', 'cr-rehab', 'cr-train', 'cr-life', 'cr-people', 'cr-props', 'icons', 'icons2'].map(n => './img/' + n + '.png'),
   './js/util.js', './js/data.js', './js/engine.js', './js/ai.js', './js/league.js', './js/speech.js', './js/shell.js', './js/ui.js', './js/gfx.js', './js/net.js', './js/voice.js', './js/game.js', './js/manager.js', './js/league-ui.js', './js/career.js', './js/career-life.js', './js/online.js', './js/app.js',
   './vendor/firebase-app.js', './vendor/firebase-auth.js', './vendor/firebase-database.js',
   ...['pitch', 'ball', 'strike', 'whiff-p', 'whiff-p2', 'whiff-n', 'whiff-n2', 'whiff-c', 'whiff-c2', 'bat1', 'bat2', 'bat3', 'bat-big', 'foul', 'hit', 'double', 'triple', 'homer', 'out', 'strikeout', 'change', 'batter', 'atbat', 'pitcher', 'mound', 'organ', 'crowd', 'hit-nb', 'double-nb', 'triple-nb', 'foul-nb', 'out-nb'].map(n => './sfx/' + n + '.mp3')];
