@@ -14,7 +14,7 @@ function homeScreen(){
       { n:5, t:'선수 육성', s: (() => { const L = peekL('career'); return L && L.career && !L.career.retired ? `${(L.career.p || findPlayer(L, L.career.id)?.p || {}).name}, ${L.season}시즌` : '내 선수 한 명을 키워 명예의 전당까지'; })(), act: v => go(careerHome, v) },
       { n:6, t:'컴퓨터끼리 관전', s:'컴퓨터 두 팀의 경기를 듣습니다.', act: v => { NEW.kind = 'watch'; go(modeScreen, v); } },
       { n:7, t:'이어하기', hide: !sv, s: sv ? `${MODE_NAME[sv.G.mode]}, ${sv.G.pre ? '경기 전 준비 중' : situation(sv.G)}` : '', act: v => resumeGame(v) },
-      { n:8, t:'설정과 게임 방법', s:'글자 크기, 화면 색, 읽어 주기, 효과음, 진동, 게임 방법과 키 안내', act: v => go(() => settingsScreen(() => go(homeScreen, 'click')), v) },
+      { n:8, t:'설정과 게임 방법', s:'화면 방식, 글자 크기, 화면 색, 읽어 주기, 효과음, 관중 소리, 게임 방법과 키 안내', act: v => go(() => settingsScreen(() => go(homeScreen, 'click')), v) },
       { n:9, t:'홈 화면에 설치하기', hide: !canInstall(), s:'아이콘으로 바로 열고 화면을 넓게 씁니다.', act: () => doInstall() },
     ] };
 }
@@ -115,38 +115,61 @@ const VOICES = { sr:'화면 낭독기 (보이스오버·톡백·점자)', tts:'�
 const onOff = b => b ? '켬' : '끔';
 const sndName = () => !SET.snd ? '끔' : SET.sndKind === 'synth' ? '간단한 소리' : '야구장 소리';
 function cycle(list, cur){ const i = list.indexOf(cur); return list[(i + 1) % list.length]; }
+const VIEWS = { gfx:'화면 보며 하기 (비장애인 모드)', a11y:'소리와 글로 하기 (시각장애인 모드)' };
+// 화면 방식을 정하면 그에 맞는 기본값도 함께 바꿈 (나중에 설정에서 하나씩 다시 바꿀 수 있음)
+function setView(v){
+  SET.view = v;
+  if(v === 'gfx'){ SET.voice = 'off'; SET.crowd = true; }
+  else { SET.voice = 'sr'; SET.crowd = false; }
+  saveSet(); if(typeof crowdSync === 'function') crowdSync();
+}
+function viewScreen(after){
+  return { top: SET.view ? '' : installBanner(), q:'어떤 방식으로 하실지 골라 주세요. 나중에 설정에서 바꿀 수 있습니다.', back: SET.view ? v => after(v) : null, opts:[
+    { n:1, t: VIEWS.gfx, s:'귀여운 도트 그림으로 투구와 타구를 보여 주고, 효과음과 관중 소리를 냅니다. 글을 읽어 주지는 않습니다.', act: v => { setView('gfx'); after(v); } },
+    { n:2, t: VIEWS.a11y, s:'보이스오버·톡백, 점자 단말기, 숫자판 키보드로 합니다. 모든 상황을 말과 글로 알려 줍니다.', act: v => { setView('a11y'); after(v); } },
+  ] };
+}
 function settingsScreen(backTo){
   const ch = (fn, label) => () => { fn(); saveSet(); stay(label()); };
   return { q:'설정입니다. 고를 때마다 값이 바뀝니다.', back: v => backTo(v), opts:[
-    { n:1, t:`글자 크기: ${FS_NAMES[SET.fs]}`, act: ch(() => { SET.fs = (SET.fs + 1) % FS_NAMES.length; }, () => `글자 크기 ${FS_NAMES[SET.fs]}`) },
-    { n:2, t:`화면 색: ${THEMES[SET.theme]}`, act: ch(() => { SET.theme = cycle(Object.keys(THEMES), SET.theme); }, () => `화면 색 ${THEMES[SET.theme]}`) },
-    { n:3, t:`읽어 주기: ${VOICES[SET.voice]}`, s:'화면 낭독기를 쓰지 않는다면 기기 음성으로 바꾸세요. 화면 낭독기와 기기 음성을 함께 켜면 두 번 읽습니다.',
+    { n:1, t:`화면 방식: ${VIEWS[SET.view] || VIEWS.a11y}`, s:'고르면 화면 방식 고르기로 갑니다. 읽어 주기와 관중 소리도 그 방식에 맞게 바뀝니다.', act: v => go(() => viewScreen(w => go(() => settingsScreen(backTo), w)), v) },
+    { n:2, t:`글자 크기: ${FS_NAMES[SET.fs]}`, act: ch(() => { SET.fs = (SET.fs + 1) % FS_NAMES.length; }, () => `글자 크기 ${FS_NAMES[SET.fs]}`) },
+    { n:3, t:`화면 색: ${THEMES[SET.theme]}`, act: ch(() => { SET.theme = cycle(Object.keys(THEMES), SET.theme); }, () => `화면 색 ${THEMES[SET.theme]}`) },
+    { n:4, t:`읽어 주기: ${VOICES[SET.voice]}`, s:'화면 낭독기를 쓰지 않는다면 기기 음성으로 바꾸세요. 화면 낭독기와 기기 음성을 함께 켜면 두 번 읽습니다.',
       act: ch(() => { SET.voice = cycle(Object.keys(VOICES), SET.voice); }, () => `읽어 주기 ${VOICES[SET.voice]}`) },
-    { n:4, t:`판정 과정 보기: ${onOff(SET.dice)}`, s:'주사위와 확률을 기록에 함께 보여 줍니다. 테이블 게임처럼 판정을 확인할 수 있습니다.',
+    { n:5, t:`판정 과정 보기: ${onOff(SET.dice)}`, s:'주사위와 확률을 기록에 함께 보여 줍니다. 테이블 게임처럼 판정을 확인할 수 있습니다.',
       act: ch(() => { SET.dice = !SET.dice; }, () => `판정 과정 보기 ${onOff(SET.dice)}`) },
-    { n:5, t:`코스 번호 배열: ${SET.pad === 'pc' ? '컴퓨터 숫자판식 (7 8 9가 위)' : '전화기식 (1 2 3이 위)'}`, s:'코스를 고를 때 숫자와 스트라이크 존 칸을 맞추는 방법입니다. 쓰는 키보드의 숫자 배열에 맞추세요.',
+    { n:6, t:`코스 번호 배열: ${SET.pad === 'pc' ? '컴퓨터 숫자판식 (7 8 9가 위)' : '전화기식 (1 2 3이 위)'}`, s:'코스를 고를 때 숫자와 스트라이크 존 칸을 맞추는 방법입니다. 쓰는 키보드의 숫자 배열에 맞추세요.',
       act: ch(() => { SET.pad = SET.pad === 'pc' ? 'phone' : 'pc'; }, () => `코스 번호 ${SET.pad === 'pc' ? '7 8 9가 높은 공' : '1 2 3이 높은 공'}`) },
-    { n:6, t:`효과음: ${sndName()}`, s:'야구장 소리(피칭, 스트라이크, 안타, 홈런, 공수교대 등) · 간단한 소리 · 끄기 순서로 바뀝니다.',
-      act: ch(() => { if(!SET.snd){ SET.snd = true; SET.sndKind = 'rec'; } else if(SET.sndKind !== 'synth') SET.sndKind = 'synth'; else SET.snd = false; }, () => `효과음 ${sndName()}`) },
-    { n:7, t:`진동: ${onOff(SET.vib)}`, s:'안드로이드 휴대폰에서 안타, 홈런, 삼진, 득점 때 진동합니다.', act: ch(() => { SET.vib = !SET.vib; }, () => `진동 ${onOff(SET.vib)}`) },
-    { n:8, t:'더 보기', s:'명령 칸, 자동 재생, 음성 빠르기, 전체화면, 설치, 시험, 저장 지우기', act: v => go(() => settings2(backTo), v) },
+    { n:7, t:`효과음: ${sndName()}`, s:'야구장 소리(피칭, 타격, 스트라이크, 안타, 홈런, 공수교대 등) · 간단한 소리 · 끄기 순서로 바뀝니다.',
+      act: ch(() => { if(!SET.snd){ SET.snd = true; SET.sndKind = 'rec'; } else if(SET.sndKind !== 'synth') SET.sndKind = 'synth'; else SET.snd = false; crowdSync(); }, () => `효과음 ${sndName()}`) },
+    { n:8, t:'더 보기', s:'진동, 관중 소리, 명령 칸, 자동 재생, 음성 빠르기, 전체화면, 설치, 시험, 저장 지우기', act: v => go(() => settings2(backTo), v) },
     { n:9, t:'게임 방법과 키 안내', act: v => go(() => helpScreen(() => go(() => settingsScreen(backTo), 'click')), v) },
   ] };
 }
 function settings2(backTo){
   const ch = (fn, label) => () => { fn(); saveSet(); stay(label()); };
   return { q:'설정 더 보기', back: v => go(() => settingsScreen(backTo), v), opts:[
-    { n:1, t:`명령 칸 숫자 바로 고르기: ${onOff(SET.quick)}`, s:'켜면 명령 칸에 숫자 하나만 적어도 바로 고릅니다. 끄면 입력 키를 눌러야 고릅니다.',
+    { n:1, t:`진동: ${onOff(SET.vib)}`, s:'안드로이드 휴대폰에서 안타, 홈런, 삼진, 득점 때 진동합니다.', act: ch(() => { SET.vib = !SET.vib; }, () => `진동 ${onOff(SET.vib)}`) },
+    { n:2, t:`관중 소리: ${onOff(SET.crowd)}`, s:'화면 보며 하기에서 경기 내내 야구장 관중 소리를 작게 깔아 줍니다. 효과음이 꺼져 있으면 나지 않습니다.',
+      act: ch(() => { SET.crowd = !SET.crowd; crowdSync(); }, () => `관중 소리 ${onOff(SET.crowd)}`) },
+    { n:3, t:`명령 칸 숫자 바로 고르기: ${onOff(SET.quick)}`, s:'켜면 명령 칸에 숫자 하나만 적어도 바로 고릅니다. 끄면 입력 키를 눌러야 고릅니다.',
       act: ch(() => { SET.quick = !SET.quick; }, () => `숫자 바로 고르기 ${onOff(SET.quick)}`) },
-    { n:2, t:`관전 자동 재생 간격: ${SET.watch}초`, act: ch(() => { SET.watch = cycle([2, 4, 6, 8, 12], SET.watch); }, () => `자동 재생 ${SET.watch}초`) },
-    { n:3, t:`기기 음성 빠르기: ${SET.rate}배`, s:'읽어 주기가 기기 음성일 때만 씁니다.', act: ch(() => { SET.rate = cycle([0.8, 1, 1.2, 1.5, 2], SET.rate); }, () => `음성 빠르기 ${SET.rate}배`) },
-    { n:4, t: FS.on() ? '전체화면 끄기' : '전체화면 켜기', hide: isStandalone(), s: FS.supported() ? '' : '이 기기에서는 홈 화면에 설치하면 넓게 쓸 수 있습니다.', act: () => FS.toggle() },
-    { n:5, t:`자동 전체화면: ${onOff(SET.autoFS)}`, hide: isStandalone(), s:'켜면 화면을 처음 누를 때 전체화면으로 바뀝니다.', act: ch(() => { SET.autoFS = !SET.autoFS; FS.userExit = false; }, () => `자동 전체화면 ${onOff(SET.autoFS)}`) },
-    { n:6, t:'홈 화면에 설치하기', hide: !canInstall(), act: () => doInstall() },
-    { n:7, t:'소리 시험', s:'읽어 주기, 효과음, 진동을 시험합니다.', act: v => { playFx(['pitch', 'hit']); speak('소리 시험입니다. 딱! 잘 맞은 타구, 안타!'); if(v === 'click' && SET.voice === 'sr') note(['소리 시험입니다. 딱! 잘 맞은 타구, 안타!'], v); } },
-    { n:9, t:`받은 채팅 읽어 주기: ${onOff(SET.chatRead)}`, s:'온라인 대전에서 상대가 보낸 채팅을 바로 읽어 줍니다. 채팅 목록은 늘 화면에 남습니다.',
+    { n:4, t:`관전 자동 재생 간격: ${SET.watch}초`, act: ch(() => { SET.watch = cycle([2, 4, 6, 8, 12], SET.watch); }, () => `자동 재생 ${SET.watch}초`) },
+    { n:5, t:`기기 음성 빠르기: ${SET.rate}배`, s:'읽어 주기가 기기 음성일 때만 씁니다.', act: ch(() => { SET.rate = cycle([0.8, 1, 1.2, 1.5, 2], SET.rate); }, () => `음성 빠르기 ${SET.rate}배`) },
+    { n:6, t: FS.on() ? '전체화면 끄기' : '전체화면 켜기', hide: isStandalone(), s: FS.supported() ? '' : '이 기기에서는 홈 화면에 설치하면 넓게 쓸 수 있습니다.', act: () => FS.toggle() },
+    { n:7, t:`자동 전체화면: ${onOff(SET.autoFS)}`, hide: isStandalone(), s:'켜면 화면을 처음 누를 때 전체화면으로 바뀝니다.', act: ch(() => { SET.autoFS = !SET.autoFS; FS.userExit = false; }, () => `자동 전체화면 ${onOff(SET.autoFS)}`) },
+    { n:8, t:'더 보기', s:'소리 시험, 채팅 읽어 주기, 저장된 경기 지우기', act: v => go(() => settings3(backTo), v) },
+    { n:9, t:'홈 화면에 설치하기', hide: !canInstall(), act: () => doInstall() },
+  ] };
+}
+function settings3(backTo){
+  const ch = (fn, label) => () => { fn(); saveSet(); stay(label()); };
+  return { q:'설정 더 보기 (마지막)', back: v => go(() => settings2(backTo), v), opts:[
+    { n:1, t:'소리 시험', s:'읽어 주기, 효과음, 진동을 시험합니다.', act: v => { playFx(['pitch', 'bat', 'hit']); speak('소리 시험입니다. 딱! 잘 맞은 타구, 안타!'); if(v === 'click' && SET.voice === 'sr') note(['소리 시험입니다. 딱! 잘 맞은 타구, 안타!'], v); } },
+    { n:2, t:`받은 채팅 읽어 주기: ${onOff(SET.chatRead)}`, s:'온라인 대전에서 상대가 보낸 채팅을 바로 읽어 줍니다. 채팅 목록은 늘 화면에 남습니다.',
       act: ch(() => { SET.chatRead = !SET.chatRead; }, () => `채팅 읽어 주기 ${onOff(SET.chatRead)}`) },
-    { n:8, t:'저장된 경기 지우기', hide: !loadSaved(), act: () => openDlg('저장된 경기 지우기', ['이어 하던 경기를 지울까요? 되돌릴 수 없습니다.'], [
+    { n:3, t:'저장된 경기 지우기', hide: !loadSaved(), act: () => openDlg('저장된 경기 지우기', ['이어 하던 경기를 지울까요? 되돌릴 수 없습니다.'], [
       { label:'지우기', act: () => { ls.del('bb_game'); stay('저장된 경기를 지웠습니다.'); } }, { label:'그만두기' }]) },
   ] };
 }
@@ -250,8 +273,14 @@ const HELP = {
     '첫 안타, 첫 홈런, 첫 승 같은 업적이 남고, 잘한 날에는 수훈 선수 인터뷰를 해서 인기가 오릅니다. 가끔 슬럼프나 부상도 생깁니다.',
     '시즌이 끝나면 다음 시즌을 이어 가고, 원할 때 은퇴합니다(마흔 살이면 은퇴). 은퇴하면 통산 기록으로 명예의 전당 심사를 합니다.',
   ],
+  '화면 방식': [
+    '처음 실행할 때 화면 방식을 고릅니다. 설정 1번에서 언제든 바꿀 수 있습니다.',
+    '화면 보며 하기(비장애인 모드): 옛날 오락기처럼 도트 그림으로 투수가 던지고, 공이 구종에 따라 휘어 들어오고, 타자가 휘두르는 모습을 보여 줍니다. 공을 치면 위에서 본 야구장으로 바뀌어 타구와 야수가 움직입니다. 관중 소리가 깔리고, 글은 읽어 주지 않습니다.',
+    '소리와 글로 하기(시각장애인 모드): 보이스오버·톡백, 점자 단말기, 숫자판 키보드로 합니다. 모든 상황을 말과 글로 알려 줍니다.',
+    '효과음은 두 방식 모두 같습니다. 타격음과 헛스윙 소리는 세게 쳤는지, 맞히려 했는지, 잘 맞았는지에 따라 달라집니다.',
+  ],
   '앞으로 만들 것': [
-    '그다음: 우리 센터 이름으로 팀과 선수 만들기, 시즌 기록, 히트 앤드 런과 견제구 같은 작전, 관중 소리.',
+    '그다음: 우리 센터 이름으로 팀과 선수 만들기, 장내 아나운서, 올스타전과 홈런 더비.',
   ],
 };
 function helpScreen(backTo){
@@ -268,5 +297,6 @@ voiceUI();
 (function(){
   const room = new URLSearchParams(location.search).get('room');
   if(room && /^[0-9]{4}$/.test(room)) go(() => nameScreen(() => startJoin(room, 'click')), 'init', [`방 ${spaced(room)}에 초대받았습니다.`]);
+  else if(!SET.view) go(() => viewScreen(v => go(homeScreen, v)), 'init');
   else go(homeScreen, 'init');
 })();

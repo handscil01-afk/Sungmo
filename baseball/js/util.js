@@ -15,7 +15,7 @@ const ls = {
 // mgrAsk: 감독 모드에서 작전을 묻는 때(key 중요한 순간만 · every 매 타석) · mgrPitch: 감독 모드에서 공 하나하나 읽기
 // sndKind: 효과음 종류(rec 녹음한 야구 소리 · synth 간단한 소리) · revOdds: 비디오 판독 확률을 숫자(num)로·말(word)로
 // watch: 관전 자동 재생 간격(초) · autoFS: 자동 전체화면 · installDismissed: 설치 안내 배너를 닫았는지
-const SET_DEF = { fs:1, theme:'dark', voice:'sr', dice:false, pad:'phone', snd:true, vib:true, quick:true, watch:4, autoFS:true, installDismissed:false, rate:1, name:'', chatRead:true, vmode:'call', mgrAsk:'key', mgrPitch:false, revOdds:'num', sndKind:'rec' };
+const SET_DEF = { fs:1, theme:'dark', voice:'sr', dice:false, pad:'phone', snd:true, vib:true, quick:true, watch:4, autoFS:true, installDismissed:false, rate:1, name:'', chatRead:true, vmode:'call', mgrAsk:'key', mgrPitch:false, revOdds:'num', sndKind:'rec', view:null, crowd:true };
 const SET = { ...SET_DEF, ...ls.get('bb_set', {}) };
 const saveSet = () => ls.set('bb_set', SET);
 function applySet(){

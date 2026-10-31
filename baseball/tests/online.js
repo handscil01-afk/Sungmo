@@ -20,6 +20,8 @@ const PORT = 8769, URL0 = `http://localhost:${PORT}/baseball/?emu=1`;
     p.on('pageerror', e => errors.push(`${name}: ${e.message}`));
     p.on('console', m => { if(m.type() === 'error' && !/favicon/.test(m.text())) errors.push(`${name} console: ${m.text()}`); });
     await p.goto(url); await p.waitForSelector('#q');
+    // 처음 실행이면 화면 방식 고르기가 먼저 나옴 (방장은 도트 그림 모드, 손님은 시각장애인 모드로 시험)
+    if((await p.$eval('#q', e => e.textContent)).includes('어떤 방식으로')) await p.keyboard.press(name === '방장' ? '1' : '2');
     return p;
   };
   const q = p => p.$eval('#q', e => e.textContent);

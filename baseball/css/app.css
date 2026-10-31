@@ -127,3 +127,10 @@ body{ margin:0; min-height:100vh; background:var(--bg); color:var(--ink); line-h
   .opt.z{ min-height:3.4rem; }
   .top{ padding:0 0 6px; }
 }
+
+/* 화면 보며 하기: 도트 그림판 (256×224를 정수배에 가깝게 확대, 흐리지 않게) */
+.gfxwrap{ width:100%; max-width:768px; margin:0 auto 8px; border:3px solid #000; border-radius:6px; overflow:hidden; background:#000; line-height:0; }
+.gfxwrap canvas{ width:100%; height:auto; aspect-ratio:256 / 224; image-rendering:pixelated; image-rendering:crisp-edges; display:block; }
+@media (orientation:landscape) and (max-height:520px){
+  .gfxwrap{ max-width:calc((100vh - 24px) * 256 / 224); }
+}

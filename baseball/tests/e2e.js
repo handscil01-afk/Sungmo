@@ -42,6 +42,10 @@ const PORT = 8766;
     page.on('console', m => { if(m.type() === 'error') errors.push(`${name} console: ${m.text()}`); });
     await page.goto(`http://localhost:${PORT}/baseball/`);
     await page.waitForSelector('#opts .opt');
+    // 처음 실행: 화면 방식 고르기 (휴대폰 세로는 시각장애인 모드, 나머지는 도트 그림 모드)
+    if(!(await q(page)).includes('어떤 방식으로')) errors.push(`${name}: 처음에 화면 방식 고르기가 나오지 않음`);
+    await shot(page, `${name}-view`);
+    await page.keyboard.press(name === 'phone' ? '2' : '1');
     await shot(page, `${name}-home`); await noOverflow(page, name + ' 처음');
     // 혼자 하기, 정밀 모드, 1이닝
     for(const k of ['1', '2', '1', '1', '1', '1', '2']) await page.keyboard.press(k);

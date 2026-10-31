@@ -53,7 +53,7 @@ function emit(G, s, k = 'p'){
   if(G.log.length > 1500) G.log.splice(0, G.log.length - 1500);
   G.out.push(e);
 }
-function fx(G, name){ G.fx.push(name); }
+function fx(G, ...names){ G.fx.push(...names); }
 // 이번 선택으로 생긴 문장과 효과음을 꺼냄
 function flush(G){ const r = { lines: G.out, fx: G.fx }; G.out = []; G.fx = []; return r; }
 
@@ -374,6 +374,7 @@ function forceWalk(G){
 // n루타 (4는 홈런). ev: 타구 힘(0~1). simple: 간단 모드(주자 발 빠르기 무시)
 function onHit(G, n, ev, simple){
   const T = batTeam(G), F = fieldTeam(G), b = G.bases, sc = [];
+  if(G.anim && G.anim.bb) G.anim.bb.hit = n;
   // 안타 종류를 세어 사이클링 히트(단타·2루타·3루타·홈런)를 알림
   const B = T.bat[T.bi], key = 'b' + Math.min(4, n);
   B.st[key] = (B.st[key] || 0) + 1;
@@ -643,6 +644,8 @@ function playPitch(G, Psel, Bsel){
   const x = aim.x + gauss(G) * sig, y = aim.y + gauss(G) * sig;
   const zd = Math.max(Math.abs(x), Math.abs(y)), inZone = zd <= 1;
   G.lastLoc = { x, y };
+  // 그래픽 화면용: 방금 던진 공 (구종·코스·결과·타구)
+  G.anim = { n: ((G.anim && G.anim.n) || 0) + 1, t: Psel.t, x, y, res:'take', hand: B.hand, swing:false, bb:null };
   emit(G, `판정 제구: 오차 ${Math.round(Math.hypot(x - aim.x, y - aim.y) * 100)}, ${inZone ? '스트라이크 존 안' : '존 밖'}.`, 'd');
   // 앞부분: 투구 동작·구종·구속·움직임 (결과를 알 수 없게) / 뒷부분: 어디로 들어간 공이었는지
   const head = `제${G.pitchNo}구, ${pickSay(G, SAY.windup)} ${pt.name} ${vel}킬로, ${pickSay(G, SAY.move[Psel.t])}…`;
@@ -665,7 +668,7 @@ function playPitch(G, Psel, Bsel){
   const taken = (why) => {
     // 몸쪽으로 크게 빠지면 몸에 맞을 수 있음
     if(x < -1.6 && rnd(G) < clamp(0.15 + (-1.6 - x) * 1.2, 0, 0.7)){
-      emit(G, `${head} 아, 몸에 맞습니다! 몸에 맞는 공으로 1루에 나갑니다.`, 'r');
+      emit(G, `${head} 아, 몸에 맞습니다! 몸에 맞는 공으로 1루에 나갑니다.`, 'r'); G.anim.res = 'hbp';
       B.st.bb++; T.BB++; P.st.bb++; forceWalk(G); fx(G, 'ball'); return 'end';
     }
     const strike = strikeCall(), border = zd > 0.95 && zd < 1.05, close = border ? '아슬아슬하게 ' : '';
@@ -722,7 +725,7 @@ function playPitch(G, Psel, Bsel){
   if(guess > 0) emit(G, '노리던 공이 들어옵니다.', 'd');
   if(timing < 0) emit(G, '느린 공에 타이밍을 빼앗깁니다.', 'd');
   if(!check(G, '맞히기', pCon, '맞힘', '헛스윙')){
-    G.strikes++; fx(G, 'whiff');
+    G.strikes++; fx(G, 'whiff-' + kk[0]); G.anim.res = 'whiff';
     if(G.strikes >= 3){
       emit(G, `${head} ${pickSay(G, SAY.whiff[kk])} 삼진 아웃!${tail}`, 'r');
       B.st.ab++; B.st.k++; P.st.k++; addOut(G); fx(G, 'k');
@@ -736,7 +739,7 @@ function playPitch(G, Psel, Bsel){
   // 맞힘: 파울인지 안으로 들어갔는지
   const pFair = clamp(0.46 + (bq - pq) / 300 + (inZone ? 0.10 * cen : -0.12) - (k === 'contact' && G.strikes === 2 ? 0.06 : 0), 0.25, 0.75);
   if(rnd(G) >= pFair){
-    fx(G, 'foul');
+    fx(G, 'batF', 'foul'); G.anim.res = 'foul';
     if(rnd(G) < 0.03 * parkOf(G).foul){
       const pos = pickOne(G, ['C', '1B', '3B']);
       emit(G, `${head} 높이 뜬 파울! ${ga(fielder(F, pos))} 끝까지 따라가 잡습니다. 파울 플라이 아웃.`, 'r');
@@ -746,10 +749,10 @@ function playPitch(G, Psel, Bsel){
     emit(G, `${head} ${pickSay(G, SAY.foul[kk])} ${countText(G)}.${tail}`, 'p');
     return flush(G);
   }
-  fx(G, 'bat');
   const q = clamp(rnd(G) * 0.75 + 0.08 + (bq - pq) / 220 + (inZone ? 0.18 * cen : -0.12), 0, 1);
   const ev = clamp(0.45 * q + 0.45 * soft(B.pow + B.cond * 4, 0.5) / 100 + ({ swing:0, power:0.07, contact:-0.07 })[k] + (pt.fast && vel >= 153 ? 0.02 : 0) + gauss(G) * 0.035, 0, 1.08);
   emit(G, `판정 타구: 정확도 ${Math.round(q * 100)}, 힘 ${Math.round(ev * 100)}.`, 'd');
+  fx(G, q > 0.75 ? 'batBig' : 'bat'); G.anim.res = 'inplay';
   G.hrun = hr;
   const hitWord = Psel.e !== 'in' && zd < 0.42 && q > 0.5 ? '가운데로 몰린 실투를 놓치지 않습니다!' : pickSay(G, SAY.hit[kk][q > 0.75 ? 'good' : 'bad']);
   inPlay(G, { head: `${head} ${hitWord}`, x, y, q, ev, k, pt });
@@ -773,7 +776,7 @@ function bunt(G, o){
     emit(G, `${head} 번트를 댔지만 파울. ${countText(G)}.`, 'p');
     return flush(G);
   }
-  fx(G, 'bunt');
+  fx(G, 'bunt'); G.anim.res = 'bunt';
   buntResult(G, head + ' 번트!', false);
   return end();
 }
@@ -838,6 +841,7 @@ function inPlay(G, o){
   const pGB = 0.42 - y * 0.10 + pt.gb - (B.pow - 50) / 500 - (k === 'power' ? 0.07 : 0) + (k === 'contact' ? 0.04 : 0);
   const pPU = 0.05 + (q < 0.25 ? 0.10 : 0), pLD = 0.16 + q * 0.12;
   const type = wpick(G, [['gb', pGB], ['pu', pPU], ['ld', pLD], ['fb', 1 - pGB - pPU - pLD]]);
+  if(G.anim) G.anim.bb = { type, fi, d: type === 'gb' ? 30 + ev * 30 : type === 'pu' ? 25 : type === 'ld' ? 50 + ev * 40 : 0 };
   const head = o.head.trim();
   const hit = (n, text) => {
     B.st.ab++; B.st.h++; T.H++; P.st.h++;
@@ -898,7 +902,8 @@ function inPlay(G, o){
   // 뜬공: 비거리와 바람
   const wind = (WIND[G.wind.dir] || WIND.none).f[fi] * G.wind.spd * 1.6;
   const raw = 36 + ev * 104 + gauss(G) * 5, d = Math.round(raw + wind), fence = pk.fence[fi];
-  const wallX = Math.max(0, (pk.wall[fi] - 2.5) * 1.6);   // 담장이 높으면 그만큼 더 멀리 가야 넘어감
+  const wallX = Math.max(0, (pk.wall[fi] - 2.5) * 1.6);
+  if(G.anim && G.anim.bb) G.anim.bb.d = d;   // 담장이 높으면 그만큼 더 멀리 가야 넘어감
   const posOF = ['LF', 'CF', 'RF'][fi], ofName = fielder(F, posOF);
   emit(G, `판정 비거리: ${Math.round(raw)}미터${wind ? `, 바람 ${wind > 0 ? '더하기' : '빼기'} ${Math.abs(Math.round(wind))}미터` : ''}, 담장 ${fence}미터.`, 'd');
   const field = ['왼쪽', '가운데', '오른쪽'][fi], hrLine = fence + wallX;
@@ -1086,6 +1091,7 @@ function playSimplePitch(G, D, O){
   const T = batTeam(G), B = curBatter(G), P = curPitcher(G);
   G.pitchNo++; P.n++; fx(G, 'pitch');
   const zoneN = SP_ZONE[D] || 55, d1 = rint(G, 1, 100), inZone = d1 <= zoneN;
+  { const a = rnd(G) * 6.28, m = inZone ? rnd(G) * 0.9 : 1.15 + rnd(G) * 0.4; G.anim = { n: ((G.anim && G.anim.n) || 0) + 1, t:'FB', x: Math.cos(a) * m, y: Math.sin(a) * m, res:'take', hand: B.hand, bb:null }; }
   emit(G, `판정 공 위치: 1~${zoneN} 스트라이크, 주사위 ${d1}.`, 'd');
   // 앞부분만 들어서는 결과를 모르게: 공이 어디로 갔는지와 주사위 숫자는 결과 뒤에 붙임
   const where = inZone ? pickOne(G, ['스트라이크 존으로 들어온 공', '존 구석을 찌른 공', '가운데로 몰린 공']) : pickOne(G, ['존을 벗어난 공', '낮게 떨어진 공', '바깥쪽으로 빠진 공']);
@@ -1109,7 +1115,7 @@ function playSimplePitch(G, D, O){
       if(G.strikes >= 2) return strike('번트 파울! 쓰리번트 실패로');
       G.strikes++; fx(G, 'foul'); emit(G, `${head} 번트를 댔지만 파울. ${countText(G)}.`, 'p'); return flush(G);
     }
-    fx(G, 'bunt'); buntResult(G, `${head} 번트!`, true); endPA(G); return flush(G);
+    fx(G, 'bunt'); G.anim.res = 'bunt'; buntResult(G, `${head} 번트!`, true); endPA(G); return flush(G);
   }
   // 존 밖 공은 휘두르려다가도 참아 낼 수 있음 (맞히기일수록 잘 참음)
   if(!inZone){
@@ -1120,14 +1126,14 @@ function playSimplePitch(G, D, O){
   const [wh, fo] = SP_SWING[inZone ? 'in' : 'out'][O] || SP_SWING.in.normal;
   const d2 = rint(G, 1, 100);
   emit(G, `판정 스윙: 1~${wh} 헛스윙, ${wh + 1}~${wh + fo} 파울, ${wh + fo + 1}~100 인플레이, 주사위 ${d2}.`, 'd');
-  if(d2 <= wh){ fx(G, 'whiff'); return strike(pickSay(G, SAY.whiff[kk])); }
+  if(d2 <= wh){ fx(G, 'whiff-' + kk[0]); G.anim.res = 'whiff'; return strike(pickSay(G, SAY.whiff[kk])); }
   if(d2 <= wh + fo){
-    fx(G, 'foul');
+    fx(G, 'batF', 'foul'); G.anim.res = 'foul';
     if(G.strikes < 2) G.strikes++;
     emit(G, `${head} ${pickSay(G, SAY.foul[kk])} ${countText(G)}.${tail}`, 'p'); return flush(G);
   }
   // 인플레이: 안타·홈런·땅볼·뜬공 표를 한 번 더 굴림 (존 밖 공을 치면 약한 타구가 많음)
-  fx(G, 'bat');
+  fx(G, 'bat'); G.anim.res = 'inplay';
   const w = { ...SP_PLAY[O] };
   w.HR *= parkOf(G).hr;
   if(!inZone){ w.HR *= 0.4; w.S2 *= 0.6; w.S1 *= 0.85; w.GO *= 1.3; w.FO *= 1.15; }

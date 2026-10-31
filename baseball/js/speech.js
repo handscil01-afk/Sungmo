@@ -86,23 +86,28 @@ const VIB = { review:[60, 60, 60, 60, 200], chat:[40, 60, 40], hit:[80], xbh:[80
 // 한 번의 선택으로 여러 효과가 나오면 가장 중요한 것 하나(간단한 소리는 순서대로 최대 3개)
 const FX_RANK = ['chat', 'roger', 'end', 'review', 'hr', 'score', 'b3', 'b2', 'xbh', 'hit', 'k', 'out', 'safe', 'ball', 'change', 'bunt', 'bat', 'foul', 'whiff', 'mitt'];
 // 간단한 소리로 바꿀 때: 새 사건 이름을 예전 소리에 맞춤
-const SYN = { strike:'mitt', ballc:'mitt', b2:'xbh', b3:'xbh', pchange:'change', sub:'change' };
+const SYN = { strike:'mitt', ballc:'mitt', b2:'xbh', b3:'xbh', pchange:'change', sub:'change', 'whiff-p':'whiff', 'whiff-s':'whiff', 'whiff-c':'whiff', batBig:'bat', batF:'bat' };
 
 /* ---------- 녹음 효과음 (sfx/*.mp3) ----------
    사건마다 소리 하나: 공을 던지면 '피칭'이 먼저 나고, 이어서 결과(스트라이크·볼·헛스윙·파울·안타·2루타·3루타·홈런·아웃·삼진) 소리가 남.
    3아웃이면 결과 뒤에 '공수교대'. 새 타자는 '타석'(관중 소리), 투수 교체는 '투수', 대타·대주자는 '타자', 경기 시작은 '마운드'.
    긴 소리는 다음 사건이 오면 부드럽게 줄이고 새 소리로 바꿈 */
-const REC = { pitch:'pitch', strike:'strike', ballc:'ball', whiff:'whiff', foul:'foul', hit:'hit', b2:'double', b3:'triple', hr:'homer',
-  out:'out', k:'strikeout', change:'change', batter:'atbat', pchange:'pitcher', sub:'batter', start:'mound' };
-const REC_MAIN = ['hr', 'b3', 'b2', 'hit', 'k', 'out', 'strike', 'ballc', 'whiff', 'foul', 'pchange', 'sub', 'start'];
+const REC = { pitch:['pitch'], strike:['strike'], ballc:['ball'], foul:['foul'], hit:['hit'], b2:['double'], b3:['triple'], hr:['homer'],
+  out:['out'], k:['strikeout'], change:['change'], batter:['atbat'], pchange:['pitcher'], sub:['batter'], start:['organ'],
+  // 헛스윙은 타격 방법마다(강하게·보통·맞히기), 타격음은 잘 맞은 정도마다 다른 소리 (여럿이면 그때그때 하나)
+  'whiff-p':['whiff-p', 'whiff-p2'], 'whiff-s':['whiff-n', 'whiff-n2'], 'whiff-c':['whiff-c', 'whiff-c2'],
+  bat:['bat1', 'bat2', 'bat3'], batF:['bat1', 'bat2', 'bat3'], batBig:['bat-big'] };
+const REC_CONTACT = ['batBig', 'bat', 'batF', 'whiff-p', 'whiff-s', 'whiff-c'];
+const REC_MAIN = ['hr', 'b3', 'b2', 'hit', 'k', 'out', 'strike', 'ballc', 'foul', 'pchange', 'sub', 'start'];
 const RECBUF = {}, RECLOAD = {}, RECNOW = [];
+const recPick = ev => { const a = REC[ev]; return a[Math.floor(Math.random() * a.length)]; };
 function recLoad(name){
   const c = audio(); if(!c || RECBUF[name] || RECLOAD[name]) return;
   RECLOAD[name] = fetch(new URL(`sfx/${name}.mp3`, document.baseURI).href).then(r => r.arrayBuffer())
     .then(ab => new Promise((ok, no) => { const p = c.decodeAudioData(ab, ok, no); if(p && p.then) p.then(ok, no); }))
     .then(buf => { RECBUF[name] = buf; }).catch(() => { delete RECLOAD[name]; });
 }
-function recPreload(){ Object.values(REC).forEach(recLoad); }
+function recPreload(){ [...new Set(Object.values(REC).flat())].forEach(recLoad); }
 ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { if(SET.snd && SET.sndKind !== 'synth') recPreload(); }, { capture:true, once:true }));
 function recStopAll(c){
   RECNOW.splice(0).forEach(x => { try{ x.g.gain.setTargetAtTime(0, c.currentTime, 0.08); x.s.stop(c.currentTime + 0.4); }catch(e){} });
@@ -119,17 +124,34 @@ function recPlay(c, name, at, vol, max){
   return Math.min(buf.duration, max || buf.duration);
 }
 function playRec(c, uniq){
-  const main = REC_MAIN.find(n => uniq.includes(n));
+  const main = REC_MAIN.find(n => uniq.includes(n)), contact = REC_CONTACT.find(n => uniq.includes(n));
   const pitch = uniq.includes('pitch'), change = uniq.includes('change');
-  if(!main && !pitch && !change && !uniq.includes('batter')) return false;
+  if(!main && !contact && !pitch && !change && !uniq.includes('batter')) return false;
   recStopAll(c);
+  // 투구(짧은 바람 소리) → 방망이(헛스윙·타격음) → 결과 → 공수교대 순서로, 겹치지 않게 조금씩 띄움
   let t = 0.02;
-  if(pitch){ recPlay(c, REC.pitch, t, 0.8); t += main ? 0.9 : 0; }
-  if(main){ const d = recPlay(c, REC[main], t, 0.85, main === 'hr' ? 9 : 4); t += Math.min(d || 1, 2.5); }
-  if(change) recPlay(c, REC.change, t, 0.7, 4);
-  else if(!pitch && !main && uniq.includes('batter')) recPlay(c, REC.batter, t, 0.6, 3);
+  if(pitch){ recPlay(c, 'pitch', t, 0.6); t += 0.35; }
+  if(contact){ recPlay(c, recPick(contact), t, 0.9); t += contact === 'batBig' ? 0.45 : 0.3; }
+  if(main){ const d = recPlay(c, recPick(main), t, 0.85, main === 'hr' ? 10 : 4); t += Math.min(d || 1, 2.5); }
+  if(change) recPlay(c, 'change', t, 0.7, 4);
+  else if(!pitch && !main && !contact && uniq.includes('batter')) recPlay(c, 'atbat', t, 0.6, 3);
   return true;
 }
+// 화면 모드의 배경 관중 소리 (설정에서 켜고 끔)
+const CROWD = { src:null };
+function crowdSync(){
+  const want = SET.snd && SET.sndKind !== 'synth' && SET.crowd && SET.view === 'gfx' && !!(UI.S && UI.S.board) && !document.hidden;
+  if(!want){ if(CROWD.src){ try{ CROWD.src.stop(); }catch(e){} CROWD.src = null; } return; }
+  if(CROWD.src) return;
+  const c = SFX.ctx; if(!c) return;   // 첫 터치 전에는 소리를 만들지 않음
+  if(c.state !== 'running'){ c.resume().then(() => crowdSync()).catch(() => {}); return; }
+  if(!RECBUF.crowd){ recLoad('crowd'); if(RECLOAD.crowd) RECLOAD.crowd.then(() => crowdSync()); return; }
+  const s = c.createBufferSource(), g = c.createGain();
+  s.buffer = RECBUF.crowd; s.loop = true; g.gain.value = 0.35; s.connect(g); g.connect(c.destination); s.start();
+  CROWD.src = s;
+}
+['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => setTimeout(crowdSync, 50), { capture:true }));
+document.addEventListener('visibilitychange', () => crowdSync());
 function playFx(list){
   if(!list || !list.length) return;
   const uniq = [...new Set(list)];
@@ -138,7 +160,7 @@ function playFx(list){
     if(c){
       // 녹음 효과음이 맡지 않는 소리(득점·판독·채팅 등)는 간단한 소리로
       const rec = SET.sndKind !== 'synth' && playRec(c, uniq);
-      const rest = rec ? uniq.filter(n => !REC[n] && !['bat', 'mitt', 'xbh'].includes(n)) : uniq.map(n => SYN[n] || n);
+      const rest = rec ? uniq.filter(n => !REC[n] && !['mitt', 'xbh'].includes(n)) : uniq.map(n => SYN[n] || n);
       let t = c.currentTime + 0.02;
       [...new Set(rest)].slice(0, 3).forEach(n => { if(SOUNDS[n]){ try{ SOUNDS[n](c, t + (rec ? 1.2 : 0)); }catch(e){} t += 0.35; } });
     }

@@ -38,7 +38,12 @@ function render(){
   applySet();
   $('#top').innerHTML = S.top || '';
   const bs = $('#boardSec');
-  if(S.board && typeof boardHTML === 'function' && G){ bs.hidden = false; bs.innerHTML = boardHTML(); }
+  if(S.board && typeof boardHTML === 'function' && G){
+    bs.hidden = false;
+    const keep = SET.view === 'gfx' && typeof gfxRender === 'function' && bs.querySelector('.gfxwrap');
+    bs.innerHTML = boardHTML();
+    if(SET.view === 'gfx' && typeof gfxRender === 'function'){ if(keep) bs.prepend(keep); gfxRender(G, UI.lastFx || []); UI.lastFx = []; }
+  }
   else { bs.hidden = true; bs.innerHTML = ''; }
   $('#say').innerHTML = (S.say || []).map(l => `<p class="${l.k ? 'k-' + l.k : ''}">${esc(l.s || l)}</p>`).join('');
   $('#say').hidden = !(S.say || []).length;
@@ -53,6 +58,7 @@ function render(){
   if(S.board) renderLog();
   if(typeof renderChat === 'function') renderChat(true);
   if(typeof voiceUI === 'function') voiceUI();
+  if(typeof crowdSync === 'function') crowdSync();
   if(hadFocus && !$('#opts').contains(document.activeElement)) $('#q').focus();
 }
 function renderOpts(S){
