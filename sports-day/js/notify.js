@@ -1,14 +1,20 @@
 'use strict';
 /* ===================== 일정·시간 안내 · 문자 무전 · 긴급 호출 ===================== */
 const WHO = [['staff','모든 진행요원'],['coach','감독'],['ref','심판·도우미·계시원'],['indiv','개인전 담당'],['team','단체전 담당'],['master','마스터만']];
-const whoLabel = k => (WHO.find(w => w[0]===k) || WHO[0])[1];
+// 'ch:<채널번호>': 무전 채널(셔틀 등)에 속한 사람과 운영진
+const isChWho = k => typeof k==='string' && k.startsWith('ch:') && CH_RE.test(k.slice(3));
+const whoLabel = k => isChWho(k) ? `${chName(k.slice(3))} 채널` : (WHO.find(w => w[0]===k) || WHO[0])[1];
 const MSG_PHRASES = ['선수 준비 완료했습니다.', '다음 경기 시작해도 됩니다.', '잠시 대기해 주세요.', '기록 확인 부탁드립니다.', '물·의자가 필요합니다.', '도움이 필요합니다. 와 주세요.'];
 const schedule = () => Array.isArray(D.config.schedule) ? D.config.schedule : [];
 // 받을 사람에 이 기기가 들어가는지 (마스터는 모두 받음, 안내판은 기기 안내 창을 받지 않음)
 function whoMatch(who){
   const r = myRole();
   if(r.role==='master') return true;
-  if(r.role==='board' || !hasDuty(r)) return false;
+  if(r.role==='board') return false;
+  // 무전 채널 앞으로 온 것: 그 채널 사람과 모든 채널을 보는 운영 현황 기기만 받음 (모르는 대상은 아무도 받지 않음)
+  if(typeof who==='string' && who.startsWith('ch:')) return isChWho(who) && !!chById(who.slice(3)) && (!!r.monitor || (myCh() || {}).ch===who.slice(3));
+  // 맡은 종목이 없는 채널 사람(셔틀 운전자·보조 등)은 '모든 진행요원' 안내만 받음
+  if(!hasDuty(r)) return !!myCh() && who==='staff';
   const ev = refEvents(r);
   switch(who){
     case 'coach': return !!r.coach;
@@ -23,19 +29,27 @@ const leftText = ms => ms <= 0 ? '시간 지남' : ms < 60000 ? '1분 안 남음
 
 /* ---------- 안내 창 (새 창처럼 화면 가운데에 크게) ---------- */
 const NQ = []; let ncur = null, nalarm = 0;
-function notice(n){ NQ.push(n); if(!ncur) showNotice(); if(typeof psWake==='function') psWake(); }   // 절전 화면이 켜져 있으면 깨움
+function notice(n){
+  // 셔틀 접근 알림은 새 알림이 오면 이전 셔틀 알림(떠 있는 것·줄 선 것)을 바로 바꿔 보여 줌: 낡은 거리를 확인 단추 뒤에 쌓아 두지 않음
+  if(n.kind==='shuttle'){
+    for(let i = NQ.length - 1; i >= 0; i--) if(NQ[i].kind==='shuttle') NQ.splice(i, 1);
+    if(ncur && ncur.kind==='shuttle'){ NQ.unshift(n); showNotice(); if(typeof psWake==='function') psWake(); return; }
+  }
+  NQ.push(n); if(!ncur) showNotice(); if(typeof psWake==='function') psWake();   // 절전 화면이 켜져 있으면 깨움
+}
 function showNotice(){
   clearInterval(nalarm);
   ncur = NQ.shift();
   const box = $('#notice');
   if(!ncur){ box.className = ''; box.innerHTML = ''; return; }
-  const V = voiceMode(), ic = V ? '' : ({ time:'⏰', msg:'💬', sos:'🚨' }[ncur.kind] || '📢');
+  const V = voiceMode(), ic = V ? '' : ({ time:'⏰', msg:'💬', sos:'🚨', shuttle:'🚌' }[ncur.kind] || '📢');
   box.className = 'open ' + ncur.kind;
   box.innerHTML = `<div class="nbox"><div class="nic">${ic}</div><div class="nt">${esc(ncur.title)}</div>${ncur.msg?`<div class="nm">${esc(ncur.msg)}</div>`:''}
     <div class="nfrom">${esc(ncur.from||'')}${ncur.from?' · ':''}${hm(ncur.at||now())}${NQ.length?` · 남은 안내 ${NQ.length}개`:''}</div>
     <button class="btn huge ${ncur.kind==='sos'?'danger':'primary'}" data-a="ntcOk">확인</button></div>`;
   // 중계 모드: 보이스오버가 바로 읽도록 알림 내용을 읽기 전용 알림 칸에도 넣음
   if(V) say(`${ncur.kind==='sos' ? '긴급 호출. ' : ''}${ncur.title}.${ncur.msg ? ' ' + ncur.msg + '.' : ''}${ncur.from ? ' ' + ncur.from + ' 님이 보냈습니다.' : ''}`);
+  else if(ncur.speak) say(ncur.speak);   // 셔틀 접근 알림 같은 안내는 소리·진동에 더해 기기 음성으로도 읽어 줌
   const beep = () => {
     SND.unlock();
     if(ncur.kind==='sos'){ SND.play([[880,0,0.25],[660,0.3,0.25],[880,0.6,0.25],[660,0.9,0.25]]); if(navigator.vibrate) navigator.vibrate([400,150,400,150,400]); }
@@ -85,31 +99,34 @@ function processMsgs(){
     if(!whoMatch(to)) return;
     notice(m.kind==='sos'
       ? { kind:'sos', title:'긴급 호출', msg:`${m.where ? `[${m.where}] ` : ''}${m.text||'도움이 필요합니다.'}`, from:m.name, at:m.at }
+      : m.kind==='shuttle' ? { kind:'shuttle', title:m.text, msg:'', from:m.name, at:m.at, speak:m.text }
       : { kind:'msg', title:m.text, msg: to==='staff' ? '' : `받는 사람: ${whoLabel(to)}`, from:m.name, at:m.at });
   });
   msgBoot = false;
   if(changed) ls.set('udh5_seenmsg', [...SEEN].slice(-300));
   drawSheet();
 }
-function sendMsg(text, to, kind='msg'){
+// quiet: 자동으로 보내는 알림(셔틀 접근 알림)은 '보냈습니다' 안내를 띄우지 않음
+function sendMsg(text, to, kind='msg', quiet=false){
   if(!can.staff()) return denied();
   const t = String(text||'').trim().slice(0, 280); if(!t && kind!=='sos'){ toast('보낼 내용을 적어 주세요.'); return Promise.resolve(false); }
   const id = now().toString(36) + uid();
   SEEN.add(id);
   return put(['main','msgs',id], { uid:store.uid, name:UI.me, text:t, to, kind, where: roleLabel(myRole()), at:now() }, false)
-    .then(ok => { if(ok) toast(kind==='sos' ? '긴급 호출을 보냈습니다.' : `${whoLabel(to)}에게 보냈습니다.`); return ok; });
+    .then(ok => { if(ok && !quiet) toast(kind==='sos' ? '긴급 호출을 보냈습니다.' : `${whoLabel(to)}에게 보냈습니다.`); return ok; });
 }
 let msgTo = 'staff', msgDraft = '';
 // 문자 무전 내용: 아래 창(메뉴)과 무전 창의 '문자' 탭에서 함께 씀
 function msgBody(){
-  const recent = D.msgs.slice().sort((a,b) => (b.at||0)-(a.at||0)).slice(0, 8);
+  // 무전 채널 앞으로 보낸 것은 그 채널 사람과 운영진에게만 보임
+  const recent = D.msgs.filter(m => !isChWho(m.to) || whoMatch(m.to)).sort((a,b) => (b.at||0)-(a.at||0)).slice(0, 8);
   const html = `<p class="sub" style="margin-top:0">누르면 바로 보냅니다. 받는 사람 기기에는 소리·진동과 함께 안내 창이 뜹니다.</p>
     <div class="chips" style="margin-bottom:10px">${WHO.map(([k,l]) => `<button class="chip ${msgTo===k?'on':''}" data-a="msgTo" data-v="${k}">${esc(l)}</button>`).join('')}</div>
     <div class="pgrid">${MSG_PHRASES.map((p,i) => `<button class="pbtn" data-a="msgPhrase" data-v="${i}"><b>${esc(p)}</b></button>`).join('')}</div>
     <div class="row nowrap" style="margin-top:12px"><input id="msgText" data-in="msg" placeholder="직접 적어서 보내기" value="${esc(msgDraft)}" autocomplete="off"><button class="btn primary" data-a="msgSend">보내기</button></div>
     <button class="btn danger huge wide" data-a="sosSend" style="margin-top:14px;width:100%">🚨 긴급 호출</button>
     <h3>최근 15분</h3>
-    <div class="list">${recent.map(m => `<div class="item"><span class="tag ${m.kind==='sos'?'red':''}">${m.kind==='sos'?'🚨':'💬'} ${hm(m.at)}</span><span class="name">${esc(m.text||'긴급 호출')}<span class="sub">${esc(m.name||'')} → ${esc(m.kind==='sos'?'모든 진행요원':whoLabel(m.to))}</span></span></div>`).join('') || '<div class="empty">아직 주고받은 문자가 없습니다.</div>'}</div>`;
+    <div class="list">${recent.map(m => `<div class="item"><span class="tag ${m.kind==='sos'?'red':''}">${m.kind==='sos'?'🚨':m.kind==='shuttle'?'🚌':'💬'} ${hm(m.at)}</span><span class="name">${esc(m.text||'긴급 호출')}<span class="sub">${esc(m.name||'')} → ${esc(m.kind==='sos'?'모든 진행요원':whoLabel(m.to))}</span></span></div>`).join('') || '<div class="empty">아직 주고받은 문자가 없습니다.</div>'}</div>`;
   return voiceMode() ? vstrip(html) : html;
 }
 function msgSheet(){

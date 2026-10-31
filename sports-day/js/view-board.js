@@ -2,15 +2,17 @@
 /* ===================== 현황판 (요약) ===================== */
 
 // 단체전 승점 카드 (compact: 휴대폰의 현황 탭처럼 좁은 화면에서 촘촘하게)
+// 종목마다 이긴 팀에 승점(기본 1점). 칸에는 종목 성적(이긴 횟수 또는 핀·점수 합계)과 확정 결과를 보임
 function teamCard(compact){
   const tot = totalPoints();
-  // 이긴 판 수에 종목의 승점(기본 1)을 곱해서 보여 줌
-  const rows = Object.entries(TEAM).map(([k,E]) => { const t = tally(k), p = E.pts||1;
-    return `<tr><td><span class="row nowrap" style="gap:8px"><span style="font-size:22px">${E.icon}</span><b>${esc(E.name)}</b>${p>1 ? `<span class="sub">(이기면 ${p}점)</span>` : ''}</span></td><td class="num score" style="color:var(--blue)">${t.blue*p}</td><td class="num score" style="color:var(--red)">${t.red*p}</td><td class="num sub">${matchesOf(k).length}판</td></tr>`; }).join('');
-  return `<div class="card${compact?' stcard stteam':''}"><h2>단체전 승점</h2>
-      <div class="totals"><div class="tbox blue"><div class="t">${esc(teamName('blue'))}</div><div class="v">${tot.blue}</div></div><div class="tbox red"><div class="t">${esc(teamName('red'))}</div><div class="v">${tot.red}</div></div></div>
-      <table style="margin-top:12px"><thead><tr><th>종목</th><th class="num">${esc(teamShort('blue'))}</th><th class="num">${esc(teamShort('red'))}</th><th class="num">진행</th></tr></thead><tbody>${rows}</tbody></table>
-      <p class="sub">${Object.values(TEAM).some(E => (E.pts||1)>1) ? '한 판 이길 때마다 종목별 승점이 올라갑니다.' : '한 판 이길 때마다 승점 1점입니다.'} 다른 기기에서 입력한 결과가 바로 반영됩니다.</p></div>`;
+  const rows = Object.entries(TEAM).map(([k,E]) => { const st = eventStat(k), res = resultOf(k), p = E.pts||1, stale = !!res && resultStale(k);
+    const cell = tm => `<td class="num score ${res && res.winner===tm ? 'won' : ''}" style="color:var(--${tm})">${fmtNum(st[tm])}<small>${esc(st.unit)}</small></td>`;
+    const state = res ? `<span class="tag ${stale ? 'warn' : 'ok'}">${stale ? '⚠ 기록 바뀜 · ' : '✓ '}${esc(teamShort(res.winner))} 승</span>` : `<span class="tag">${st.count ? '진행 중' : '전'}</span>`;
+    return `<tr><td><span class="row nowrap" style="gap:8px"><span style="font-size:22px">${E.icon}</span><b>${esc(E.name)}</b>${p>1 ? `<span class="sub">(이기면 ${p}점)</span>` : ''}</span><div class="sub evst">${esc(evStatusText(k))}</div></td>${cell('blue')}${cell('red')}<td class="num">${state}</td></tr>`; }).join('');
+  return `<div class="card${compact?' stcard stteam':''}"><h2>단체전 종목 승점</h2>
+      <div class="totals"><div class="tbox blue"><div class="t">${esc(teamName('blue'))} 승점</div><div class="v">${tot.blue}</div></div><div class="tbox red"><div class="t">${esc(teamName('red'))} 승점</div><div class="v">${tot.red}</div></div></div>
+      <table style="margin-top:12px"><thead><tr><th>종목</th><th class="num">${esc(teamShort('blue'))}</th><th class="num">${esc(teamShort('red'))}</th><th class="num">결과</th></tr></thead><tbody>${rows}</tbody></table>
+      <p class="sub">종목마다 이긴 팀에 승점을 줍니다. 심판이 결과를 확정한 종목만 승점에 들어가고, 칸의 숫자는 그 종목의 이긴 횟수 또는 핀·점수 합계입니다.</p></div>`;
 }
 // 개인전 종목 하나의 1~3등 카드 (compact: 한 줄씩 촘촘하게)
 function indivCard(k, compact){
@@ -113,7 +115,7 @@ document.addEventListener('pointerdown', () => { if(myRole().role==='board'){ co
 const bdMute = () => !!ls.get('udh5_bdmute', false);
 ACT.bdMute = () => { ls.set('udh5_bdmute', !bdMute()); touchDevice(); toast(bdMute() ? '이 기기에서는 안내판 소리를 내지 않습니다.' : '이 기기에서 안내판 소리를 냅니다.'); drawSheet(); return false; };
 const RESULT_MS = 7000, CALL_MS = 30000, ANN_MS = 15000, FLASH_MS = 8000, PERSON_MS = 120000;
-const BOARD = { init:false, seen:new Set(), lastCall:{}, lastCc:{}, ccInit:false, ccFx:null, annId:null, testAt:0, overlay:null, queue:[], busy:false, timer:0, callFx:null, person:null, personAt:0 };
+const BOARD = { init:false, seen:new Set(), lastCall:{}, lastRes:{}, lastCc:{}, ccInit:false, ccFx:null, annId:null, testAt:0, overlay:null, queue:[], busy:false, timer:0, callFx:null, person:null, personAt:0 };
 // 지금 안내판에 띄울 화면: 마스터가 정한 것, 자동이면 가장 최근에 기록이 들어온 종목
 function boardTarget(){
   const m = boardCfg().mode || 'auto';
@@ -121,7 +123,7 @@ function boardTarget(){
   if(m.startsWith('team:') && TEAM[m.slice(5)]) return { kind:'team', ev:m.slice(5) };
   let best = { t:0, kind:'indiv' };
   D.matches.forEach(x => { const t = Math.max(x.at||0, x.editedAt||0); if(!x.deleted && TEAM[x.event] && t>best.t) best = { t, kind:'team', ev:x.event }; });
-  Object.entries(D.calls).forEach(([ev, c]) => { const t = (c.call||{}).at||0; if(TEAM[ev] && t>best.t) best = { t, kind:'team', ev }; });
+  Object.entries(D.calls).forEach(([ev, c]) => { const t = Math.max((c.call||{}).at||0, (c.result||{}).at||0); if(TEAM[ev] && t>best.t) best = { t, kind:'team', ev }; });
   // 감독이 자기 팀 선수를 부른 것도 가장 최근 활동으로 침
   Object.values(D.ccalls).forEach(c => { const t = c.at||0; if(TEAM[c.event] && ORDER_EVENTS.includes(c.event) && t>best.t) best = { t, kind:'team', ev:c.event }; });
   D.indiv.forEach(x => { const t = Math.max(x.at||0, x.editedAt||0); if(t>best.t) best = { t, kind:'indiv' }; });
@@ -135,7 +137,7 @@ function boardTick(){
   if(!BOARD.init){
     if(!D.loaded.matches || !D.loaded.calls || !D.loaded.config) return;
     D.matches.forEach(m => BOARD.seen.add(m.id));
-    Object.entries(D.calls).forEach(([ev, c]) => BOARD.lastCall[ev] = (c.call||{}).at||0);
+    Object.entries(D.calls).forEach(([ev, c]) => { BOARD.lastCall[ev] = (c.call||{}).at||0; BOARD.lastRes[ev] = (c.result||{}).at||0; });
     BOARD.annId = ann.id || null; BOARD.testAt = cfg.testAt || 0; BOARD.awardStep = awardsStep();
     BOARD.init = true; return;
   }
@@ -147,6 +149,9 @@ function boardTick(){
   Object.entries(D.calls).forEach(([ev, c]) => {
     const call = c.call || {};
     if((call.at||0) > (BOARD.lastCall[ev]||0)){ BOARD.lastCall[ev] = call.at; if(TEAM[ev] && call.at > now()-120000) BOARD.queue.push({ kind:'call', ev, call }); }
+    // 심판이 종목 결과를 확정하면 '종목 끝' 화면
+    const res = c.result;
+    if(res && (res.at||0) > (BOARD.lastRes[ev]||0)){ BOARD.lastRes[ev] = res.at; if(TEAM[ev] && resultOf(ev) && res.at > now()-120000) BOARD.queue.push({ kind:'evres', ev, res }); }
   });
   // 감독이 부른 선수: 처음 불러온 것은 이미 본 것으로 치고, 그 뒤에 새로 생긴 것만 알림
   if(D.loaded.ccalls){
@@ -173,17 +178,17 @@ function runFx(){
   if(fx.kind==='test'){ if(sound){ const d = SND.dingdong(); if(cfg.callVoice) setTimeout(() => SND.speak('안내판 소리 시험입니다.'), d*1000+200); dur = voiceMs; } toast('안내판 소리 시험'); }
   else if(fx.kind==='call' || fx.kind==='autocall'){
     let c = fx.call;
-    if(fx.kind==='autocall'){ const pa = prepAhead(), b = upcoming(fx.ev,'blue',pa), r = upcoming(fx.ev,'red',pa); c = b && r ? { kind:'next', blue:b, red:r, ahead:pa } : null; }
+    if(fx.kind==='autocall'){ const pa = prepAhead(), b = upcoming(fx.ev,'blue',pa), r = upcoming(fx.ev,'red',pa); c = b && r ? { kind:'next', ...unitCall(fx.ev, b, r), ahead:pa } : null; }
     if(c){
       const ahead = c.ahead != null ? c.ahead : (c.kind==='now' ? 0 : 1);
-      BOARD.callFx = { ev:fx.ev, kind:c.kind, blue:c.blue, red:c.red, ahead, start:now() };
-      if(sound){ const d = SND.dingdong(); if(cfg.callVoice) setTimeout(() => SND.speak(callText(c.blue, c.red, c.kind, ahead)), d*1000+200); }
+      BOARD.callFx = { ev:fx.ev, kind:c.kind, b:callSide(c, 'blue'), r:callSide(c, 'red'), ahead, start:now() };
+      if(sound){ const d = SND.dingdong(); if(cfg.callVoice) setTimeout(() => SND.speak(callText(c, ahead)), d*1000+200); }
       dur = voiceMs;
     } else dur = 0;
   } else if(fx.kind==='ccall'){
     const c = fx.c, T = boardTarget();
     // 그 종목 화면을 보고 있으면 위쪽 호출 띠로, 다른 화면이면 잠깐 화면 가득 띄움
-    if(T.kind==='team' && T.ev===c.event){ BOARD.ccFx = { ev:c.event, team:c.team, pid:c.pid, kind:c.kind, ahead:c.ahead, start:now() }; dur = voiceMs; }
+    if(T.kind==='team' && T.ev===c.event){ BOARD.ccFx = { ev:c.event, team:c.team, pid:c.pid, pids:c.pids, group:c.group, kind:c.kind, ahead:c.ahead, start:now() }; dur = voiceMs; }
     else { BOARD.overlay = { kind:'ccall', c, start:now() }; dur = 7000; }
     if(sound){ const d = SND.dingdong(); if(cfg.callVoice) setTimeout(() => SND.speak(ccallText(c)), d*1000+200); }
   } else if(fx.kind==='ann'){
@@ -196,6 +201,10 @@ function runFx(){
   } else if(fx.kind==='result'){
     BOARD.overlay = { kind:'result', m:fx.m, start:now() }; dur = RESULT_MS;
     if(sound) SND.fanfare();
+  } else if(fx.kind==='evres'){
+    // 종목 끝: 이긴 팀과 승점을 크게 보이고 읽어 줌
+    BOARD.overlay = { kind:'evres', ev:fx.ev, res:fx.res, start:now() }; dur = RESULT_MS + 2000;
+    if(sound){ const d = SND.fanfare(); if(cfg.callVoice) setTimeout(() => SND.speak(evResSpeech(fx.ev, fx.res)), d*1000+300); dur = 9000; }
   }
   queueRender();
   BOARD.timer = setTimeout(finishFx, dur);
@@ -205,20 +214,37 @@ function finishFx(){
   const done = BOARD.overlay;
   BOARD.overlay = null; BOARD.busy = false;
   // 결과를 보여 준 뒤에는 다음 선수를 부름 (뒤에 결과가 더 밀려 있으면 마지막 결과 뒤에만)
-  if(done && done.kind==='result' && TEAM[done.m.event] && TEAM[done.m.event].mode!=='round' && !BOARD.queue.some(f => f.kind==='result' && f.m.event===done.m.event))
+  if(done && done.kind==='result' && TEAM[done.m.event] && TEAM[done.m.event].mode!=='round' && !BOARD.queue.some(f => f.kind==='result' && f.m.event===done.m.event) && !resultOf(done.m.event) && !eventStat(done.m.event).reached)
     BOARD.queue.unshift({ kind:'autocall', ev:done.m.event });
   queueRender(); runFx();
 }
 // 호출 문구: 몇 번째 뒤 선수인지 함께 말함 (ahead 1 다음, 2 다다음, 3 세 번째 뒤). 이름을 골라 부른 경우처럼 모르면 '준비해 주세요'만
-const aheadWord = a => (a > 0 && AHEAD_LABEL[a]) ? AHEAD_LABEL[a] + ' 선수' : '';
-function callLabel(kind, ahead){ if(kind==='now') return '📣 지금 나와 주세요'; const w = aheadWord(ahead); return `📣 ${w ? w + ', ' : ''}준비해 주세요`; }
-function ccallText(c){
-  const w = c.kind==='now' ? '' : aheadWord(c.ahead);
-  return `${w ? w + ', ' : ''}${teamName(c.team)} ${pname(c.pid)} 선수, ${c.kind==='now' ? '지금 경기장으로 나와 주세요.' : '준비해 주세요.'}`;
+const aheadWord = (a, grp) => (a > 0 && AHEAD_LABEL[a]) ? AHEAD_LABEL[a] + (grp ? ' 조' : ' 선수') : '';
+function callLabel(kind, ahead, grp){ if(kind==='now') return '📣 지금 나와 주세요'; const w = aheadWord(ahead, grp); return `📣 ${w ? w + ', ' : ''}준비해 주세요`; }
+// 호출 문서의 한 팀: { ids:[사람…], no:조 번호(조 대결만, 아니면 0) } (blue·red 는 첫 사람, 조 대결이면 blueIds·redIds·blueGroup·redGroup 도 있음)
+function callSide(c, team){
+  const ids = Array.isArray(c[team+'Ids']) && c[team+'Ids'].length ? c[team+'Ids'] : (c[team] ? [c[team]] : []);
+  return { ids, no: c[team+'Group'] || 0, grp: !!c[team+'Group'] };
 }
-function callText(blue, red, kind, ahead){
-  const w = kind==='now' ? '' : aheadWord(ahead == null ? 1 : ahead);
-  return `${w ? w + ', ' : ''}${teamName('blue')} ${pname(blue)}, ${teamName('red')} ${pname(red)} 선수, ${kind==='now' ? '지금 경기장으로 나와 주세요.' : '준비해 주세요.'}`;
+const ccIds = c => Array.isArray(c.pids) && c.pids.length ? c.pids : (c.pid ? [c.pid] : []);
+function ccallText(c){
+  const G = !!c.group, w = c.kind==='now' ? '' : aheadWord(c.ahead, G), tail = c.kind==='now' ? '지금 경기장으로 나와 주세요.' : '준비해 주세요.';
+  if(G) return `${w ? w + ', ' : ''}${teamName(c.team)} ${c.group}조 ${ccIds(c).map(pname).join(', ')}, ${tail}`;
+  return `${w ? w + ', ' : ''}${teamName(c.team)} ${pname(c.pid)} 선수, ${tail}`;
+}
+// 안내판 호출 문구: 한 사람씩이면 '청팀 ○○○, 홍팀 ○○○ 선수, 준비해 주세요.', 조 대결이면 '청팀 2조 ○○○, ○○○. 홍팀 2조 ○○○, ○○○. 준비해 주세요.'
+function callText(c, ahead){
+  const kind = c.kind, sb = callSide(c, 'blue'), sr = callSide(c, 'red'), G = !!(sb.no || sr.no);
+  const w = kind==='now' ? '' : aheadWord(ahead == null ? 1 : ahead, G), tail = kind==='now' ? '지금 경기장으로 나와 주세요.' : '준비해 주세요.';
+  const nm = s => s.ids.map(pname).join(', ');
+  if(G) return `${w ? w + ', ' : ''}${teamName('blue')} ${sb.no}조 ${nm(sb)}. ${teamName('red')} ${sr.no}조 ${nm(sr)}. ${tail}`;
+  return `${w ? w + ', ' : ''}${teamName('blue')} ${nm(sb)}, ${teamName('red')} ${nm(sr)} 선수, ${tail}`;
+}
+// 종목 끝 낭독
+function evResSpeech(ev, res){
+  const E = TEAM[ev], tot = totalPoints(), st = eventStat(ev);
+  const sc = st.metric==='sum' ? `${sumLabel(st.unit)} ${teamName('blue')} ${fmtNum(res.blue)}, ${teamName('red')} ${fmtNum(res.red)}.` : `${teamName('blue')} ${res.blue}승, ${teamName('red')} ${res.red}승.`;
+  return `${E.name} 끝. ${sc} ${teamName(res.winner)} ${res.decider ? '결정전 ' : ''}승리, 승점 ${E.pts||1}점. 전체 승점 ${teamName('blue')} ${tot.blue}, ${teamName('red')} ${tot.red}.`;
 }
 // 깜빡임: 다시 그려도 애니메이션이 처음부터 다시 시작되지 않게 시작 시각만큼 앞당김
 function flashAttr(start, dur=FLASH_MS){
@@ -246,35 +272,48 @@ function boardScreen(){
   const key = T.kind + (T.ev || '') + (BOARD.person ? 'P' : '');
   return `<div class="bd ${fixed?'bdfix':''}${pc?' bdpc':''}"${pc ? ` data-fit="1" data-fskey="${key}"${T.kind==='indiv' && !BOARD.person ? ' data-fsmax="44"' : ''}` : ''}>${pc ? body + annStrip : annStrip + body}</div>${boardOverlay()}${soundHint}`;
 }
+// 안내판에 보일 한 팀의 출전자: 한 사람이면 이름, 조이면 '2조' 와 조원
+function bdSide(ev, tm, key){
+  const ids = unitIds(ev, tm, key), G = groupSize(ev);
+  return { key, ids, no: unitNo(ev, tm, key), grp: G > 0, names: ids.map(pname).join('·') };
+}
 function boardTeam(ev){
-  const E = TEAM[ev], t = tally(ev), tot = totalPoints(), n = matchesOf(ev).length + 1;
-  const head = `<div class="bdhead"><span class="bic">${E.icon}</span><h1>${esc(E.name)}</h1><span class="bsub">${E.mode==='round'?`${n}판째`:`${n}번째 대결`}</span><span class="grow"></span>
-    <div class="bscore">${teamBadge('blue',true)}<span class="n blue">${t.blue}</span><span class="c">:</span><span class="n red">${t.red}</span>${teamBadge('red',true)}</div></div>`;
+  const E = TEAM[ev], st = eventStat(ev), tot = totalPoints(), res = resultOf(ev), stale = res && resultStale(ev), G = groupSize(ev), n = st.count + 1;
+  const lap = lapsOn(ev) ? lapInfo(ev) : null;
+  const sub = E.mode==='round' ? `${n}판째` : lap ? `${lap.lap}바퀴째` : E.bag ? `${Math.min(n, BEANBAG_ROUNDS)}번째 판` : `${n}번째 대결`;
+  const unitTag = st.metric==='sum' ? `<small class="bu">${esc(st.unit)} 합계</small>` : `<small class="bu">${E.bag ? '승' : ''}</small>`;
+  const head = `<div class="bdhead"><span class="bic">${E.icon}</span><h1>${esc(E.name)}</h1><span class="bsub">${res ? '종목 끝' : sub}</span><span class="grow"></span>
+    <div class="bscore">${teamBadge('blue',true)}<span class="n blue">${fmtNum(st.blue)}</span><span class="c">:</span><span class="n red">${fmtNum(st.red)}</span>${teamBadge('red',true)}${st.metric==='sum' ? unitTag : ''}</div></div>`;
+  const endStrip = res ? `<div class="bdend ${res.winner}"><b>🏁 ${esc(E.name)} 끝</b><span>${esc(teamName(res.winner))} 승${res.decider ? ' (결정전)' : ''} · 승점 ${E.pts||1}점</span></div>` : '';
   const foot = `<div class="bdfoot"><b>전체 승점</b><span class="tot blue">${esc(teamName('blue'))} ${tot.blue}</span><span class="tot red">${esc(teamName('red'))} ${tot.red}</span>
-    <span class="grow"></span>${Object.entries(TEAM).filter(([k]) => k!==ev).map(([k,X]) => { const x = tally(k); return `<span class="mini">${X.icon} ${x.blue}:${x.red}</span>`; }).join('')}</div>`;
-  if(E.mode==='round') return head + `<div class="bdvs round"><div class="bp blue"><div class="lbl">${esc(teamName('blue'))}</div><div class="nm">${t.blue}승</div></div><div class="vsm">VS</div><div class="bp red"><div class="lbl">${esc(teamName('red'))}</div><div class="nm">${t.red}승</div></div></div>` + foot;
+    <span class="grow"></span>${Object.entries(TEAM).filter(([k]) => k!==ev).map(([k,X]) => { const x = eventStat(k), r = resultOf(k); return `<span class="mini${r ? ' fin' : ''}">${X.icon} ${fmtNum(x.blue)}:${fmtNum(x.red)}${r ? ' ✓' : ''}</span>`; }).join('')}</div>`;
+  if(E.mode==='round') return head + endStrip + `<div class="bdvs round"><div class="bp blue"><div class="lbl">${esc(teamName('blue'))}</div><div class="nm">${st.blue}승</div></div><div class="vsm">VS</div><div class="bp red"><div class="lbl">${esc(teamName('red'))}</div><div class="nm">${st.red}승</div></div></div>` + foot;
   const b = upNext(ev,'blue'), r = upNext(ev,'red');
-  // 위쪽 호출 띠: 심판이 부른 선수(30초) 또는 다음 선수
+  // 위쪽 호출 띠: 심판이 부른 선수(조)(30초) 또는 다음 선수(조)
   const fx = BOARD.callFx && BOARD.callFx.ev===ev && now()-BOARD.callFx.start < CALL_MS ? BOARD.callFx : null;
   const pa = prepAhead(), pb = upcoming(ev,'blue',pa), pr = upcoming(ev,'red',pa);
-  const cb = fx ? fx.blue : pb, cr = fx ? fx.red : pr, kind = fx ? fx.kind : 'next';
+  const cb = fx ? fx.b : (pb ? bdSide(ev, 'blue', pb) : null), cr = fx ? fx.r : (pr ? bdSide(ev, 'red', pr) : null), kind = fx ? fx.kind : 'next';
+  const cn = s => s.grp ? `<span class="gno">${s.no}조</span> ${s.ids.map(i => esc(pname(i))).join('·')}` : s.ids.map(i => esc(pname(i))).join('·');
   const cc = BOARD.ccFx && BOARD.ccFx.ev===ev && now()-BOARD.ccFx.start < CALL_MS ? BOARD.ccFx : null;
-  const ccbar = cc ? `<div class="callbar one ${cc.kind==='now'?'now':''}"${flashAttr(cc.start)}><div class="cl">${callLabel(cc.kind, cc.ahead)}</div>
-      <div class="cp">${teamBadge(cc.team,true)}<b>${esc(teamName(cc.team))} ${esc(pname(cc.pid))}</b></div></div>` : '';
-  const call = cb && cr ? `<div class="callbar ${kind==='now'?'now':''}"${fx ? flashAttr(fx.start) : ''}>
-      <div class="cl">${callLabel(kind, fx ? fx.ahead : pa)}</div>
-      <div class="cp">${teamBadge('blue',true)}<b>${esc(pname(cb))}</b></div><div class="cp">${teamBadge('red',true)}<b>${esc(pname(cr))}</b></div></div>` : '';
-  const ord = tm => orderFor(ev, tm);
+  const ccbar = cc ? `<div class="callbar one ${cc.kind==='now'?'now':''}${cc.group ? ' grp' : ''}"${flashAttr(cc.start)}><div class="cl">${callLabel(cc.kind, cc.ahead, !!cc.group)}</div>
+      <div class="cp">${teamBadge(cc.team,true)}<b>${esc(teamName(cc.team))} ${cc.group ? `<span class="gno">${cc.group}조</span> ` : ''}${ccIds(cc).map(i => esc(pname(i))).join('·')}</b></div></div>` : '';
+  const callG = !!(cb && cb.grp);
+  const call = cb && cb.ids.length && cr && cr.ids.length && !res ? `<div class="callbar ${kind==='now'?'now':''}${callG ? ' grp' : ''}"${fx ? flashAttr(fx.start) : ''}>
+      <div class="cl">${callLabel(kind, fx ? fx.ahead : pa, callG)}</div>
+      <div class="cp">${teamBadge('blue',true)}<b>${cn(cb)}</b></div><div class="cp">${teamBadge('red',true)}<b>${cn(cr)}</b></div></div>` : '';
   const tg = teamOpt(ev).board, mk = tg ? marksOf(ev) : null;
-  const bp = (tm, id) => `<div class="bp ${tm}"><div class="lbl">${esc(teamName(tm))}${id?` ${ord(tm).indexOf(id)+1}번`:''}</div><div class="nm">${id?esc(pname(id)):'-'}</div>${mk ? `<div class="bcnt">던진 개수 <b>${markCount(mk, tm)}</b></div>` : ''}</div>`;
+  const bp = (tm, key) => { const sd = key ? bdSide(ev, tm, key) : null;
+    return `<div class="bp ${tm}${G ? ' grp' : ''}"><div class="lbl">${esc(teamName(tm))}${sd ? (G ? ` ${sd.no}조` : ` ${sd.no}번`) : ''}</div><div class="nm">${sd ? esc(sd.names) : '-'}</div>${mk ? `<div class="bcnt">던진 개수 <b>${markCount(mk, tm)}</b></div>` : ''}</div>`; };
   // 다다음 선수를 부르는 경우, 그 사이의 다음 경기도 작게 보여 줌
-  const nextLine = pa > 1 && b.next && r.next ? `<span class="bdnext">다음 경기 ${teamBadge('blue')} ${esc(pname(b.next))} · ${teamBadge('red')} ${esc(pname(r.next))}</span>` : '';
+  const nb = pa > 1 ? upcoming(ev,'blue',1) : null, nr = pa > 1 ? upcoming(ev,'red',1) : null;
+  const nextLine = nb && nr ? `<span class="bdnext">다음 경기 ${teamBadge('blue')} ${esc(unitNames(ev,'blue',nb))} · ${teamBadge('red')} ${esc(unitNames(ev,'red',nr))}</span>` : '';
   // 과녁판 중계 종목: 지금 선수 옆(가로 화면) 또는 아래(세로 화면)에 과녁판을 크게 띄움
   const duelHtml = `<div class="bdvs">${bp('blue', b.cur)}<div class="vsm">VS</div>${bp('red', r.cur)}</div>`;
   const mid = tg ? `<div class="bdsplit">${duelHtml}${tgtBoardHtml(ev, { legend:false })}</div>` : duelHtml;
+  const label = `<div class="bdlabel">${res ? '마지막 경기' : '지금 경기'}${nextLine}</div>`;
   // PC·프로젝터(무대 위 높은 화면)는 호출 띠를 아래쪽에 둠
-  if(bdPC()) return head + `<div class="bdlabel">지금 경기${nextLine}</div>` + mid + foot + ccbar + call;
-  return ccbar + call + head + `<div class="bdlabel">지금 경기${nextLine}</div>` + mid + foot;
+  if(bdPC()) return head + endStrip + label + mid + foot + ccbar + call;
+  return ccbar + call + head + endStrip + label + mid + foot;
 }
 function boardIndiv(){
   const ps = people(), pc = bdPC();
@@ -331,13 +370,27 @@ function boardOverlay(){
   const o = BOARD.overlay; if(!o) return '';
   // PC·프로젝터 화면: 겹쳐 뜨는 화면도 글자 크기를 화면에 꼭 맞춤
   const pc = bdPC(), ca = k => pc ? ` bdpc" data-fit="1" data-fskey="ovl-${k}` : '';
-  if(o.kind==='ccall') return `<div class="ovl ccall ${o.c.team}${ca('ccall')}" data-a="bdDismiss"${flashAttr(o.start)}><div class="lbl">${callLabel(o.c.kind, o.c.ahead)}</div>
-    <div class="who"><span class="tn">${esc(teamName(o.c.team))}</span></div><div class="nm">${esc(pname(o.c.pid))}</div><div class="ovev2">${EVENTS[o.c.event] ? `${EVENTS[o.c.event].icon} ${esc(EVENTS[o.c.event].name)}` : ''}</div></div>`;
+  if(o.kind==='ccall') return `<div class="ovl ccall ${o.c.team}${ca('ccall')}" data-a="bdDismiss"${flashAttr(o.start)}><div class="lbl">${callLabel(o.c.kind, o.c.ahead, !!o.c.group)}</div>
+    <div class="who"><span class="tn">${esc(teamName(o.c.team))}</span></div><div class="nm">${o.c.group ? `${o.c.group}조 ` : ''}${ccIds(o.c).map(i => esc(pname(i))).join('·')}</div><div class="ovev2">${EVENTS[o.c.event] ? `${EVENTS[o.c.event].icon} ${esc(EVENTS[o.c.event].name)}` : ''}</div></div>`;
   if(o.kind==='ann') return `<div class="ovl ann${ca('ann')}" data-a="bdDismiss"${flashAttr(o.start)}><div class="lbl">📢 안내</div><div class="txt">${esc(o.ann.text)}</div></div>`;
+  if(o.kind==='evres'){
+    const E = TEAM[o.ev]; if(!E) return '';
+    const res = o.res, w = res.winner, l = w==='blue' ? 'red' : 'blue', tot = totalPoints(), st = eventStat(o.ev);
+    const line = st.metric==='sum' ? `${esc(sumLabel(st.unit))} ${fmtNum(res.blue)} : ${fmtNum(res.red)}` : `${esc(teamName('blue'))} ${res.blue}승 : ${res.red}승 ${esc(teamName('red'))}`;
+    return `<div class="ovl result evres${ca('evres')}" data-a="bdDismiss"><div class="ovev">${E.icon} ${esc(E.name)} 끝</div>
+      <div class="half win ${w}"${flashAttr(o.start)}><div class="big">🏆 ${esc(teamName(w))} 승리</div><div class="nm">${res.decider ? '결정전 승리 · ' : ''}승점 ${E.pts||1}점</div><div class="osc">${line}</div></div>
+      <div class="half lose"><div class="big">전체 승점 ${tot.blue} : ${tot.red}</div><div class="nm">${esc(teamName('blue'))} ${tot.blue}점 · ${esc(teamName('red'))} ${tot.red}점</div></div></div>`;
+  }
   const m = o.m, E = TEAM[m.event]; if(!E) return '';
-  // 대결 점수를 기록한 경우 '3 : 2' (왼쪽 청팀 · 오른쪽 홍팀)
-  const osc = scoreTxt(m) ? `<div class="osc">${teamBadge('blue',true)} ${scoreTxt(m)} ${teamBadge('red',true)}</div>` : '';
-  const nm = tm => E.mode==='round' ? '' : esc(pname(tm==='blue' ? m.blueId : m.redId));
+  const sumEv = metricOf(m.event)==='sum' && m.blueScore != null && m.redScore != null;
+  const G = groupSize(m.event);
+  const who = tm => { const nm = matchNames(m, tm); return nm ? ((G && m[tm+'Group']) ? `${m[tm+'Group']}조 ${nm}` : nm) : ''; };
+  // 점수·핀 합계 종목은 '홍길동 7핀 : 김철수 5핀', 그 밖에 점수를 기록했으면 '3 : 2' (왼쪽 청팀 · 오른쪽 홍팀)
+  const u = sumEv ? esc(evUnit(m.event)) : '';
+  const osc = sumEv && G ? `<div class="osc names col">${TEAM_KEYS.map(k => `<div class="ol">${teamBadge(k,true)} <span>${esc(who(k))}</span> <b>${fmtNum(m[k+'Score'])}${u}</b></div>`).join('')}</div>`
+    : sumEv ? `<div class="osc names">${teamBadge('blue',true)} ${esc(who('blue'))} ${fmtNum(m.blueScore)}${u} <span class="c">:</span> ${esc(who('red'))} ${fmtNum(m.redScore)}${u} ${teamBadge('red',true)}</div>`
+    : (scoreTxt(m) ? `<div class="osc">${teamBadge('blue',true)} ${scoreTxt(m)} ${teamBadge('red',true)}</div>` : '');
+  const nm = tm => (E.mode==='round' || sumEv) ? '' : esc(who(tm));
   const tm = tmk => E.mode==='time' ? `<div class="tm">${fmtSec(tmk==='blue' ? m.blueTime : m.redTime)}초</div>` : '';
   const head = `<div class="ovev">${E.icon} ${esc(E.name)}</div>`;
   if(m.winner==='draw') return `<div class="ovl result${ca('result')}" data-a="bdDismiss">${head}<div class="half draw"${flashAttr(o.start)}><div class="big">무승부</div>${osc}</div>
@@ -392,7 +445,7 @@ function awardsControl(){
     <p class="sub">안내판을 시상식 화면으로 바꾸고, 종목별 3등 → 2등 → 1등, 마지막에 종합 우승 순서로 한 단계씩 발표합니다. 발표할 때마다 팡파르와 함께 이름을 읽어 줍니다.</p>
     <div class="row twobtn">${on ? '' : '<button class="btn primary grow" data-a="awStart">🏆 시상식 화면으로 바꾸기</button>'}
       ${on ? `<button class="btn grow" data-a="awStep" data-v="-1" ${i<0?'disabled':''}>◀ 이전</button><button class="btn primary grow" data-a="awStep" data-v="1" ${i>=steps.length-1?'disabled':''}>다음 발표 ▶</button><button class="btn" data-a="awEnd">끝내기</button>` : ''}</div>
-    <div class="list awlist">${steps.map((s,k) => `<div class="item ${k===i?'cur':''} ${k<i?'done':''}"><span class="no tag">${k+1}</span><span class="name">${esc(awardLabel(s))}<span class="sub">${s.kind==='team' ? `${esc(teamName('blue'))} ${s.tot.blue} : ${s.tot.red} ${esc(teamName('red'))}` : s.winners.map(x => esc(x.p.name)+' '+sc(s.ev, x.total)).join(', ')}</span></span>${k===i?'<span class="tag dark">지금 발표</span>':''}</div>`).join('')}</div></div>`;
+    <div class="list awlist">${steps.map((s,k) => `<div class="item ${k===i?'cur':''} ${k<i?'done':''}"><span class="no tag">${k+1}</span><span class="name">${esc(awardLabel(s))}<span class="sub">${s.kind==='team' ? `${esc(teamName('blue'))} ${s.tot.blue} : ${s.tot.red} ${esc(teamName('red'))}` : s.winners.map(x => esc(x.p.name)+' '+sc(s.ev, x.total)).join(', ')}</span></span>${k===i?'<span class="tag dark">지금 발표</span>':''}</div>`).join('')}</div></div>${lastPlaceCard()}`;
 }
 
 /* ---------- 시상식 ---------- */

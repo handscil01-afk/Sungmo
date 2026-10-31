@@ -9,7 +9,7 @@ const UI = {
   mtab: ls.get('udh5_mtab', 'game'),          // 마스터 아래 메뉴
   ev: ls.get('udh5_ev', 'tuho'),              // 고른 종목 탭
   stab: ls.get('udh5_stab', ''),             // 여러 역할을 가진 기기의 역할 탭 (coach / ev:종목 / timer:종목)
-  coachEv: ls.get('udh5_cev', 'gymball'),     // 감독 화면에서 고른 단체전 종목
+  coachEv: ls.get('udh5_cev', ''),             // 감독 화면에서 고른 단체전 종목 (없어진 종목이면 rebuildEvents 가 첫 종목으로)
   sub: {},                                    // 종목별 보조 화면 (단체전: play/order, 개인전: enter/rank)
   round: { archery:'main', freeball:'main', tuho:'main' },
   lanes: ls.get('udh5_lanes2', { archery:[], freeball:[], tuho:[] }),
@@ -95,17 +95,61 @@ const recsOf = (ev, pid) => ({ p1: rec(ev,'p1',pid), p2: rec(ev,'p2',pid), main:
 // 지운 사람을 뺀 대기 순서
 function qList(ev){ const q = D.queues[ev]; return ((q && Array.isArray(q.list)) ? q.list : []).filter(id => { const p = person(id); return !!p && !p.deleted; }); }
 
-/* ===================== 단체전 ===================== */
+/* ===================== 단체전 =====================
+   종목마다 이긴 팀에 승점 pts(기본 1)점. 종목 성적(eventStat)은 이긴 횟수(wins) 또는 점수·핀 합계(sum)이고,
+   심판이 '결과 확정'을 누르면 main/calls/{종목}.result 에 저장되어 그때부터 승점으로 셈 */
 function matchesOf(ev){ return D.matches.filter(m => m.event===ev && !m.deleted).sort((a,b)=>(a.at||0)-(b.at||0)); }
 function tally(ev){ const t={red:0,blue:0,draw:0}; matchesOf(ev).forEach(m => { if(t[m.winner]!=null) t[m.winner]++; }); return t; }
-// 승점: 이긴 판 수에 종목의 승점(pts, 기본 1)을 곱해서 더함
-function totalPoints(){ const t={red:0,blue:0}; Object.keys(TEAM).forEach(ev => { const x=tally(ev), p=TEAM[ev].pts||1; t.red+=x.red*p; t.blue+=x.blue*p; }); return t; }
+const groupSize = ev => (TEAM[ev] && TEAM[ev].group) || 0;                       // 한 조 인원 (0이면 한 사람씩)
+const beanbagMode = () => settings().beanbagMode==='B' ? 'B' : 'A';
+// 종목 성적 방식: 'sum' 점수(핀) 합계 / 'wins' 이긴 횟수. 콩주머니는 마스터가 고른 승부 방식(A 3선승, B 총점)을 따름
+function metricOf(ev){ const E = TEAM[ev]; if(!E) return 'wins'; return (E.agg==='sum' || (E.bag && beanbagMode()==='B')) ? 'sum' : 'wins'; }
+const evUnit = ev => metricOf(ev)==='sum' ? ((TEAM[ev] && TEAM[ev].unit) || '점') : '승';
+const r3n = v => Math.round(v*1000)/1000;
+// 종목 결과를 심판이 확정한 것 (없으면 null)
+function resultOf(ev){ const r = (D.calls[ev]||{}).result; return r && (r.winner==='blue' || r.winner==='red') ? r : null; }
+/* 종목 성적: { metric:'wins'|'sum', blue, red, unit('승'|'핀'|'점'), leader('blue'|'red'|null), done(판정할 수 있는 상태: 3선승 달성·5판 끝 등),
+   reached(콩주머니 A안에서 3선승 달성), count(기록한 대결·판 수), result(확정 정보 또는 null) } */
+function eventStat(ev){
+  const E = TEAM[ev] || {}, ms = matchesOf(ev), metric = metricOf(ev);
+  let blue = 0, red = 0;
+  if(metric==='sum') ms.forEach(m => { blue += parseFloat(m.blueScore) || 0; red += parseFloat(m.redScore) || 0; });
+  else { const t = tally(ev); blue = t.blue; red = t.red; }
+  blue = r3n(blue); red = r3n(red);
+  const reached = !!(E.bag && metric==='wins' && Math.max(blue, red) >= BEANBAG_WINS);
+  const done = E.bag && metric==='wins' ? (reached || ms.length >= BEANBAG_ROUNDS) : ms.length > 0;
+  return { metric, blue, red, unit: evUnit(ev), leader: blue>red ? 'blue' : red>blue ? 'red' : null, done, reached, count: ms.length, result: resultOf(ev) };
+}
+// 확정한 뒤에 기록이 바뀌었는가 (확정 당시 성적과 지금 성적이 다름)
+function resultStale(ev){
+  const r = resultOf(ev); if(!r) return false;
+  const s = eventStat(ev);
+  return Math.abs((+r.blue||0) - s.blue) > 1e-9 || Math.abs((+r.red||0) - s.red) > 1e-9;
+}
+// 승점: 확정된 종목의 이긴 팀에 그 종목의 승점(pts, 기본 1)을 줌
+function totalPoints(){ const t={red:0,blue:0}; Object.keys(TEAM).forEach(ev => { const r = resultOf(ev); if(r) t[r.winner] += (TEAM[ev].pts||1); }); return t; }
+// 성적 글: '이가네 3승 · 함씨네 2승' / '핀 합계 37 : 41' / '점수 합계 5 : 3'
+const sumLabel = unit => unit==='점' ? '점수 합계' : `${unit} 합계`;
+function statText(ev, st = eventStat(ev)){
+  return st.metric==='sum' ? `${sumLabel(st.unit)} ${fmtNum(st.blue)} : ${fmtNum(st.red)}` : `${teamName('blue')} ${st.blue}승 · ${teamName('red')} ${st.red}승`;
+}
+// 종목 상태 글: '확정: 이가네 승' / '진행 중 (이가네 3승 · 함씨네 2승)' / '아직 시작 전'
+function evStatusText(ev){
+  const r = resultOf(ev); if(r) return `확정: ${teamName(r.winner)} 승`;
+  const st = eventStat(ev);
+  return st.count ? `진행 중 (${statText(ev, st)})` : '아직 시작 전';
+}
+// 종목 성적 한 줄: 승점 표기 '승점 2 : 1'
+const ptsText = tot => `승점 ${tot.blue} : ${tot.red}`;
+
 // 종목별 설정: 과녁판 중계(board)·대결 점수 기록(score). 기본 종목은 마스터 설정(events.opt), 만든 종목은 자기 설정을 따름. 콩주머니만 과녁판이 기본으로 켜짐
+// 대결 점수가 정해져 있는 종목(볼링, 콩주머니 B안)은 항상 점수로 기록
 function teamOpt(ev){
   const E = TEAM[ev]; if(!E) return { board:false, score:false };
   if(E.custom) return { board: !!E.board && E.mode==='duel', score: !!E.score && E.mode!=='time' };
   const o = (((D.config.events||{}).opt)||{})[ev] || {};
-  return { board: (o.board ?? (ev==='beanbag')) && E.mode==='duel', score: !!(o.score ?? false) && E.mode!=='time' };
+  const score = E.scoreFixed ? metricOf(ev)==='sum' : (!!(o.score ?? false) && E.mode!=='time');
+  return { board: (o.board ?? (ev==='beanbag')) && E.mode==='duel', score };
 }
 // 과녁판 위에 찍은 표시 {list:[{t,x,y,n}], first}
 function marksOf(ev){ const m = (D.calls[ev]||{}).marks || {}; return { list: Array.isArray(m.list) ? m.list : [], first: m.first==='red' ? 'red' : 'blue', addN:m.addN||0, addAt:m.addAt||0, at:m.at||0 }; }
@@ -122,41 +166,117 @@ function orderFor(ev, team){
   members(team).forEach(id => { if(!list.includes(id)) list.push(id); });
   return list;
 }
-function plays(ev, team){
-  const c={}; matchesOf(ev).forEach(m => { const id = team==='red'? m.redId : m.blueId; if(id) c[id]=(c[id]||0)+1; }); return c;
+// 대결 기록에 들어 있는 한 팀의 사람들 (조 대결은 blueIds·redIds, 그 밖은 blueId·redId)
+function matchIds(m, team){
+  const a = m[team+'Ids']; if(Array.isArray(a) && a.length) return a;
+  const id = m[team+'Id']; return id ? [id] : [];
 }
-// 출전 횟수가 가장 적은 사람 중 순서가 빠른 사람이 지금 선수, 그다음이 다음 선수
-function upNext(ev, team){
-  const c = plays(ev, team);
-  let q = orderFor(ev, team).map((id,i) => ({ id, i, n:c[id]||0 })).sort((a,b) => a.n-b.n || a.i-b.i);
+// '홍길동' 또는 조 대결은 '홍길동·김철수'
+function matchNames(m, team, sep = '·'){
+  const ids = matchIds(m, team); if(ids.length) return ids.map(pname).join(sep);
+  return m[team+'Name'] || '';
+}
+// 사람별 출전 횟수 (조 대결은 조원 모두에게 셈)
+function plays(ev, team){
+  const c={}; matchesOf(ev).forEach(m => matchIds(m, team).forEach(id => { c[id]=(c[id]||0)+1; })); return c;
+}
+
+/* ---------- 출전 단위: 한 사람(일반 종목) 또는 한 조(콩주머니) ----------
+   단위의 key 는 한 사람이면 사람 번호, 조이면 'g1'·'g2'… (심판이 고른 선수 calls.pick 도 이 key 로 저장) */
+// 조 편성 전체: 감독이 정한 순서(orderFor)를 앞에서부터 size명씩 자르고, 마지막에 모자란 사람이 남으면 앞 조에 붙임 (2명씩이면 마지막 3명)
+// 조 번호는 불참을 빼기 전의 전체 순서로 정하므로 불참이 생겨도 번호가 흔들리지 않음. ids: 불참을 뺀 조원
+function cutGroups(ev, team){
+  const size = groupSize(ev); if(!size) return [];
+  const ord = orderFor(ev, team), cut = [];
+  for(let i = 0; i < ord.length; i += size) cut.push(ord.slice(i, i + size));
+  if(cut.length > 1 && cut[cut.length-1].length < size) cut[cut.length-2].push(...cut.pop());
+  return cut.map((all, i) => ({ no:i+1, key:'g'+(i+1), all, ids: all.filter(id => !isAbsent(id)) }));
+}
+// 경기에 나올 조: 조원이 모두 불참인 조는 뺌 (모두 불참이면 그대로 둠)
+function groupsFor(ev, team){
+  const all = cutGroups(ev, team), present = all.filter(g => g.ids.length);
+  return present.length ? present : all.map(g => ({ ...g, ids: g.all }));
+}
+// 경기에 나올 단위 목록: [{ key, ids, no(조 번호 또는 순서 번호), i }]
+function unitList(ev, team){
+  if(groupSize(ev)) return groupsFor(ev, team).map((g, i) => ({ key:g.key, ids:g.ids, no:g.no, i }));
+  const ord = orderFor(ev, team);
+  let c = ord.map((id, i) => ({ id, i })).filter(x => !isAbsent(x.id));
   // 불참으로 표시한 사람은 건너뜀 (모두 불참이면 그대로)
-  if(q.some(x => !isAbsent(x.id))) q = q.filter(x => !isAbsent(x.id));
+  if(!c.length) c = ord.map((id, i) => ({ id, i }));
+  return c.map(x => ({ key:x.id, ids:[x.id], no:x.i+1, i:x.i }));
+}
+// 단위별 출전 횟수 (key 기준)
+function unitPlays(ev, team){
+  const c = {}, G = groupSize(ev);
+  matchesOf(ev).forEach(m => {
+    const v = G ? (team==='red' ? m.redGroup : m.blueGroup) : (team==='red' ? m.redId : m.blueId);
+    if(v==null || v==='') return;
+    const k = G ? 'g'+v : v; c[k] = (c[k]||0) + 1;
+  });
+  return c;
+}
+const unitIds = (ev, team, key) => {
+  if(!key) return [];
+  if(groupSize(ev)){ const g = groupsFor(ev, team).find(x => x.key===key); return g ? g.ids : []; }
+  return [key];
+};
+// 순서 번호(한 사람) 또는 조 번호
+const unitNo = (ev, team, key) => {
+  if(!key) return 0;
+  if(groupSize(ev)){ const g = cutGroups(ev, team).find(x => x.key===key); return g ? g.no : 0; }
+  return orderFor(ev, team).indexOf(key) + 1;
+};
+// '홍길동' 또는 조는 '홍길동·김철수'
+const unitNames = (ev, team, key, sep = '·') => unitIds(ev, team, key).map(pname).join(sep);
+// '홍길동' 또는 조는 '2조: 홍길동·김철수'
+const unitTitle = (ev, team, key) => { if(!key) return ''; return groupSize(ev) ? `${unitNo(ev, team, key)}조: ${unitNames(ev, team, key)}` : pname(key); };
+
+// 출전 횟수가 가장 적은 단위 중 순서가 빠른 것이 지금 선수(조), 그다음이 다음 선수(조)
+function upNext(ev, team){
+  const c = unitPlays(ev, team);
+  const q = unitList(ev, team).map(u => ({ id:u.key, i:u.i, n:c[u.key]||0 })).sort((a,b) => a.n-b.n || a.i-b.i);
   if(!q.length) return { cur:null, next:null };
-  // 심판이 '선수 바꾸기'로 고른 사람 (모든 기기가 같이 봄)
+  // 심판이 '선수 바꾸기'로 고른 선수(조) (모든 기기가 같이 봄)
   const pick = ((D.calls[ev]||{}).pick||{})[team];
   const cur = (pick && q.some(x => x.id===pick)) ? pick : q[0].id;
   const rest = q.filter(x => x.id!==cur);
   return { cur, next: rest.length ? rest[0].id : cur, picked: cur!==q[0].id };
 }
 
-// 앞으로 나올 순서 n명: [지금, 다음, 다다음…]. 경기를 차례로 치른다고 셈해서, 팀원이 적으면 처음으로 돌아감
-const candOf = (ev, team) => { const ord = orderFor(ev, team), c = ord.filter(id => !isAbsent(id)); return c.length ? c : ord; };
+// 앞으로 나올 순서 n개: [지금, 다음, 다다음…]. 경기를 차례로 치른다고 셈해서, 팀원이 적으면 처음으로 돌아감 (볼링은 이렇게 두 번째 바퀴로 이어짐)
 function lineup(ev, team, n){
   const u = upNext(ev, team); if(!u.cur) return [];
-  const ord = orderFor(ev, team), cand = candOf(ev, team), c = { ...plays(ev, team) };
+  const keys = unitList(ev, team).map(x => x.key), c = { ...unitPlays(ev, team) };
   const out = [u.cur]; c[u.cur] = (c[u.cur]||0) + 1;
   while(out.length < n){
-    const id = cand.slice().sort((a,b) => (c[a]||0) - (c[b]||0) || ord.indexOf(a) - ord.indexOf(b))[0];
-    out.push(id); c[id] = (c[id]||0) + 1;
+    const k = keys.slice().sort((a,b) => (c[a]||0) - (c[b]||0) || keys.indexOf(a) - keys.indexOf(b))[0];
+    out.push(k); c[k] = (c[k]||0) + 1;
   }
   return out;
 }
-// 지금 선수에서 k번째 뒤에 나올 사람 (0 지금, 1 다음, 2 다다음…)
+// 안내판 호출에 실을 값: blue·red 는 첫 사람(예전 형식과 같음), 조 대결은 blueIds·redIds·blueGroup·redGroup 도 실음
+function unitCall(ev, bk, rk){
+  const bi = unitIds(ev, 'blue', bk), ri = unitIds(ev, 'red', rk), o = { blue: bi[0] || null, red: ri[0] || null };
+  if(groupSize(ev)){ o.blueIds = bi; o.redIds = ri; o.blueGroup = unitNo(ev, 'blue', bk); o.redGroup = unitNo(ev, 'red', rk); }
+  return o;
+}
+// 지금 선수에서 k번째 뒤에 나올 선수(조) (0 지금, 1 다음, 2 다다음…)
 const upcoming = (ev, team, k) => lineup(ev, team, Math.max(0,k)+1)[Math.max(0,k)] || null;
 // 두 팀 모두 한 번씩 나오려면 남은 대결 수 (지금 대결 포함)
 function remainingMatches(ev){
-  const left = team => { const pl = plays(ev, team); return candOf(ev, team).filter(id => !pl[id]).length; };
+  const left = team => { const pl = unitPlays(ev, team); return unitList(ev, team).filter(u => !pl[u.key]).length; };
   return Math.max(left('blue'), left('red'));
+}
+// 볼링처럼 한 바퀴를 돌고 이어서 다음 바퀴를 도는 종목: 지금 몇 번째 바퀴인지, 이 바퀴에 남은 대결 수(지금 포함), 이 바퀴를 이미 한 팀 수
+const lapsOn = ev => !!(TEAM[ev] && TEAM[ev].agg==='sum' && TEAM[ev].mode==='duel');
+function lapInfo(ev){
+  const teams = TEAM_KEYS.map(t => ({ us: unitList(ev, t), pl: unitPlays(ev, t) })).filter(x => x.us.length);
+  if(!teams.length) return { lap:1, left:0, started:0 };
+  const lap = 1 + Math.min(...teams.map(x => Math.min(...x.us.map(u => x.pl[u.key]||0))));
+  const left = Math.max(...teams.map(x => x.us.filter(u => (x.pl[u.key]||0) < lap).length));
+  const started = teams.reduce((n, x) => n + x.us.filter(u => (x.pl[u.key]||0) >= lap).length, 0);
+  return { lap, left, started };
 }
 
 /* ===================== 역할·권한 =====================
@@ -174,7 +294,7 @@ function normRole(r){
   return o;
 }
 const hasDuty = r => !!(r.coach || r.events.length || r.helpers.length || r.timers.length || r.monitor);
-// 운영 현황만 보는 기기 (점수·출석을 건드리지 않음)
+// 운영 현황만 보는 기기 (점수·불참 표시를 건드리지 않음. 전체 인원 출석 체크는 할 수 있음)
 const monitorOnly = r => !!r.monitor && !(r.coach || r.events.length || r.helpers.length || r.timers.length);
 function myRole(){
   if(D.amMaster) return { ...normRole(null), role:'master' };
@@ -205,8 +325,9 @@ const can = {
   record: ev => D.amMaster || refEvents().includes(ev),
   order: team => D.amMaster || myRole().coach===team,
   time: ev => D.amMaster || myRole().timers.includes(ev) || refEvents().includes(ev),
-  staff: () => D.amMaster || hasDuty(myRole()),
-  abs: () => D.amMaster || (hasDuty(myRole()) && !monitorOnly(myRole())),     // 출석(불참) 표시
+  staff: () => D.amMaster || hasDuty(myRole()) || !!myCh(),             // 무전 채널(셔틀 등)에 속한 기기도 문자·무전을 씀
+  abs: () => D.amMaster || (hasDuty(myRole()) && !monitorOnly(myRole())),     // 선수 불참 표시
+  att: () => D.amMaster || myRole().role==='staff',                         // 전체 인원 출석 체크 (운영 현황 전용 기기도 가능, 안내판·역할 대기는 불가)
   ccall: team => D.amMaster || myRole().coach===team,                      // 감독이 자기 팀 선수 부르기
 };
 

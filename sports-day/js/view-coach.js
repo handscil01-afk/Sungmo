@@ -3,11 +3,12 @@
 
 function coachView(team){
   const ev = UI.ev, other = team==='blue' ? 'red' : 'blue', tab = UI.coachTab || 'our';
-  const b = upNext(ev,'blue'), r = upNext(ev,'red');
+  const b = upNext(ev,'blue'), r = upNext(ev,'red'), G = groupSize(ev);
+  const now_ = (tm, u) => u.cur ? esc(G ? `${unitNo(ev, tm, u.cur)}조 ${unitNames(ev, tm, u.cur)}` : pname(u.cur)) : '-';
   return `<div class="fit">
     ${eventTabs(ORDER_EVENTS, 'cev', UI.coachEv, true)}
-    <div class="infobar coachinfo"><span class="sub">지금</span><b class="cn blue">${b.cur?esc(pname(b.cur)):'-'}</b><span class="sub">vs</span><b class="cn red">${r.cur?esc(pname(r.cur)):'-'}</b>
-      <span class="grow"></span>${scoreline(tally(ev))}<button class="btn small" data-a="coachCall" aria-label="우리 팀 선수 부르기">📣<span class="bl"> 부르기</span></button></div>
+    <div class="infobar coachinfo"><span class="sub">지금</span><b class="cn blue">${now_('blue', b)}</b><span class="sub">vs</span><b class="cn red">${now_('red', r)}</b>
+      <span class="grow"></span>${scoreline(ev)}<button class="btn small" data-a="coachCall" aria-label="${G ? '우리 팀 조 부르기' : '우리 팀 선수 부르기'}">📣<span class="bl"> 부르기</span></button></div>
     <div class="seg sm coachseg"><button class="${tab!=='opp'?'on':''}" data-a="coachTab" data-v="our">우리 팀 순서 짜기</button><button class="${tab==='opp'?'on':''}" data-a="coachTab" data-v="opp">${esc(teamName(other))} 순서 보기</button></div>
     <div class="coachfit">${orderPanel(ev, team, tab!=='opp')}${oppPanel(ev, other, tab==='opp')}</div>
   </div>`;
@@ -22,21 +23,26 @@ function orderBoth(ev){
   </div>`;
 }
 // 순서 짜기: 위쪽 줄은 넣을 팀원(누르면 맨 뒤, 끌면 원하는 자리), 아래는 출전 순서(손잡이로 옮기기)
+// 조 대결 종목에서 사람마다 몇 조인지: { 사람 번호: 조 번호 }
+function groupMap(ev, team){ const m = {}; cutGroups(ev, team).forEach(g => g.all.forEach(id => { m[id] = g.no; })); return m; }
+const groupNote = ev => groupSize(ev) ? `<div class="sub psub gnote">순서대로 ${groupSize(ev)}명씩 한 조가 됩니다. 마지막에 한 명이 남으면 앞 조에 붙어 세 명이 됩니다.</div>` : '';
 function orderPanel(ev, team, sel){
-  const saved = orderSaved(ev, team), pl = plays(ev, team), u = upNext(ev, team);
+  const saved = orderSaved(ev, team), pl = plays(ev, team), u0 = upNext(ev, team), G = groupSize(ev), gm = G ? groupMap(ev, team) : {};
+  const cs = new Set(G ? unitIds(ev, team, u0.cur) : [u0.cur]), ns = new Set(G ? unitIds(ev, team, u0.next) : [u0.next]);
   const pool = members(team).filter(id => !saved.includes(id));
   const rows = saved.map((id,i) => {
-    const locked = !!pl[id];
-    return `<div class="orow ${id===u.cur?'cur':''} ${locked?'done':''}" data-oid="${id}">
+    const locked = !!pl[id], gst = G && (i===0 || gm[saved[i-1]]!==gm[id]);
+    return `<div class="orow ${cs.has(id)?'cur':''} ${locked?'done':''} ${gst?'gstart':''}" data-oid="${id}">
       ${locked ? '<span class="handle off" title="경기를 마쳐 고정됨">✓</span>' : `<span class="handle" data-drag="order" data-id="${id}" aria-label="끌어서 옮기기">⠿</span>`}
-      <span class="no">${i+1}</span><span class="name">${esc(pname(id))}</span>
-      ${id===u.cur?'<span class="tag dark">지금</span>':id===u.next?'<span class="tag warn">다음</span>':''}${locked?`<span class="tag ok">${pl[id]}회</span>`:''}${isAbsent(id)?'<span class="tag red">불참</span>':''}
+      <span class="no">${i+1}</span>${G ? `<span class="gtag g${(gm[id]||1)%2}">${gm[id]||'-'}조</span>` : ''}<span class="name">${esc(pname(id))}</span>
+      ${cs.has(id)?'<span class="tag dark">지금</span>':ns.has(id)?'<span class="tag warn">다음</span>':''}${locked?`<span class="tag ok">${pl[id]}회</span>`:''}${isAbsent(id)?'<span class="tag red">불참</span>':''}
       ${locked ? '' : `<button class="xbtn" data-a="oremove" data-t="${team}" data-v="${id}" aria-label="순서에서 빼기">✕</button>`}</div>`;
   }).join('');
   // 위쪽: 정한 출전 순서(번호), 아래쪽: 아직 넣지 않은 팀원(가나다순, 왼쪽부터 빈틈없이)
   return `<div class="cpanel ${sel?'sel':''}">
     <div class="ptitle">${teamBadge(team)} <b>${esc(teamName(team))} 출전 순서</b><span class="tag">${saved.length}/${members(team).length}명</span><span class="grow"></span>
       ${saved.length ? `<button class="btn small" data-a="ocopy" data-t="${team}">다른 종목에도</button><button class="btn small danger" data-a="oclear" data-t="${team}">비우기</button>` : ''}</div>
+    ${groupNote(ev)}
     <div class="dropzone order box" data-zone="order" data-t="${team}">${rows || '<div class="empty dz-empty">아래 팀원을 누르면 차례대로 번호가 붙어 여기에 들어옵니다. 끌어다 놓으면 원하는 자리에 넣습니다.</div>'}</div>
     <div class="ptitle pooltitle"><b>넣을 팀원</b><span class="sub">가나다순 · 누르면 맨 뒤에 추가</span></div>
     <div class="dropzone pool" data-zone="pool" data-t="${team}">
@@ -48,34 +54,39 @@ function orderPanel(ev, team, sel){
 }
 // 상대 팀 순서 (보기만)
 function oppPanel(ev, team, sel){
-  const ord = orderFor(ev, team), saved = orderSaved(ev, team), pl = plays(ev, team), u = upNext(ev, team);
-  const rows = ord.map((id,i) => `<div class="item ${id===u.cur?'cur':''} ${pl[id]?'done':''}"><span class="no">${i+1}</span><span class="name">${esc(pname(id))}</span>
-      ${id===u.cur?'<span class="tag dark">지금</span>':id===u.next?'<span class="tag warn">다음</span>':''}${pl[id]?`<span class="tag ok">✓ ${pl[id]}회</span>`:''}${saved.includes(id)?'':'<span class="tag">자동</span>'}${isAbsent(id)?'<span class="tag red">불참</span>':''}</div>`).join('');
+  const ord = orderFor(ev, team), saved = orderSaved(ev, team), pl = plays(ev, team), u0 = upNext(ev, team), G = groupSize(ev), gm = G ? groupMap(ev, team) : {};
+  const cs = new Set(G ? unitIds(ev, team, u0.cur) : [u0.cur]), ns = new Set(G ? unitIds(ev, team, u0.next) : [u0.next]);
+  const rows = ord.map((id,i) => `<div class="item ${cs.has(id)?'cur':''} ${pl[id]?'done':''} ${G && (i===0 || gm[ord[i-1]]!==gm[id]) ? 'gstart' : ''}"><span class="no">${i+1}</span>${G ? `<span class="gtag g${(gm[id]||1)%2}">${gm[id]||'-'}조</span>` : ''}<span class="name">${esc(pname(id))}</span>
+      ${cs.has(id)?'<span class="tag dark">지금</span>':ns.has(id)?'<span class="tag warn">다음</span>':''}${pl[id]?`<span class="tag ok">✓ ${pl[id]}회</span>`:''}${saved.includes(id)?'':'<span class="tag">자동</span>'}${isAbsent(id)?'<span class="tag red">불참</span>':''}</div>`).join('');
   return `<div class="cpanel ${sel?'sel':''}"><div class="ptitle">${teamBadge(team)} <b>${esc(teamName(team))} 순서</b><span class="tag">보기만</span></div>
-    <div class="list olist box">${rows || '<div class="empty">이 팀에 배정된 사람이 없습니다.</div>'}</div></div>`;
+    ${groupNote(ev)}<div class="list olist box">${rows || '<div class="empty">이 팀에 배정된 사람이 없습니다.</div>'}</div></div>`;
 }
 /* ---------- 감독: 우리 팀 선수를 안내판으로 부르기 ----------
    main/ccalls/{종목}_{팀} 문서 하나에 가장 최근 호출을 덮어씀. 안내판이 새 호출을 알아보고 소리·화면으로 알림 */
 const CC = { team:'' };
 function ccallSheet(){
-  const ev = UI.ev, team = CC.team, E = EVENTS[ev];
-  const btn = (k, label, cls='') => { const id = upcoming(ev, team, k);
-    return `<button class="btn huge wide ccbtn ${cls}" data-a="ccallPlay" data-v="${k}" ${id?'':'disabled'} style="width:100%;margin-bottom:10px">${label}<small>${esc(id ? pname(id) : '-')}</small></button>`; };
-  const ord = orderFor(ev, team), pl = plays(ev, team), u = upNext(ev, team);
-  return `<h2>📣 ${esc(teamName(team))} 선수 부르기 <small class="sub">${E.icon} ${esc(E.name)}</small></h2>
-    ${btn(0, '지금 선수 다시 부르기')}${btn(1, '다음 선수 부르기', 'primary')}${btn(2, '다다음 선수 부르기')}
+  const ev = UI.ev, team = CC.team, E = EVENTS[ev], G = groupSize(ev), w = G ? '조' : '선수';
+  const nm = key => key ? (G ? `${unitNo(ev, team, key)}조 ${unitNames(ev, team, key)}` : pname(key)) : '-';
+  const btn = (k, label, cls='') => { const key = upcoming(ev, team, k);
+    return `<button class="btn huge wide ccbtn ${cls}" data-a="ccallPlay" data-v="${k}" ${key?'':'disabled'} style="width:100%;margin-bottom:10px">${label}<small>${esc(nm(key))}</small></button>`; };
+  const u = upNext(ev, team), pl = unitPlays(ev, team), list = unitList(ev, team);
+  return `<h2>📣 ${esc(teamName(team))} ${w} 부르기 <small class="sub">${E.icon} ${esc(E.name)}</small></h2>
+    ${btn(0, `지금 ${w} 다시 부르기`)}${btn(1, `다음 ${w} 부르기`, 'primary')}${btn(2, `다다음 ${w} 부르기`)}
     <h3>우리 팀 순서에서 골라 부르기</h3>
-    <div class="list olist sheetlist">${ord.map((id,i) => `<div class="item tap ${id===u.cur?'cur':''} ${pl[id]?'done':''}" data-a="ccallPick" data-v="${id}"><span class="no">${i+1}</span><span class="name">${esc(pname(id))}</span>
-      ${id===u.cur?'<span class="tag dark">지금</span>':id===u.next?'<span class="tag warn">다음</span>':''}${pl[id]?`<span class="tag ok">✓ ${pl[id]}회</span>`:''}${isAbsent(id)?'<span class="tag red">불참</span>':''}</div>`).join('') || '<div class="empty">팀원이 없습니다.</div>'}</div>
-    <p class="sub">누르면 안내판에 소리와 함께 "${esc(teamName(team))} ○○○ 준비해 주세요"가 뜹니다. 이름을 눌러 고른 선수는 "준비해 주세요"로 부릅니다.</p>
+    <div class="list olist sheetlist">${list.map(x => `<div class="item tap ${x.key===u.cur?'cur':''} ${pl[x.key]?'done':''}" data-a="ccallPick" data-v="${x.key}"><span class="no ${G?'g':''}">${G ? x.no + '조' : x.no}</span><span class="name">${esc(unitNames(ev, team, x.key))}</span>
+      ${x.key===u.cur?'<span class="tag dark">지금</span>':x.key===u.next?'<span class="tag warn">다음</span>':''}${pl[x.key]?`<span class="tag ok">✓ ${pl[x.key]}회</span>`:''}</div>`).join('') || '<div class="empty">팀원이 없습니다.</div>'}</div>
+    <p class="sub">누르면 안내판에 소리와 함께 "${esc(teamName(team))} ${G ? '2조 ○○○, ○○○' : '○○○'} 준비해 주세요"가 뜹니다. 이름을 눌러 고른 ${w}는 "준비해 주세요"로 부릅니다.</p>
     <button class="btn wide" data-a="closeSheet">닫기</button>`;
 }
-function ccall(pid, kind, ahead){
+// key: 선수(사람 번호) 또는 조('g2'). 안내판 호출 문서에는 첫 사람(pid)과, 조이면 pids·group 도 실음
+function ccall(key, kind, ahead){
   const ev = UI.ev, team = CC.team;
   if(!can.ccall(team)) return denied();
-  if(!ORDER_EVENTS.includes(ev) || !pid){ toast('부를 선수가 없습니다.'); return Promise.resolve(false); }
-  return put(['main','ccalls',`${ev}_${team}`], { event:ev, team, pid, kind, ...(ahead != null ? { ahead } : {}), at:now(), by:UI.me }, false)
-    .then(ok => { if(ok) toast(`안내판에 ${pname(pid)} 선수를 불렀습니다.`); return ok; });
+  const ids = unitIds(ev, team, key);
+  if(!ORDER_EVENTS.includes(ev) || !ids.length){ toast(`부를 ${groupSize(ev) ? '조가' : '선수가'} 없습니다.`); return Promise.resolve(false); }
+  const G = groupSize(ev);
+  return put(['main','ccalls',`${ev}_${team}`], { event:ev, team, pid:ids[0], ...(G ? { pids:ids, group:unitNo(ev, team, key) } : {}), kind, ...(ahead != null ? { ahead } : {}), at:now(), by:UI.me }, false)
+    .then(ok => { if(ok) toast(G ? `안내판에 ${teamName(team)} ${unitNo(ev, team, key)}조를 불렀습니다.` : `안내판에 ${pname(ids[0])} 선수를 불렀습니다.`); return ok; });
 }
 function saveOrder(ev, team, list){
   if(!can.order(team)) return denied();
