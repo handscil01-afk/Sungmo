@@ -56,7 +56,8 @@ function render(){
   const nt = $('#note'); nt.innerHTML = nl.map(l => `<p>${esc(l)}</p>`).join(''); nt.hidden = !nl.length;
   // 화면 보며 하기: 긴 질문은 '무엇을 할지'(첫 문장 + 마지막 질문)를 크게, 나머지 설명은 작게
   const qs = gg ? (S.q || '').split(/(?<=[.?!])\s+/) : [];
-  if(gg && qs.length > 2) $('#q').innerHTML = `<span class="qt">${esc(qs[0])} ${esc(qs[qs.length - 1])}</span> <span class="qd">${esc(qs.slice(1, -1).join(' '))}</span>`;
+  // 첫 문장(공격·수비·수비 작전 등)은 색 띠, 마지막 질문은 크게, 가운데 설명은 작게
+  if(gg && qs.length >= 2) $('#q').innerHTML = `<span class="qchip ${/수비/.test(qs[0]) ? 'def' : /공격/.test(qs[0]) ? 'off' : ''}">${esc(qs[0].replace(/\.$/, ''))}</span> <span class="qt">${esc(qs[qs.length - 1])}</span>${qs.length > 2 ? ` <span class="qd">${esc(qs.slice(1, -1).join(' '))}</span>` : ''}`;
   else $('#q').textContent = S.q || '';
   renderOpts(S);
   if(typeof gstatRender === 'function'){ if(gg) gstatRender(G); else if($('#gstat')) $('#gstat').hidden = true; }
@@ -80,7 +81,9 @@ function renderOpts(S){
     let el = have.get(k);
     if(el) have.delete(k);
     else { el = document.createElement('button'); el.type = 'button'; el.dataset.k = k; }
-    el.className = 'opt' + (o.cls ? ' ' + o.cls : '');
+    // 화면 보며 하기: 메뉴 성격의 선택지(더 보기·지금 상황·맡기기 등)는 아래쪽 작은 단추로
+    const minor = document.documentElement.classList.contains('gfxgame') && /더 보기|지금 상황|맡기기|노림수|사인대로|수비 위치|투수 상태|작전:/.test(o.t);
+    el.className = 'opt' + (o.cls ? ' ' + o.cls : '') + (minor ? ' minor' : '');
     el.dataset.n = o.n;
     const ico = o.icon ? `<span class="oicon" aria-hidden="true" style="--ix:${o.icon[1] % 4};--iy:${Math.floor(o.icon[1] / 4)};background-image:url(img/${o.icon[0]}.png)"></span>` : '';
     const html = `<span class="num">${o.n}<span class="sr-only">번. </span></span>${ico}<span class="tx"><b>${esc(o.t)}</b>${o.s ? `<span class="sr-only">. </span><small>${esc(o.s)}</small>` : ''}</span>`;

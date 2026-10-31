@@ -205,6 +205,14 @@ function drawPitchScene(G, A){
   // 타자: 오른손은 홈 왼쪽, 왼손은 오른쪽(좌우 뒤집음)
   let bPose = 'stance';
   if(A && (ph === 'flight' && A.t0 > 0.8 || ph === 'result')){ if(A.res === 'bunt') bPose = 'bunt'; else if(['whiff', 'foul', 'inplay'].includes(A.res)) bPose = ph === 'result' && A.t0 > 0.3 ? 'swfollow' : 'swing'; }
+  // 주자: 베이스에서 리드하고 있는 모습 (1루는 오른쪽, 3루는 왼쪽, 2루는 투수 뒤)
+  if(L === LAY_IMG && GX.meta['runner-s']){
+    [[226, 146, false], [160, 100, true], [30, 146, true]].forEach(([x, y, flip], i) => {
+      if(G.bases[i] == null) return;
+      R(x - 4 + (flip ? 6 : -6), y - 1, 8, 3, PAL.white);   // 베이스
+      drawPerson('runner-s', x + (flip ? -6 : 6), y, T.color, 'p0', flip);
+    });
+  }
   const bp = left ? L.batL : L.batR;
   // 서 있는 자세만 반대로 뒤집음 (왼쪽 타석은 방망이를 오른쪽에 들고 섬). 휘두르는 그림은 원래 방향 그대로
   // 왼쪽 타석(오른손): 방망이를 오른쪽에 들고 서서 왼쪽으로 휘두르고, 휘두른 뒤 방망이가 왼쪽 위로. 오른쪽 타석은 그 반대
