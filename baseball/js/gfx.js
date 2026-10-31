@@ -465,7 +465,7 @@ function drawCard(A){
   R(10, y0, 236, 120, '#000'); R(10, y0, 236, 2, PAL.ink); R(10, y0 + 118, 236, 2, PAL.ink);
   // 제목
   if(A.mode === 'end') banner(G.walkoff ? '끝내기!' : '게임 셋!', y0 - 2, PAL.ink, 18);
-  else pxText('공수 교대', 128, y0 + 6, PAL.ink, 16);
+  else pxText(A.mode === 'skip' ? '▶▶ 내 차례까지 넘어감' : '공수 교대', 128, y0 + 6, PAL.ink, 16);
   // 이닝별 점수: 마지막 9이닝까지, 그리고 R(점수)·H(안타)
   const n = Math.max(G.innings, G.inning), first = Math.max(1, n - 8), cols = n - first + 1;
   const cx = i => 66 + i * 14, top = y0 + 38;
@@ -479,7 +479,8 @@ function drawCard(A){
     pxText(String(T.H || 0), 66 + cols * 14 + 26, y + 1, PAL.white, 9, true, false);
   });
   // 다음 이닝 안내
-  const msg = A.mode === 'end' ? (G.winner >= 0 ? `${G.teams[G.winner].short} 승리!` : '무승부') : `${G.inning}회${G.top ? '초' : '말'} · ${batTeam(G).short} 공격`;
+  const bt = ['1루', '2루', '3루'].filter((_, i) => G.bases[i] != null);
+  const msg = A.mode === 'skip' ? `${G.inning}회${G.top ? '초' : '말'} ${G.outs}아웃 ${bt.length ? '주자 ' + bt.join('·') : '주자 없음'} · 내 차례` : A.mode === 'end' ? (G.winner >= 0 ? `${G.teams[G.winner].short} 승리!` : '무승부') : `${G.inning}회${G.top ? '초' : '말'} · ${batTeam(G).short} 공격`;
   pxText(msg, 128, y0 + 98, PAL.white, 11);
 }
 
@@ -489,6 +490,7 @@ function bannerOf(fx, text){
   const has = n => fx.includes(n);
   if(G && G.over) return [G.walkoff ? '끝내기!' : '게임 셋!', PAL.ink, has('hr')];
   if(has('hr')) return ['홈런!', PAL.red, true];
+  if(/실책/.test(text)) return ['실책!', PAL.red];
   if(/병살/.test(text)) return ['병살!', '#3cbcfc'];
   if(has('b3')) return ['3루타!', PAL.ink]; if(has('b2')) return ['2루타!', PAL.ink]; if(has('hit')) return ['안타!', PAL.ink];
   if(has('k')) return ['삼진!', '#3cbcfc']; if(has('ball')) return ['볼넷', '#58d854']; if(has('out')) return ['아웃!', '#3cbcfc'];
@@ -497,28 +499,31 @@ function bannerOf(fx, text){
   return null;
 }
 // 새 투구·새 플레이가 있으면 차례대로 보여 줌 (투구 → 도루·견제·판독)
-function gfxStart(G, fx, lines, pre){
+function gfxStart(G, fx, lines, pre, skip){
   const now = performance.now(), text = (lines || []).map(l => l.s || l).join(' ');
-  const newPitch = !!(G.anim && G.anim.n !== GX.lastAnimN), newPlay = !!(G.play && G.play.n !== GX.lastPlayN);
+  // skip: 육성 모드에서 내 차례 뒤 다음 내 차례까지 건너뜀. 내 공(skip.snap.anim)만 보여 주고, 건너뛴 장면 대신 '건너뜀' 카드
+  const A0 = skip ? skip.snap.anim : G.anim, P0 = skip ? skip.snap.play : G.play;
+  const newPitch = !!(A0 && A0.n !== GX.lastAnimN), newPlay = !!(P0 && P0.n !== GX.lastPlayN);
   GX.lastAnimN = G.anim ? G.anim.n : null; GX.lastPlayN = G.play ? G.play.n : null;
   const list = [];
   if(newPitch){
     document.documentElement.classList.add('gfxhold');   // 결과 글은 공을 잡거나 떨어질 때 보여 줌
     if(G.over) document.documentElement.classList.add('gfxholdall');   // 마지막 공: 잡히기 전에는 '경기가 끝났습니다'와 선택지도 숨김
     // 도루·견제의 세이프·아웃은 뒤의 베이스 장면에서 보여 줌
-    const pfx = newPlay && G.anim.res !== 'inplay' ? fx.filter(n => n !== 'safe' && n !== 'out') : fx;
+    const pfx = newPlay && A0.res !== 'inplay' ? fx.filter(n => n !== 'safe' && n !== 'out') : fx;
     let bn = bannerOf(pfx, text);
-    if(G.anim.res === 'hbp') bn = ['몸에 맞는 공', '#58d854'];
-    list.push({ kind:'pitch', ...G.anim, ph:'windup', t0:0, banner: bn && bn[0], bannerColor: bn && bn[1], hr: bn && bn[2], jit: (Math.random() - 0.5) * 0.3 });
+    if(A0.res === 'hbp') bn = ['몸에 맞는 공', '#58d854'];
+    list.push({ kind:'pitch', ...A0, view: skip ? skip.snap : null, ph:'windup', t0:0, banner: bn && bn[0], bannerColor: bn && bn[1], hr: bn && bn[2], jit: (Math.random() - 0.5) * 0.3 });
   }
   if(newPlay){
-    const p = G.play;
+    const p = P0;
     if(p.k === 'steal' || p.k === 'pick') list.push({ kind:'base', o: p, t0:0, banner: p.safe ? (p.k === 'steal' ? '도루!' : '세이프!') : '아웃!', intro: p.k === 'pick' ? '견제!' : null });
     else if(p.k === 'review') list.push({ kind:'review', o: p, t0:0 });
     else if(p.k === 'reviewEnd') list.push({ kind:'reviewEnd', o: p, t0:0 });
   }
+  if(skip){ list.push({ kind:'card', mode:'skip', from: skip.from }); }
   // 공수 교대·경기 끝: 이닝별 점수판 카드를 이어서 보여 줌
-  if(G.over && GX.overShown !== G.at){ GX.overShown = G.at; list.push({ kind:'card', mode:'end' }); }
+  else if(G.over && GX.overShown !== G.at){ GX.overShown = G.at; list.push({ kind:'card', mode:'end' }); }
   else if((fx || []).includes('change')) list.push({ kind:'card', mode:'change' });
   if(!list.length){ const bn = bannerOf(fx || [], text); if(bn) list.push({ kind:'banner', ph:'result', t0:1, banner: bn[0], bannerColor: bn[1], hr: bn[2] }); }
   if(!list.length) return;
@@ -529,7 +534,7 @@ function gfxStart(G, fx, lines, pre){
 // 시간이 흐른 만큼 단계를 정함. 끝났으면 false
 function stepAnim(A, el){
   if(A.kind === 'banner') return el < 1200;
-  if(A.kind === 'card'){ A.t0 = Math.min(1, el / 250); return A.mode === 'end' || el < 2600; }   // 경기 끝 카드는 계속 둠
+  if(A.kind === 'card'){ A.t0 = Math.min(1, el / 250); return A.mode === 'end' || el < (A.mode === 'skip' ? 3000 : 2600); }   // 경기 끝 카드는 계속 둠
   if(A.kind === 'base'){ A.t0 = Math.min(1, el / 1500); return el < 2400; }
   if(A.kind === 'review'){ A.t0 = (el % 2600) / 2600; return true; }   // 판독을 고르는 동안 계속 다시 보여 줌
   if(A.kind === 'reviewEnd'){ A.t0 = Math.min(1, el / 2600); A.phase = el < 2600 ? 'replay' : 'end'; return el < 4400; }
@@ -545,6 +550,7 @@ function stepAnim(A, el){
 const REDUCED = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 // 그림에 쓸 경기 상태: 마지막 공으로 공수가 바뀌었거나 경기가 끝났으면, 움직임이 끝날 때까지 공을 던지기 전 상태(팀 색·타자·투수·주자)로 그림
 function viewOf(A){
+  if(A && A.view) return A.view;   // 육성 건너뛰기: 내 공은 건너뛰기 전 모습으로
   const p = A && A.pre;
   return p && (p.top !== G.top || p.inning !== G.inning || (G.over && !p.over)) ? p : G;
 }
@@ -611,10 +617,11 @@ function gfxRender(G, fx, lines){
   if(key !== GX.key){
     const fresh = GX.key && GX.key.split(':')[0] === String(G.at);
     GX.key = key;
-    if(fresh) gfxStart(G, fx || [], lines, GX.lastSnap);
+    if(fresh) gfxStart(G, fx || [], lines, GX.lastSnap, UI.lastSkip);
     else { GX.lastAnimN = G.anim ? G.anim.n : null; GX.lastPlayN = G.play ? G.play.n : null; GX.anim = null; GX.queue = []; }
   }
   GX.lastSnap = snapOf(G);   // 다음 움직임에서 '던지기 전 상태'로 씀
+  UI.lastSkip = null;
   if(!GX.raf) GX.raf = requestAnimationFrame(gfxTick);
 }
 

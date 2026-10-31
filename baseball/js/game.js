@@ -97,7 +97,7 @@ function recentLines(n){ return G.log.filter(l => l.k !== 'd' || SET.dice).slice
 function gameNext(via, res){
   // 감독 모드: 묻지 않는 타석은 바로 진행하고 결과를 모음 (온라인 손님은 방장이 계산)
   if(G.mode === 'manager' && !(NET.on && NET.role === 'guest')) res = mgrAuto(res);
-  if(res){ playFx(res.fx); UI.lastFx = res.fx || []; UI.lastLines = res.lines || []; }
+  if(res){ playFx(res.fx); UI.lastFx = res.skip ? res.skip.fx : res.fx || []; UI.lastLines = res.lines || []; UI.lastSkip = res.skip || null; }
   const lines = visible(res ? res.lines : []);
   if(NET.on){ netNext(via, res, lines); return; }
   saveGame();
@@ -109,6 +109,15 @@ function gameNext(via, res){
   }
   if(G.pre){ const ti = [0, 1].find(t => !G.pre.ready[t] && needs(t)); go(() => pregameScreen(ti), via, lines); return; }
   // 비디오 판독: 원심에 손해를 본 팀이 사람이면 묻고, 컴퓨터(또는 맡긴 쪽·기회 없음)면 바로 정함
+  if(G.review && G.focus){
+    // 선수 육성: 판독 신청은 감독(컴퓨터)이 함. 내가 관련된 판정이면 선수로서 강하게 어필할지 고름
+    const R = G.review, side = R.side, d = R.data || {}, myTeam = G.focusTeam;
+    const runner = d.r != null ? G.teams[batIdx(G)].bat[d.r] : null;
+    const mine = side === myTeam && ((runner && runner.id === G.focus) || (['first', 'hr'].includes(R.kind) && curBatter(G).id === G.focus) || (R.kind === 'pick' && curPitcher(G).id === G.focus));
+    if(mine && reviewLeft(G, side) > 0){ go(appealScreen, via, lines); return; }
+    const r = resolveReview(G, side === myTeam ? aiChallenge(G) : aiChallenge(G));
+    gameNext(via, { lines:[...(res ? res.lines : []), ...r.lines], fx: r.fx }); return;
+  }
   if(G.review){
     const side = G.review.side;
     if(!needs(side) || reviewLeft(G, side) <= 0){
@@ -128,12 +137,21 @@ function gameNext(via, res){
     return;
   }
   // 선수 육성: 내 선수 차례가 올 때까지 빠르게 진행하고, 점수가 난 장면과 이닝 소식만 읽어 줌
+  // 건너뛴 장면의 소리는 내지 않고, '내 차례까지 넘어갔다'는 알림과 지금 상황만 알려 줌 (그림 모드는 카드)
   if(G.focus && !needs(off) && !needs(def)){
-    const more = runSteps(() => needs(batIdx(G)) || needs(1 - batIdx(G)));
-    const me = (() => { const f = myLine(G, G.focus); return f ? (f.bat || f.pit).name : ''; })();
-    const lastN = more.lines.map(l => l.k).lastIndexOf('n');
-    const keep = more.lines.filter((l, i) => l.k === 'i' || (l.k === 'r' && /홈인|대기록/.test(l.s)) || (l.k === 'c' && me && l.s.includes(me)) || (i === lastN && !G.over));
-    gameNext(via, { lines:[...(res ? res.lines : []), ...keep], fx: more.fx.slice(-2) }); return;
+    const snap = typeof snapOf === 'function' ? snapOf(G) : null, from = `${G.inning}회${G.top ? '초' : '말'} ${G.outs}아웃`;
+    const myFx = (res && res.skip ? res.skip.fx : res && res.fx) || [];
+    const runs0 = G.teams.map(runsOf);
+    const more = runSteps(() => needs(batIdx(G)) || needs(1 - batIdx(G)) || G.over);
+    const scored = G.teams.map((T, i) => runsOf(T) - runs0[i]);
+    const big = more.lines.filter(l => l.k === 'i' && /대기록|교체/.test(l.s));
+    const sum = G.over ? [{ s:`내 차례 없이 경기가 끝까지 진행되었습니다.`, k:'c' }] : [
+      { s:`▶▶ 다음 내 차례까지 넘어갑니다. ${from}부터 진행했습니다.${scored.some(x => x) ? ` 그사이 ${G.teams.map((T, i) => scored[i] ? `${T.short} ${scored[i]}점` : '').filter(Boolean).join(', ')}.` : ' 그사이 점수는 나지 않았습니다.'}`, k:'c' },
+      ...big,
+      { s:`지금 ${situation(G)}`, k:'c' }];
+    // 내 결과 뒤에 붙은 다음 타자 소개·수비 위치 변경 같은 글은 건너뛴 쪽이라 뺌
+    const mineL = res ? res.lines : [], lastR = mineL.map(l => l.k).lastIndexOf('r');
+    gameNext(via, { lines:[...(lastR >= 0 ? mineL.slice(0, lastR + 1) : mineL), ...sum], fx: [], skip: snap ? { snap, fx: myFx, from } : null }); return;
   }
   if(!needs(off) && !needs(def)){ go(watchScreen, via, lines); return; }
   const turn = (needs(def) && !GS.pend.def) ? def : off;
@@ -210,6 +228,19 @@ function delegate(scope, via){
 
 /* ---------- 비디오 판독 ---------- */
 function reviewWord(p){ return p >= 0.45 ? '뒤집힐 가능성이 꽤 있어 보입니다' : p >= 0.35 ? '반반 정도로 보입니다' : '뒤집기는 어려워 보입니다'; }
+function appealScreen(){
+  const R = G.review;
+  const go2 = (appeal, v) => {
+    const yes = aiChallenge(G) || (appeal && Math.random() < 0.65);
+    const pre = appeal ? [{ s: yes ? '강하게 어필했습니다! 감독이 나와서 비디오 판독을 신청합니다.' : '강하게 어필했지만 감독은 판독을 신청하지 않습니다.', k:'c' }] : [{ s:'판정을 받아들입니다.', k:'c' }];
+    const r = resolveReview(G, appeal ? yes : aiChallenge(G));
+    gameNext(v, { lines:[...pre, ...r.lines], fx: r.fx });
+  };
+  return { board:true, q:`아슬아슬한 판정! 원심은 ${callWord(R.call)}입니다. 어떻게 할까요?`, opts:[
+    { n:1, t:'강하게 어필하기', s:'세이프라고(또는 아웃이라고) 강하게 주장합니다. 감독이 판독을 신청할 가능성이 커집니다.', act: v => go2(true, v) },
+    { n:2, t:'판정 받아들이기', s:'감독에게 맡깁니다.', act: v => go2(false, v) },
+  ] };
+}
 function reviewScreen(){
   const R = G.review, left = reviewLeft(G, R.side);
   const odds = SET.revOdds === 'word' ? reviewWord(R.p) : `뒤집힐 확률 약 ${Math.round(R.p * 100)}퍼센트`;

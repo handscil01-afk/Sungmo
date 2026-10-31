@@ -412,8 +412,11 @@ const fielder = (T, pos) => { const p = T.bat.find(x => x.pos === pos); return `
 function onError(G, pos){
   const F = fieldTeam(G), b = G.bases, sc = [];
   F.E++;
-  emit(G, `아, ${fielder(F, pos)}의 실책! 타자는 1루에 나갑니다.`, 'r');
-  fx(G, 'ball');
+  // 실책 종류: 외야는 뜬공·타구를 놓침(포구 실책), 내야는 공을 놓치거나(포구 실책) 1루 송구가 빗나감(송구 실책)
+  const of = ['LF', 'CF', 'RF'].includes(pos), throwErr = !of && rnd(G) < 0.45;
+  const what = of ? pickOne(G, ['타구를 쫓아가다 공을 떨어뜨립니다', '글러브에 맞고 튕겨 나갑니다']) : throwErr ? pickOne(G, ['잡아서 1루로 던졌는데 송구가 높게 빗나갑니다', '급하게 던진 송구가 1루수 옆으로 빠집니다']) : pickOne(G, ['땅볼을 잡다가 공을 놓칩니다', '공이 글러브 밑으로 빠져나갑니다']);
+  emit(G, `아, ${fielder(F, pos)}, ${what}! ${throwErr ? '송구' : '포구'} 실책으로 타자는 1루에 나갑니다.`, 'r');
+  fx(G, 'safe');
   if(b[2] != null) sc.push(b[2]);
   G.bases = [batTeam(G).bi, b[0], b[1]];
   scoreRuns(G, sc, false);
