@@ -177,7 +177,7 @@ function drawPitchScene(G, A){
   GX.ctx.lineWidth = 1;
   if(GX.meta.umpire && L === LAY_IMG){
     const call = A && ph === 'result' ? ({ '스트라이크!':'u1', '삼진!':'u1', '헛스윙!':'u1', '파울':'u3' })[A.banner] || 'u0' : 'u0';
-    drawPerson('umpire', 140, 238, '#ff00ff', call, false);
+    if(call !== 'u0') drawPerson('umpire', 140, 238, '#ff00ff', call, false);   // 주심은 콜할 때만 보임
   }
   drawPerson('catcher', L.catcher[0], L.catcher[1], F.color, 'squat', false);
   // 공: 투수 손에서 나와 구종에 따라 휘며 커짐 (왼손 투수는 반대쪽 손)
@@ -200,7 +200,8 @@ function drawPitchScene(G, A){
   let bPose = 'stance';
   if(A && (ph === 'flight' && A.t0 > 0.8 || ph === 'result')){ if(A.res === 'bunt') bPose = 'bunt'; else if(['whiff', 'foul', 'inplay'].includes(A.res)) bPose = ph === 'result' && A.t0 > 0.3 ? 'swfollow' : 'swing'; }
   const bp = left ? L.batL : L.batR;
-  drawPerson('batter', bp[0], bp[1], T.color, bPose, !left);   // 홈플레이트 쪽으로 몸을 돌린 모습: 왼쪽 타석은 방망이가 오른쪽에서 왼쪽으로
+  // 서 있는 자세만 반대로 뒤집음 (왼쪽 타석은 방망이를 오른쪽에 들고 섬). 휘두르는 그림은 원래 방향 그대로
+  drawPerson('batter', bp[0], bp[1], T.color, bPose, bPose === 'stance' ? !left : left);
   scoreBar(G);
   if(A && ph === 'result' && A.banner) banner(A.banner, 112, A.bannerColor || PAL.ink, 22);
 }
