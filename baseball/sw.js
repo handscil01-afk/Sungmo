@@ -1,4 +1,4 @@
-const CACHE = 'baseball-v12';
+const CACHE = 'baseball-v13';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png',
   './css/app.css', './img/index.json', ...['bg-pitch', 'bg-field', 'pitcher', 'batter', 'catcher', 'fielder', 'banners', 'banners2', 'umpire', 'umpire-s', 'runner', 'tv'].map(n => './img/' + n + '.png'),
   './js/util.js', './js/data.js', './js/engine.js', './js/ai.js', './js/league.js', './js/speech.js', './js/shell.js', './js/ui.js', './js/gfx.js', './js/net.js', './js/voice.js', './js/game.js', './js/manager.js', './js/league-ui.js', './js/career.js', './js/online.js', './js/app.js',

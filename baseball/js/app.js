@@ -122,6 +122,7 @@ function setView(v){
   if(v === 'gfx'){ SET.voice = 'off'; SET.crowd = true; }
   else { SET.voice = 'sr'; SET.crowd = false; }
   saveSet(); if(typeof crowdSync === 'function') crowdSync();
+  if(v === 'gfx' && typeof gfxLoad === 'function') gfxLoad();
 }
 function viewScreen(after){
   return { top: SET.view ? '' : installBanner(), q:'어떤 방식으로 하실지 골라 주세요. 나중에 설정에서 바꿀 수 있습니다.', back: SET.view ? v => after(v) : null, opts:[

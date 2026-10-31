@@ -1033,6 +1033,9 @@ function playSimple(G, D, O, from){
   P.n += rint(G, 3, 6);
   const rows = simpleTable(D, O, parkOf(G).hr), d = rint(G, 1, 100), row = rows.find(r => d >= r.from && d <= r.to);
   emit(G, '주사위 표: ' + rows.map(r => `${SIMPLE_NAME[r.k]} ${r.from}~${r.to}`).join(', ') + '.', 'd');
+  // 화면 모드 그림용: 타석 한 번에 방식도 마지막 공 하나를 보여 줌 (경기 결과와는 상관없는 꾸밈이라 Math.random)
+  G.anim = { n: ((G.anim && G.anim.n) || 0) + 1, t:'FB', x: row.k === 'BB' ? 1.4 : (Math.random() - 0.5) * 1.4, y: row.k === 'BB' ? -0.6 : (Math.random() - 0.5) * 1.4,
+    res: row.k === 'K' ? 'whiff' : row.k === 'BB' ? 'take' : 'inplay', hand: B.hand, bb:null };
   simpleOutcome(G, row.k, `주사위 ${d}.`);
   if(!G.review) endPA(G);
   return flush(G);
@@ -1041,6 +1044,11 @@ function playSimple(G, D, O, from){
 function simpleOutcome(G, k, head){
   const T = batTeam(G), B = curBatter(G), P = curPitcher(G);
   const fi = rint(G, 0, 2), fieldWord = ['왼쪽', '가운데', '오른쪽'][fi];
+  // 화면 모드 그림용 타구 (종류·방향·거리). 꾸밈이라 경기 난수를 쓰지 않음
+  const fz = parkOf(G).fence[fi], rr = Math.random();
+  const bb = { HR:{ type:'fb', d: fz + 15, hit:4 }, S3:{ type:'ld', d: fz - 6, hit:3 }, S2:{ type: rr < 0.5 ? 'ld' : 'fb', d: fz - 14, hit:2 }, S1:{ type: rr < 0.5 ? 'gb' : 'ld', d: 40 + rr * 25, hit:1 },
+    GO:{ type:'gb', d: 25 + rr * 12 }, FO:{ type: rr < 0.25 ? 'pu' : 'fb', d: rr < 0.25 ? 25 : 55 + rr * 40 } }[k];
+  if(bb && G.anim && G.anim.res === 'inplay') G.anim.bb = { ...bb, fi };
   const hit = (n, text) => { B.st.ab++; B.st.h++; T.H++; P.st.h++; if(n === 4){ B.st.hr++; P.st.hr++; fx(G, 'hr'); } else fx(G, n === 3 ? 'b3' : n === 2 ? 'b2' : 'hit'); emit(G, `${head} ${text}`, 'r'); onHit(G, n, 0.5, true); };
   switch(k){
     case 'K': B.st.ab++; B.st.k++; P.st.k++; addOut(G); emit(G, `${head} 헛스윙 삼진! ${G.outs}아웃.`, 'r'); fx(G, 'k'); break;

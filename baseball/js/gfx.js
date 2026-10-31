@@ -22,12 +22,18 @@ function banner(text, y, color, size){
 
 // img/index.json에 적힌 그림만 불러옴 (없는 파일을 찾느라 오류가 나지 않게)
 function gfxLoad(){
-  GX.img.__ = true;
+  if(GX.img.__) return;
+  GX.img.__ = true; GX.pending = 1;
   fetch(new URL('img/index.json', document.baseURI).href).then(r => r.ok ? r.json() : []).catch(() => []).then(list => {
+    GX.pending = 0;
     if(list && !Array.isArray(list)){ GX.meta = list; list = Object.keys(list); }
-    (list || []).filter(n => GX_FILES.includes(n)).forEach(n => {
+    const want = (list || []).filter(n => GX_FILES.includes(n));
+    GX.pending = want.length;
+    const done = () => { GX.pending--; if(GX.cv && !GX.raf) GX.raf = requestAnimationFrame(gfxTick); };
+    want.forEach(n => {
     const im = new Image();
-    im.onload = () => { GX.img[n] = im; GX.tinted = {}; GX.key = ''; };
+    im.onerror = done;
+    im.onload = () => { GX.img[n] = im; GX.tinted = {}; done(); };
     im.src = new URL(`img/${n}.png`, document.baseURI).href;
     });
   });
@@ -110,7 +116,7 @@ function drawPerson(kind, x, foot, team, pose, flip, row = 0){
 // 투수 폼: 투수마다 정해짐 (오버핸드 60%, 사이드암 25%, 언더핸드 15%). 그림 줄 번호
 function armSlot(P){ let h = 7; for(const c of String(P.name) + P.id) h = (h * 31 + c.charCodeAt(0)) | 0; const v = Math.abs(h) % 20; return v < 12 ? 0 : v < 17 ? 1 : 2; }
 // 화면 배치: 그림 파일 배경과 코드로 그린 배경의 자리가 다름
-const LAY_IMG = { pitcher:[128, 121], batR:[62, 214], batL:[194, 214], catcher:[128, 244], zone:[128, 160, 12, 11], release:[[121, 88], [114, 96], [118, 108]] };
+const LAY_IMG = { pitcher:[128, 121], batR:[86, 214], batL:[170, 214], catcher:[128, 244], zone:[128, 160, 12, 11], release:[[121, 88], [114, 96], [118, 108]] };
 const LAY_CODE = { pitcher:[128, 102], batR:[106, 202], batL:[150, 202], catcher:[128, 218], zone:[128, 186, 10, 9], release:[[130, 92], [126, 96], [128, 100]] };
 const lay = () => GX.img['bg-pitch'] && GX.meta.pitcher ? LAY_IMG : LAY_CODE;
 
@@ -162,7 +168,13 @@ function drawPitchScene(G, A){
   drawPerson('pitcher', L.pitcher[0], L.pitcher[1], F.color, pPose, pl, slot);
   // 스트라이크 존 (흐리게)
   const z = L.zone;
-  GX.ctx.strokeStyle = 'rgba(252,252,252,0.35)'; GX.ctx.strokeRect(z[0] - z[2] - 0.5, z[1] - z[3] - 0.5, z[2] * 2, z[3] * 2);
+  // 스트라이크 존 9칸 (흐리게)
+  GX.ctx.strokeStyle = 'rgba(252,252,252,0.4)'; GX.ctx.lineWidth = 0.5;
+  for(let i = 0; i <= 3; i++){
+    const gx = z[0] - z[2] + i * z[2] * 2 / 3, gy = z[1] - z[3] + i * z[3] * 2 / 3;
+    GX.ctx.beginPath(); GX.ctx.moveTo(gx, z[1] - z[3]); GX.ctx.lineTo(gx, z[1] + z[3]); GX.ctx.moveTo(z[0] - z[2], gy); GX.ctx.lineTo(z[0] + z[2], gy); GX.ctx.stroke();
+  }
+  GX.ctx.lineWidth = 1;
   if(GX.meta.umpire && L === LAY_IMG){
     const call = A && ph === 'result' ? ({ '스트라이크!':'u1', '삼진!':'u1', '헛스윙!':'u1', '파울':'u3' })[A.banner] || 'u0' : 'u0';
     drawPerson('umpire', 140, 238, '#ff00ff', call, false);
@@ -222,7 +234,7 @@ function fenceAt(G, ang){
   return f[1] + (side - f[1]) * Math.min(1, a);
 }
 function bgField(G){
-  if(wide()){ GX.ctx.drawImage(GX.img['bg-field'], 0, 0); return; }
+  if(wide()){ GX.ctx.drawImage(parkBg(G), 0, 0); parkExtra(G); return; }
   const ctx = GX.ctx;
   R(0, 0, 256, 224, PAL.stand);
   const rnd = mulberry(11);
@@ -300,6 +312,71 @@ function fireworks(now){
     const t = ((now / 900) + i * 0.27) % 1, cx = [50, 206, 90, 170][i], cy = [50, 56, 36, 40][i], r = 4 + t * 22;
     for(let j = 0; j < 10; j++){ const a = j / 10 * 6.283; R(cx + Math.cos(a) * r, cy + Math.sin(a) * r + t * 6, 2, 2, cols[(i + j) % cols.length]); }
   }
+}
+
+/* ---------- 구장마다 다른 바깥 풍경 ----------
+   경기장 그림의 바깥(어두운 바탕) 칸을 구장 특징에 맞는 무늬로 칠하고, 구석에 작은 표시를 그림 */
+const PARK_LOOK = {
+  star:    { name:'손잡다 필드', bg:['#141c3c', '#f8d878'], kind:'city' },     // 도시 야경
+  whale:   { name:'블루웨일즈', bg:['#0c3c8c', '#5cb8f8'], kind:'sea', icon:'whale' },
+  thunder: { name:'썬더볼츠', bg:['#2c2c3c', '#fce000'], kind:'storm', icon:'bolt' },
+  hawk:    { name:'마린필드', bg:['#0c5c7c', '#bcf0fc'], kind:'sea', icon:'wind' },
+  swallow: { name:'스위프트', bg:['#5c94fc', '#fcfcfc'], kind:'day' },
+  turtle:  { name:'스톤터틀즈', bg:['#1c5c4c', '#7c7c7c'], kind:'lake', icon:'rock' },
+  meteor:  { name:'메테오스', bg:['#0c0c2c', '#fcfcfc'], kind:'stars', icon:'meteor' },
+  knight:  { name:'나이츠 돔', bg:['#4c4c5c', '#8c8c9c'], kind:'dome' },
+  beacon:  { name:'비컨스', bg:['#0c2c5c', '#fcfcfc'], kind:'sea', icon:'light' },
+  windy:   { name:'오름구장', bg:['#2c6c2c', '#5cac3c'], kind:'hill', icon:'mill' },
+};
+function parkBg(G){
+  const key = (G.park && G.park.key) || 'star', k = 'park:' + key;
+  if(GX.tinted[k]) return GX.tinted[k];
+  const im = GX.img['bg-field'], L = PARK_LOOK[key] || PARK_LOOK.star;
+  const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+  const x = c.getContext('2d'); x.drawImage(im, 0, 0);
+  const d = x.getImageData(0, 0, c.width, c.height), p = d.data;
+  const f0 = [p[8], p[9], p[10]];   // 바깥 바탕색 (왼쪽 위 구석)
+  const hex = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const A = hex(L.bg[0]), B = hex(L.bg[1]);
+  for(let y = 0; y < c.height; y++) for(let xx = 0; xx < c.width; xx++){
+    const i = (y * c.width + xx) * 4;
+    if(Math.abs(p[i] - f0[0]) + Math.abs(p[i + 1] - f0[1]) + Math.abs(p[i + 2] - f0[2]) > 24) continue;
+    let dot = false;
+    if(L.kind === 'city') dot = (xx % 6 < 2) && (y % 8 < 3) && ((xx * 7 + y * 13) % 5 === 0);
+    else if(L.kind === 'sea' || L.kind === 'lake') dot = (y % 10 === 0) && ((xx + y) % 12 < 5);
+    else if(L.kind === 'storm') dot = (xx + y * 3) % 17 === 0;
+    else if(L.kind === 'day') dot = (y % 24 < 6) && ((xx + Math.floor(y / 24) * 20) % 40 < 18);
+    else if(L.kind === 'stars') dot = ((xx * 31 + y * 17) % 97) === 0;
+    else if(L.kind === 'dome') dot = (xx % 16 === 0) || (y % 16 === 0);
+    else if(L.kind === 'hill') dot = ((xx + y) % 9 === 0);
+    const C = dot ? B : A; p[i] = C[0]; p[i + 1] = C[1]; p[i + 2] = C[2];
+  }
+  x.putImageData(d, 0, 0);
+  return (GX.tinted[k] = c);
+}
+// 구장 특징 표시: 전광판 이름, 돔 지붕, 높은 왼쪽 담장, 구석 그림
+function parkExtra(G){
+  const key = (G.park && G.park.key) || 'star', L = PARK_LOOK[key] || PARK_LOOK.star, pk = G.park || {}, ctx = GX.ctx;
+  pxText(L.name, 256, 22, PAL.ink, 7, true, false);   // 가운데 담장 뒤 전광판
+  if(pk.dome){   // 돔: 경기장 위로 반투명한 지붕 테두리와 살
+    ctx.strokeStyle = 'rgba(220,220,235,0.55)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(256, 330, 300, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();
+    ctx.lineWidth = 1; for(let a = 1.12; a < 1.9; a += 0.1){ ctx.beginPath(); ctx.moveTo(256 + Math.cos(a * Math.PI) * 300, 330 + Math.sin(a * Math.PI) * 300); ctx.lineTo(256 + Math.cos(a * Math.PI) * 250, 330 + Math.sin(a * Math.PI) * 250); ctx.stroke(); }
+  }
+  if(pk.wall && pk.wall[0] > 4){   // 높은 왼쪽 담장: 두껍고 진한 벽
+    for(let a = -0.78; a < -0.3; a += 0.02){ const q = fm(a, fenceAt(G, a) + 1); R(q.x - 3, q.y - 4, 6, 7, '#0c4c1c'); R(q.x - 3, q.y - 4, 6, 1, '#8cd88c'); }
+  }
+  if(pk.foul > 2){ ctx.fillStyle = 'rgba(200,140,80,0.35)'; ctx.fillRect(0, 300, 40, 140); ctx.fillRect(472, 300, 40, 140); }   // 넓은 파울 지역
+  const icon = (x, y) => {
+    if(L.icon === 'whale'){ R(x, y, 14, 5, '#1c4cbc'); R(x + 12, y - 4, 3, 4, '#1c4cbc'); R(x + 14, y - 6, 4, 2, '#1c4cbc'); R(x + 3, y + 1, 2, 1, PAL.white); }
+    else if(L.icon === 'bolt'){ for(let i = 0; i < 5; i++) R(x + (i % 2) * 3, y + i * 3, 3, 3, PAL.ink); }
+    else if(L.icon === 'light'){ R(x + 2, y, 4, 14, PAL.white); R(x + 2, y + 4, 4, 2, PAL.red); R(x + 1, y - 3, 6, 3, PAL.ink); }
+    else if(L.icon === 'mill'){ R(x + 3, y + 2, 2, 12, PAL.white); R(x - 2, y + 2, 12, 2, PAL.white); R(x + 3, y - 3, 2, 12, PAL.white); }
+    else if(L.icon === 'meteor'){ for(let i = 0; i < 6; i++) R(x + i * 2, y + i, 2, 2, i ? '#f8b800' : PAL.white); }
+    else if(L.icon === 'rock'){ R(x, y + 4, 10, 6, '#7c7c7c'); R(x + 2, y + 2, 6, 2, '#9c9c9c'); }
+    else if(L.icon === 'wind'){ for(let i = 0; i < 3; i++) R(x, y + i * 4, 10 - i * 2, 1, PAL.white); }
+  };
+  icon(6, 8); icon(494, 8); icon(4, 470); icon(496, 470);
 }
 
 /* ---------- 베이스 가까이 (도루·견제·판독 다시 보기) ----------
@@ -400,8 +477,9 @@ function stepAnim(A, el){
   if(el < 700){ A.ph = 'flight'; A.t0 = (el - 300) / 400; return true; }
   if(A.res !== 'inplay' || !A.bb){ A.ph = 'result'; A.t0 = 1; return el < 1600; }
   if(el < 1000){ A.ph = 'result'; A.t0 = (el - 700) / 300; return true; }
-  if(el < 2100){ A.ph = 'fly'; A.t0 = (el - 1000) / 1100; return true; }
-  A.ph = 'fresult'; A.t0 = 1; return el < 3300;
+  const fly = A.bb.type === 'gb' ? 1300 : 1900;
+  if(el < 1000 + fly){ A.ph = 'fly'; A.t0 = (el - 1000) / fly; return true; }
+  A.ph = 'fresult'; A.t0 = 1; return el < 1000 + fly + 1500;
 }
 const REDUCED = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 function gfxTick(){
@@ -410,6 +488,7 @@ function gfxTick(){
   const now = performance.now();
   let A = GX.anim;
   while(A && !stepAnim(A, (now - A.start) * (REDUCED() ? 3 : 1))){ A = GX.anim = GX.queue.shift() || null; if(A){ A.start = now; } }
+  if(GX.pending > 0){ R(0, 0, 256, 224, '#000'); pxText('그림 불러오는 중…', 128, 104, PAL.white, 12); return; }
   if(!A) drawPitchScene(G, null);
   else if(A.kind === 'banner'){ drawPitchScene(G, null); banner(A.banner, 112, A.bannerColor || PAL.ink, 22); }
   else if(A.kind === 'base'){
@@ -444,3 +523,6 @@ function gfxRender(G, fx, lines){
   }
   if(!GX.raf) GX.raf = requestAnimationFrame(gfxTick);
 }
+
+// 화면 모드면 시작하자마자 그림을 미리 불러옴 (처음 경기 화면에서 임시 그림이 보이지 않게)
+if(typeof SET !== 'undefined' && SET.view === 'gfx') gfxLoad();
