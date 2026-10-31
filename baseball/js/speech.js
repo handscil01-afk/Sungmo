@@ -130,8 +130,16 @@ function playRec(c, uniq){
   recStopAll(c);
   // 투구(짧은 바람 소리) → 방망이(헛스윙·타격음) → 결과 → 공수교대 순서로, 겹치지 않게 조금씩 띄움
   let t = 0.02;
-  if(pitch){ recPlay(c, 'pitch', t, 0.6); t += 0.35; }
-  if(contact){ recPlay(c, recPick(contact), t, 0.9); t += contact === 'batBig' ? 0.45 : 0.3; }
+  // 화면 보며 하기: 그림 움직임에 맞춤 (공이 손을 떠날 때 피칭, 공이 올 때 타격, 잡거나 떨어질 때 결과)
+  const gx = SET.view === 'gfx' && pitch && typeof G !== 'undefined' && G && G.anim;
+  if(gx){
+    recPlay(c, 'pitch', 0.3, 0.6);
+    if(contact) recPlay(c, recPick(contact), 0.7, 0.9);
+    t = G.anim.res === 'inplay' && G.anim.bb ? 1.0 + (G.anim.bb.type === 'gb' ? 1.3 : 1.9) : 0.8;
+  } else {
+    if(pitch){ recPlay(c, 'pitch', t, 0.6); t += 0.35; }
+    if(contact){ recPlay(c, recPick(contact), t, 0.9); t += contact === 'batBig' ? 0.45 : 0.3; }
+  }
   if(main){ const d = recPlay(c, recPick(main), t, 0.85, main === 'hr' ? 10 : 4); t += Math.min(d || 1, 2.5); }
   if(change) recPlay(c, 'change', t, 0.7, 4);
   else if(!pitch && !main && !contact && uniq.includes('batter')) recPlay(c, 'atbat', t, 0.6, 3);

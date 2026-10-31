@@ -475,6 +475,7 @@ function gfxStart(G, fx, lines){
   GX.lastAnimN = G.anim ? G.anim.n : null; GX.lastPlayN = G.play ? G.play.n : null;
   const list = [];
   if(newPitch){
+    document.documentElement.classList.add('gfxhold');   // 결과 글은 공을 잡거나 떨어질 때 보여 줌
     // 도루·견제의 세이프·아웃은 뒤의 베이스 장면에서 보여 줌
     const pfx = newPlay && G.anim.res !== 'inplay' ? fx.filter(n => n !== 'safe' && n !== 'out') : fx;
     let bn = bannerOf(pfx, text);
@@ -519,6 +520,8 @@ function gfxTick(){
   const now = performance.now();
   let A = GX.anim;
   while(A && !stepAnim(A, (now - A.start) * (REDUCED() ? 3 : 1))){ A = GX.anim = GX.queue.shift() || null; if(A){ A.start = now; } }
+  // 결과가 나오는 순간(또는 움직임이 없을 때) 아래 결과 글을 보여 줌
+  if(!A || A.kind !== 'pitch' || A.ph === 'fresult' || (A.ph === 'result' && !(A.res === 'inplay' && A.bb))) document.documentElement.classList.remove('gfxhold');
   if(GX.pending > 0){ R(0, 0, 256, 224, '#000'); pxText('그림 불러오는 중…', 128, 104, PAL.white, 12); return; }
   if(!A) drawPitchScene(G, null);
   else if(A.kind === 'banner'){ drawPitchScene(G, null); banner(A.banner, 112, A.bannerColor || PAL.ink, 22); }

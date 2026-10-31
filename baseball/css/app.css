@@ -169,3 +169,4 @@ html.gfxgame #chatSec{ max-height:20vh; overflow:auto; }
   html.gfxgame #turn{ padding-top:36px; }
   html.gfxgame .opts:not(.grid){ grid-template-columns:repeat(2, minmax(0, 1fr)); }
 }
+html.gfxgame.gfxhold #say{ visibility:hidden; }
