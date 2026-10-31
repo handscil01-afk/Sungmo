@@ -50,8 +50,8 @@ const PORT = 8766;
     await shot(page, `${name}-view`);
     await page.keyboard.press(name === 'phone' ? '2' : '1');
     await shot(page, `${name}-home`); await noOverflow(page, name + ' 처음');
-    // 혼자 하기, 정밀 모드, 1이닝
-    for(const k of ['1', '2', '1', '1', '1', '1', '2']) await page.keyboard.press(k);
+    // 혼자 하기, 정밀 모드(직접 고를 것: 구종만), 1이닝
+    for(const k of ['1', '2', '1', '1', '1', '1', '1', '2']) await page.keyboard.press(k);
     await shot(page, `${name}-ready`);
     await page.keyboard.press('1');
     await page.waitForFunction(() => document.querySelector('#boardSec') && !document.querySelector('#boardSec').hidden);
@@ -87,7 +87,7 @@ const PORT = 8766;
       console.log(`${name}: 맡기기·이어하기 ${s3}번 만에 끝`);
       // 둘이 하기 정밀 모드 1이닝 (기기 넘기기 화면 포함)
       await page.keyboard.press('4');
-      for(const k of ['2', '2', '3', '4', '1', '1', '1']) await page.keyboard.press(k);
+      for(const k of ['2', '2', '2', '3', '4', '1', '1', '1']) await page.keyboard.press(k);   // 직접 고를 것: 구종과 코스
       let hand = 0;
       for(let i = 0; i < 3000; i++){
         const qq = await q(page);

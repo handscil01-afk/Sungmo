@@ -233,12 +233,46 @@ function handoffScreen(ti){
 }
 
 /* ---------- 수비 (정밀 모드) ---------- */
+/* ---------- 직접 고를 항목 (설정의 '직접 고를 항목') ----------
+   pt 구종 · loc 코스(full 9칸 / height 높낮이만 / none) · edge 붙이는 정도 · pow 세기 · bat 치는 방법(full 네 가지 / simple 치기·지켜보기) · guess 노림수 */
+const picks = () => ({ pt:true, loc:'full', edge:true, pow:true, bat:'full', guess:true, ...(SET.picks || {}) });
+// 고를 차례인 다음 항목으로 가고, 다 골랐으면 고르지 않은 항목을 컴퓨터가 채워서 던짐
+function pitchNext(v){
+  const p = picks(), s = GS.sel || { k:'pitch' };
+  if(p.loc === 'full' && s.r == null) return go(locScreen, v);
+  if(p.loc === 'height' && s.r == null) return go(heightScreen, v);
+  const center = s.r === 1 && s.c === 1;
+  if(p.edge && p.loc === 'full' && !center && !s.e) return go(edgeScreen, v);
+  if(p.pow && !s.w) return go(powScreen, v);
+  submit('def', fillPitch(s), v);
+}
+function fillPitch(s){
+  const a = aiPitch(G, 'fill'), o = { k:'pitch', t: s.t || a.t, r: s.r ?? a.r, c: s.c ?? a.c, e: s.e || a.e, w: s.w || 2 };
+  if(s.r != null && s.c == null && o.r === 1 && o.c === 1 && o.e !== 'in') o.c = Math.random() < 0.5 ? 0 : 2;   // 높낮이만 골랐을 때
+  if(o.r === 1 && o.c === 1) o.e = 'in';
+  return o;
+}
+// 지금까지 고른 것을 말로 (질문 앞머리)
+function selDesc(s){
+  const a = [];
+  if(s.t) a.push(PITCH[s.t].name);
+  if(s.r != null && s.c != null) a.push(ZONE_NAME[s.r][s.c] + (s.e && !(s.r === 1 && s.c === 1) ? ', ' + EDGE[s.e].name : ''));
+  else if(s.r != null) a.push(['높게', '가운데 높이로', '낮게'][s.r]);
+  return a.length ? a.join(', ') + '. ' : '';
+}
+function heightScreen(){
+  const opts = [['높게', '높은 공은 헛스윙을 끌어내기 좋지만 맞으면 멀리 갑니다.'], ['가운데 높이', '스트라이크를 잡기 쉽지만 맞기도 쉽습니다.'], ['낮게', '땅볼을 끌어내기 좋습니다. 빠지면 볼이 됩니다.']]
+    .map(([t, sub], r) => ({ n: r + 1, t, s: sub, act: v => { GS.sel = { ...GS.sel, r }; pitchNext(v); } }));
+  return { board:true, sub:true, q:`${selDesc(GS.sel)}어느 높이로 던질까요? 좌우는 포수가 정합니다.`, opts, back: v => go(defMain, v) };
+}
 function defMain(){
   if(G.mode === 'simple') return simpleDef();
   if(G.mode === 'manager') return mgrDef();
   const ti = 1 - batIdx(G), T = G.teams[ti], P = curPitcher(G), B = curBatter(G);
   const last = T.lastSel && T.lastSel.k === 'pitch' && P.pitches.some(x => x.t === T.lastSel.t) ? T.lastSel : null;
-  const opts = P.pitches.map((x, i) => ({ n: i + 1, t: PITCH[x.t].name, s: `${gradeWord(x.g)} · 보통 세기로 약 ${expVel(P, x.t, 2)}킬로`, act: v => { GS.sel = { k:'pitch', t:x.t }; go(locScreen, v); } }));
+  const p = picks();
+  const opts = p.pt ? P.pitches.map((x, i) => ({ n: i + 1, t: PITCH[x.t].name, s: `${gradeWord(x.g)} · 보통 세기로 약 ${expVel(P, x.t, 2)}킬로`, act: v => { GS.sel = { k:'pitch', t:x.t }; pitchNext(v); } }))
+    : [{ n:1, t: p.loc !== 'none' || p.pow ? '던지기' : '공 던지기', s:'구종은 포수가 고릅니다.', act: v => { GS.sel = { k:'pitch' }; pitchNext(v); } }];
   opts.push({ n:5, t:'지난 공 그대로', s: last ? selText(last) : '아직 던진 공이 없습니다.', hide: !last, act: v => submit('def', { ...last }, v) });
   opts.push({ n:6, t:'포수 사인대로 던지기', s:'이번 공은 컴퓨터 포수가 골라 줍니다.', act: v => submit('def', aiPitch(G), v) });
   opts.push({ n:7, t:'수비 위치 바꾸기', s:`지금 내야 ${ALIGN_IN[T.align.inf]}, 외야 ${ALIGN_OUT[T.align.of]}`, act: v => go(alignScreen, v) });
@@ -253,21 +287,23 @@ function locScreen(){
   for(let r = 0; r < 3; r++) for(let c = 0; c < 3; c++)
     opts.push({ n: zoneNum(r, c), t: ZONE_NAME[r][c], cls:'z', act: v => {
       GS.sel = { ...GS.sel, r, c };
-      if(r === 1 && c === 1){ GS.sel.e = 'in'; go(powScreen, v); } else go(edgeScreen, v);
+      if(r === 1 && c === 1) GS.sel.e = 'in';
+      pitchNext(v);
     } });
-  return { board:true, sub:true, grid:true, q:`${PITCH[GS.sel.t].name}, 어디로 던질까요? 몸쪽은 타자 쪽입니다.`, opts, back: v => go(defMain, v) };
+  return { board:true, sub:true, grid:true, q:`${selDesc(GS.sel)}어디로 던질까요? 몸쪽은 타자 쪽입니다.`, opts, back: v => go(defMain, v) };
 }
 function edgeScreen(){
   const s = GS.sel, name = ZONE_NAME[s.r][s.c];
-  const opts = ['in', 'edge', 'out'].map((e, i) => ({ n: i + 1, t: EDGE[e].name, s: EDGE[e].sub, act: v => { GS.sel = { ...GS.sel, e }; go(powScreen, v); } }));
-  return { board:true, sub:true, q:`${PITCH[s.t].name}, ${name}. 얼마나 붙일까요?`, opts, back: v => go(locScreen, v) };
+  const opts = ['in', 'edge', 'out'].map((e, i) => ({ n: i + 1, t: EDGE[e].name, s: EDGE[e].sub, act: v => { GS.sel = { ...GS.sel, e }; pitchNext(v); } }));
+  return { board:true, sub:true, q:`${s.t ? PITCH[s.t].name + ', ' : ''}${name}. 얼마나 붙일까요?`, opts, back: v => go(locScreen, v) };
 }
 function powScreen(){
   const s = GS.sel, P = curPitcher(G);
   const sub = { 1:'구위가 좋아지지만 제구가 흔들리고 힘이 빨리 빠집니다.', 2:'평소대로 던집니다.', 3:'제구가 좋아지지만 공이 가벼워집니다.' };
-  const opts = [1, 2, 3].map(w => ({ n:w, t:`${POWER[w].name}, 약 ${expVel(P, s.t, w)}킬로`, s: sub[w], act: v => submit('def', { ...GS.sel, w }, v) }));
-  return { board:true, sub:true, q:`${PITCH[s.t].name}, ${ZONE_NAME[s.r][s.c]}${s.r === 1 && s.c === 1 ? '' : ', ' + EDGE[s.e].name}. 얼마나 세게 던질까요?`, opts,
-    back: v => go(s.r === 1 && s.c === 1 ? locScreen : edgeScreen, v) };
+  const opts = [1, 2, 3].map(w => ({ n:w, t: s.t ? `${POWER[w].name}, 약 ${expVel(P, s.t, w)}킬로` : POWER[w].name, s: sub[w], act: v => { GS.sel = { ...GS.sel, w }; pitchNext(v); } }));
+  const p = picks();
+  return { board:true, sub:true, q:`${selDesc(s)}얼마나 세게 던질까요?`, opts,
+    back: v => go(p.loc === 'full' ? (s.r === 1 && s.c === 1 || !p.edge ? locScreen : edgeScreen) : p.loc === 'height' ? heightScreen : defMain, v) };
 }
 function alignScreen(){
   const ti = 1 - batIdx(G), T = G.teams[ti], a = T.align;
@@ -341,15 +377,15 @@ function offMain(){
   const g = GS.guess;
   const runner = bs[1] != null && bs[2] == null ? T.bat[bs[1]] : bs[0] != null && bs[1] == null ? T.bat[bs[0]] : null;
   const runners = bs.some(x => x != null);
-  const bat = k => v => submit('off', { k, g }, v);
+  const bat = k => v => submit('off', { k, g }, v), p = picks();
   return { board:true, q:`${whoLabel(ti)}공격. 타자 ${B.name}, 제${G.pitchNo + 1}구 ${countText(G)}. 어떻게 할까요?`, opts:[
     { n:1, t:'치기', s:'스트라이크면 치고, 볼은 골라냅니다.', act: bat('swing') },
-    { n:2, t:'강하게 치기', s:'장타를 노립니다. 헛스윙이 늘고 볼에 잘 속습니다.', act: bat('power') },
-    { n:3, t:'맞히기', s:'짧게 맞힙니다. 공을 더 잘 보지만 타구 힘은 약합니다.', act: bat('contact') },
+    { n:2, t:'강하게 치기', s:'장타를 노립니다. 헛스윙이 늘고 볼에 잘 속습니다.', hide: p.bat === 'simple', act: bat('power') },
+    { n:3, t:'맞히기', s:'짧게 맞힙니다. 공을 더 잘 보지만 타구 힘은 약합니다.', hide: p.bat === 'simple', act: bat('contact') },
     { n:4, t:'지켜보기', s:'이번 공은 치지 않습니다.', act: bat('take') },
     { n:5, t: runners ? '번트' : '기습 번트', s: runners ? '타자는 아웃되더라도 주자를 한 베이스 보냅니다.' : '발로 1루를 노립니다.', act: bat('bunt') },
     stealOpt(6, '타자는 이번 공을 지켜봅니다.', (from, v) => submit('off', { k:'steal', g, from }, v)),
-    { n:7, t:`노림수: ${g ? GUESS[g] : '없음'}`, s:'맞으면 잘 맞고, 틀리면 맞히기 어렵습니다. 이번 타석 동안 유지됩니다.', act: v => go(guessScreen, v) },
+    { n:7, t:`노림수: ${g ? GUESS[g] : '없음'}`, s:'맞으면 잘 맞고, 틀리면 맞히기 어렵습니다. 이번 타석 동안 유지됩니다.', hide: !p.guess && !g, act: v => go(guessScreen, v) },
     { n:8, t:'코치에게 맡기기', s:'이번 공은 컴퓨터가 골라 줍니다.', act: v => submit('off', aiBat(G), v) },
     { n:9, t:'더 보기', s:'점수판, 선수 정보, 맡기기, 설정', act: v => go(moreScreen, v) },
   ] };

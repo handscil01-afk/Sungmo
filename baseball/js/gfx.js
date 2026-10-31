@@ -182,7 +182,8 @@ function drawPitchScene(G, A){
   GX.ctx.lineWidth = 1;
   if(GX.meta.umpire && L === LAY_IMG){
     const call = A && ph === 'result' ? ({ '스트라이크!':'u1', '삼진!':'u1', '헛스윙!':'u1', '파울':'u3' })[A.banner] || 'u0' : 'u0';
-    if(call !== 'u0') drawPerson('umpire', 128, 212, '#ff00ff', call, false);   // 주심은 콜할 때만, 포수 뒤(더 멀리)에 작게
+    // 주심은 콜할 때만, 타자 반대편 포수 옆에 나타남 (포수 뒤에 그려서 겹쳐도 포수가 앞)
+    if(call !== 'u0') drawPerson('umpire', left ? 76 : 180, 226, '#ff00ff', call, false);
   }
   drawPerson('catcher', L.catcher[0], L.catcher[1], F.color, 'squat', false);
   // 공: 투수 손에서 나와 구종에 따라 휘며 커짐 (왼손 투수는 반대쪽 손)
