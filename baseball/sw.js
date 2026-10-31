@@ -1,6 +1,6 @@
-const CACHE = 'baseball-v10';
+const CACHE = 'baseball-v11';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png',
-  './css/app.css', './img/index.json',
+  './css/app.css', './img/index.json', ...['bg-pitch', 'bg-field', 'pitcher', 'batter', 'catcher', 'fielder', 'banners'].map(n => './img/' + n + '.png'),
   './js/util.js', './js/data.js', './js/engine.js', './js/ai.js', './js/league.js', './js/speech.js', './js/shell.js', './js/ui.js', './js/gfx.js', './js/net.js', './js/voice.js', './js/game.js', './js/manager.js', './js/league-ui.js', './js/career.js', './js/online.js', './js/app.js',
   './vendor/firebase-app.js', './vendor/firebase-auth.js', './vendor/firebase-database.js',
   ...['pitch', 'ball', 'strike', 'whiff-p', 'whiff-p2', 'whiff-n', 'whiff-n2', 'whiff-c', 'whiff-c2', 'bat1', 'bat2', 'bat3', 'bat-big', 'foul', 'hit', 'double', 'triple', 'homer', 'out', 'strikeout', 'change', 'batter', 'atbat', 'pitcher', 'mound', 'organ', 'crowd'].map(n => './sfx/' + n + '.mp3')];

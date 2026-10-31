@@ -5,7 +5,7 @@
    - 수비 화면: 공을 치면 위에서 본 야구장으로 바뀌어 타구가 날아가고 야수가 쫓아감. 홈런이면 담장을 넘김
    그림 파일(img/*.png, GPT로 만든 도트 그림)이 있으면 그것을 쓰고, 없으면 코드로 그린 도트 그림을 씀.
    팀 색 자리는 그림에서 자홍색(#FF00FF)으로 칠해 두면 팀 색으로 바꿔 칠함. 이 화면은 눈으로 보는 용도라 화면 낭독기에는 숨김 */
-const GX = { W:256, H:224, cv:null, ctx:null, key:'', anim:null, raf:0, img:{}, tinted:{}, crowd:null };
+const GX = { W:256, H:224, cv:null, ctx:null, key:'', anim:null, raf:0, img:{}, tinted:{}, meta:{} };
 const PAL = { sky:'#5c94fc', stand:'#3c3c64', fence:'#00682c', grass:'#38a838', grass2:'#4cbc4c', dirt:'#c88850', dirt2:'#b87840', line:'#fcfcfc',
   skin:'#f8b878', white:'#fcfcfc', black:'#000000', glove:'#a85010', bat:'#e4a050', ball:'#fcfcfc', ink:'#fcfc54', red:'#f83800' };
 const GX_FILES = ['bg-pitch', 'bg-field', 'pitcher', 'batter', 'catcher', 'fielder', 'banners'];
@@ -20,11 +20,14 @@ function banner(text, y, color, size){
 // img/index.json에 적힌 그림만 불러옴 (없는 파일을 찾느라 오류가 나지 않게)
 function gfxLoad(){
   GX.img.__ = true;
-  fetch(new URL('img/index.json', document.baseURI).href).then(r => r.ok ? r.json() : []).catch(() => []).then(list => (list || []).filter(n => GX_FILES.includes(n)).forEach(n => {
+  fetch(new URL('img/index.json', document.baseURI).href).then(r => r.ok ? r.json() : []).catch(() => []).then(list => {
+    if(list && !Array.isArray(list)){ GX.meta = list; list = Object.keys(list); }
+    (list || []).filter(n => GX_FILES.includes(n)).forEach(n => {
     const im = new Image();
     im.onload = () => { GX.img[n] = im; GX.tinted = {}; GX.key = ''; };
     im.src = new URL(`img/${n}.png`, document.baseURI).href;
-  }));
+    });
+  });
 }
 // 그림 파일의 자홍색 칸을 팀 색으로 바꾼 사본 (색마다 한 번 만들어 둠)
 function tinted(name, color){
@@ -85,22 +88,27 @@ function person(x, y, team, pose, flip){
   else if(pose === 'swfollow'){ P(-5, 3, 2, 4, PAL.skin); P(-10, -1, 2, 8, PAL.bat); }
   else if(pose === 'bunt'){ P(-2, 7, 2, 2, PAL.skin); P(-6, 6, 12, 2, PAL.bat); }
 }
-// 그림 파일의 동작 칸 (pitcher·batter: 32×48 네 칸)
+// 그림 파일의 동작 칸 (img/index.json의 칸 크기·줄 수). 발끝 가운데를 (x, foot)에 맞춰 그림
 const POSE_FRAME = { set:0, lift:1, throw:2, follow:3, stance:0, swing:1, swfollow:2, bunt:3 };
-function drawPerson(kind, x, y, team, pose, flip){
-  const file = kind === 'catcher' ? 'catcher' : kind;
-  const im = tinted(file, team);
-  if(im){
-    const fw = kind === 'catcher' ? im.width : 32, fh = kind === 'catcher' ? im.height : 48, fr = POSE_FRAME[pose] || 0;
-    const ctx = GX.ctx;
+function drawPerson(kind, x, foot, team, pose, flip, row = 0){
+  const im = tinted(kind, team), m = GX.meta[kind];
+  if(im && m){
+    const fr = Math.min(m.n - 1, POSE_FRAME[pose] || 0), r = Math.min(m.rows - 1, row), ctx = GX.ctx;
+    const dx = Math.round(x - m.w / 2), dy = Math.round(foot - m.h);
     ctx.save();
-    if(flip){ ctx.translate(Math.round(x), 0); ctx.scale(-1, 1); ctx.drawImage(im, fr * fw, 0, fw, fh, -fw / 2, Math.round(y - fh + 20), fw, fh); }
-    else ctx.drawImage(im, fr * fw, 0, fw, fh, Math.round(x - fw / 2), Math.round(y - fh + 20), fw, fh);
+    if(flip){ ctx.translate(dx + m.w, dy); ctx.scale(-1, 1); ctx.drawImage(im, fr * m.w, r * m.h, m.w, m.h, 0, 0, m.w, m.h); }
+    else ctx.drawImage(im, fr * m.w, r * m.h, m.w, m.h, dx, dy, m.w, m.h);
     ctx.restore();
     return;
   }
-  person(x, y, team, pose, flip);
+  person(x, foot - (kind === 'catcher' ? 14 : 20), team, pose, flip);
 }
+// 투수 폼: 투수마다 정해짐 (오버핸드 60%, 사이드암 25%, 언더핸드 15%). 그림 줄 번호
+function armSlot(P){ let h = 7; for(const c of String(P.name) + P.id) h = (h * 31 + c.charCodeAt(0)) | 0; const v = Math.abs(h) % 20; return v < 12 ? 0 : v < 17 ? 1 : 2; }
+// 화면 배치: 그림 파일 배경과 코드로 그린 배경의 자리가 다름
+const LAY_IMG = { pitcher:[128, 121], batR:[62, 214], batL:[194, 214], catcher:[128, 226], zone:[128, 168, 12, 11], release:[[121, 88], [114, 96], [118, 108]] };
+const LAY_CODE = { pitcher:[128, 102], batR:[106, 202], batL:[150, 202], catcher:[128, 218], zone:[128, 186, 10, 9], release:[[130, 92], [126, 96], [128, 100]] };
+const lay = () => GX.img['bg-pitch'] && GX.meta.pitcher ? LAY_IMG : LAY_CODE;
 
 /* ---------- 투구 화면 ---------- */
 function bgPitch(){
@@ -134,40 +142,68 @@ function scoreBar(G){
   base(244, 29, G.bases[0] != null); base(236, 22, G.bases[1] != null); base(228, 29, G.bases[2] != null); R(237, 37, 3, 3, PAL.white);
 }
 // 스트라이크 존 좌표: x(-몸쪽~+바깥쪽)·y(+높게)를 화면으로. 오른손 타자면 바깥쪽이 화면 오른쪽
-const zonePt = (x, y, hand) => ({ x: 128 + (hand === 'L' ? -x : x) * 10, y: 186 - y * 9 });
+const zonePt = (x, y, hand) => { const z = lay().zone; return { x: z[0] + (hand === 'L' ? -x : x) * z[2], y: z[1] - y * z[3] }; };
 const BREAK = { FB:[0, -3], SI:[-5, 4], CT:[4, 1], SL:[9, 3], CU:[2, 14], CH:[-2, 8], FK:[0, 12] };
 function drawPitchScene(G, A){
   bgPitch();
-  const P = curPitcher(G), B = curBatter(G), F = fieldTeam(G), T = batTeam(G);
-  const hand = (A && A.hand) || B.hand, left = hand === 'L';
+  const L = lay(), P = curPitcher(G), B = curBatter(G), F = fieldTeam(G), T = batTeam(G);
+  const hand = (A && A.hand) || B.hand, left = hand === 'L', pl = P.hand === 'L', slot = armSlot(P);
   const ph = A ? A.ph : 'idle';   // idle·windup·flight·result
-  const pPose = ph === 'windup' ? (A.t0 < 0.5 ? 'lift' : 'throw') : ph === 'flight' || ph === 'result' ? 'follow' : 'set';
-  drawPerson('pitcher', 128, 82, F.color, pPose, false);
-  // 공
-  if(A && (ph === 'flight' || (ph === 'result' && A.res !== 'inplay'))){
-    const tgt = zonePt(A.x, A.y, hand), k = ph === 'flight' ? A.t0 : 1;
-    const br = BREAK[A.t] || [0, 0], dir = left ? -1 : 1;
-    const sx = 130, sy = 92, cx = (sx + tgt.x) / 2 - br[0] * dir * 1.5, cy = (sy + tgt.y) / 2 - 10 - br[1];
-    const bx = (1 - k) * (1 - k) * sx + 2 * (1 - k) * k * cx + k * k * tgt.x, by = (1 - k) * (1 - k) * sy + 2 * (1 - k) * k * cy + k * k * tgt.y;
-    const s = 1 + k * 2.2;
-    R(bx - s / 2, by - s / 2, s, s, PAL.ball);
-    if(ph === 'result'){ R(tgt.x - 2, tgt.y - 2, 5, 5, A.res === 'take' && Math.abs(A.x) <= 1 && Math.abs(A.y) <= 1 ? PAL.ink : PAL.ball); }
-  }
+  const pPose = ph === 'windup' ? (A.t0 < 0.5 ? 'lift' : 'throw') : ph === 'flight' ? (A.t0 < 0.15 ? 'throw' : 'follow') : ph === 'result' ? 'follow' : 'set';
+  drawPerson('pitcher', L.pitcher[0], L.pitcher[1], F.color, pPose, pl, slot);
   // 스트라이크 존 (흐리게)
-  GX.ctx.strokeStyle = 'rgba(252,252,252,0.35)'; GX.ctx.strokeRect(118.5, 177.5, 20, 18);
+  const z = L.zone;
+  GX.ctx.strokeStyle = 'rgba(252,252,252,0.35)'; GX.ctx.strokeRect(z[0] - z[2] - 0.5, z[1] - z[3] - 0.5, z[2] * 2, z[3] * 2);
+  drawPerson('catcher', L.catcher[0], L.catcher[1], F.color, 'squat', false);
+  // 공: 투수 손에서 나와 구종에 따라 휘며 커짐 (왼손 투수는 반대쪽 손)
+  const rel = L.release[slot], sx = pl ? 2 * L.pitcher[0] - rel[0] : rel[0], sy = rel[1];
+  const tgt = A ? zonePt(A.x, A.y, hand) : null;
+  if(A && (ph === 'flight' || (ph === 'result' && A.res !== 'inplay'))){
+    const k = ph === 'flight' ? A.t0 : 1;
+    const br = BREAK[A.t] || [0, 0], dir = pl ? -1 : 1;
+    const cx = (sx + tgt.x) / 2 - br[0] * dir * 1.5, cy = (sy + tgt.y) / 2 - 10 - br[1] - (slot === 2 ? -6 : 0);
+    const bx = (1 - k) * (1 - k) * sx + 2 * (1 - k) * k * cx + k * k * tgt.x, by = (1 - k) * (1 - k) * sy + 2 * (1 - k) * k * cy + k * k * tgt.y;
+    ball(bx, by, 1.5 + k * 2.5);
+    if(ph === 'result' && A.res === 'take' && Math.abs(A.x) <= 1 && Math.abs(A.y) <= 1) R(tgt.x - 3, tgt.y - 3, 7, 1, PAL.ink), R(tgt.x - 3, tgt.y + 3, 7, 1, PAL.ink);
+  }
+  // 쳤을 때: 공이 방망이에 맞고 튀어 나감 (뜬공은 위로, 땅볼은 투수 쪽 아래로)
+  if(A && ph === 'result' && A.res === 'inplay' && A.bb){
+    const k = Math.min(1, A.t0 * 1.4), up = A.bb.type === 'gb' ? 0.2 : A.bb.type === 'ld' ? 0.6 : 1.2, side = [-1, 0, 1][A.bb.fi ?? 1] * 60;
+    ball(tgt.x + side * k, tgt.y - (tgt.y - 40) * k * up, 4 - k * 2);
+  }
   // 타자: 오른손은 홈 왼쪽, 왼손은 오른쪽(좌우 뒤집음)
   let bPose = 'stance';
-  if(A && (ph === 'flight' && A.t0 > 0.8 || ph === 'result')){ if(A.res === 'bunt') bPose = 'bunt'; else if(['whiff', 'foul', 'inplay'].includes(A.res)) bPose = ph === 'result' ? 'swfollow' : 'swing'; }
-  drawPerson('batter', left ? 150 : 106, 182, T.color, bPose, left);
-  drawPerson('catcher', 128, 204, F.color, 'squat', false);
+  if(A && (ph === 'flight' && A.t0 > 0.8 || ph === 'result')){ if(A.res === 'bunt') bPose = 'bunt'; else if(['whiff', 'foul', 'inplay'].includes(A.res)) bPose = ph === 'result' && A.t0 > 0.3 ? 'swfollow' : 'swing'; }
+  const bp = left ? L.batL : L.batR;
+  drawPerson('batter', bp[0], bp[1], T.color, bPose, left);
   scoreBar(G);
-  if(A && ph === 'result' && A.banner) banner(A.banner, 120, A.bannerColor || PAL.ink, 22);
+  if(A && ph === 'result' && A.banner) banner(A.banner, 112, A.bannerColor || PAL.ink, 22);
+}
+// 공 하나 (크기 s): 흰 공에 검정 테두리
+function ball(x, y, s){
+  const r = Math.max(1, Math.round(s));
+  if(r <= 1){ R(x, y, 2, 2, PAL.ball); return; }
+  R(x - r / 2 - 1, y - r / 2, r + 2, r, '#000'); R(x - r / 2, y - r / 2 - 1, r, r + 2, '#000'); R(x - r / 2, y - r / 2, r, r, PAL.ball);
 }
 
-/* ---------- 수비 화면 (위에서 본 야구장) ---------- */
-const HOME = { x:128, y:210 }, PXM = 1.3;   // 1미터 = 1.3픽셀
-const fieldPt = (ang, m) => ({ x: HOME.x + Math.sin(ang) * m * PXM, y: HOME.y - Math.cos(ang) * m * PXM });
+/* ---------- 수비 화면 (위에서 본 야구장) ----------
+   fm(각도, 미터)은 야구장 위 한 점을 화면 좌표로. 각도 0은 가운데, +는 오른쪽(1루 쪽), ±0.785가 파울선.
+   그림 배경(비스듬히 본 야구장)은 내야가 크고 외야가 눌려 있어서, 베이스까지는 그대로, 그 너머는 담장까지 눌러서 맞춤 */
+const HOME = { x:128, y:210 }, PXM = 1.3;   // 코드로 그린 배경: 1미터 = 1.3픽셀
 const FIELD_ANG = [-0.55, 0, 0.55];
+const FIMG = { home:[128, 199], b1:[221, 133], b2:[128, 85], b3:[35, 133] };
+function fm(ang, m){
+  if(!GX.img['bg-field']) return { x: HOME.x + Math.sin(ang) * m * PXM, y: HOME.y - Math.cos(ang) * m * PXM };
+  const a = Math.max(-0.785, Math.min(0.785, ang)), t = Math.abs(a) / 0.785, side = a < 0 ? FIMG.b3 : FIMG.b1;
+  const ring = [FIMG.b2[0] + (side[0] - FIMG.b2[0]) * t, FIMG.b2[1] + (side[1] - FIMG.b2[1]) * t];
+  const rr = 38.8 / (Math.sin(Math.abs(a)) + Math.cos(a)), u = m / rr;
+  const g = u <= 1 ? u : 1 + (u - 1) * (0.16 + 0.015 * t);
+  const p = { x: FIMG.home[0] + (ring[0] - FIMG.home[0]) * g, y: FIMG.home[1] + (ring[1] - FIMG.home[1]) * g };
+  if(ang !== a) p.x += (ang - a) * 200;   // 파울 지역 바깥
+  return p;
+}
+// 높이 1미터가 화면에서 몇 픽셀 위로 보이는지 (멀수록 작게)
+const hpx = y => GX.img['bg-field'] ? 0.8 + 0.6 * Math.max(0, Math.min(1, (y - 47) / 152)) : 0.9;
 function fenceAt(G, ang){
   const f = (G.park && G.park.fence) || [98, 120, 98], a = Math.abs(ang) / 0.785, side = ang < 0 ? f[0] : f[2];
   return f[1] + (side - f[1]) * Math.min(1, a);
@@ -179,48 +215,66 @@ function bgField(G){
   const rnd = mulberry(11);
   for(let y = 0; y < 224; y += 3) for(let x = (y % 2) * 2; x < 256; x += 4) if(rnd() < 0.35) R(x, y, 2, 2, ['#fcfcfc', '#f87858', '#3cbcfc', '#f8b800'][Math.floor(rnd() * 4)]);
   ctx.fillStyle = PAL.fence; ctx.beginPath(); ctx.moveTo(HOME.x, HOME.y + 6);
-  for(let a = -0.8; a <= 0.8001; a += 0.05){ const p = fieldPt(a, fenceAt(G, a) + 4); ctx.lineTo(p.x, p.y); }
+  for(let a = -0.8; a <= 0.8001; a += 0.05){ const p = fm(a, fenceAt(G, a) + 4); ctx.lineTo(p.x, p.y); }
   ctx.closePath(); ctx.fill();
   ctx.fillStyle = PAL.grass; ctx.beginPath(); ctx.moveTo(HOME.x, HOME.y + 2);
-  for(let a = -0.8; a <= 0.8001; a += 0.05){ const p = fieldPt(a, fenceAt(G, a)); ctx.lineTo(p.x, p.y); }
+  for(let a = -0.8; a <= 0.8001; a += 0.05){ const p = fm(a, fenceAt(G, a)); ctx.lineTo(p.x, p.y); }
   ctx.closePath(); ctx.fill();
   ctx.fillStyle = PAL.dirt; ctx.beginPath(); ctx.moveTo(HOME.x, HOME.y + 4); ctx.lineTo(HOME.x + 40, HOME.y - 34); ctx.lineTo(HOME.x, HOME.y - 66); ctx.lineTo(HOME.x - 40, HOME.y - 34); ctx.closePath(); ctx.fill();
   ctx.fillStyle = PAL.grass2; ctx.beginPath(); ctx.moveTo(HOME.x, HOME.y - 6); ctx.lineTo(HOME.x + 24, HOME.y - 30); ctx.lineTo(HOME.x, HOME.y - 54); ctx.lineTo(HOME.x - 24, HOME.y - 30); ctx.closePath(); ctx.fill();
   R(HOME.x - 3, HOME.y - 33, 6, 5, PAL.dirt2);
+  [[0.785, 27.4], [0, 38.8], [-0.785, 27.4]].forEach(([a, m]) => { const b = fm(a, m); R(b.x - 2, b.y - 2, 4, 4, PAL.white); });
 }
-const BASE_PT = [{ x:153, y:185 }, { x:128, y:160 }, { x:103, y:185 }];
-const FIELDER_HOME = { P:{ x:128, y:181 }, C:{ x:128, y:216 }, '1B':{ x:150, y:178 }, '2B':{ x:140, y:162 }, SS:{ x:115, y:162 }, '3B':{ x:106, y:178 }, LF:fieldPt(-0.5, 78), CF:fieldPt(0, 88), RF:fieldPt(0.5, 78) };
+const BASE_POL = [[0.785, 27.4], [0, 38.8], [-0.785, 27.4]];
+const FPOS = { P:[0, 18.4], '1B':[0.6, 30], '2B':[0.2, 39], SS:[-0.2, 39], '3B':[-0.6, 30], LF:[-0.5, 82], CF:[0, 94], RF:[0.5, 82] };
 function tinyPlayer(x, y, team, frame){
-  const im = tinted('fielder', team);
-  if(im){ GX.ctx.drawImage(im, (frame % 4) * 16, 0, 16, 24, Math.round(x - 8), Math.round(y - 20), 16, 24); return; }
+  if(tinted('fielder', team) && GX.meta.fielder){ drawPerson('fielder', x, y, team, ['set', 'lift', 'throw', 'follow'][frame % 4], false); return; }
   R(x - 2, y - 7, 4, 2, team); R(x - 2, y - 5, 4, 2, PAL.skin); R(x - 3, y - 3, 6, 4, PAL.white);
   R(x - 3 + (frame % 2), y + 1, 2, 2, PAL.white); R(x + 1 - (frame % 2), y + 1, 2, 2, PAL.white);
 }
+// 타구가 떨어지는(잡히는) 거리: 엔진이 정한 거리, 없으면 타구 종류로 짐작
+function landDist(G, bb, ang){
+  const fence = fenceAt(G, ang);
+  if(bb.hit === 4) return Math.max(bb.d || 0, fence + 12);
+  if(bb.d) return Math.min(bb.d, fence - 2);
+  return { gb:35, ld:bb.hit ? 70 : 55, fb:bb.hit >= 2 ? fence - 8 : 78, pu:24 }[bb.type] || 60;
+}
 function drawFieldScene(G, A){
   bgField(G);
-  const F = fieldTeam(G), T = batTeam(G), bb = A.bb || {}, k = A.t0;
+  const F = fieldTeam(G), T = batTeam(G), bb = A.bb || {}, k = Math.min(1, A.t0);
   const ang = FIELD_ANG[bb.fi ?? 1] + (A.jit || 0);
-  const dist = bb.d || 60, land = fieldPt(ang, Math.min(dist, 140));
-  // 야수: 공에 가장 가까운 야수가 쫓아감
-  const keys = Object.keys(FIELDER_HOME);
+  const dist = landDist(G, bb, ang), land = fm(ang, dist);
+  // 야수: 공에 가장 가까운 야수가 쫓아감 (홈런이면 담장까지)
+  const chase = bb.hit === 4 ? fm(ang, fenceAt(G, ang) - 3) : land;
   let near = 'CF', nd = 1e9;
-  keys.forEach(p => { const h = FIELDER_HOME[p], dd = Math.hypot(h.x - land.x, h.y - land.y); if(p !== 'C' && dd < nd){ nd = dd; near = p; } });
-  keys.forEach(p => {
-    const h = FIELDER_HOME[p], hx = h.x, hy = h.y;
-    const go = p === near ? Math.min(1, k * 1.2) : 0;
-    tinyPlayer(hx + (land.x - hx) * go * 0.9, hy + (land.y - hy) * go * 0.9, F.color, Math.floor(k * 10));
-  });
-  // 주자 (플레이가 끝난 뒤의 자리)
-  G.bases.forEach((r, i) => { if(r != null && A.ph === 'fresult') tinyPlayer(BASE_PT[i].x, BASE_PT[i].y, T.color, 0); });
-  BASE_PT.forEach(b => R(b.x - 2, b.y - 2, 4, 4, PAL.white));
-  // 타구: 뜬공은 높이 떠서(그림자와 공), 땅볼은 굴러감
-  const kk = Math.min(1, k);
-  const bx = HOME.x + (land.x - HOME.x) * kk, by = HOME.y + (land.y - HOME.y) * kk;
-  const high = bb.type === 'fb' || bb.type === 'pu' ? Math.sin(kk * Math.PI) * (bb.type === 'pu' ? 40 : 30 + dist / 6) : bb.type === 'ld' ? Math.sin(kk * Math.PI) * 8 : 0;
-  R(bx - 1, by - 1, 3, 2, 'rgba(0,0,0,0.45)');
-  R(bx - 1.5, by - 1.5 - high, 3, 3, PAL.ball);
+  const pts = {}; Object.keys(FPOS).forEach(p => { pts[p] = fm(FPOS[p][0], FPOS[p][1]); const dd = Math.hypot(pts[p].x - chase.x, pts[p].y - chase.y); if(dd < nd){ nd = dd; near = p; } });
+  const people = Object.keys(FPOS).map(p => { const h = pts[p], go = p === near ? Math.min(1, k * 1.15) : 0; return [h.x + (chase.x - h.x) * go, h.y + (chase.y - h.y) * go, F.color, p === near && go < 1 ? Math.floor(k * 12) : 0]; });
+  const home = fm(0, 0); people.push([home.x, home.y + 12, F.color, 0]);   // 포수
+  // 타자 주자: 1루로 뜀 / 결과가 나오면 지금 주자 자리
+  if(A.ph === 'fly'){ const b1 = fm(...BASE_POL[0]), q = Math.min(1, k * 1.3); people.push([home.x + (b1.x - home.x) * q, home.y + (b1.y - home.y) * q, T.color, Math.floor(k * 12)]); }
+  else G.bases.forEach((r, i) => { if(r != null){ const b = fm(...BASE_POL[i]); people.push([b.x, b.y + 2, T.color, 0]); } });
+  people.sort((p, q) => p[1] - q[1]).forEach(p => tinyPlayer(...p));   // 먼 사람부터 그려서 가까운 사람이 앞에
+  // 타구: 그림자는 땅을 따라가고, 공은 높이만큼 위에 크게 (높이 뜨면 화면에 가까워지는 것처럼)
+  const gx = home.x + (land.x - home.x) * k, gy = home.y + (land.y - home.y) * k;
+  const apex = { fb: 22 + dist / 5, pu: 38, ld: 5, gb: 0 }[bb.type] ?? 15;
+  let h = 4 * apex * k * (1 - k);
+  if(bb.type === 'gb') h = Math.abs(Math.sin(k * Math.PI * 3)) * 2.5 * (1 - k);
+  if(bb.hit === 4 && k >= 1) h = 0;
+  R(gx - 2, gy - 1, 4, 2, 'rgba(0,0,0,0.45)');
+  ball(gx, gy - h * hpx(gy), 2 + h / 7);
   scoreBar(G);
-  if(A.ph === 'fresult' && A.banner){ banner(A.banner, 96, A.bannerColor || PAL.ink, 24); if(A.hr && Math.floor(performance.now() / 150) % 2) pxText('★', 60, 70, PAL.red, 18), pxText('★', 196, 70, PAL.ink, 18); }
+  if(A.ph === 'fresult' && A.banner){
+    banner(A.banner, 92, A.bannerColor || PAL.ink, 24);
+    if(A.hr) fireworks(performance.now());
+  }
+}
+// 홈런 불꽃: 몇 군데에서 터지며 퍼짐
+function fireworks(now){
+  const cols = [PAL.red, PAL.ink, '#3cbcfc', '#58d854', PAL.white];
+  for(let i = 0; i < 4; i++){
+    const t = ((now / 900) + i * 0.27) % 1, cx = [50, 206, 90, 170][i], cy = [50, 56, 36, 40][i], r = 4 + t * 22;
+    for(let j = 0; j < 10; j++){ const a = j / 10 * 6.283; R(cx + Math.cos(a) * r, cy + Math.sin(a) * r + t * 6, 2, 2, cols[(i + j) % cols.length]); }
+  }
 }
 
 /* ---------- 움직임 ---------- */
@@ -253,7 +307,7 @@ function gfxTick(){
     else if(el < 300){ A.ph = 'windup'; A.t0 = el / 300; }
     else if(el < 700){ A.ph = 'flight'; A.t0 = (el - 300) / 400; }
     else if(A.res !== 'inplay' || !A.bb){ A.ph = 'result'; A.t0 = 1; if(el > 1600) GX.anim = null; }
-    else if(el < 1000){ A.ph = 'result'; A.banner0 = A.banner; }
+    else if(el < 1000){ A.ph = 'result'; A.t0 = (el - 700) / 300; }
     else if(el < 2100){ A.ph = 'fly'; A.t0 = (el - 1000) / 1100; }
     else { A.ph = 'fresult'; A.t0 = 1; if(el > 3300) GX.anim = null; }
   }
