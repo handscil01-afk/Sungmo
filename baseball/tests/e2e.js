@@ -19,6 +19,9 @@ const PORT = 8766;
   const noOverflow = async (page, where) => {
     const w = await page.evaluate(() => [document.documentElement.scrollWidth, innerWidth]);
     if(w[0] > w[1] + 1) errors.push(`${where}: 가로로 넘침 ${w[0]} > ${w[1]}`);
+    // 화면 보며 하기의 경기 화면은 세로로도 넘치면 안 됨 (한 화면에서 다 고름)
+    const v = await page.evaluate(() => [document.documentElement.classList.contains('gfxgame'), document.documentElement.scrollHeight, innerHeight, (() => { const o = [...document.querySelectorAll('#opts .opt')].pop(); return o ? Math.round(o.getBoundingClientRect().bottom) : 0; })()]);
+    if(v[0] && (v[1] > v[2] + 1 || v[3] > v[2] + 1)) errors.push(`${where}: 그림 모드 경기 화면이 한 화면을 넘침 ${v[1]}/${v[3]} > ${v[2]}`);
   };
   // 경기 화면에서 무작위로 골라 끝까지 진행 (메뉴 빠져나가기·그만하기는 피함)
   async function playToEnd(page, tag, useClick){

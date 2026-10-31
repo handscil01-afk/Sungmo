@@ -134,3 +134,38 @@ body{ margin:0; min-height:100vh; background:var(--bg); color:var(--ink); line-h
 @media (orientation:landscape) and (max-height:520px){
   .gfxwrap{ max-width:calc((100vh - 24px) * 256 / 224); }
 }
+
+/* 화면 보며 하기: 경기 화면은 스크롤 없이 한 화면 (그림 → 결과 한 줄 → 질문 → 선택지) */
+html.gfxgame, html.gfxgame body{ height:100%; overflow:hidden; }
+html.gfxgame #app{ height:100dvh; display:flex; flex-direction:column; padding:max(4px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)); max-width:none; }
+html.gfxgame .top{ position:fixed; top:max(6px, env(safe-area-inset-top)); right:max(8px, env(safe-area-inset-right)); padding:0; z-index:5; }
+html.gfxgame .top h1{ display:none; }
+html.gfxgame .top .btn.small{ min-height:30px; padding:2px 10px; font-size:0.75rem; opacity:0.85; background:rgba(0,0,0,0.6); border-color:#666; color:#fff; }
+html.gfxgame #top, html.gfxgame #note, html.gfxgame #logSec, html.gfxgame #cmdForm{ display:none !important; }
+html.gfxgame #main{ flex:1; min-height:0; display:flex; flex-direction:column; gap:6px; }
+html.gfxgame #boardSec{ flex:none; }
+html.gfxgame #boardSec > :not(.gfxwrap){ display:none; }
+html.gfxgame .gfxwrap{ margin:0 auto; max-width:min(100%, calc((100dvh - 230px) * 256 / 224)); border-width:2px; }
+html.gfxgame #turn{ flex:1; min-height:0; display:flex; flex-direction:column; gap:6px; overflow:auto; }
+html.gfxgame #say{ background:none; border:0; padding:0 2px; margin:0; }
+html.gfxgame #say p{ display:none; margin:0; }
+html.gfxgame #say p:last-child{ display:block; font-size:0.8rem; line-height:1.35; color:var(--ink2); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+html.gfxgame #q{ font-size:0.9rem; margin:0; line-height:1.3; }
+html.gfxgame .opts:not(.grid){ grid-template-columns:repeat(3, minmax(0, 1fr)); gap:6px; }
+html.gfxgame .opt{ min-height:46px; padding:4px 6px; gap:6px; border-radius:10px; }
+html.gfxgame .opt small{ display:none; }
+html.gfxgame .opt b{ font-size:0.82rem; line-height:1.2; }
+html.gfxgame .opt .num{ width:1.5rem; height:1.5rem; font-size:0.8rem; flex:none; }
+html.gfxgame .opts.grid .opt{ min-height:40px; }
+html.gfxgame #extra .btn{ min-height:36px; padding:4px 12px; font-size:0.85rem; }
+html.gfxgame #chatSec{ max-height:20vh; overflow:auto; }
+/* 가로 화면: 왼쪽 그림, 오른쪽 선택지 */
+@media (orientation:landscape){
+  html.gfxgame #main{ flex-direction:row; }
+  html.gfxgame #boardSec{ height:100%; display:flex; align-items:center; flex:none; }
+  html.gfxgame #turn{ height:100%; }
+  html.gfxgame .gfxwrap{ max-width:none; width:auto; height:min(calc(100dvh - 12px), calc(58vw * 224 / 256)); aspect-ratio:256 / 224; flex:none; }
+  html.gfxgame .gfxwrap canvas{ height:100%; width:auto; }
+  html.gfxgame #turn{ padding-top:36px; }
+  html.gfxgame .opts:not(.grid){ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+}

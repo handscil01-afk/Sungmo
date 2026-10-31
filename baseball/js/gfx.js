@@ -5,15 +5,18 @@
    - 수비 화면: 공을 치면 위에서 본 야구장으로 바뀌어 타구가 날아가고 야수가 쫓아감. 홈런이면 담장을 넘김
    그림 파일(img/*.png, GPT로 만든 도트 그림)이 있으면 그것을 쓰고, 없으면 코드로 그린 도트 그림을 씀.
    팀 색 자리는 그림에서 자홍색(#FF00FF)으로 칠해 두면 팀 색으로 바꿔 칠함. 이 화면은 눈으로 보는 용도라 화면 낭독기에는 숨김 */
-const GX = { W:256, H:224, cv:null, ctx:null, key:'', anim:null, raf:0, img:{}, tinted:{}, meta:{} };
+const GX = { W:256, H:224, cv:null, ctx:null, key:'', anim:null, queue:[], raf:0, img:{}, tinted:{}, meta:{}, cam:{ x:0, y:0 }, lastAnimN:null, lastPlayN:null };
 const PAL = { sky:'#5c94fc', stand:'#3c3c64', fence:'#00682c', grass:'#38a838', grass2:'#4cbc4c', dirt:'#c88850', dirt2:'#b87840', line:'#fcfcfc',
   skin:'#f8b878', white:'#fcfcfc', black:'#000000', glove:'#a85010', bat:'#e4a050', ball:'#fcfcfc', ink:'#fcfc54', red:'#f83800' };
-const GX_FILES = ['bg-pitch', 'bg-field', 'pitcher', 'batter', 'catcher', 'fielder', 'banners'];
+const GX_FILES = ['bg-pitch', 'bg-field', 'pitcher', 'batter', 'catcher', 'fielder', 'banners', 'banners2', 'umpire', 'umpire-s', 'runner', 'tv'];
 // 결과 글씨 (banners.png를 쓸 때는 이 순서로 한 줄에 하나씩, 128×32)
 const BANNERS = ['스트라이크!', '볼', '헛스윙!', '파울', '안타!', '2루타!', '3루타!', '홈런!', '아웃!', '삼진!', '볼넷', '세이프!', '몸에 맞는 공'];
+const BANNERS2 = ['비디오 판독', '판정 번복!', '원심 유지', '견제!', '도루!', '병살!', '끝내기!', '게임 셋!'];
 function banner(text, y, color, size){
-  const im = GX.img.banners, i = BANNERS.indexOf(text);
-  if(im && i >= 0 && im.height >= (i + 1) * 32){ GX.ctx.drawImage(im, 0, i * 32, 128, 32, 64, Math.round(y - 4), 128, 32); return; }
+  for(const [file, list] of [['banners', BANNERS], ['banners2', BANNERS2]]){
+    const im = GX.img[file], m = GX.meta[file], i = list.indexOf(text);
+    if(im && m && i >= 0 && im.height >= (i + 1) * m.h){ const sc = m.scale || 1, w = m.w / sc, h = m.h / sc; GX.ctx.drawImage(im, 0, i * m.h, m.w, m.h, Math.round(128 - w / 2), Math.round(y + 12 - h / 2), w, h); return; }
+  }
   pxText(text, 128, y, color, size);
 }
 
@@ -43,22 +46,21 @@ function tinted(name, color){
 }
 const R = (x, y, w, h, c) => { GX.ctx.fillStyle = c; GX.ctx.fillRect(Math.round(x), Math.round(y), w, h); };
 // 도트 글씨: 글자를 그린 뒤 반투명한 테두리를 없애 또렷하게
+// 글씨: 그림판이 2배 해상도라 글씨는 2배 크기로 만들어 반으로 줄여 그림 (도트 그림보다 또렷하게)
 function pxText(str, x, y, color, size = 10, center = true, outline = true){
   const k = `t${str}${color}${size}${outline}`;
   let c = GX.tinted[k];
   if(!c){
-    const m = document.createElement('canvas').getContext('2d'); m.font = `bold ${size}px sans-serif`;
-    const w = Math.ceil(m.measureText(str).width) + 4, h = size + 6;
+    const S = size * 2, font = `bold ${S}px 'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif`;
+    const m = document.createElement('canvas').getContext('2d'); m.font = font;
+    const w = Math.ceil(m.measureText(str).width) + 8, h = S + 10;
     c = document.createElement('canvas'); c.width = w; c.height = h;
-    const t = c.getContext('2d'); t.font = `bold ${size}px sans-serif`; t.textBaseline = 'top';
-    if(outline){ t.fillStyle = '#000'; [[-1, 0], [1, 0], [0, -1], [0, 1], [1, 1]].forEach(([dx, dy]) => t.fillText(str, 2 + dx, 2 + dy)); }
-    t.fillStyle = color; t.fillText(str, 2, 2);
-    const d = t.getImageData(0, 0, w, h), p = d.data;
-    for(let i = 3; i < p.length; i += 4) p[i] = p[i] > 110 ? 255 : 0;
-    t.putImageData(d, 0, 0);
+    const t = c.getContext('2d'); t.font = font; t.textBaseline = 'top'; t.lineJoin = 'round';
+    if(outline){ t.strokeStyle = '#000'; t.lineWidth = 4; t.strokeText(str, 4, 4); }
+    t.fillStyle = color; t.fillText(str, 4, 4);
     GX.tinted[k] = c;
   }
-  GX.ctx.drawImage(c, Math.round(center ? x - c.width / 2 : x), Math.round(y));
+  GX.ctx.drawImage(c, center ? x - c.width / 4 : x, y, c.width / 2, c.height / 2);
 }
 
 /* ---------- 코드로 그린 사람 (그림 파일이 없을 때) ----------
@@ -89,11 +91,13 @@ function person(x, y, team, pose, flip){
   else if(pose === 'bunt'){ P(-2, 7, 2, 2, PAL.skin); P(-6, 6, 12, 2, PAL.bat); }
 }
 // 그림 파일의 동작 칸 (img/index.json의 칸 크기·줄 수). 발끝 가운데를 (x, foot)에 맞춰 그림
-const POSE_FRAME = { set:0, lift:1, throw:2, follow:3, stance:0, swing:1, swfollow:2, bunt:3 };
+const POSE_FRAME = { set:0, lift:1, throw:2, follow:3, stance:0, swing:1, swfollow:2, bunt:3, u0:0, u1:1, u2:2, u3:3, u4:4, run0:0, run1:1, slideH:2, slideF:3, tag0:4, tag1:5, throw0:6, throw1:7 };
 function drawPerson(kind, x, foot, team, pose, flip, row = 0){
   const im = tinted(kind, team), m = GX.meta[kind];
   if(im && m){
-    const fr = Math.min(m.n - 1, POSE_FRAME[pose] || 0), r = Math.min(m.rows - 1, row), ctx = GX.ctx;
+    let f0 = POSE_FRAME[pose] || 0, r = row;
+    if(f0 >= m.n){ r = Math.floor(f0 / m.n); f0 %= m.n; }
+    const fr = Math.min(m.n - 1, f0), ctx = GX.ctx; r = Math.min(m.rows - 1, r);
     const dx = Math.round(x - m.w / 2), dy = Math.round(foot - m.h);
     ctx.save();
     if(flip){ ctx.translate(dx + m.w, dy); ctx.scale(-1, 1); ctx.drawImage(im, fr * m.w, r * m.h, m.w, m.h, 0, 0, m.w, m.h); }
@@ -106,7 +110,7 @@ function drawPerson(kind, x, foot, team, pose, flip, row = 0){
 // 투수 폼: 투수마다 정해짐 (오버핸드 60%, 사이드암 25%, 언더핸드 15%). 그림 줄 번호
 function armSlot(P){ let h = 7; for(const c of String(P.name) + P.id) h = (h * 31 + c.charCodeAt(0)) | 0; const v = Math.abs(h) % 20; return v < 12 ? 0 : v < 17 ? 1 : 2; }
 // 화면 배치: 그림 파일 배경과 코드로 그린 배경의 자리가 다름
-const LAY_IMG = { pitcher:[128, 121], batR:[62, 214], batL:[194, 214], catcher:[128, 226], zone:[128, 168, 12, 11], release:[[121, 88], [114, 96], [118, 108]] };
+const LAY_IMG = { pitcher:[128, 121], batR:[62, 214], batL:[194, 214], catcher:[128, 244], zone:[128, 160, 12, 11], release:[[121, 88], [114, 96], [118, 108]] };
 const LAY_CODE = { pitcher:[128, 102], batR:[106, 202], batL:[150, 202], catcher:[128, 218], zone:[128, 186, 10, 9], release:[[130, 92], [126, 96], [128, 100]] };
 const lay = () => GX.img['bg-pitch'] && GX.meta.pitcher ? LAY_IMG : LAY_CODE;
 
@@ -130,16 +134,21 @@ function mulberry(a){ return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Mat
 // 위쪽 점수판 (볼·스트라이크·아웃 등과 주자 미니 다이아몬드)
 function scoreBar(G){
   const [A, H] = G.teams;
-  R(0, 0, 256, 18, '#000');
-  pxText(`${A.short} ${runsOf(A)}`, 4, 2, A.color, 10, false, false);
-  pxText(`${H.short} ${runsOf(H)}`, 70, 2, H.color, 10, false, false);
-  pxText(G.over ? '경기 끝' : `${G.inning}회${G.top ? '초' : '말'}`, 136, 2, PAL.white, 10, false, false);
-  const lamp = (lx, label, n, max, c) => { pxText(label, lx, 4, PAL.white, 8, false, false); for(let i = 0; i < max; i++) R(lx + 8 + i * 6, 7, 4, 4, i < n ? c : '#3c3c3c'); };
-  lamp(170, 'B', G.balls, 3, '#58d854'); lamp(200, 'S', G.strikes, 2, '#f8b800'); lamp(224, 'O', G.outs, 2, PAL.red);
-  // 주자: 오른쪽 위 작은 다이아몬드
-  const base = (bx, by, on) => { R(bx, by, 5, 5, on ? PAL.ink : '#000'); R(bx + 1, by + 1, 3, 3, on ? PAL.ink : '#555'); };
-  R(224, 20, 30, 22, 'rgba(0,0,0,0.55)');
-  base(244, 29, G.bases[0] != null); base(236, 22, G.bases[1] != null); base(228, 29, G.bases[2] != null); R(237, 37, 3, 3, PAL.white);
+  R(0, 0, 256, 31, '#000'); R(0, 31, 256, 1, '#3c3c64');
+  // 왼쪽: 두 팀 점수 (공격 중인 팀 앞에 ▶)
+  [[A, 1], [H, 16]].forEach(([T, y], i) => {
+    if(!G.over && (i === 0) === G.top) pxText('▶', 2, y + 1, PAL.ink, 8, false, false);
+    pxText(T.short, 11, y, T.color, 11, false, false);
+    pxText(String(runsOf(T)), 70, y, PAL.white, 11, false, false);
+  });
+  pxText(G.over ? '경기 끝' : `${G.inning}회${G.top ? '초' : '말'}`, 100, 8, PAL.white, 12, true, false);
+  // 볼·스트라이크·아웃
+  const lamp = (lx, y, label, n, max, c) => { pxText(label, lx, y, PAL.white, 9, false, false); for(let i = 0; i < max; i++){ R(lx + 10 + i * 9, y + 2, 7, 7, '#000'); R(lx + 11 + i * 9, y + 3, 5, 5, i < n ? c : '#3c3c3c'); } };
+  lamp(126, 1, 'B', G.balls, 3, '#58d854'); lamp(126, 11, 'S', G.strikes, 2, '#f8b800'); lamp(126, 21, 'O', G.outs, 2, PAL.red);
+  // 주자: 오른쪽 작은 다이아몬드
+  const base = (bx, by, on) => { R(bx, by, 8, 8, '#000'); R(bx + 1, by + 1, 6, 6, on ? PAL.ink : '#555'); };
+  // (오른쪽 끝 36픽셀은 메뉴 단추 자리)
+  base(202, 12, G.bases[0] != null); base(188, 2, G.bases[1] != null); base(174, 12, G.bases[2] != null); R(190, 24, 4, 4, PAL.white);
 }
 // 스트라이크 존 좌표: x(-몸쪽~+바깥쪽)·y(+높게)를 화면으로. 오른손 타자면 바깥쪽이 화면 오른쪽
 const zonePt = (x, y, hand) => { const z = lay().zone; return { x: z[0] + (hand === 'L' ? -x : x) * z[2], y: z[1] - y * z[3] }; };
@@ -154,6 +163,10 @@ function drawPitchScene(G, A){
   // 스트라이크 존 (흐리게)
   const z = L.zone;
   GX.ctx.strokeStyle = 'rgba(252,252,252,0.35)'; GX.ctx.strokeRect(z[0] - z[2] - 0.5, z[1] - z[3] - 0.5, z[2] * 2, z[3] * 2);
+  if(GX.meta.umpire && L === LAY_IMG){
+    const call = A && ph === 'result' ? ({ '스트라이크!':'u1', '삼진!':'u1', '헛스윙!':'u1', '파울':'u3' })[A.banner] || 'u0' : 'u0';
+    drawPerson('umpire', 140, 238, '#ff00ff', call, false);
+  }
   drawPerson('catcher', L.catcher[0], L.catcher[1], F.color, 'squat', false);
   // 공: 투수 손에서 나와 구종에 따라 휘며 커짐 (왼손 투수는 반대쪽 손)
   const rel = L.release[slot], sx = pl ? 2 * L.pitcher[0] - rel[0] : rel[0], sy = rel[1];
@@ -186,30 +199,30 @@ function ball(x, y, s){
   R(x - r / 2 - 1, y - r / 2, r + 2, r, '#000'); R(x - r / 2, y - r / 2 - 1, r, r + 2, '#000'); R(x - r / 2, y - r / 2, r, r, PAL.ball);
 }
 
-/* ---------- 수비 화면 (위에서 본 야구장) ----------
-   fm(각도, 미터)은 야구장 위 한 점을 화면 좌표로. 각도 0은 가운데, +는 오른쪽(1루 쪽), ±0.785가 파울선.
-   그림 배경(비스듬히 본 야구장)은 내야가 크고 외야가 눌려 있어서, 베이스까지는 그대로, 그 너머는 담장까지 눌러서 맞춤 */
+/* ---------- 수비 화면 (위에서 본 넓은 야구장, 화면이 공을 따라감) ----------
+   fm(각도, 미터)은 야구장 위 한 점을 '세계 좌표'로. 각도 0은 가운데, +는 오른쪽(1루 쪽), ±0.785가 파울선.
+   그림 배경(512×512)은 외야가 실제보다 눌려 있어서, 베이스까지는 그대로 줄이고 그 너머는 그 구장의 담장 거리가 그림의 담장에 오도록 맞춤 */
 const HOME = { x:128, y:210 }, PXM = 1.3;   // 코드로 그린 배경: 1미터 = 1.3픽셀
 const FIELD_ANG = [-0.55, 0, 0.55];
-const FIMG = { home:[128, 199], b1:[221, 133], b2:[128, 85], b3:[35, 133] };
+const FW = { home:[256, 400], b1:[346, 302], b2:[256, 231], b3:[166, 302], gC:1.95, gS:2.38 };
+const wide = () => !!(GX.img['bg-field'] && GX.meta['bg-field'] && GX.meta['bg-field'].w >= 512);
+const worldW = () => wide() ? GX.meta['bg-field'].w : 256, worldH = () => wide() ? GX.meta['bg-field'].h : 224;
 function fm(ang, m){
-  if(!GX.img['bg-field']) return { x: HOME.x + Math.sin(ang) * m * PXM, y: HOME.y - Math.cos(ang) * m * PXM };
-  const a = Math.max(-0.785, Math.min(0.785, ang)), t = Math.abs(a) / 0.785, side = a < 0 ? FIMG.b3 : FIMG.b1;
-  const ring = [FIMG.b2[0] + (side[0] - FIMG.b2[0]) * t, FIMG.b2[1] + (side[1] - FIMG.b2[1]) * t];
-  const rr = 38.8 / (Math.sin(Math.abs(a)) + Math.cos(a)), u = m / rr;
-  const g = u <= 1 ? u : 1 + (u - 1) * (0.16 + 0.015 * t);
-  const p = { x: FIMG.home[0] + (ring[0] - FIMG.home[0]) * g, y: FIMG.home[1] + (ring[1] - FIMG.home[1]) * g };
-  if(ang !== a) p.x += (ang - a) * 200;   // 파울 지역 바깥
+  if(!wide()) return { x: HOME.x + Math.sin(ang) * m * PXM, y: HOME.y - Math.cos(ang) * m * PXM };
+  const a = Math.max(-0.785, Math.min(0.785, ang)), t = Math.abs(a) / 0.785, side = a < 0 ? FW.b3 : FW.b1;
+  const ring = [FW.b2[0] + (side[0] - FW.b2[0]) * t, FW.b2[1] + (side[1] - FW.b2[1]) * t];
+  const rr = 38.8 / (Math.sin(Math.abs(a)) + Math.cos(a)), fence = fenceAt(G, a), gf = FW.gC + (FW.gS - FW.gC) * t;
+  const g = m <= rr ? m / rr : 1 + (gf - 1) * (m - rr) / Math.max(10, fence - rr);
+  const p = { x: FW.home[0] + (ring[0] - FW.home[0]) * g, y: FW.home[1] + (ring[1] - FW.home[1]) * g };
+  if(ang !== a) p.x += (ang - a) * 260;   // 파울 지역 바깥
   return p;
 }
-// 높이 1미터가 화면에서 몇 픽셀 위로 보이는지 (멀수록 작게)
-const hpx = y => GX.img['bg-field'] ? 0.8 + 0.6 * Math.max(0, Math.min(1, (y - 47) / 152)) : 0.9;
 function fenceAt(G, ang){
-  const f = (G.park && G.park.fence) || [98, 120, 98], a = Math.abs(ang) / 0.785, side = ang < 0 ? f[0] : f[2];
+  const f = (G && G.park && G.park.fence) || [98, 120, 98], a = Math.abs(ang) / 0.785, side = ang < 0 ? f[0] : f[2];
   return f[1] + (side - f[1]) * Math.min(1, a);
 }
 function bgField(G){
-  if(GX.img['bg-field']){ GX.ctx.drawImage(GX.img['bg-field'], 0, 0); return; }
+  if(wide()){ GX.ctx.drawImage(GX.img['bg-field'], 0, 0); return; }
   const ctx = GX.ctx;
   R(0, 0, 256, 224, PAL.stand);
   const rnd = mulberry(11);
@@ -223,7 +236,7 @@ function bgField(G){
   ctx.fillStyle = PAL.dirt; ctx.beginPath(); ctx.moveTo(HOME.x, HOME.y + 4); ctx.lineTo(HOME.x + 40, HOME.y - 34); ctx.lineTo(HOME.x, HOME.y - 66); ctx.lineTo(HOME.x - 40, HOME.y - 34); ctx.closePath(); ctx.fill();
   ctx.fillStyle = PAL.grass2; ctx.beginPath(); ctx.moveTo(HOME.x, HOME.y - 6); ctx.lineTo(HOME.x + 24, HOME.y - 30); ctx.lineTo(HOME.x, HOME.y - 54); ctx.lineTo(HOME.x - 24, HOME.y - 30); ctx.closePath(); ctx.fill();
   R(HOME.x - 3, HOME.y - 33, 6, 5, PAL.dirt2);
-  [[0.785, 27.4], [0, 38.8], [-0.785, 27.4]].forEach(([a, m]) => { const b = fm(a, m); R(b.x - 2, b.y - 2, 4, 4, PAL.white); });
+  BASE_POL.forEach(([a, m]) => { const b = fm(a, m); R(b.x - 2, b.y - 2, 4, 4, PAL.white); });
 }
 const BASE_POL = [[0.785, 27.4], [0, 38.8], [-0.785, 27.4]];
 const FPOS = { P:[0, 18.4], '1B':[0.6, 30], '2B':[0.2, 39], SS:[-0.2, 39], '3B':[-0.6, 30], LF:[-0.5, 82], CF:[0, 94], RF:[0.5, 82] };
@@ -235,33 +248,45 @@ function tinyPlayer(x, y, team, frame){
 // 타구가 떨어지는(잡히는) 거리: 엔진이 정한 거리, 없으면 타구 종류로 짐작
 function landDist(G, bb, ang){
   const fence = fenceAt(G, ang);
-  if(bb.hit === 4) return Math.max(bb.d || 0, fence + 12);
+  if(bb.hit === 4) return Math.max(bb.d || 0, fence + 14);
   if(bb.d) return Math.min(bb.d, fence - 2);
   return { gb:35, ld:bb.hit ? 70 : 55, fb:bb.hit >= 2 ? fence - 8 : 78, pu:24 }[bb.type] || 60;
 }
 function drawFieldScene(G, A){
-  bgField(G);
-  const F = fieldTeam(G), T = batTeam(G), bb = A.bb || {}, k = Math.min(1, A.t0);
+  const F = fieldTeam(G), T = batTeam(G), bb = A.bb || {}, k = Math.min(1, A.t0), ctx = GX.ctx;
   const ang = FIELD_ANG[bb.fi ?? 1] + (A.jit || 0);
-  const dist = landDist(G, bb, ang), land = fm(ang, dist);
-  // 야수: 공에 가장 가까운 야수가 쫓아감 (홈런이면 담장까지)
-  const chase = bb.hit === 4 ? fm(ang, fenceAt(G, ang) - 3) : land;
-  let near = 'CF', nd = 1e9;
-  const pts = {}; Object.keys(FPOS).forEach(p => { pts[p] = fm(FPOS[p][0], FPOS[p][1]); const dd = Math.hypot(pts[p].x - chase.x, pts[p].y - chase.y); if(dd < nd){ nd = dd; near = p; } });
-  const people = Object.keys(FPOS).map(p => { const h = pts[p], go = p === near ? Math.min(1, k * 1.15) : 0; return [h.x + (chase.x - h.x) * go, h.y + (chase.y - h.y) * go, F.color, p === near && go < 1 ? Math.floor(k * 12) : 0]; });
-  const home = fm(0, 0); people.push([home.x, home.y + 12, F.color, 0]);   // 포수
-  // 타자 주자: 1루로 뜀 / 결과가 나오면 지금 주자 자리
-  if(A.ph === 'fly'){ const b1 = fm(...BASE_POL[0]), q = Math.min(1, k * 1.3); people.push([home.x + (b1.x - home.x) * q, home.y + (b1.y - home.y) * q, T.color, Math.floor(k * 12)]); }
-  else G.bases.forEach((r, i) => { if(r != null){ const b = fm(...BASE_POL[i]); people.push([b.x, b.y + 2, T.color, 0]); } });
-  people.sort((p, q) => p[1] - q[1]).forEach(p => tinyPlayer(...p));   // 먼 사람부터 그려서 가까운 사람이 앞에
+  const dist = landDist(G, bb, ang), land = fm(ang, dist), home = fm(0, 0);
   // 타구: 그림자는 땅을 따라가고, 공은 높이만큼 위에 크게 (높이 뜨면 화면에 가까워지는 것처럼)
   const gx = home.x + (land.x - home.x) * k, gy = home.y + (land.y - home.y) * k;
   const apex = { fb: 22 + dist / 5, pu: 38, ld: 5, gb: 0 }[bb.type] ?? 15;
   let h = 4 * apex * k * (1 - k);
   if(bb.type === 'gb') h = Math.abs(Math.sin(k * Math.PI * 3)) * 2.5 * (1 - k);
-  if(bb.hit === 4 && k >= 1) h = 0;
+  const lift = h * (wide() ? 1.1 : 0.9);
+  // 화면(카메라): 처음엔 내야 전체, 그다음 공을 부드럽게 따라감
+  const W = worldW(), H = worldH(), clampC = c => ({ x: Math.max(0, Math.min(W - 256, c.x)), y: Math.max(0, Math.min(H - 224, c.y)) });
+  if(!A.camInit){ A.camInit = true; GX.cam = clampC({ x: home.x - 128, y: home.y - 196 }); }
+  const want = clampC({ x: gx - 128, y: gy - lift * 0.5 - 118 });
+  GX.cam = { x: GX.cam.x + (want.x - GX.cam.x) * 0.12, y: GX.cam.y + (want.y - GX.cam.y) * 0.12 };
+  ctx.save(); ctx.translate(-Math.round(GX.cam.x), -Math.round(GX.cam.y));
+  bgField(G);
+  // 야수: 공에 가장 가까운 야수가 쫓아감 (홈런이면 담장까지)
+  const chase = bb.hit === 4 ? fm(ang, fenceAt(G, ang) - 3) : land;
+  let near = 'CF', nd = 1e9;
+  const pts = {}; Object.keys(FPOS).forEach(p => { pts[p] = fm(FPOS[p][0], FPOS[p][1]); const dd = Math.hypot(pts[p].x - chase.x, pts[p].y - chase.y); if(dd < nd){ nd = dd; near = p; } });
+  const people = Object.keys(FPOS).map(p => { const hp = pts[p], go = p === near ? Math.min(1, k * 1.15) : 0; return [hp.x + (chase.x - hp.x) * go, hp.y + (chase.y - hp.y) * go, F.color, p === near && go < 1 ? Math.floor(k * 12) : 0]; });
+  people.push([home.x, home.y + 12, F.color, 0]);   // 포수
+  // 타자 주자: 1루로 뜀 / 결과가 나오면 지금 주자 자리
+  if(A.ph === 'fly'){ const b1 = fm(...BASE_POL[0]), q = Math.min(1, k * 1.3); people.push([home.x + (b1.x - home.x) * q, home.y + (b1.y - home.y) * q, T.color, Math.floor(k * 12)]); }
+  else G.bases.forEach((r, i) => { if(r != null){ const b = fm(...BASE_POL[i]); people.push([b.x, b.y + 2, T.color, 0]); } });
+  people.sort((p, q) => p[1] - q[1]).forEach(p => tinyPlayer(...p));   // 먼 사람부터 그려서 가까운 사람이 앞에
+  // 심판: 결과가 나오면 1루심(세이프·아웃) 또는 주심(홈런)이 콜
+  if(A.ph === 'fresult' && GX.meta['umpire-s']){
+    if(A.hr) drawPerson('umpire-s', home.x + 14, home.y + 22, '#ff00ff', 'u4', false);
+    else { const u = fm(0.95, 30); drawPerson('umpire-s', u.x, u.y, '#ff00ff', /아웃|삼진|병살/.test(A.banner || '') ? 'u1' : 'u2', false); }
+  }
   R(gx - 2, gy - 1, 4, 2, 'rgba(0,0,0,0.45)');
-  ball(gx, gy - h * hpx(gy), 2 + h / 7);
+  ball(gx, gy - lift, 2 + h / 6);
+  ctx.restore();
   scoreBar(G);
   if(A.ph === 'fresult' && A.banner){
     banner(A.banner, 92, A.bannerColor || PAL.ink, 24);
@@ -277,61 +302,145 @@ function fireworks(now){
   }
 }
 
+/* ---------- 베이스 가까이 (도루·견제·판독 다시 보기) ----------
+   옆에서 본 베이스. 도루는 주자가 왼쪽에서 달려와 슬라이딩하고 야수가 오른쪽에서 공을 받아 태그.
+   견제는 반대로 주자가 오른쪽(리드한 자리)에서 돌아옴. safe면 주자가 먼저, 아니면 태그가 먼저 */
+function drawBasePlay(o, k){
+  const T = batTeam(G), F = fieldTeam(G), back = o.k === 'pick', flip = back;
+  const X = x => flip ? 256 - x : x;
+  R(0, 0, 256, 224, PAL.grass); for(let y = 0; y < 110; y += 12) R(0, y, 256, 6, PAL.grass2);
+  R(0, 110, 256, 80, PAL.dirt); R(0, 110, 256, 2, PAL.dirt2);
+  R(X(128) - 9, 152, 18, 6, '#000'); R(X(128) - 8, 153, 16, 4, PAL.white);   // 베이스
+  const arrive = o.safe ? 0.7 : 0.84, tagT = o.safe ? 0.8 : 0.66;
+  // 심판 (뒤쪽)
+  if(GX.meta.umpire) drawPerson('umpire', X(196), 132, '#ff00ff', k > Math.max(arrive, tagT) + 0.04 ? (o.safe ? 'u2' : 'u1') : 'u0', flip);
+  // 야수: 공을 기다리다 받으면 글러브를 베이스 쪽으로
+  const hasRunner = GX.meta.runner && tinted('runner', T.color);
+  const fPose = k < tagT - 0.15 ? 'tag1' : 'tag0';
+  // 주자: 달리다가 슬라이딩
+  const rx = k < arrive ? -30 + (128 - 22 + 30) * (k / arrive) : 128 - 22 + (k - arrive) * 10;
+  const sliding = k > arrive - 0.18;
+  if(hasRunner){
+    drawPerson('runner', X(152), 162, F.color, fPose, flip);
+    drawPerson('runner', X(Math.min(rx, 116)), 162, T.color, sliding ? 'slideF' : (Math.floor(k * 14) % 2 ? 'run1' : 'run0'), flip);
+    if(sliding) for(let i = 0; i < 4; i++) R(X(rx - 34 - i * 5) , 152 + (i % 2) * 4, 3, 3, '#f8e0b0');
+  } else {
+    person(X(152), 140, F.color, 'set', flip); person(X(Math.min(rx, 116)), 140, T.color, sliding ? 'follow' : 'set', flip);
+  }
+  // 공: 오른쪽 위(포수·투수 쪽)에서 날아와 글러브로
+  if(k < tagT){ const q = Math.max(0, (k - (tagT - 0.35)) / 0.35); if(q > 0) ball(X(300 - 160 * q), 70 + 60 * q, 3); }
+}
+// 비디오 판독: 오래된 TV 화면 안에서 느리게 다시 봄
+function drawReview(o, k, phase){
+  R(0, 0, 256, 224, '#101828');
+  for(let y = 20; y < 224; y += 4) R(0, y, 256, 1, '#141e30');
+  const tv = GX.meta.tv, tx = 28, ty = 30, sc = tv ? tv.screen : [24, 29, 152, 92];
+  const sx = tx + sc[0], sy = ty + sc[1], sw = sc[2], sh = sc[3];
+  const ctx = GX.ctx;
+  ctx.save(); ctx.beginPath(); ctx.rect(sx, sy, sw, sh); ctx.clip();
+  const z = 0.62; ctx.translate(sx + sw / 2 - 128 * z, sy + sh / 2 - 138 * z); ctx.scale(z, z);
+  if(o.rk === 'hr'){   // 담장 끝 타구: 담장 꼭대기 근처로 떨어지는 공
+    R(0, 0, 256, 224, PAL.stand); R(0, 110, 256, 60, PAL.fence); R(0, 110, 256, 3, PAL.ink); R(0, 170, 256, 54, PAL.grass);
+    const fall = 30 + k * 100, over = o.call === 'hr';
+    ball(128 + (over ? -10 : 10) * k, over ? fall : Math.min(fall, 116 + (k - 0.8) * 60), 6);
+  } else drawBasePlay({ k: o.rk === 'pick' ? 'pick' : 'steal', safe: o.call === 'safe' }, k);
+  ctx.restore();
+  if(GX.img.tv) ctx.drawImage(GX.img.tv, tx, ty); else { ctx.strokeStyle = '#888'; ctx.lineWidth = 6; ctx.strokeRect(sx - 3, sy - 3, sw + 6, sh + 6); ctx.lineWidth = 1; }
+  scoreBar(G);
+  if(phase === 'end') banner(o.flip ? '판정 번복!' : '원심 유지', 186, o.flip ? PAL.red : PAL.ink, 20);
+  else if(Math.floor(performance.now() / 500) % 2 || phase === 'replay') banner('비디오 판독', 186, PAL.ink, 20);
+}
+
 /* ---------- 움직임 ---------- */
-// 결과 글씨: 이번에 생긴 효과음 사건으로 정함
-function bannerOf(fx){
+// 결과 글씨: 이번에 생긴 효과음 사건과 중계 문장으로 정함
+function bannerOf(fx, text){
   const has = n => fx.includes(n);
+  if(G && G.over) return [G.walkoff ? '끝내기!' : '게임 셋!', PAL.ink, has('hr')];
   if(has('hr')) return ['홈런!', PAL.red, true];
+  if(/병살/.test(text)) return ['병살!', '#3cbcfc'];
   if(has('b3')) return ['3루타!', PAL.ink]; if(has('b2')) return ['2루타!', PAL.ink]; if(has('hit')) return ['안타!', PAL.ink];
   if(has('k')) return ['삼진!', '#3cbcfc']; if(has('ball')) return ['볼넷', '#58d854']; if(has('out')) return ['아웃!', '#3cbcfc'];
   if(fx.some(n => /^whiff/.test(n))) return ['헛스윙!', '#f8b800']; if(has('foul')) return ['파울', PAL.white];
   if(has('strike')) return ['스트라이크!', '#f8b800']; if(has('ballc')) return ['볼', '#58d854']; if(has('safe')) return ['세이프!', PAL.ink];
   return null;
 }
-function gfxStart(G, fx){
-  const A0 = G.anim;
-  let bn = bannerOf(fx || []);
-  if(A0 && A0.res === 'hbp') bn = ['몸에 맞는 공', '#58d854'];
-  if(!A0){ if(bn) GX.anim = { simple:true, ph:'result', t0:1, start: performance.now(), banner: bn[0], bannerColor: bn[1], hr: bn[2] }; return; }
-  GX.anim = { ...A0, ph:'windup', t0:0, start: performance.now(), banner: bn && bn[0], bannerColor: bn && bn[1], hr: bn && bn[2], jit: (Math.random() - 0.5) * 0.3 };
+// 새 투구·새 플레이가 있으면 차례대로 보여 줌 (투구 → 도루·견제·판독)
+function gfxStart(G, fx, lines){
+  const now = performance.now(), text = (lines || []).map(l => l.s || l).join(' ');
+  const newPitch = !!(G.anim && G.anim.n !== GX.lastAnimN), newPlay = !!(G.play && G.play.n !== GX.lastPlayN);
+  GX.lastAnimN = G.anim ? G.anim.n : null; GX.lastPlayN = G.play ? G.play.n : null;
+  const list = [];
+  if(newPitch){
+    // 도루·견제의 세이프·아웃은 뒤의 베이스 장면에서 보여 줌
+    const pfx = newPlay && G.anim.res !== 'inplay' ? fx.filter(n => n !== 'safe' && n !== 'out') : fx;
+    let bn = bannerOf(pfx, text);
+    if(G.anim.res === 'hbp') bn = ['몸에 맞는 공', '#58d854'];
+    list.push({ kind:'pitch', ...G.anim, ph:'windup', t0:0, banner: bn && bn[0], bannerColor: bn && bn[1], hr: bn && bn[2], jit: (Math.random() - 0.5) * 0.3 });
+  }
+  if(newPlay){
+    const p = G.play;
+    if(p.k === 'steal' || p.k === 'pick') list.push({ kind:'base', o: p, t0:0, banner: p.safe ? (p.k === 'steal' ? '도루!' : '세이프!') : '아웃!', intro: p.k === 'pick' ? '견제!' : null });
+    else if(p.k === 'review') list.push({ kind:'review', o: p, t0:0 });
+    else if(p.k === 'reviewEnd') list.push({ kind:'reviewEnd', o: p, t0:0 });
+  }
+  if(!list.length){ const bn = bannerOf(fx || [], text); if(bn) list.push({ kind:'banner', ph:'result', t0:1, banner: bn[0], bannerColor: bn[1], hr: bn[2] }); }
+  if(!list.length) return;
+  list.forEach(a => a.start = now);
+  GX.anim = list.shift(); GX.queue = list;
+  if(!GX.raf && GX.cv) GX.raf = requestAnimationFrame(gfxTick);
+}
+// 시간이 흐른 만큼 단계를 정함. 끝났으면 false
+function stepAnim(A, el){
+  if(A.kind === 'banner') return el < 1200;
+  if(A.kind === 'base'){ A.t0 = Math.min(1, el / 1500); return el < 2400; }
+  if(A.kind === 'review'){ A.t0 = (el % 2600) / 2600; return true; }   // 판독을 고르는 동안 계속 다시 보여 줌
+  if(A.kind === 'reviewEnd'){ A.t0 = Math.min(1, el / 2600); A.phase = el < 2600 ? 'replay' : 'end'; return el < 4400; }
+  // 투구: 투구 동작 0.3초 → 공 0.4초 → 결과 0.9초 (치면 공이 튀어 나가고) → 타구 1.1초 → 결과 1.2초
+  if(el < 300){ A.ph = 'windup'; A.t0 = el / 300; return true; }
+  if(el < 700){ A.ph = 'flight'; A.t0 = (el - 300) / 400; return true; }
+  if(A.res !== 'inplay' || !A.bb){ A.ph = 'result'; A.t0 = 1; return el < 1600; }
+  if(el < 1000){ A.ph = 'result'; A.t0 = (el - 700) / 300; return true; }
+  if(el < 2100){ A.ph = 'fly'; A.t0 = (el - 1000) / 1100; return true; }
+  A.ph = 'fresult'; A.t0 = 1; return el < 3300;
 }
 const REDUCED = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 function gfxTick(){
   GX.raf = 0;
   if(!GX.cv || !document.contains(GX.cv) || !G) return;
-  const A = GX.anim, now = performance.now();
-  if(A){
-    const el = (now - A.start) / (REDUCED() ? 4 : 1);
-    // 시간표: 투구 동작 0.3초 → 공 0.4초 → 결과 0.9초 (치면) → 타구 1.1초 → 결과 1.2초
-    if(A.simple){ A.ph = 'result'; if(el > 1200) GX.anim = null; }
-    else if(el < 300){ A.ph = 'windup'; A.t0 = el / 300; }
-    else if(el < 700){ A.ph = 'flight'; A.t0 = (el - 300) / 400; }
-    else if(A.res !== 'inplay' || !A.bb){ A.ph = 'result'; A.t0 = 1; if(el > 1600) GX.anim = null; }
-    else if(el < 1000){ A.ph = 'result'; A.t0 = (el - 700) / 300; }
-    else if(el < 2100){ A.ph = 'fly'; A.t0 = (el - 1000) / 1100; }
-    else { A.ph = 'fresult'; A.t0 = 1; if(el > 3300) GX.anim = null; }
+  const now = performance.now();
+  let A = GX.anim;
+  while(A && !stepAnim(A, (now - A.start) * (REDUCED() ? 3 : 1))){ A = GX.anim = GX.queue.shift() || null; if(A){ A.start = now; } }
+  if(!A) drawPitchScene(G, null);
+  else if(A.kind === 'banner'){ drawPitchScene(G, null); banner(A.banner, 112, A.bannerColor || PAL.ink, 22); }
+  else if(A.kind === 'base'){
+    drawBasePlay(A.o, A.t0); scoreBar(G);
+    if(A.intro && A.t0 < 0.45) banner(A.intro, 40, PAL.ink, 22);
+    if(A.t0 >= 1) banner(A.banner, 40, A.o.safe ? PAL.ink : '#3cbcfc', 22);
   }
-  const B = GX.anim;
-  if(B && (B.ph === 'fly' || B.ph === 'fresult')) drawFieldScene(G, B);
-  else drawPitchScene(G, B && !(B.res === 'inplay' && B.ph === 'result' && B.bb) ? B : (B ? { ...B, banner:null } : null));
+  else if(A.kind === 'review') drawReview(A.o, A.t0, 'wait');
+  else if(A.kind === 'reviewEnd') drawReview(A.o, A.t0, A.phase);
+  else if(A.ph === 'fly' || A.ph === 'fresult') drawFieldScene(G, A);
+  else drawPitchScene(G, A.res === 'inplay' && A.ph === 'result' && A.bb ? { ...A, banner:null } : A);
   if(GX.anim) GX.raf = requestAnimationFrame(gfxTick);
 }
-// render()가 부름: 화면 모드일 때 상황판 자리에 그림판을 두고, 새 투구가 있으면 움직임을 시작
-function gfxRender(G, fx){
+// render()가 부름: 화면 모드일 때 상황판 자리에 그림판을 두고, 새 투구·플레이가 있으면 움직임을 시작
+function gfxRender(G, fx, lines){
   const bs = $('#boardSec');
   let wrap = bs.querySelector('.gfxwrap');
   if(!wrap){
     wrap = document.createElement('div'); wrap.className = 'gfxwrap'; wrap.setAttribute('aria-hidden', 'true');
-    wrap.innerHTML = '<canvas id="gfx" width="256" height="224"></canvas>';
+    wrap.innerHTML = '<canvas id="gfx" width="512" height="448"></canvas>';
     GX.cv = wrap.firstChild; GX.ctx = GX.cv.getContext('2d'); GX.ctx.imageSmoothingEnabled = false; GX.key = '';
+    GX.ctx.setTransform(2, 0, 0, 2, 0, 0);   // 그림은 256×224 좌표로 그리고 2배로 (글씨는 2배 해상도 그대로)
     if(!GX.img.__) gfxLoad();
   }
   bs.prepend(wrap);
-  const key = `${G.at}:${G.anim ? G.anim.n : 0}:${G.seq}`;
+  const key = `${G.at}:${G.anim ? G.anim.n : 0}:${G.play ? G.play.n : 0}:${G.seq}`;
   if(key !== GX.key){
     const fresh = GX.key && GX.key.split(':')[0] === String(G.at);
     GX.key = key;
-    if(fresh) gfxStart(G, fx);
+    if(fresh) gfxStart(G, fx || [], lines);
+    else { GX.lastAnimN = G.anim ? G.anim.n : null; GX.lastPlayN = G.play ? G.play.n : null; GX.anim = null; GX.queue = []; }
   }
   if(!GX.raf) GX.raf = requestAnimationFrame(gfxTick);
 }

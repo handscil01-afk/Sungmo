@@ -36,13 +36,16 @@ function stay(msg){ rerender(); speak(msg); }
 function render(){
   const S = UI.S, hadFocus = $('#opts').contains(document.activeElement);
   applySet();
+  // 화면 보며 하기의 경기 화면: 그림 + 짧은 결과 한 줄 + 선택지만 한 화면에 (머리줄·글 상황판·기록은 숨김)
+  const gg = SET.view === 'gfx' && !!S.board && !!G;
+  document.documentElement.classList.toggle('gfxgame', gg);
   $('#top').innerHTML = S.top || '';
   const bs = $('#boardSec');
   if(S.board && typeof boardHTML === 'function' && G){
     bs.hidden = false;
     const keep = SET.view === 'gfx' && typeof gfxRender === 'function' && bs.querySelector('.gfxwrap');
     bs.innerHTML = boardHTML();
-    if(SET.view === 'gfx' && typeof gfxRender === 'function'){ if(keep) bs.prepend(keep); gfxRender(G, UI.lastFx || []); UI.lastFx = []; }
+    if(SET.view === 'gfx' && typeof gfxRender === 'function'){ if(keep) bs.prepend(keep); gfxRender(G, UI.lastFx || [], UI.lastLines || []); UI.lastFx = []; UI.lastLines = []; }
   }
   else { bs.hidden = true; bs.innerHTML = ''; }
   $('#say').innerHTML = (S.say || []).map(l => `<p class="${l.k ? 'k-' + l.k : ''}">${esc(l.s || l)}</p>`).join('');

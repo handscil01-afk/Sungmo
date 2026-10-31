@@ -463,6 +463,7 @@ function doSteal(G, simple, breaking, allowRev, pick){
   if(from === 2){
     emit(G, `판정 홈스틸: 확률 ${th}퍼센트, 주사위 ${d}, ${ok ? '세이프' : '아웃'}.`, 'd');
     b[2] = null;
+    markPlay(G, { k:'steal', to:3, safe:ok });
     if(ok){ R.st.sb++; emit(G, `${R.name}, 홈으로 파고듭니다! 홈스틸 성공!`, 'r'); fx(G, 'safe'); scoreRuns(G, [r], false); }
     else { addOut(G); emit(G, `${R.name}, 홈으로 뛰었지만 포수 ${fielder(F, 'C').replace(/^포수 /, '')}에게 태그 아웃! ${G.outs}아웃.`, 'r'); fx(G, 'out'); }
     return;
@@ -476,8 +477,9 @@ function doSteal(G, simple, breaking, allowRev, pick){
   }
   stealResult(G, from, r, to, ok, simple);
 }
-function stealResult(G, from, r, to, ok, simple){
+function stealResult(G, from, r, to, ok, simple, viaReview){
   const b = G.bases, R = batTeam(G).bat[r], F = fieldTeam(G);
+  if(!viaReview) markPlay(G, { k:'steal', to: from + 1, safe: ok });
   if(ok){
     b[from + 1] = r; b[from] = null; R.st.sb++;
     emit(G, `${R.name}, ${to} 도루 성공!`, 'r'); fx(G, 'safe');
@@ -513,6 +515,7 @@ function doPickoff(G, base){
       say: `${intro} ${R.name}, 몸을 날려 돌아갑니다… 아슬아슬! 원심은 ${callWord(call)}. ${ok ? `${R.name}, 손이 먼저 들어갔다며 강하게 어필합니다.` : `${josa(fld, '이', '가')} 태그가 먼저였다며 강하게 어필합니다.`}` });
     return;
   }
+  markPlay(G, { k:'pick', base, safe: !ok });
   if(ok){ G.bases[base] = null; addOut(G); emit(G, `${intro} ${R.name}, 귀루가 늦었습니다! 견제사, 아웃! ${G.outs}아웃.`, 'r'); fx(G, 'out'); return; }
   emit(G, pickOne(G, [`${intro} ${R.name}, 슬라이딩으로 돌아갑니다. 세이프.`, `${intro} 주자는 여유 있게 귀루합니다.`, `${intro} ${R.name}, 손이 먼저 들어갑니다. 세이프.`, `${intro} 주자를 묶어 둡니다. 세이프.`]), 'r');
 }
@@ -523,7 +526,9 @@ function doPickoff(G, base){
 const flipCall = c => ({ out:'safe', safe:'out', hr:'2b', '2b':'hr' })[c];
 const callWord = c => ({ out:'아웃', safe:'세이프', hr:'홈런', '2b':'2루타' })[c];
 const reviewLeft = (G, side) => G.teams[side].rev ?? 2;
-function openReview(G, R){ G.review = R; emit(G, R.say, 'r'); fx(G, 'review'); }
+// 화면 모드 그림용 플레이 기록 (도루·견제·비디오 판독). n이 늘어날 때마다 그림이 그 장면을 보여 줌
+function markPlay(G, o){ G.playN = (G.playN || 0) + 1; G.play = { n: G.playN, ...o }; }
+function openReview(G, R){ G.review = R; emit(G, R.say, 'r'); fx(G, 'review'); markPlay(G, { k:'review', rk: R.kind, call: R.call, base: R.data && (R.data.base ?? R.data.from) }); }
 function resolveReview(G, challenge){
   const R = G.review; if(!R) return flush(G);
   G.review = null;
@@ -532,6 +537,7 @@ function resolveReview(G, challenge){
   if(challenge && reviewLeft(G, R.side) > 0){
     emit(G, `${T.short} 감독, 비디오 판독을 신청합니다. 판독 중입니다…`, 'c');
     const th = Math.round(R.p * 100), d = rint(G, 1, 100);
+    markPlay(G, { k:'reviewEnd', rk: R.kind, flip: d <= th, call: d <= th ? flipCall(R.call) : R.call, base: R.data && (R.data.base ?? R.data.from) });
     if(d <= th){
       fin = flipCall(R.call); T.rev = reviewLeft(G, R.side);
       emit(G, `뒤집힐 확률 ${th}퍼센트, 주사위 ${d}. 판독 결과 원심이 뒤집힙니다! ${callWord(fin)}! ${T.short}의 판독 기회는 그대로 ${T.rev}번입니다.`, 'r'); fx(G, 'safe');
@@ -545,7 +551,7 @@ function resolveReview(G, challenge){
 }
 function applyReview(G, R, c){
   const T = batTeam(G), B = curBatter(G), P = curPitcher(G), d = R.data || {};
-  if(R.kind === 'steal'){ stealResult(G, d.from, d.r, d.to, c === 'safe', d.simple); if(G.outs >= 3) endPA(G, true); return; }
+  if(R.kind === 'steal'){ stealResult(G, d.from, d.r, d.to, c === 'safe', d.simple, true); if(G.outs >= 3) endPA(G, true); return; }
   if(R.kind === 'pick'){
     if(c === 'out' && G.bases[d.base] === d.r){ G.bases[d.base] = null; addOut(G); emit(G, `견제사로 인정됩니다. ${G.outs}아웃.`, 'r'); fx(G, 'out'); if(G.outs >= 3) endPA(G, true); }
     else emit(G, '세이프로 인정됩니다.', 'r');

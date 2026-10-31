@@ -58,23 +58,26 @@ def components(mask):
                 if 0 <= yy < sm.shape[0] and 0 <= xx < sm.shape[1] and sm[yy, xx] and not lab[yy, xx]:
                     lab[yy, xx] = k; st.append((yy, xx))
         boxes.append([min(xs) * 4, min(ys) * 4, max(xs) * 4 + 4, max(ys) * 4 + 4, len(ys)])
-    return boxes
+    return boxes, lab
 
 def frames(im, min_area=400):
     """한 줄의 동작 칸들: 큰 덩어리가 사람, 작은 덩어리(공·떨어진 조각)는 가장 가까운 사람에 붙임"""
     al = np.array(im)[..., 3] > 128
-    bx = components(al)
+    bx, lab = components(al)
+    for i, b in enumerate(bx): b.append([i + 1])
     big = sorted([b for b in bx if b[4] >= min_area], key=lambda b: b[0])
     for b in bx:
         if b[4] >= min_area or b[4] < 3: continue
-        cx = (b[0] + b[2]) / 2
-        t = min(big, key=lambda B: abs((B[0] + B[2]) / 2 - cx))
-        t[0], t[1], t[2], t[3] = min(t[0], b[0]), min(t[1], b[1]), max(t[2], b[2]), max(t[3], b[3])
-    res = []
+        cx, cy = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
+        t = min(big, key=lambda B: abs((B[0] + B[2]) / 2 - cx) + 0.3 * abs((B[1] + B[3]) / 2 - cy))
+        t[0], t[1], t[2], t[3] = min(t[0], b[0]), min(t[1], b[1]), max(t[2], b[2]), max(t[3], b[3]); t[5] += b[5]
+    res, arr = [], np.array(im)
     for b in big:
-        sub = Image.new('RGBA', im.size, (0, 0, 0, 0))
-        # 상자 안에서 다른 사람 조각이 섞이지 않도록 이 덩어리 상자만 잘라 냄
-        res.append(im.crop((b[0], b[1], min(b[2], im.width), min(b[3], im.height))))
+        # 상자가 겹쳐도 옆 사람 조각(방망이 끝 등)이 섞이지 않게 이 사람의 덩어리 칸만 남김
+        keep = np.isin(lab, b[5]).repeat(4, 0).repeat(4, 1)
+        full = np.zeros(al.shape, bool); full[: keep.shape[0], : keep.shape[1]] = keep
+        a = arr.copy(); a[~full] = 0
+        res.append(Image.fromarray(a).crop((b[0], b[1], min(b[2], im.width), min(b[3], im.height))))
     return res
 
 def rows(im, gap=3, n=None, th=128):
@@ -158,7 +161,21 @@ def outline(im):
     a[add] = [0, 0, 0, 255]
     return Image.fromarray(a)
 
-def banners(name, im, n_expected, cell_w=128, cell_h=32, text_h=22):
+TEXT_PAL = np.array([[0, 0, 0], [252, 224, 0], [252, 252, 252], [255, 0, 255], [248, 56, 0], [252, 152, 56]])
+def clean_text(im):
+    """글씨 색을 몇 가지(검정 테두리, 노랑, 흰색, 자홍, 빨강, 주황)로만 맞춰 지저분한 중간색을 없앰"""
+    a = np.array(im).astype(int)
+    rgb = a[..., :3]
+    d = ((rgb[..., None, :] - TEXT_PAL[None, None]) ** 2).sum(-1)
+    idx = d.argmin(-1)
+    dark = rgb.sum(-1) < 200
+    idx[dark] = 0
+    out = TEXT_PAL[idx]
+    res = np.dstack([out, a[..., 3]]).astype(np.uint8)
+    res[a[..., 3] == 0] = 0
+    return Image.fromarray(res)
+
+def banners(name, im, n_expected, cell_w=384, cell_h=80, text_h=60):
     rs = rows(im, n=n_expected, th=240)
     out = Image.new('RGBA', (cell_w, cell_h * len(rs)), (0, 0, 0, 0))
     text_ref = sorted(r.height for r in rs)[len(rs) // 2]   # 보통 줄 높이 (홈런처럼 큰 줄은 더 크게)
@@ -168,11 +185,11 @@ def banners(name, im, n_expected, cell_w=128, cell_h=32, text_h=22):
         xs = np.where(al.sum(0) > 1)[0]; ys = np.where(al.sum(1) > 1)[0]
         r = r.crop((xs[0], ys[0], xs[-1] + 1, ys[-1] + 1))
         s = min((cell_h - 2 if r.height > 1.6 * text_ref else text_h) / r.height, (cell_w - 4) / r.width)
-        f = outline(tidy(shrink(r, s), 12))
+        f = outline(outline(clean_text(shrink(r, s))))
         out.paste(f, ((cell_w - f.width) // 2, j * cell_h + (cell_h - f.height) // 2), f)
     out.save(os.path.join(OUT, name + '.png'))
     print(name, out.size)
-    return { 'w': cell_w, 'h': cell_h, 'n': 1, 'rows': len(rs) }
+    return { 'w': cell_w, 'h': cell_h, 'n': 1, 'rows': len(rs), 'scale': 2 }
 
 def background(name, im, colors=32):
     bg = im.convert('RGB').resize((256, 224), Image.BOX)
@@ -180,6 +197,34 @@ def background(name, im, colors=32):
     bg.save(os.path.join(OUT, name + '.png'))
     print(name, bg.size)
     return { 'w': 256, 'h': 224, 'n': 1, 'rows': 1 }
+
+def bgwide(name, im, size):
+    """넓은 경기장: 체크무늬 바깥은 어두운 관중석 색으로 채우고 정사각형 size로"""
+    base = Image.new('RGBA', im.size, (28, 28, 60, 255)); base.alpha_composite(im)
+    bg = base.convert('RGB').resize((size, size), Image.BOX)
+    bg = bg.quantize(48, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).convert('RGB')
+    bg.save(os.path.join(OUT, name + '.png'))
+    print(name, bg.size)
+    return { 'w': size, 'h': size, 'n': 1, 'rows': 1 }
+
+def picture(name, im, width):
+    """틀 그림(TV): 가운데 투명한 화면 자리의 상자도 함께 적음"""
+    s = width / im.width
+    f = tidy(shrink(im, s), 24)
+    al = np.array(f)[..., 3] == 0
+    h, w = al.shape
+    # 테두리와 이어지지 않은 투명 칸 = 화면 자리
+    seen = np.zeros_like(al); st = [(y, x) for x in range(w) for y in (0, h - 1)] + [(y, x) for y in range(h) for x in (0, w - 1)]
+    while st:
+        y, x = st.pop()
+        if 0 <= y < h and 0 <= x < w and al[y, x] and not seen[y, x]:
+            seen[y, x] = True; st += [(y + 1, x), (y - 1, x), (y, x + 1), (y, x - 1)]
+    hole = al & ~seen
+    ys, xs = np.where(hole)
+    f.save(os.path.join(OUT, name + '.png'))
+    scr = [int(xs.min()), int(ys.min()), int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1)] if len(xs) else [0, 0, w, h]
+    print(name, f.size, 'screen', scr)
+    return { 'w': f.width, 'h': f.height, 'n': 1, 'rows': 1, 'screen': scr }
 
 meta = {}
 cfg = json.load(open(os.path.join(SRC, 'sprites.json')))
@@ -189,6 +234,8 @@ for name, c in cfg.items():
     if c.get('checker'): im = remove_checker(im)
     kind = c['kind']
     if kind == 'bg': meta[name] = background(name, im)
+    elif kind == 'bgwide': meta[name] = bgwide(name, im, c['size'])
+    elif kind == 'picture': meta[name] = picture(name, im, c['width'])
     elif kind == 'banners': meta[name] = banners(name, im, c['n'])
     else:
         rr = rows(im) if c.get('rows', 1) > 1 else [im]
