@@ -90,8 +90,15 @@ function castResult(res, opt = {}){
         else if(bb.type !== 'gb') fly.push('c_chase');
         if(dive) fly.push('c_dive');
       }
+      // 안타는 공이 떨어지는(내야를 빠져나가는) 순간에 "안타!", 그 뒤 베이스 승부(홈 송구 등)는 일어나는 순간마다
+      const isHit = !!ps && (has('hit') || has('b2') || has('b3'));
+      let hitT = null;
+      if(isHit){
+        const land = ev.find(e => e.k === 'land'), first = ev.find(e => e.k === 'ball'), pick = ev.find(e => e.k === 'pickup');
+        hitT = land ? land.t : bb.type === 'gb' && first ? Math.min(first.t1, 1.3) : pick ? pick.t - 0.3 : null;
+      }
       // 결과 전까지 들어가는 만큼만 (첫 마디는 꼭)
-      const room = tl.result - tl.contact - 0.1, fit = [];
+      const room = (hitT != null ? hitT : tl.result - tl.contact) - (hitT != null ? 0 : 0) - 0.1, fit = [];
       let used = 0;
       fly.forEach((id, i) => { const d = castDur(id); if(i === 0 || used + d <= room){ fit.push(id); used += d; } });
       at(tl.contact, fit);
@@ -109,8 +116,13 @@ function castResult(res, opt = {}){
         else post.push(Math.random() < 0.25 ? 'r_out_sad' : pick1('r_catch1', 'r_catch2', 'r_catch3'));
       }
       else if(has('safe')) post.push(pick1('r_safe1', 'r_safe2'));
-      if(ps && (has('hit') || has('b2') || has('b3')) && (ps.rm || []).some(m => m.to == null)) post.push('r_steal_out');
-      resAt = tl.result; at(resAt, post);
+      if(isHit && hitT != null){
+        resAt = tl.contact + hitT; at(resAt, post);
+        // 그 뒤 베이스 승부: 홈에서 세이프면 득점, 아웃이면 "아웃! 잡아냅니다", 그 밖의 세이프는 "세이프!"
+        (ps.call || []).filter(c => c.base != null && !c.catch && c.t > hitT + 0.2 && !(c.base === 0 && !c.out)).sort((a, b) => a.t - b.t)
+          .forEach(c => at(tl.contact + c.t, c.out ? 'r_steal_out' : c.base === 3 ? pick1('r_score1', 'r_score2') : 'r_safe1'));
+        CAST.scoreSaid = (ps.call || []).some(c => c.base === 3 && !c.out && c.t > hitT + 0.2);
+      } else { resAt = tl.result; at(resAt, post); }
     } else {
       // 공이 미트에 들어가는(또는 방망이가 헛도는) 순간 판정, 이어서 볼카운트
       resAt = tl.contact;
@@ -141,7 +153,8 @@ function castResult(res, opt = {}){
     else if(P.k === 'wp') at(t, 'r_sigh1');
   }
   // 득점
-  if(/홈인|들어옵니다/.test(text) && !has('hr')) at(resAt, pick1('r_score1', 'r_score2'));
+  if(/홈인|들어옵니다/.test(text) && !has('hr') && !CAST.scoreSaid) at(resAt, pick1('r_score1', 'r_score2'));
+  CAST.scoreSaid = false;
   // 끝·공수 교대·새 타자 안내 (앞 중계가 끝난 뒤). 육성처럼 바로 건너뛸 때는 빼고, 건너뛴 뒤 지금 상황을 따로 말함(castSkip)
   const after = [];
   if(!opt.noAfter){

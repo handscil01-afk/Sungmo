@@ -245,7 +245,7 @@ function keyName(e){
 }
 document.addEventListener('keydown', e => {
   const cl = document.documentElement.classList;
-  if((cl.contains('hold') || cl.contains('castwait')) && !e.target.closest('input, textarea')) { e.preventDefault(); return; }   // 결과·중계를 기다리는 동안은 고르지 않음   // 결과를 기다리는 동안은 고르지 않음
+  if(cl.contains('hold') && !e.target.closest('input, textarea')) { e.preventDefault(); return; }   // 결과를 기다리는 동안은 고르지 않음 (중계 중에는 골라도 됨: 중계를 끊고 바로 진행)   // 결과를 기다리는 동안은 고르지 않음
   if(dlgOpen() || e.ctrlKey || e.metaKey || e.altKey) return;
   const t = e.target, tag = t && t.tagName;
   if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
