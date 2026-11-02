@@ -105,7 +105,7 @@ function suspenseMs(fx){
 function gameNext(via, res){
   // 감독 모드: 묻지 않는 타석은 바로 진행하고 결과를 모음 (온라인 손님은 방장이 계산)
   if(G.mode === 'manager' && !(NET.on && NET.role === 'guest')) res = mgrAuto(res);
-  if(res){ if(!res.skip){ UI.susp = suspenseMs(res.fx || []); if(typeof castResult === 'function' && castOn()){ const at = castResult(res, UI.susp); UI.castNow = true; if(at && UI.susp){ UI.susp = Math.max(UI.susp, at * 1000); SFX.castAt = at; } } } playFx(res.fx); UI.lastFx = res.skip ? res.skip.fx : res.fx || []; UI.lastLines = res.lines || []; UI.lastSkip = res.skip || null; }
+  if(res){ if(!res.skip){ UI.susp = suspenseMs(res.fx || []); if(typeof castResult === 'function' && castOn()){ const c = castResult(res); UI.castNow = true; if(c){ if(c.at && UI.susp){ UI.susp = Math.max(UI.susp, c.at * 1000); SFX.castAt = c.at; } UI.castLock = c.end * 1000; } } } playFx(res.fx); UI.lastFx = res.skip ? res.skip.fx : res.fx || []; UI.lastLines = res.lines || []; UI.lastSkip = res.skip || null; }
   const lines = visible(res ? res.lines : []);
   if(NET.on){ netNext(via, res, lines); return; }
   saveGame();
@@ -560,7 +560,7 @@ function startAutoPlay(){
     const pa = G.pa;
     const r = runSteps(() => G.pa !== pa);
     gameNext('auto', { lines: r.lines, fx: r.fx });
-    if(G && !G.over && GS.play) GS.play = setTimeout(tick, SET.watch * 1000);
+    if(G && !G.over && GS.play) GS.play = setTimeout(tick, Math.max(SET.watch * 1000, (UI.castEnd || 0) - performance.now() + 400));   // 중계가 끝난 뒤에
     else GS.play = 0;
   };
   GS.play = setTimeout(tick, 600);

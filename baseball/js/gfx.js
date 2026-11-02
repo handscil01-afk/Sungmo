@@ -204,7 +204,9 @@ function drawPitchScene(G, A){
   }
   // 타자: 오른손은 홈 왼쪽, 왼손은 오른쪽(좌우 뒤집음)
   let bPose = 'stance';
-  if(A && (ph === 'flight' && A.t0 > 0.8 || ph === 'result')){ if(A.res === 'bunt') bPose = 'bunt'; else if(['whiff', 'foul', 'inplay'].includes(A.res)) bPose = ph === 'result' && A.t0 > 0.3 ? 'swfollow' : 'swing'; }
+  const isBunt = A && (A.res === 'bunt' || (A.bb && A.bb.ps && A.bb.ps.bunt));
+  if(isBunt && (ph === 'flight' || ph === 'result')) bPose = 'bunt';
+  else if(A && (ph === 'flight' && A.t0 > 0.8 || ph === 'result')){ if(A.res === 'bunt') bPose = 'bunt'; else if(['whiff', 'foul', 'inplay'].includes(A.res)) bPose = ph === 'result' && A.t0 > 0.3 ? 'swfollow' : 'swing'; }
   // 주자: 베이스에서 리드하고 있는 모습 (1루는 오른쪽, 3루는 왼쪽, 2루는 투수 뒤)
   if(L === LAY_IMG && GX.meta['runner-s']){
     [[226, 146, false], [160, 100, true], [30, 146, true]].forEach(([x, y, flip], i) => {
@@ -271,6 +273,8 @@ const FPOS = { P:[0, 18.4], '1B':[0.6, 30], '2B':[0.2, 39], SS:[-0.2, 39], '3B':
 // 수비 화면의 작은 사람. mode: ready 서 있음 · run 달림 · catch 공 잡음 · throw 던짐 · runner 주자 달림 · base 베이스 위 주자
 function tinyPlayer(x, y, team, mode, frame = 0, flip = false){
   const has = n => GX.meta[n] && tinted(n, team);
+  // 달리는 수비수도 주자와 같은 달리기 그림(팀 색), 가는 쪽을 바라봄
+  if(mode === 'run' && has('runner-s')) return drawPerson('runner-s', x, y, team, ['p0', 'p1'][frame % 2], flip);
   if(mode === 'run' && has('fielder')) return drawPerson('fielder', x, y, team, ['set', 'lift', 'throw', 'follow'][frame % 4], false);
   if((mode === 'runner' || mode === 'base') && has('runner-s')) return drawPerson('runner-s', x, y, team, mode === 'base' ? 'p0' : ['p0', 'p1'][frame % 2], flip);
   // 서 있거나 잡거나 던질 때: 투수의 준비 자세(글러브를 가슴에)를 작게. 공 그림이 섞이지 않아 깔끔함
@@ -362,43 +366,53 @@ function basePath(b0, b1, k){
   return lerp2(pts[from + i], pts[from + i + 1], f);
 }
 function drawPlayReplay(G, A){
-  const ps = A.bb.ps, TL = A.tl, S = TL.scale, F = fieldTeam(G), T = batTeam(G), ctx = GX.ctx;
-  const ts = A.ph === 'fresult' ? ps.result + (A.tt - TL.result) / S : Math.max(0, (A.tt - TL.contact) / S);   // 실제 시간(초)
-  // 공: 지금 시간이 들어 있는 구간, 구간 사이(잡고 던지기 전)는 앞 구간 끝(글러브 안)
+  const ps = A.bb.ps, TL = A.tl, F = fieldTeam(G), T = batTeam(G), ctx = GX.ctx;
+  const ts = Math.max(0, A.tt - TL.contact);   // 친 순간부터 흐른 실제 시간(초). 결과 뒤에도 그대로 흘러 모두 마지막 자리에 섬
+  // 공: 지금 시간이 들어 있는 구간 (구간 사이, 잡고 던지기 전에는 앞 구간 끝 = 글러브 안)
   const balls = (ps.ev || []).filter(e => e.k === 'ball' || e.k === 'carry');
   let seg = balls[0], bp = [0, 0], hgt = 0;
   for(const e of balls){ if(ts >= e.t0) seg = e; }
-  if(seg){ const k = clamp((ts - seg.t0) / Math.max(0.01, seg.t1 - seg.t0), 0, 1); bp = lerp2(seg.from, seg.to, k); hgt = seg.h ? seg.h * 4 * k * (1 - k) : seg === balls[0] && A.bb.type === 'gb' ? Math.abs(Math.sin(k * Math.PI * 3)) * 2.5 * (1 - k) : 0; }
+  if(seg){
+    const k = clamp((ts - seg.t0) / Math.max(0.01, seg.t1 - seg.t0), 0, 1);
+    // 땅볼은 점점 느려짐(처음 빠르고 끝에 느림), 송구·뜬공은 거의 같은 빠르기
+    const kk = seg === balls[0] && A.bb.type === 'gb' ? 1 - (1 - k) * (1 - k) * 0.6 - (1 - k) * 0.4 : k;
+    bp = lerp2(seg.from, seg.to, seg === balls[0] && A.bb.type === 'gb' ? Math.min(1, kk) : k);
+    hgt = seg.h ? seg.h * 4 * k * (1 - k) : seg === balls[0] && A.bb.type === 'gb' ? Math.abs(Math.sin(k * Math.PI * 3)) * 2.5 * (1 - k) : 0;
+  }
   const bw = mw(bp), lift = hgt * (wide() ? 1.1 : 0.9);
   // 화면: 공을 따라감
   const W = worldW(), H = worldH(), clampC = c => ({ x: Math.max(0, Math.min(W - 256, c.x)), y: Math.max(0, Math.min(H - 224, c.y)) }), home = fm(0, 0);
   if(!A.camInit){ A.camInit = true; GX.cam = clampC({ x: home.x - 128, y: home.y - 196 }); }
   const want = clampC({ x: bw.x - 128, y: bw.y - lift * 0.5 - 118 });
-  GX.cam = { x: GX.cam.x + (want.x - GX.cam.x) * 0.14, y: GX.cam.y + (want.y - GX.cam.y) * 0.14 };
+  GX.cam = { x: GX.cam.x + (want.x - GX.cam.x) * 0.12, y: GX.cam.y + (want.y - GX.cam.y) * 0.12 };
   ctx.save(); ctx.translate(-Math.round(GX.cam.x), -Math.round(GX.cam.y));
   bgField(G);
   const people = [];
-  // 수비수: 움직인 사람은 기록된 길을, 나머지는 제자리
-  const Fs = fieldersOf(G), catchAt = (ps.ev || []).filter(e => e.k === 'catch' || e.k === 'field' || e.k === 'pickup');
+  // 수비수: 기록된 길(반응 → 전력 질주 → 기다림). 움직이는 쪽을 바라봄
+  const Fs = fieldersOf(G), holds = (ps.ev || []).filter(e => e.k === 'catch' || e.k === 'field' || e.k === 'pickup');
   Object.keys(Fs).forEach(pos => {
-    const path = ps.fm && ps.fm[pos], p = path ? pathAt(path, ts) : Fs[pos].at, w = mw(p);
-    const moving = path && ts > path[0][0] && ts < path[path.length - 1][0];
-    const got = catchAt.some(e => e.pos === pos && ts >= e.t && ts < e.t + 0.8);
-    people.push([w.x, w.y + (pos === 'C' ? 10 : 0), F.color, moving ? 'run' : got ? 'catch' : 'ready', Math.floor(ts * 12), w.x < bw.x]);
+    const path = ps.fm && ps.fm[pos], p = path ? pathAt(path, ts) : Fs[pos].at, p0 = path ? pathAt(path, ts - 0.06) : p, w = mw(p), w0 = mw(p0);
+    const moving = Math.hypot(w.x - w0.x, w.y - w0.y) > 0.15;
+    const got = holds.some(e => e.pos === pos && ts >= e.t && ts < e.t + 0.7);
+    people.push([w.x, w.y + (pos === 'C' ? 10 : 0), F.color, moving ? 'run' : got ? 'catch' : 'ready', Math.floor(ts * 10), moving ? w.x < w0.x : w.x > bw.x]);
   });
-  // 주자: 타자는 기록의 도착 시각(runT)에 맞춰, 다른 주자는 결과 시각까지 목표 베이스로
-  if(A.ph !== 'fresult'){
-    const batTo = Math.max(1, ps.batTried || ps.bat || 1) - 1, runT = ps.runT || ps.result, k1 = clamp(ts / Math.max(0.3, runT), 0, 1);
-    const outBat = ps.bat === 0 && (ps.call || []).some(c => c.out && ts >= c.t);
-    if(!outBat && ps.kind !== 'hr' || ps.kind === 'hr') { const p = basePath(-1, ps.kind === 'hr' ? 3 : batTo, ps.kind === 'hr' ? clamp(ts / (ps.result * 2.5), 0, 1) : k1); const w = mw(p); people.push([w.x, w.y, T.color, k1 < 1 ? 'runner' : 'base', Math.floor(ts * 12), false]); }
-    (ps.rm || []).forEach(m => {
-      const goal = m.to == null ? m.from + 1 : m.to, k = clamp(ts / Math.max(0.5, ps.result), 0, 1);
-      if(m.to == null && (ps.call || []).some(c => c.out && c.base === goal && ts >= c.t)) return;
-      const w = mw(basePath(m.from, goal, k)); people.push([w.x, w.y, T.color, k < 1 && goal !== m.from ? 'runner' : 'base', Math.floor(ts * 12), false]);
-    });
-  } else G.bases.forEach((r, i) => { if(r != null){ const b = fm(...BASE_POL[i]); people.push([b.x, b.y + 2, T.color, 'base', 0, false]); } });
+  // 주자: 저마다 출발(t0)·도착(t) 시각대로 베이스 길을 따라 달림. 아웃된 주자는 잠시 뒤 사라짐. 달리는 쪽을 바라봄(1→2루, 2→3루는 왼쪽)
+  const runner = (b0, b1, t0, t1, gone) => {
+    if(gone != null && ts > gone + 0.5) return;
+    const k = t1 > t0 ? clamp((ts - t0) / (t1 - t0), 0, 1) : 1, p = basePath(b0, b1, k), q = basePath(b0, b1, Math.max(0, k - 0.02)), w = mw(p), wq = mw(q);
+    const run = k > 0 && k < 1 && b1 !== b0;
+    people.push([w.x, w.y, T.color, run ? 'runner' : 'base', Math.floor(ts * 12), run ? w.x < wq.x : false]);
+  };
+  const batTo = ps.kind === 'hr' ? 3 : Math.max(1, ps.batTried || ps.bat || 1) - 1;
+  if(ps.batOut) runner(-1, ps.batOut.base, 0.6, ps.batOut.t, ps.batOut.t);
+  else if(ps.bat === 0){ const c = (ps.call || []).find(x => x.base === 0 && x.out); if(!(ps.ev || []).some(e => e.k === 'catch')) runner(-1, 0, 0.6, ps.runT || 4.3, c ? c.t : 4.3); }
+  else runner(-1, batTo, 0.6, ps.kind === 'hr' ? 0.6 + 4 * 27.4 / 6.5 : ps.runT || 4.3, null);
+  (ps.rm || []).forEach(m => {
+    if(m.to == null) runner(m.from, m.back ? m.from : (m.at ?? m.from + 1), m.t0, m.t, m.t);
+    else runner(m.from, m.to, m.t0, m.t, null);
+  });
   people.sort((p, q) => p[1] - q[1]).forEach(p => tinyPlayer(...p));
-  // 베이스 판정: 그 순간 0.9초 동안 OUT / SAFE
+  // 베이스 판정: 그 순간부터 0.9초 동안 OUT / SAFE
   (ps.call || []).forEach(c => {
     if(c.catch || ts < c.t || ts > c.t + 0.9 || c.base == null) return;
     const w = mw(BASE_XY[c.base]); pxText(c.out ? 'OUT' : 'SAFE', w.x, w.y - 26, c.out ? '#3cbcfc' : PAL.ink, 9);
@@ -494,7 +508,9 @@ function drawBasePlay(o, k){
   R(0, 0, 256, 224, PAL.grass); for(let y = 0; y < 110; y += 12) R(0, y, 256, 6, PAL.grass2);
   R(0, 110, 256, 80, PAL.dirt); R(0, 110, 256, 2, PAL.dirt2);
   R(X(128) - 9, 152, 18, 6, '#000'); R(X(128) - 8, 153, 16, 4, PAL.white);   // 베이스
-  const arrive = o.safe ? 0.7 : 0.84, tagT = o.safe ? 0.8 : 0.66;
+  // 계산한 시각(주자 도착 tR, 송구·태그 tB)의 차이를 그대로: 먼저 닿는 쪽이 0.7 근처, 늦는 쪽은 차이만큼 뒤
+  let arrive = o.safe ? 0.7 : 0.84, tagT = o.safe ? 0.8 : 0.66;
+  if(o.tR && o.tB){ const m0 = Math.min(o.tR, o.tB); arrive = clamp(0.68 + (o.tR - m0) / 1.5, 0.6, 0.95); tagT = clamp(0.68 + (o.tB - m0) / 1.5, 0.6, 0.95); }
   // 심판 (뒤쪽)
   if(GX.meta.umpire) drawPerson('umpire', X(196), 132, '#ff00ff', k > Math.max(arrive, tagT) + 0.04 ? (o.safe ? 'u2' : 'u1') : 'u0', flip);
   // 야수: 공을 기다리다 받으면 글러브를 베이스 쪽으로
@@ -595,7 +611,8 @@ function gfxStart(G, fx, lines, pre, skip){
   }
   if(newPlay){
     const p = P0;
-    if(p.k === 'steal' || p.k === 'pick') list.push({ kind:'base', o: p, t0:0, banner: p.safe ? (p.k === 'steal' ? '도루!' : '세이프!') : '아웃!', intro: p.k === 'pick' ? '견제!' : null });
+    if(p.k === 'wp') list.push({ kind:'banner', ph:'result', t0:1, banner: p.word + '!', bannerColor: PAL.ink });
+    else if(p.k === 'steal' || p.k === 'pick') list.push({ kind:'base', o: p, t0:0, banner: p.safe ? (p.k === 'steal' ? '도루!' : '세이프!') : '아웃!', intro: p.k === 'pick' ? '견제!' : null });
     else if(p.k === 'review') list.push({ kind:'review', o: p, t0:0 });
     else if(p.k === 'reviewEnd') list.push({ kind:'reviewEnd', o: p, t0:0 });
   }
@@ -622,7 +639,7 @@ function stepAnim(A, el){
   if(el < ms(T.release)){ A.ph = 'windup'; A.t0 = el / ms(T.release); return true; }
   if(el < ms(T.contact)){ A.ph = 'flight'; A.t0 = (el - ms(T.release)) / ms(T.contact - T.release); return true; }
   if(A.res !== 'inplay' || !A.bb){ A.ph = 'result'; A.t0 = 1; return el < ms(T.end); }
-  const fs = T.contact + 0.25;
+  const fs = T.contact + 0.12;   // 맞는 순간을 잠깐 보여 주고 바로 위에서 본 야구장으로 (같은 시간 흐름)
   if(el < ms(fs)){ A.ph = 'result'; A.t0 = (el - ms(T.contact)) / 250; return true; }
   if(el < ms(T.result)){ A.ph = 'fly'; A.t0 = (el - ms(fs)) / ms(T.result - fs); return true; }
   A.ph = 'fresult'; A.t0 = 1; return el < ms(T.end);
