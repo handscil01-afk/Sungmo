@@ -4,7 +4,7 @@
 /* ---------- 처음 화면 ---------- */
 function homeScreen(){
   const sv = loadSaved();
-  return { top: installBanner(), q:'무엇을 할까요?',
+  return { top: installBanner(), hero:true, q:'무엇을 할까요?',
     note:['공 하나하나를 고르며 진행하는 확률 야구입니다.', '번호 키, 화면 단추, 명령 칸 가운데 편한 방법으로 고릅니다.', '0은 지금 상황, 점(.)은 뒤로, 곱하기(*)는 키 안내입니다. 게임 방법은 8번 설정에 있습니다.'],
     opts:[
       { n:1, t:'혼자 하기', s:'컴퓨터 팀과 대결합니다.', act: v => { NEW.kind = '1p'; go(modeScreen, v); } },
