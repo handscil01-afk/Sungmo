@@ -30,7 +30,7 @@ function ttsSay(text){
 function speak(text){
   if(!text) return;
   if(SET.voice === 'tts') ttsSay(text);
-  else if(SET.voice === 'sr') liveSay(text);
+  else if(SET.voice === 'sr' || SET.voice === 'cast') liveSay(text);
 }
 // 아이폰은 처음 한 번 터치 안에서 읽어야 그 뒤로도 읽어 줌
 let ttsWarm = false;
@@ -142,6 +142,7 @@ function playRec(c, uniq){
     recPlay(c, 'pitch', gxv ? 0.3 : 0.02, 0.6);
     if(contact) recPlay(c, recPick(contact), tc, 0.9);
     t = inplay ? tc + 0.3 + fly : foul ? (gxv ? 0.75 : 0.9) : gxv ? 0.8 : 0.45;
+    if(SFX.castAt){ t = Math.max(t, SFX.castAt); SFX.castAt = 0; }   // 중계 음성이 결과를 말하는 순간에 맞춤
     if(inplay || foul) crowdSwell(c, tc + 0.05, t, ['hr', 'b3', 'b2', 'hit'].includes(main) ? (main === 'hr' ? 'big' : 'hit') : 'fade');
   } else {
     if(pitch){ recPlay(c, 'pitch', t, 0.6); t += 0.35; }
