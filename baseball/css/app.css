@@ -314,3 +314,62 @@ html.gfxui .banner{ background:linear-gradient(180deg, #23336b, #141c3a); border
 @media (orientation: landscape) and (max-height: 500px){ #hero{ height:96px; padding-bottom:10px; background-position:center 45%; } #hero b{ font-size:1.5rem; } #hero span{ display:none; } }
 html.gfxui .opt.noico{ padding-left:24px; }
 html.gfxui .gico.tm{ background:radial-gradient(circle at 35% 30%, rgba(255,255,255,0.35), rgba(255,255,255,0) 55%), var(--tc); color:#111; font-weight:900; font-size:1.1rem; border-radius:50%; border:2px solid rgba(0,0,0,0.35); }
+
+/* ===== 화면 보며 하기 메뉴: 한 화면에 들어오게 작게 =====
+   설명은 카드에서 빼고(화면 낭독기용 글은 남김) 위 설명 창에 보임. 메뉴는 바둑판, 설정은 한 줄씩 얇게 */
+html.gfxui #app{ padding-top:calc(4px + env(safe-area-inset-top)); }
+html.gfxui .top{ padding:2px 0 6px; }
+html.gfxui .top .btn{ min-height:36px; padding:4px 12px; font-size:0.8rem; }
+html.gfxui #main{ gap:8px; }
+html.gfxui #turn{ display:flex; flex-direction:column; gap:8px; }
+#hero{ height:88px; margin:0 0 8px; padding-bottom:8px; border-radius:16px; }
+#hero b{ font-size:1.55rem; }
+#hero span{ font-size:0.72rem; margin-top:2px; }
+html.gfxui .banner{ padding:8px 10px; gap:4px; margin-bottom:8px; border-radius:14px; }
+html.gfxui .banner b, html.gfxui .banner strong{ font-size:0.9rem; }
+html.gfxui .banner span{ font-size:0.75rem; }
+html.gfxui .banner .row{ gap:6px; margin-top:2px; }
+html.gfxui .banner .btn{ min-height:34px; padding:4px 12px; font-size:0.8rem; border-radius:999px; }
+html.gfxui #q{ font-size:0.95rem; margin:0; }
+html.gfxui #say, html.gfxui #note{ font-size:0.78rem; padding:6px 10px; }
+html.gfxui .opts:not(.grid){ grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; }
+html.gfxui .opts.setlist{ grid-template-columns:minmax(0, 1fr); gap:6px; }
+html.gfxui .opt{ min-height:50px; padding:6px 8px 6px 8px; gap:8px; border-radius:12px; box-shadow:0 3px 0 rgba(0,0,0,0.45); }
+html.gfxui .opt.noico{ padding-left:18px; }
+html.gfxui .opt .num{ top:-5px; left:-5px; width:1.2rem; height:1.2rem; font-size:0.66rem; border-width:1.5px; }
+html.gfxui .opt b{ font-size:0.88rem; line-height:1.25; }
+html.gfxui .opt small{ position:absolute !important; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+html.gfxui .gico{ width:32px; height:32px; border-radius:9px; }
+html.gfxui .gico svg{ width:19px; height:19px; }
+html.gfxui .gico.tm{ font-size:0.95rem; }
+html.gfxui .oicon{ width:32px; height:32px; background-size:128px 128px; background-position:calc(var(--ix) * -32px) calc(var(--iy) * -32px); }
+html.gfxui .opts.setlist .opt{ min-height:42px; }
+html.gfxui .opt .val{ font-size:0.72rem; padding:2px 9px; }
+html.gfxui .opt.set.long .tx{ grid-template-columns:minmax(0, 1fr) auto; }
+html.gfxui .opt.set.long .val{ justify-self:end; max-width:9.5rem; }
+html.gfxui .opt.sel{ border-color:#ffd23f; box-shadow:0 0 0 2px #ffd23f, 0 3px 0 rgba(0,0,0,0.45); background:linear-gradient(180deg, rgba(255,210,63,0.16), rgba(255,210,63,0.04)), #141c3a; }
+#gdesc[hidden]{ display:none; }
+#gdesc{ min-height:3.4rem; padding:7px 12px; border-radius:12px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.14); font-size:0.78rem; line-height:1.45; color:#c9d3f0; display:flex; flex-direction:column; justify-content:center; }
+#gdesc b{ color:#ffd23f; font-size:0.85rem; }
+#gdesc em{ font-style:normal; color:#7f8db5; font-size:0.7rem; margin-top:2px; }
+#gdesc .hint{ color:#7f8db5; }
+html.gfxui #extra .btn.back{ min-height:38px; font-size:0.85rem; }
+html.gfxui:not(.gfxinput) #cmdForm{ margin-top:2px; }
+html.gfxui:not(.gfxinput) #cmdForm label{ display:none; }
+html.gfxui:not(.gfxinput) #cmd{ min-height:34px; padding:4px 12px; font-size:0.85rem; }
+html.gfxui:not(.gfxinput) #cmd::placeholder{ color:#6b789f; }
+@media (min-width: 560px){ html.gfxui .opts:not(.grid):not(.setlist){ grid-template-columns:repeat(3, minmax(0, 1fr)); } html.gfxui .opts.setlist{ grid-template-columns:repeat(2, minmax(0, 1fr)); } #hero{ height:100px; } }
+@media (min-width: 900px){ html.gfxui .opts:not(.grid):not(.setlist){ grid-template-columns:repeat(4, minmax(0, 1fr)); } }
+@media (orientation: landscape) and (max-height: 500px){ #hero{ display:none; } html.gfxui .top h1{ font-size:1rem; } html.gfxui .opt{ min-height:44px; } }
+@media (orientation: landscape) and (max-height: 500px){
+  html.gfxui .banner{ flex-direction:row; align-items:center; flex-wrap:wrap; }
+  html.gfxui .banner span{ display:none; }
+  html.gfxui .banner .row{ margin:0 0 0 auto; }
+  #gdesc{ min-height:2.3rem; padding:4px 10px; }
+  html.gfxui .opt{ min-height:40px; }
+  html.gfxui .opts:not(.grid){ gap:6px; }
+  html.gfxui #turn{ gap:6px; }
+  html.gfxui .top{ padding:0 0 4px; }
+  html.gfxui #main{ gap:6px; }
+  html.gfxui .banner{ margin-bottom:6px; padding:6px 10px; }
+}
