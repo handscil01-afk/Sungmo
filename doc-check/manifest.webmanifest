@@ -1,0 +1,35 @@
+{
+ "name": "기안 점검판",
+ "short_name": "기안 점검판",
+ "description": "기안 문서가 빠지거나 순서가 바뀌었는지 문서대장·내부기안·스캔을 맞춰 보는 PC용 점검판",
+ "scope": "./",
+ "display": "fullscreen",
+ "display_override": [
+  "fullscreen",
+  "standalone"
+ ],
+ "orientation": "landscape",
+ "background_color": "#f3f5f8",
+ "theme_color": "#1f5f99",
+ "lang": "ko",
+ "icons": [
+  {
+   "src": "icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "any"
+  },
+  {
+   "src": "icon-maskable-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "maskable"
+  }
+ ]
+}
