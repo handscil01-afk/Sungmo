@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>중계 음성 확인</title>
+<style>
+  :root{ --bg:#10141c; --card:#1b2230; --ink:#eef2f8; --sub:#9aa6b8; --ok:#2e9d5b; --bad:#d0463c; --acc:#3c8cfc; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--ink); font:16px/1.45 system-ui, sans-serif; }
+  header{ position:sticky; top:0; z-index:2; background:#0b0e14; padding:10px 16px; border-bottom:1px solid #2a3344; }
+  h1{ font-size:18px; margin:0 0 4px; }
+  header p{ margin:0; color:var(--sub); font-size:14px; }
+  .bar{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; align-items:center; }
+  button{ font:inherit; border:0; border-radius:10px; padding:8px 12px; background:#2a3344; color:var(--ink); cursor:pointer; }
+  button.main{ background:var(--acc); }
+  main{ padding:8px 16px 80px; max-width:760px; margin:0 auto; }
+  .row{ background:var(--card); border-radius:12px; padding:10px; margin:8px 0; display:grid; grid-template-columns:auto 1fr; gap:6px 10px; align-items:center; }
+  .row.ok{ outline:2px solid var(--ok); } .row.bad{ outline:2px solid var(--bad); }
+  .play{ width:52px; height:52px; font-size:22px; grid-row:span 2; }
+  .t{ font-weight:600; } .id{ color:var(--sub); font-size:12px; margin-left:6px; font-weight:400; }
+  .acts{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .acts button.okb.on{ background:var(--ok); } .acts button.badb.on{ background:var(--bad); }
+  .acts input{ flex:1; min-width:140px; font:inherit; padding:7px 9px; border-radius:8px; border:1px solid #3a4558; background:#0f131b; color:var(--ink); }
+  #out{ width:100%; min-height:120px; margin-top:8px; font:13px/1.4 monospace; background:#0f131b; color:var(--ink); border:1px solid #3a4558; border-radius:8px; display:none; }
+  #msg{ color:var(--sub); font-size:14px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>중계 음성 확인</h1>
+  <p>▶를 눌러 듣고, 적힌 문장과 같으면 "맞음", 다르면 "틀림"을 누르세요. 틀리면 실제로 들리는 말을 적어 주세요.</p>
+  <div class="bar">
+    <button class="main" id="copy">결과 복사</button>
+    <button id="onlyTodo">아직 안 고른 것만 보기</button>
+    <span id="msg"></span>
+  </div>
+  <textarea id="out" readonly></textarea>
+</header>
+<main id="list">불러오는 중…</main>
+<script>
+'use strict';
+const KEY = 'bb_voice_check';
+const load = () => { try{ return JSON.parse(localStorage.getItem(KEY)) || {}; }catch(e){ return {}; } };
+const save = s => { try{ localStorage.setItem(KEY, JSON.stringify(s)); }catch(e){} };
+let st = load(), onlyTodo = false, audio = null;
+const $ = s => document.querySelector(s);
+Promise.all([fetch('script.txt').then(r => r.text()), fetch('index.json').then(r => r.json())]).then(([txt, idx]) => {
+  const have = new Set(idx.made || []);
+  const rows = txt.split('\n').filter(Boolean).map(l => l.split('\t')).map(([n, id, t]) => ({ n, id, t: (t || '').replace(/^\(.+?\)\s*/, '') })).filter(r => have.has(r.id));
+  const list = $('#list');
+  const draw = () => {
+    list.innerHTML = '';
+    rows.forEach(r => {
+      const v = st[r.id] || {};
+      if(onlyTodo && v.mark) return;
+      const el = document.createElement('div');
+      el.className = 'row' + (v.mark === 'ok' ? ' ok' : v.mark === 'bad' ? ' bad' : '');
+      el.innerHTML = `<button class="play" aria-label="${r.t} 듣기">▶</button><div class="t">${r.t}<span class="id">${r.id}</span></div>
+        <div class="acts"><button class="okb${v.mark === 'ok' ? ' on' : ''}">맞음</button><button class="badb${v.mark === 'bad' ? ' on' : ''}">틀림</button>
+        <input placeholder="실제로 들리는 말" value="${(v.say || '').replace(/"/g, '&quot;')}"></div>`;
+      el.querySelector('.play').onclick = () => { if(audio) audio.pause(); audio = new Audio(r.id + '.mp3'); audio.play().catch(() => {}); };
+      el.querySelector('.okb').onclick = () => { st[r.id] = { ...v, mark:'ok' }; save(st); draw(); };
+      el.querySelector('.badb').onclick = () => { st[r.id] = { ...v, mark:'bad' }; save(st); draw(); };
+      el.querySelector('input').onchange = e => { st[r.id] = { ...(st[r.id] || {}), say: e.target.value, mark: (st[r.id] || {}).mark || 'bad' }; save(st); draw(); };
+      list.appendChild(el);
+    });
+    const done = rows.filter(r => st[r.id] && st[r.id].mark).length, bad = rows.filter(r => st[r.id] && st[r.id].mark === 'bad').length;
+    $('#msg').textContent = `${done}/${rows.length}개 확인 · 틀림 ${bad}개`;
+  };
+  $('#onlyTodo').onclick = () => { onlyTodo = !onlyTodo; $('#onlyTodo').textContent = onlyTodo ? '모두 보기' : '아직 안 고른 것만 보기'; draw(); };
+  $('#copy').onclick = () => {
+    const lines = rows.filter(r => st[r.id] && st[r.id].mark === 'bad').map(r => `${r.id} | ${r.t} | 들림: ${st[r.id].say || '?'}`);
+    const done = rows.filter(r => st[r.id] && st[r.id].mark).length;
+    const text = `중계 음성 확인 결과 (${done}/${rows.length}개 확인, 틀림 ${lines.length}개)\n` + lines.join('\n');
+    const out = $('#out'); out.style.display = 'block'; out.value = text; out.select();
+    (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => { $('#msg').textContent = '복사했습니다. 채팅에 붙여 넣어 주세요.'; }, () => { $('#msg').textContent = '아래 글을 길게 눌러 복사해 주세요.'; });
+  };
+  draw();
+}).catch(() => { $('#list').textContent = '목록을 불러오지 못했습니다.'; });
+</script>
+</body>
+</html>
