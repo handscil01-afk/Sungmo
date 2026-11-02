@@ -105,7 +105,9 @@ function suspenseMs(fx){
 function gameNext(via, res){
   // 감독 모드: 묻지 않는 타석은 바로 진행하고 결과를 모음 (온라인 손님은 방장이 계산)
   if(G.mode === 'manager' && !(NET.on && NET.role === 'guest')) res = mgrAuto(res);
-  if(res){ if(!res.skip){ UI.susp = suspenseMs(res.fx || []); if(typeof castResult === 'function' && castOn()){ const c = castResult(res); UI.castNow = true; if(c){ if(c.at && UI.susp){ UI.susp = Math.max(UI.susp, c.at * 1000); SFX.castAt = c.at; } UI.castLock = c.end * 1000; } } } playFx(res.fx); UI.lastFx = res.skip ? res.skip.fx : res.fx || []; UI.lastLines = res.lines || []; UI.lastSkip = res.skip || null; }
+  if(res){ const willSkip = !!(G.focus && !G.review && !needs(batIdx(G)) && !needs(1 - batIdx(G)));   // 육성: 이 결과 뒤 바로 다음 내 차례까지 건너뜀
+    if(res.skip && typeof castSkip === 'function'){ const e = castSkip(); if(e){ UI.castLock = e * 1000; UI.castNow = true; } }
+    if(!res.skip){ UI.susp = suspenseMs(res.fx || []); if(typeof castResult === 'function' && castOn()){ const c = castResult(res, { noAfter: willSkip }); UI.castNow = true; if(c){ if(c.at && UI.susp){ UI.susp = Math.max(UI.susp, c.at * 1000); SFX.castAt = c.at; } UI.castLock = c.end * 1000; } } } if(typeof castSeen === 'function') castSeen(); playFx(res.fx); UI.lastFx = res.skip ? res.skip.fx : res.fx || []; UI.lastLines = res.lines || []; UI.lastSkip = res.skip || null; }
   const lines = visible(res ? res.lines : []);
   if(NET.on){ netNext(via, res, lines); return; }
   saveGame();

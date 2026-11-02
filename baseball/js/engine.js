@@ -539,7 +539,7 @@ const flipCall = c => ({ out:'safe', safe:'out', hr:'2b', '2b':'hr' })[c];
 const callWord = c => ({ out:'아웃', safe:'세이프', hr:'홈런', '2b':'2루타' })[c];
 const reviewLeft = (G, side) => G.teams[side].rev ?? 2;
 // 화면 모드 그림용 플레이 기록 (도루·견제·비디오 판독). n이 늘어날 때마다 그림이 그 장면을 보여 줌
-function markPlay(G, o){ G.playN = (G.playN || 0) + 1; G.play = { n: G.playN, ...o }; }
+function markPlay(G, o){ G.playN = (G.playN || 0) + 1; G.play = { n: G.playN, an: G.anim ? G.anim.n : 0, ...o }; }   // an: 그때의 공 번호 (중계가 언제 말할지 정함)
 function openReview(G, R){ G.review = R; emit(G, R.say, 'r'); fx(G, 'review'); markPlay(G, { k:'review', rk: R.kind, call: R.call, base: R.data && (R.data.base ?? R.data.from) }); }
 function resolveReview(G, challenge){
   const R = G.review; if(!R) return flush(G);

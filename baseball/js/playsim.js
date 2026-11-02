@@ -180,7 +180,9 @@ function simPlay(G, bb, opt = {}){
   res.ev.filter(e => e.k === 'ball' && e.t0 > 0.05).forEach(e => {
     const b = BASE_XY.findIndex(q => dist2(q, e.to) < 0.5); if(b < 0) return;
     if(Object.keys(fm).some(pos => reachAt(pos, b))) return;
-    const pos = coverFor(b).find(q => !fm[q] || !busyAt(q, e.t1)) || coverFor(b)[0], f = F[pos];
+    const thrower = Object.keys(fm).find(q => { const pth = fm[q], last = pth[pth.length - 1]; return dist2(last[1], e.from) < 2.5 && last[0] <= e.t0 + 0.6; });
+    const pos = coverFor(b).find(q => q !== thrower && (!fm[q] || !busyAt(q, e.t1))) || coverFor(b).find(q => q !== thrower), f = F[pos];
+    if(!f) return;
     const from = fm[pos] ? fm[pos][fm[pos].length - 1] : [0, f.at];
     const d = dist2(from[1], BASE_XY[b]), start = Math.max(from[0], f.react), arrive = Math.min(e.t1, start + d / f.v);
     fm[pos] = (fm[pos] || [[0, f.at]]).concat([[start, from[1]], [Math.max(arrive, start + 0.05), BASE_XY[b]]]);
@@ -256,7 +258,11 @@ function gbThrows(G, F, res, best, runners, tB1){
   const outOf = new Map();   // 주자 순번(-1 타자) → 아웃된 베이스·시각
   const close = [];
   const throwEv = (from, to, b, t0, h) => ev.push({ k:'ball', t0, t1: b, from, to, h });
+  // 송구를 받는 사람은 그 베이스로 달려감(투수의 1루 커버 포함), 직접 들고 가면 그 야수가 베이스로
+  const goCover = (pos, b, tb) => { const cf = F[pos]; if(!cf || res.fmove[pos] && pos !== best.pos) return; if(pos === best.pos) return; res.fmove[pos] = [[0, cf.at], [Math.min(tb, reachT(cf, BASE_XY[b])), BASE_XY[b]]]; };
   const doThrow = c => {
+    if(c.ball.self && c.ball.cover === best.pos) res.fmove[best.pos] = [[0, f.at], [tf, P0], [c.ball.t, BASE_XY[c.base]]];
+    else if(c.ball.cover) goCover(c.ball.cover, c.base, c.ball.t);
     if(c.ball.self){ if(c.ball.cover === best.pos) ev.push({ k:'carry', t0: tf, t1: c.ball.t, from: P0, to: BASE_XY[c.base] }); else throwEv(P0, BASE_XY[c.base], c.ball.t, c.ball.t0 ?? tf, 1); }
     else throwEv(P0, BASE_XY[c.base], c.ball.t, c.ball.t0, c.ball.h || 2);
     const out = c.ball.t < c.arrive;
@@ -273,6 +279,7 @@ function gbThrows(G, F, res, best, runners, tB1){
     const t0 = tgt.ball.t + (tgt.base === 1 ? 0.55 : 0.7), d = dist2(BASE_XY[tgt.base], BASE_XY[0]);
     const tb = Math.max(t0 + d / cf.arm, reachT(c1, BASE_XY[0]) + 0.1);
     relay = true;
+    goCover(best.pos === '1B' ? 'P' : '1B', 0, tb);
     throwEv(BASE_XY[tgt.base], BASE_XY[0], tb, t0, 2);
     const out = tb < tB1;
     close.push({ base:0, who:-1, m: tB1 - tb, force:true });
