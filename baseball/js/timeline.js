@@ -5,11 +5,13 @@
    release 공을 놓음(피칭 소리) · contact 공이 타자에게 옴(방망이 소리, 헛스윙·볼·스트라이크는 여기서 결정)
    field   땅볼을 야수가 잡음(그다음 1루로 던짐) · result 결과가 정해지는 순간(뜬공을 잡음, 송구가 1루에 도착, 공이 떨어짐, 담장을 넘음)
    runner  타자가 1루에 닿는 순간(아웃이면 송구보다 늦게, 내야 안타면 먼저) */
-const TL_BASE = { release:0.3, contact:0.7 };
+const TL_BASE = { release:0.8, contact:1.27 };   // 투구 동작 0.8초, 공이 날아가는 시간은 구속으로
 function playTL(A, fx){
   if(!A) return null;
   fx = fx || [];
-  const t = { ...TL_BASE, kind:'pitch', result: TL_BASE.contact };
+  const t = { ...TL_BASE, kind:'pitch' };
+  t.contact = t.release + 18.4 * 0.93 / ((A.vel || 140) / 3.6);   // 실제 속도: 145킬로면 약 0.42초
+  t.result = t.contact;
   const c = t.contact, bb = A.bb;
   // 위치·속도로 계산한 플레이(playsim.js)가 있으면 그 기록의 시간을 그대로 (그림은 ANIM_SCALE배 빠르게 재생)
   if(A.res === 'inplay' && bb && bb.ps){
@@ -18,7 +20,7 @@ function playTL(A, fx){
     const fe = (ps.ev || []).find(e => e.k === 'field'); if(fe) t.field = c + fe.t * S;
     t.result = c + Math.max(0.6, ps.result) * S;
     if(ps.runT) t.runner = c + ps.runT * S;
-    t.end = t.result + 1.5;
+    t.end = t.result + 1.6;
     return t;
   }
   if(A.res === 'inplay' && bb){
@@ -37,6 +39,6 @@ function playTL(A, fx){
   else if(A.res === 'bunt'){ t.kind = 'bunt'; t.field = c + 0.9; t.result = c + 1.5; }
   else if(A.res === 'foul' || fx.includes('batF')){ t.kind = 'foul'; t.result = c + 0.8; }
   else t.kind = A.res || 'take';
-  t.end = t.result + (t.kind === 'pitch' || t.kind === 'take' || t.kind === 'whiff' || t.kind === 'hbp' ? 0.9 : 1.5);
+  t.end = t.result + (t.kind === 'pitch' || t.kind === 'take' || t.kind === 'whiff' || t.kind === 'hbp' ? 1.0 : 1.5);
   return t;
 }

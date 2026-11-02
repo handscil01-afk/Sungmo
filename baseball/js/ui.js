@@ -38,6 +38,9 @@ function suspend(lines){
 }
 function go(make, via = 'init', lines = []){
   if(UI.holdT){ clearTimeout(UI.holdT); UI.holdT = 0; document.documentElement.classList.remove('hold'); }
+  // 중계 음성이 끝날 때까지 다음 선택을 받지 않음 (자동 시험은 window.__susp를 켠 때만)
+  const lock = UI.castLock && !(navigator.webdriver && !window.__susp) ? UI.castLock : 0; UI.castLock = 0;
+  if(UI.castT){ clearTimeout(UI.castT); UI.castT = 0; document.documentElement.classList.remove('castwait'); }
   const sus = suspend(lines || []);
   UI.make = make; UI.say = sus ? sus.lines : lines || []; UI.note = null;
   UI.S = make(); if(UI.say.length || !UI.S.say) UI.S.say = UI.say;
@@ -46,17 +49,25 @@ function go(make, via = 'init', lines = []){
   render();
   const castNow = UI.castNow; UI.castNow = false;   // 중계 음성이 결과를 말하면 화면 낭독기는 질문만
   const say = castNow ? [] : UI.S.say.filter(l => !l.after).map(l => l.s || l);
+  if(lock){
+    document.documentElement.classList.add('castwait'); UI.castEnd = performance.now() + lock;
+    UI.castT = setTimeout(() => {
+      UI.castT = 0; document.documentElement.classList.remove('castwait');
+      if(castNow && !sus) speak(UI.S.q || '');
+      if(via === 'click' && !$('#opts').contains(document.activeElement)) $('#q').focus({ preventScroll:true });
+    }, Math.max(lock, sus ? sus.ms : 0) + 50);
+  }
   if(sus){
     // 앞부분만 먼저 읽고, 시간이 지나면 결과와 질문
     speak(say.join(' '));
     UI.holdT = setTimeout(() => {
       UI.holdT = 0; document.documentElement.classList.remove('hold');
-      speak([...(castNow ? [] : sus.tail), UI.S.q].filter(Boolean).join(' '));
+      speak([...(castNow ? [] : sus.tail), lock && sus.ms < lock ? '' : UI.S.q].filter(Boolean).join(' '));
       if(via === 'click' && !$('#opts').contains(document.activeElement)) $('#q').focus({ preventScroll:true });
     }, sus.ms);
     return;
   }
-  const msg = [...say, UI.S.q].filter(Boolean).join(' ');
+  const msg = [...say, lock && castNow ? '' : UI.S.q].filter(Boolean).join(' ');
   if(via === 'click'){
     setTimeout(() => { const el = UI.S.focusCmd ? $('#cmd') : say.length ? $('#say') : $('#q'); if(el) el.focus({ preventScroll:false }); }, 40);
     if(SET.voice === 'tts') ttsSay(msg);
@@ -232,7 +243,8 @@ function keyName(e){
   return null;
 }
 document.addEventListener('keydown', e => {
-  if(document.documentElement.classList.contains('hold') && !e.target.closest('input, textarea')) { e.preventDefault(); return; }   // 결과를 기다리는 동안은 고르지 않음
+  const cl = document.documentElement.classList;
+  if((cl.contains('hold') || cl.contains('castwait')) && !e.target.closest('input, textarea')) { e.preventDefault(); return; }   // 결과·중계를 기다리는 동안은 고르지 않음   // 결과를 기다리는 동안은 고르지 않음
   if(dlgOpen() || e.ctrlKey || e.metaKey || e.altKey) return;
   const t = e.target, tag = t && t.tagName;
   if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;

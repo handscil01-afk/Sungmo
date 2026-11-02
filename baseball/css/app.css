@@ -254,3 +254,6 @@ html.gfxgame .opts:not(.grid) .opt.minor b{ line-height:1.2; }
 /* 뜸 들이는 중계: 결과를 기다리는 동안 결과 글·다음 질문·선택지를 숨김 */
 html.hold .tail, html.hold #say p.after{ display:none !important; }
 html.hold #q, html.hold #opts, html.hold #extra, html.hold #gstat, html.hold #cmdForm{ visibility:hidden; }
+
+/* 중계 음성이 끝날 때까지: 선택지는 보이되 누를 수 없음 */
+html.castwait #opts, html.castwait #extra{ pointer-events:none; opacity:0.55; transition:opacity .2s; }
