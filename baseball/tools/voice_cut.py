@@ -9,9 +9,9 @@ M={}
 k='2a97f7cd'
 M.update({0:(k,s_(k,0)),1:(k,s_(k,1)),2:(k,s_(k,2)),3:(k,(6.37,7.32)),4:(k,(7.87,8.9)),5:(k,(9.44,10.37)),6:(k,s_(k,4)),7:(k,s_(k,5)),8:(k,s_(k,6)),9:(k,s_(k,7)),10:(k,s_(k,8))})
 for n,i in zip(range(11,19),range(9,17)): M[n]=(k,s_(k,i))
-# 사용자 확인: '의 공격입니다' 조각 앞에 '대'가 붙어 있음 → 29.55초(소리가 약해지는 곳)에서 나눔
+# 사용자 확인: '의 공격입니다' 조각 앞에 '대'가 붙어 있음 → 29.76초(소리가 거의 끊기는 곳)에서 나눔 ('대'가 길게 발음됨)
 HARD={21,22}
-M.update({19:(k,(27.08,27.6)),20:(k,(28.15,28.66)),21:(k,(29.38,29.555)),22:(k,(29.555,30.85)),23:(k,s_(k,19))})
+M.update({19:(k,(27.08,27.6)),20:(k,(28.15,28.66)),21:(k,(29.38,29.76)),22:(k,(29.76,30.85)),23:(k,s_(k,19))})
 k='d20ae73c'
 M.update({24:(k,s_(k,0)),25:(k,(1.63,2.09)),26:(k,(2.38,2.9)),27:(k,(3.49,4.53)),28:(k,s_(k,2))})
 for n,i in zip(range(29,48),range(3,22)): M[n]=(k,s_(k,i))
@@ -56,7 +56,7 @@ for n,(k,(s,e)) in sorted(M.items()):
     loud=x[np.abs(x)>0.02]; rms=np.sqrt((loud**2).mean()) if len(loud) else 0.05; peak=np.abs(x).max() or 1
     gain=min(0.16/rms,0.89/peak); db=20*np.log10(gain); dd=ee-ss
     f=glob.glob(U+k+'-*.wav')[0]
-    subprocess.run(['ffmpeg','-v','error','-y','-i',f,'-af',f'atrim=start={ss:.3f}:end={ee:.3f},asetpts=PTS-STARTPTS,volume={db:.2f}dB,afade=t=in:d=0.02,afade=t=out:st={max(0,dd-0.1):.3f}:d=0.1','-ar','44100','-ac','1','-b:a','64k',OUT+ids[n]+'.mp3'],check=True)
+    subprocess.run(['ffmpeg','-v','error','-y','-i',f,'-af',f'atrim=start={ss:.3f}:end={ee:.3f},asetpts=PTS-STARTPTS,volume={db:.2f}dB,afade=t=in:d=0.02,afade=t=out:st={max(0,dd-(0.03 if n in HARD else 0.1)):.3f}:d={0.03 if n in HARD else 0.1}','-ar','44100','-ac','1','-b:a','64k',OUT+ids[n]+'.mp3'],check=True)
     made.append(ids[n])
 json.dump({'made':made,'variants':{i:1 for i in made}},open(OUT+'index.json','w'),ensure_ascii=False)
 print('clips',len(made))
