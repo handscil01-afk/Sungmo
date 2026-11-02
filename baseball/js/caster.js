@@ -67,7 +67,7 @@ function castResult(res){
   const fx = res.fx || [], text = (res.lines || []).map(l => l.s || l).join(' '), has = n => fx.includes(n), A = G.anim;
   const plan = [];   // [시각(초), [조각…]] 시각 순서대로
   const at = (t, ...ids) => { ids = ids.flat(3).filter(Boolean); if(ids.length) plan.push([t, ids]); };
-  if(has('start')) at(0, 'intro', teamClip(G.teams[0], true), teamClip(G.teams[1], true), 'playball');
+  if(has('start')) at(0, 'intro', teamClip(G.teams[0], true), 'j_vs', teamClip(G.teams[1], true), 'playball');
   const fresh = A && A.n !== CAST.animN; if(A) CAST.animN = A.n;
   const contact = fx.some(n => /^bat/.test(n)), pitched = fresh && (has('pitch') || contact);
   const tl = pitched ? playTL(A, fx) : null;
@@ -140,10 +140,10 @@ function castResult(res){
   if(/홈인|들어옵니다/.test(text) && !has('hr')) at(resAt, pick1('r_score1', 'r_score2'));
   // 끝·공수 교대·새 타자 안내 (앞 중계가 끝난 뒤)
   const after = [];
-  if(G.over){ after.push(G.walkoff ? 'r_walkoff' : 'end', 'j_score', teamClip(G.teams[0]), numClip(runsOf(G.teams[0])), teamClip(G.teams[1]), numClip(runsOf(G.teams[1]))); }
+  if(G.over){ after.push(G.walkoff ? 'r_walkoff' : 'end', 'j_score', teamClip(G.teams[0]), numClip(runsOf(G.teams[0])), 'j_vs', numClip(runsOf(G.teams[1])), teamClip(G.teams[1])); }
   else {
     if(has('change')) after.push('change', `inn_${Math.min(12, G.inning)}${G.top ? 't' : 'b'}`, teamClip(batTeam(G)), 'j_attack',
-      'j_score', teamClip(G.teams[0]), numClip(runsOf(G.teams[0])), teamClip(G.teams[1]), numClip(runsOf(G.teams[1])));
+      'j_score', teamClip(G.teams[0]), numClip(runsOf(G.teams[0])), 'j_vs', numClip(runsOf(G.teams[1])), teamClip(G.teams[1]));
     if(has('pchange')) after.push('r_pitcher_change');
     if((has('batter') && !has('start')) || has('change')){
       after.push(`bat_${batTeam(G).bi + 1}`);
