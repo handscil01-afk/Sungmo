@@ -53,7 +53,15 @@ for n,(k,(s,e)) in sorted(M.items()):
     loud=x[np.abs(x)>0.02]; rms=np.sqrt((loud**2).mean()) if len(loud) else 0.05; peak=np.abs(x).max() or 1
     gain=min(0.16/rms,0.89/peak); db=20*np.log10(gain); dd=ee-ss
     f=glob.glob(U+k+'-*.wav')[0]
-    subprocess.run(['ffmpeg','-v','error','-y','-i',f,'-ss',f'{ss:.3f}','-t',f'{dd:.3f}','-af',f'volume={db:.2f}dB,afade=t=in:d=0.02,afade=t=out:st={max(0,dd-0.1):.3f}:d=0.1','-ar','44100','-ac','1','-b:a','64k',OUT+ids[n]+'.mp3'],check=True)
+    subprocess.run(['ffmpeg','-v','error','-y','-i',f,'-af',f'atrim=start={ss:.3f}:end={ee:.3f},asetpts=PTS-STARTPTS,volume={db:.2f}dB,afade=t=in:d=0.02,afade=t=out:st={max(0,dd-0.1):.3f}:d=0.1','-ar','44100','-ac','1','-b:a','64k',OUT+ids[n]+'.mp3'],check=True)
     made.append(ids[n])
 json.dump({'made':made,'variants':{i:1 for i in made}},open(OUT+'index.json','w'),ensure_ascii=False)
 print('clips',len(made))
+
+# 확인: 모든 조각에 실제 소리가 있는지
+bad=[]
+for i in made:
+    raw=subprocess.run(['ffmpeg','-v','error','-i',OUT+i+'.mp3','-f','s16le','-ac','1','-ar','16000','-'],capture_output=True).stdout
+    x=np.frombuffer(raw,np.int16).astype(float)/32768
+    if np.abs(x).max()<0.2 or np.sqrt((x**2).mean())<0.02: bad.append((i,round(float(np.abs(x).max()),3)))
+print('소리 없는 조각',bad)
