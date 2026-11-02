@@ -126,7 +126,9 @@ function recPlay(c, name, at, vol, max){
   return Math.min(buf.duration, max || buf.duration);
 }
 function playRec(c, uniq){
-  const main = REC_MAIN.find(n => uniq.includes(n)), contact = REC_CONTACT.find(n => uniq.includes(n));
+  // 중계 음성일 때는 목소리가 들어 있는 녹음(스트라이크·볼·파울·아웃·안타·공수 교대 등)은 빼고 방망이·관중 소리만
+  const cast = typeof castOn === 'function' && castOn();
+  const main = cast ? null : REC_MAIN.find(n => uniq.includes(n)), contact = REC_CONTACT.find(n => uniq.includes(n));
   const pitch = uniq.includes('pitch'), change = uniq.includes('change');
   if(!main && !contact && !pitch && !change && !uniq.includes('batter')) return false;
   recStopAll(c);
@@ -143,7 +145,8 @@ function playRec(c, uniq){
     if(contact) recPlay(c, recPick(contact), tc, 0.9);
     t = inplay ? tc + 0.3 + fly : foul ? (gxv ? 0.75 : 0.9) : gxv ? 0.8 : 0.45;
     if(SFX.castAt){ t = Math.max(t, SFX.castAt); SFX.castAt = 0; }   // 중계 음성이 결과를 말하는 순간에 맞춤
-    if(inplay || foul) crowdSwell(c, tc + 0.05, t, ['hr', 'b3', 'b2', 'hit'].includes(main) ? (main === 'hr' ? 'big' : 'hit') : 'fade');
+    const won = ['hr', 'b3', 'b2', 'hit'].find(n => uniq.includes(n));
+    if(inplay || foul) crowdSwell(c, tc + 0.05, t, won ? (won === 'hr' ? 'big' : 'hit') : 'fade');
   } else {
     if(pitch){ recPlay(c, 'pitch', t, 0.6); t += 0.35; }
     if(contact){ recPlay(c, recPick(contact), t, 0.9); t += contact === 'batBig' ? 0.45 : 0.3; }
@@ -156,8 +159,8 @@ function playRec(c, uniq){
     const d = recPlay(c, nm, t + (main === 'out' ? 0.15 : 0), 0.85, main === 'hr' ? 10 : 4); t += Math.min(d || 1, 2.5);
   }
   else if(main){ const d = recPlay(c, recPick(main), t, 0.85, main === 'hr' ? 10 : 4); t += Math.min(d || 1, 2.5); }
-  if(change) recPlay(c, 'change', t, 0.7, 4);
-  else if(!pitch && !main && !contact && uniq.includes('batter')) recPlay(c, 'atbat', t, 0.6, 3);
+  if(change && !cast) recPlay(c, 'change', t, 0.7, 4);
+  else if(!cast && !pitch && !main && !contact && uniq.includes('batter')) recPlay(c, 'atbat', t, 0.6, 3);
   return true;
 }
 // 타구가 날아가는 동안 관중이 술렁이며 커지고, 결과에 따라 길게 환호(hit·big)하거나 금세 사그라듦(fade)
