@@ -1,7 +1,7 @@
 // 리그 시험: 시즌 전체와 포스트시즌을 컴퓨터끼리 진행하고 기록이 맞는지 확인함. 사용법: node baseball/tests/league.js [팀당 경기 수]
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const dir = path.join(__dirname, '..', 'js');
-['data.js', 'engine.js', 'ai.js', 'league.js'].forEach(f => vm.runInThisContext(fs.readFileSync(path.join(dir, f), 'utf8'), { filename: f }));
+['data.js', 'engine.js', 'playsim.js', 'ai.js', 'league.js'].forEach(f => vm.runInThisContext(fs.readFileSync(path.join(dir, f), 'utf8'), { filename: f }));
 const len = +process.argv[2] || 18, t0 = Date.now();
 const L = leagueNew({ my:'star', len, mode:'manager', inn:9, seed:7 });
 let days = 0;

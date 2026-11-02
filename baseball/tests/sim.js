@@ -1,7 +1,7 @@
 // 컴퓨터끼리 여러 경기를 돌려 수치와 규칙 위반을 확인함. 사용법: node baseball/tests/sim.js [경기 수]
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const dir = path.join(__dirname, '..', 'js');
-['data.js', 'engine.js', 'ai.js'].forEach(f => vm.runInThisContext(fs.readFileSync(path.join(dir, f), 'utf8'), { filename: f }));
+['data.js', 'engine.js', 'playsim.js', 'ai.js'].forEach(f => vm.runInThisContext(fs.readFileSync(path.join(dir, f), 'utf8'), { filename: f }));
 
 const N = +process.argv[2] || 300;
 function run(mode, unit, easy){

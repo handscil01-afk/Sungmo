@@ -287,6 +287,7 @@ function landDist(G, bb, ang){
   return { gb:35, ld:bb.hit ? 70 : 55, fb:bb.hit >= 2 ? fence - 8 : 78, pu:24 }[bb.type] || 60;
 }
 function drawFieldScene(G, A){
+  if(A.bb && A.bb.ps && A.tl && A.tl.scale) return drawPlayReplay(G, A);
   const F = fieldTeam(G), T = batTeam(G), bb = A.bb || {}, k = Math.min(1, A.t0), ctx = GX.ctx;
   const ang = FIELD_ANG[bb.fi ?? 1] + (A.jit || 0);
   const dist = landDist(G, bb, ang), land = fm(ang, dist), home = fm(0, 0);
@@ -345,6 +346,71 @@ function drawFieldScene(G, A){
     if(A.hr) fireworks(performance.now());
   }
 }
+// 계산한 플레이(playsim.js의 기록)를 그대로 재생: 공의 길·높이, 수비수 움직임, 주자, 베이스마다의 판정
+const mw = p => fm(Math.atan2(p[0], p[1]), Math.hypot(p[0], p[1]));   // 미터 좌표 → 야구장 그림 좌표
+function pathAt(path, t){
+  if(!path || !path.length) return null;
+  if(t <= path[0][0]) return path[0][1];
+  for(let i = 1; i < path.length; i++){ const [t0, p0] = path[i - 1], [t1, p1] = path[i]; if(t <= t1){ const k = t1 > t0 ? (t - t0) / (t1 - t0) : 1; return [p0[0] + (p1[0] - p0[0]) * k, p0[1] + (p1[1] - p0[1]) * k]; } }
+  return path[path.length - 1][1];
+}
+// 베이스 길을 따라 b0(−1은 타석)에서 b1까지, 0~1 비율
+function basePath(b0, b1, k){
+  const pts = [[0, 0], ...BASE_XY.slice(0, 3), [0, 0]], from = b0 + 1, to = b1 + 1, n = to - from;
+  if(n <= 0) return pts[from];
+  const x = Math.min(n, Math.max(0, k * n)), i = Math.min(n - 1, Math.floor(x)), f = x - i;
+  return lerp2(pts[from + i], pts[from + i + 1], f);
+}
+function drawPlayReplay(G, A){
+  const ps = A.bb.ps, TL = A.tl, S = TL.scale, F = fieldTeam(G), T = batTeam(G), ctx = GX.ctx;
+  const ts = A.ph === 'fresult' ? ps.result + (A.tt - TL.result) / S : Math.max(0, (A.tt - TL.contact) / S);   // 실제 시간(초)
+  // 공: 지금 시간이 들어 있는 구간, 구간 사이(잡고 던지기 전)는 앞 구간 끝(글러브 안)
+  const balls = (ps.ev || []).filter(e => e.k === 'ball' || e.k === 'carry');
+  let seg = balls[0], bp = [0, 0], hgt = 0;
+  for(const e of balls){ if(ts >= e.t0) seg = e; }
+  if(seg){ const k = clamp((ts - seg.t0) / Math.max(0.01, seg.t1 - seg.t0), 0, 1); bp = lerp2(seg.from, seg.to, k); hgt = seg.h ? seg.h * 4 * k * (1 - k) : seg === balls[0] && A.bb.type === 'gb' ? Math.abs(Math.sin(k * Math.PI * 3)) * 2.5 * (1 - k) : 0; }
+  const bw = mw(bp), lift = hgt * (wide() ? 1.1 : 0.9);
+  // 화면: 공을 따라감
+  const W = worldW(), H = worldH(), clampC = c => ({ x: Math.max(0, Math.min(W - 256, c.x)), y: Math.max(0, Math.min(H - 224, c.y)) }), home = fm(0, 0);
+  if(!A.camInit){ A.camInit = true; GX.cam = clampC({ x: home.x - 128, y: home.y - 196 }); }
+  const want = clampC({ x: bw.x - 128, y: bw.y - lift * 0.5 - 118 });
+  GX.cam = { x: GX.cam.x + (want.x - GX.cam.x) * 0.14, y: GX.cam.y + (want.y - GX.cam.y) * 0.14 };
+  ctx.save(); ctx.translate(-Math.round(GX.cam.x), -Math.round(GX.cam.y));
+  bgField(G);
+  const people = [];
+  // 수비수: 움직인 사람은 기록된 길을, 나머지는 제자리
+  const Fs = fieldersOf(G), catchAt = (ps.ev || []).filter(e => e.k === 'catch' || e.k === 'field' || e.k === 'pickup');
+  Object.keys(Fs).forEach(pos => {
+    const path = ps.fm && ps.fm[pos], p = path ? pathAt(path, ts) : Fs[pos].at, w = mw(p);
+    const moving = path && ts > path[0][0] && ts < path[path.length - 1][0];
+    const got = catchAt.some(e => e.pos === pos && ts >= e.t && ts < e.t + 0.8);
+    people.push([w.x, w.y + (pos === 'C' ? 10 : 0), F.color, moving ? 'run' : got ? 'catch' : 'ready', Math.floor(ts * 12), w.x < bw.x]);
+  });
+  // 주자: 타자는 기록의 도착 시각(runT)에 맞춰, 다른 주자는 결과 시각까지 목표 베이스로
+  if(A.ph !== 'fresult'){
+    const batTo = Math.max(1, ps.batTried || ps.bat || 1) - 1, runT = ps.runT || ps.result, k1 = clamp(ts / Math.max(0.3, runT), 0, 1);
+    const outBat = ps.bat === 0 && (ps.call || []).some(c => c.out && ts >= c.t);
+    if(!outBat && ps.kind !== 'hr' || ps.kind === 'hr') { const p = basePath(-1, ps.kind === 'hr' ? 3 : batTo, ps.kind === 'hr' ? clamp(ts / (ps.result * 2.5), 0, 1) : k1); const w = mw(p); people.push([w.x, w.y, T.color, k1 < 1 ? 'runner' : 'base', Math.floor(ts * 12), false]); }
+    (ps.rm || []).forEach(m => {
+      const goal = m.to == null ? m.from + 1 : m.to, k = clamp(ts / Math.max(0.5, ps.result), 0, 1);
+      if(m.to == null && (ps.call || []).some(c => c.out && c.base === goal && ts >= c.t)) return;
+      const w = mw(basePath(m.from, goal, k)); people.push([w.x, w.y, T.color, k < 1 && goal !== m.from ? 'runner' : 'base', Math.floor(ts * 12), false]);
+    });
+  } else G.bases.forEach((r, i) => { if(r != null){ const b = fm(...BASE_POL[i]); people.push([b.x, b.y + 2, T.color, 'base', 0, false]); } });
+  people.sort((p, q) => p[1] - q[1]).forEach(p => tinyPlayer(...p));
+  // 베이스 판정: 그 순간 0.9초 동안 OUT / SAFE
+  (ps.call || []).forEach(c => {
+    if(c.catch || ts < c.t || ts > c.t + 0.9 || c.base == null) return;
+    const w = mw(BASE_XY[c.base]); pxText(c.out ? 'OUT' : 'SAFE', w.x, w.y - 26, c.out ? '#3cbcfc' : PAL.ink, 9);
+  });
+  if(A.ph === 'fresult' && GX.meta['umpire-s'] && ps.kind !== 'hr'){ const u = fm(1.1, 38); drawPerson('umpire-s', u.x, u.y, '#ff00ff', /아웃|삼진|병살/.test(A.banner || '') ? 'u1' : 'u2', false); }
+  R(bw.x - 2, bw.y - 1, 4, 2, 'rgba(0,0,0,0.45)');
+  ball(bw.x, bw.y - lift, 2 + hgt / 6);
+  ctx.restore();
+  scoreBar(G);
+  if(A.ph === 'fresult' && A.banner){ banner(A.banner, 34, A.bannerColor || PAL.ink, 22); if(A.hr) fireworks(performance.now()); }
+}
+
 // 홈런 불꽃: 몇 군데에서 터지며 퍼짐
 function fireworks(now){
   const cols = [PAL.red, PAL.ink, '#3cbcfc', '#58d854', PAL.white];
