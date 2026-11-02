@@ -20,7 +20,8 @@ function playTL(A, fx){
     const fe = (ps.ev || []).find(e => e.k === 'field'); if(fe) t.field = c + fe.t * S;
     t.result = c + Math.max(0.6, ps.result) * S;
     if(ps.runT) t.runner = c + ps.runT * S;
-    t.end = t.result + 1.6;
+    const lastBall = Math.max(0, ...(ps.ev || []).filter(e => e.k === 'ball').map(e => e.t1));
+    t.end = Math.max(t.result + 1.6, c + lastBall + 0.4);   // 홈런은 공이 담장 너머에 떨어질 때까지
     return t;
   }
   if(A.res === 'inplay' && bb){

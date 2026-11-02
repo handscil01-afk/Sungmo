@@ -43,6 +43,11 @@ function battedBall(G, o){
   else { b.d = o.d; b.hang = 2.1 + b.d / 46; }
   return b;
 }
+// 그 방향의 담장 거리: 가운데 담장과 좌·우 담장 사이를 각도로 이음 (그림의 담장과 같은 계산)
+function fenceAng(G, ang){
+  const f = (parkOf(G) && parkOf(G).fence) || [98, 120, 98], a = Math.min(1, Math.abs(ang) / 0.785), side = ang < 0 ? f[0] : f[2];
+  return f[1] + (side - f[1]) * a;
+}
 const polar = (ang, m) => [Math.sin(ang) * m, Math.cos(ang) * m];
 
 /* 플레이 계산. 돌려주는 것: { kind, outs, bat(타자 결과 베이스 0=아웃 1~4), runners:[{from, to}], scored:[주자 순번], err, ev:[…], result, text… } */
@@ -65,7 +70,8 @@ function simPlay0(G, bb, opt = {}){
   }
   const gbPool = bb.bunt ? ['P', 'C', '1B', '3B', '2B'] : POS_INF, gbMode = bb.bunt ? 'run' : 'gb';
   if(bb.type === 'gb'){
-    const tStop = bb.v / bb.dec, ballAt = t => { const tt = Math.min(t, tStop); return polar(bb.ang, bb.v * tt - bb.dec * tt * tt / 2); };
+    const wallR = fenceAng(G, bb.ang) - 2;   // 굴러가다 담장에서 멈춤
+    const tStop = bb.v / bb.dec, ballAt = t => { const tt = Math.min(t, tStop); return polar(bb.ang, Math.min(wallR, bb.v * tt - bb.dec * tt * tt / 2)); };
     let best = null;
     for(let t = 0.15; t <= tStop + 0.01; t += 0.04){
       const p = ballAt(t); if(Math.hypot(...p) > 47) break;
@@ -92,6 +98,8 @@ function simPlay0(G, bb, opt = {}){
   }
 
   // ---------- 뜬공·직선타·내야 뜬공 ----------
+  const fence = fenceAng(G, bb.ang);   // 이 타구 방향의 담장
+  if(!opt.hr && bb.d > fence - 1){ bb.d = fence - 1; opt = { ...opt, wall:true }; }   // 홈런이 아니면 담장 앞(담장을 맞고 떨어짐)
   const L = polar(bb.ang, bb.d), hang = bb.hang;
   // 직선타는 내야수 앞을 지나갈 때 잡을 수도 있음
   let catcher = null;
@@ -110,7 +118,6 @@ function simPlay0(G, bb, opt = {}){
     pool.forEach(pos => { const t = reachT(F[pos], L, 'air'); if(!m || t < m.t) m = { pos, t }; });
     catcher = { pos: m.pos, t: hang, p: L, margin: hang - m.t };
   }
-  const fence = parkOf(G).fence[bb.fi ?? 1] || 110;
   // 담장을 넘으면 홈런 (비거리 판정은 엔진이 이미 함: opt.hr)
   if(opt.hr){
     const f = F[catcher.pos];
