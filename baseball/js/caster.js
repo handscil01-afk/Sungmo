@@ -4,7 +4,10 @@
    voice/index.json의 variants에 같은 문장의 녹음이 여러 개면(이름-2) 번갈아 골라 매번 조금씩 다르게 들림.
    공을 친 결과는 뜸 들이는 중계 시간표에 맞춰: '쳤습니다! 높이 뜹니다! 오른쪽으로!' → (타구가 떨어질 때) '잡았습니다! 아웃!' */
 const CAST = { idx:null, buf:{}, loading:{}, until:0, last:{}, src:[] };
-function castOn(){ return SET.voice === 'cast'; }
+// 중계 음성: 설정의 '중계 음성'이 켜져 있고 효과음이 켜져 있을 때 (두 모드 모두 기본 켬)
+function castOn(){ return SET.cast !== false && SET.snd !== false; }
+// 설정을 켤 때 들려 주는 예시
+function castSample(){ castLoadIndex().then(() => { ['intro', 'playball'].forEach(castFile); Promise.all(['intro', 'playball'].map(castLoad)).then(() => { castStop(); castPlay(['intro', 'playball'], 0.1); }); }); }
 function castLoadIndex(){
   if(CAST.idx || CAST.idxP) return CAST.idxP;
   CAST.idxP = fetch(new URL('voice/index.json', document.baseURI).href).then(r => r.json()).then(j => { CAST.idx = j.variants || {}; }).catch(() => { CAST.idx = {}; });

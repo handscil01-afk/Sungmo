@@ -296,7 +296,7 @@ function drawFieldScene(G, A){
   const b1 = fm(...BASE_POL[0]), gbOut = bb.type === 'gb' && !bb.hit && TL.field;
   const kRoll = gbOut ? Math.min(1, (now - fs) / (TL.field - fs)) : k;
   let gx = home.x + (land.x - home.x) * kRoll, gy = home.y + (land.y - home.y) * kRoll;
-  if(gbOut && now > TL.field){ const q = Math.min(1, (now - TL.field) / (TL.result - TL.field)); gx = land.x + (b1.x - land.x) * q; gy = land.y + (b1.y - land.y) * q; }
+  if(gbOut && now > TL.field){ const q = Math.min(1, (now - TL.field) / (TL.result - TL.field)); gx = land.x + (b1.x - land.x) * q; gy = land.y + (b1.y - land.y) * q; }   // 송구(1루수가 잡았으면 들고 감)
   const apex = { fb: 22 + dist / 5, pu: 38, ld: 5, gb: 0 }[bb.type] ?? 15;
   let h = 4 * apex * k * (1 - k);
   if(bb.type === 'gb') h = gbOut && now > TL.field ? 3 : Math.abs(Math.sin(kRoll * Math.PI * 3)) * 2.5 * (1 - kRoll);
@@ -315,6 +315,10 @@ function drawFieldScene(G, A){
   // 공에 가장 가까운 야수만 쫓아감: 아웃은 떨어지기 전에 도착해 잡고, 안타는 공이 떨어진 뒤에야 도착해 던짐. 나머지는 서 있음
   const people = Object.keys(FPOS).map(p => {
     const hp = pts[p];
+    // 땅볼 아웃: 다른 내야수가 잡으면 1루수가 베이스로 들어가 송구를 받음
+    if(p === '1B' && gbOut && near !== '1B'){ const q = Math.min(1, (now - fs) / Math.max(0.2, TL.field - fs)); return [hp.x + (b1.x + 4 - hp.x) * q, hp.y + (b1.y - hp.y) * q, F.color, q < 1 ? 'run' : 'catch', Math.floor(now * 12), true]; }
+    // 1루수가 직접 잡으면 공을 들고 베이스를 밟음
+    if(p === '1B' && gbOut && near === '1B' && now > TL.field){ const q = Math.min(1, (now - TL.field) / (TL.result - TL.field)); return [land.x + (b1.x - land.x) * q, land.y + (b1.y - land.y) * q, F.color, q < 1 ? 'run' : 'catch', Math.floor(now * 12), true]; }
     if(p !== near) return [hp.x, hp.y, F.color, 'ready', 0, hp.x < chase.x];
     // 땅볼은 잡는 순간(field)에 도착, 뜬공 아웃은 떨어지기 직전에 도착, 안타는 늦게
     const go = gbOut ? Math.min(1, (now - fs) / (TL.field - fs)) : Math.min(1, k * (bb.hit ? 0.8 : 1.12)), x = hp.x + (chase.x - hp.x) * go, y = hp.y + (chase.y - hp.y) * go;
@@ -330,14 +334,14 @@ function drawFieldScene(G, A){
   // 심판: 결과가 나오면 1루심(세이프·아웃) 또는 주심(홈런)이 콜
   if(A.ph === 'fresult' && GX.meta['umpire-s']){
     if(A.hr) drawPerson('umpire-s', home.x + 14, home.y + 22, '#ff00ff', 'u4', false);
-    else { const u = fm(0.95, 30); drawPerson('umpire-s', u.x, u.y, '#ff00ff', /아웃|삼진|병살/.test(A.banner || '') ? 'u1' : 'u2', false); }
+    else { const u = fm(1.1, 38); drawPerson('umpire-s', u.x, u.y, '#ff00ff', /아웃|삼진|병살/.test(A.banner || '') ? 'u1' : 'u2', false); }
   }
   R(gx - 2, gy - 1, 4, 2, 'rgba(0,0,0,0.45)');
   ball(gx, gy - lift, 2 + h / 6);
   ctx.restore();
   scoreBar(G);
   if(A.ph === 'fresult' && A.banner){
-    banner(A.banner, 92, A.bannerColor || PAL.ink, 24);
+    banner(A.banner, 34, A.bannerColor || PAL.ink, 22);   // 위쪽에 (베이스 장면을 가리지 않게)
     if(A.hr) fireworks(performance.now());
   }
 }

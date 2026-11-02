@@ -112,7 +112,7 @@ function readyScreen(){
 /* ---------- 설정 ---------- */
 const FS_NAMES = ['보통', '크게', '아주 크게', '가장 크게'];
 const THEMES = { dark:'어두운 화면 (고대비)', light:'밝은 화면', yellow:'노랑 바탕에 검정 글씨' };
-const VOICES = { sr:'화면 낭독기 (보이스오버·톡백·점자)', cast:'중계 음성 (캐스터 목소리로 중계, 화면 낭독기는 질문만)', tts:'기기 음성으로 읽기', off:'읽지 않기' };
+const VOICES = { sr:'화면 낭독기 (보이스오버·톡백·점자)', tts:'기기 음성으로 읽기', off:'읽지 않기' };
 const onOff = b => b ? '켬' : '끔';
 const sndName = () => !SET.snd ? '끔' : SET.sndKind === 'synth' ? '간단한 소리' : '야구장 소리';
 function cycle(list, cur){ const i = list.indexOf(cur); return list[(i + 1) % list.length]; }
@@ -122,6 +122,7 @@ function setView(v){
   SET.view = v;
   if(v === 'gfx'){ SET.voice = 'off'; SET.crowd = true; }
   else { SET.voice = 'sr'; SET.crowd = false; }
+  SET.cast = true;
   saveSet(); if(typeof crowdSync === 'function') crowdSync();
   if(v === 'gfx' && typeof gfxLoad === 'function') gfxLoad();
 }
@@ -153,8 +154,8 @@ function settings2(backTo){
   const ch = (fn, label) => () => { fn(); saveSet(); stay(label()); };
   return { q:'설정 더 보기', back: v => go(() => settingsScreen(backTo), v), opts:[
     { n:1, t:`진동: ${onOff(SET.vib)}`, s:'안드로이드 휴대폰에서 안타, 홈런, 삼진, 득점 때 진동합니다.', act: ch(() => { SET.vib = !SET.vib; }, () => `진동 ${onOff(SET.vib)}`) },
-    { n:2, t:`관중 소리: ${onOff(SET.crowd)}`, s:'화면 보며 하기에서 경기 내내 야구장 관중 소리를 작게 깔아 줍니다. 효과음이 꺼져 있으면 나지 않습니다.',
-      act: ch(() => { SET.crowd = !SET.crowd; crowdSync(); }, () => `관중 소리 ${onOff(SET.crowd)}`) },
+    { n:2, t:`중계 음성: ${onOff(SET.cast !== false)}`, s:'캐스터 목소리로 경기를 중계합니다. 켜면 경기 결과는 중계로 듣고, 화면 낭독기는 질문과 선택지만 읽습니다. 켤 때 예시를 들려 줍니다.',
+      act: ch(() => { SET.cast = SET.cast === false; if(SET.cast){ SET.snd = true; castSample(); } }, () => `중계 음성 ${onOff(SET.cast !== false)}`) },
     { n:3, t:`명령 칸 숫자 바로 고르기: ${onOff(SET.quick)}`, s:'켜면 명령 칸에 숫자 하나만 적어도 바로 고릅니다. 끄면 입력 키를 눌러야 고릅니다.',
       act: ch(() => { SET.quick = !SET.quick; }, () => `숫자 바로 고르기 ${onOff(SET.quick)}`) },
     { n:4, t:`관전 자동 재생 간격: ${SET.watch}초`, act: ch(() => { SET.watch = cycle([2, 4, 6, 8, 12], SET.watch); }, () => `자동 재생 ${SET.watch}초`) },
@@ -215,8 +216,10 @@ function picksCustom(after, back){
 function settings3(backTo){
   const ch = (fn, label) => () => { fn(); saveSet(); stay(label()); };
   return { q:'설정 더 보기 (마지막)', back: v => go(() => settings2(backTo), v), opts:[
-    { n:1, t:'소리 시험', s:'읽어 주기, 효과음, 진동을 시험합니다.', act: v => { playFx(['pitch', 'bat', 'hit']); speak('소리 시험입니다. 딱! 잘 맞은 타구, 안타!'); if(v === 'click' && SET.voice === 'sr') note(['소리 시험입니다. 딱! 잘 맞은 타구, 안타!'], v); } },
+    { n:1, t:'소리 시험', s:'읽어 주기, 효과음, 중계 음성, 진동을 시험합니다.', act: v => { playFx(['pitch', 'bat', 'hit']); if(castOn()) castSample(); speak('소리 시험입니다. 딱! 잘 맞은 타구, 안타!'); if(v === 'click' && SET.voice === 'sr') note(['소리 시험입니다. 딱! 잘 맞은 타구, 안타!'], v); } },
     { n:5, t:`타격 난이도: ${EASY_NAME[SET.easy ?? 1]}`, s:'쉬움일수록 잘 맞히고 안타·볼넷·진루가 많아집니다. 다음 경기부터 적용합니다. (리그의 다른 팀 경기는 늘 현실)', act: ch(() => { SET.easy = cycle([1, 2, 0], SET.easy ?? 1); }, () => `타격 난이도 ${EASY_NAME[SET.easy]}`) },
+    { n:6, t:`관중 소리: ${onOff(SET.crowd)}`, s:'화면 보며 하기에서 경기 내내 야구장 관중 소리를 작게 깔아 줍니다. 효과음이 꺼져 있으면 나지 않습니다.',
+      act: ch(() => { SET.crowd = !SET.crowd; crowdSync(); }, () => `관중 소리 ${onOff(SET.crowd)}`) },
     { n:4, t:`정밀 모드에서 직접 고를 것: ${pickName()}`, s:'구종만 · 구종과 코스 · 전부 · 내 맘대로', act: v => go(() => picksScreen(w => go(() => settings3(backTo), w)), v) },
     { n:2, t:`받은 채팅 읽어 주기: ${onOff(SET.chatRead)}`, s:'온라인 대전에서 상대가 보낸 채팅을 바로 읽어 줍니다. 채팅 목록은 늘 화면에 남습니다.',
       act: ch(() => { SET.chatRead = !SET.chatRead; }, () => `채팅 읽어 주기 ${onOff(SET.chatRead)}`) },
