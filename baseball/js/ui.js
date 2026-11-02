@@ -43,13 +43,14 @@ function go(make, via = 'init', lines = []){
   addStatusOpt(UI.S);
   if(sus) document.documentElement.classList.add('hold');
   render();
-  const say = UI.S.say.filter(l => !l.after).map(l => l.s || l);
+  const castNow = UI.castNow; UI.castNow = false;   // 중계 음성이 결과를 말하면 화면 낭독기는 질문만
+  const say = castNow ? [] : UI.S.say.filter(l => !l.after).map(l => l.s || l);
   if(sus){
     // 앞부분만 먼저 읽고, 시간이 지나면 결과와 질문
     speak(say.join(' '));
     UI.holdT = setTimeout(() => {
       UI.holdT = 0; document.documentElement.classList.remove('hold');
-      speak([...sus.tail, UI.S.q].filter(Boolean).join(' '));
+      speak([...(castNow ? [] : sus.tail), UI.S.q].filter(Boolean).join(' '));
       if(via === 'click' && !$('#opts').contains(document.activeElement)) $('#q').focus({ preventScroll:true });
     }, sus.ms);
     return;

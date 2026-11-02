@@ -112,7 +112,7 @@ function readyScreen(){
 /* ---------- 설정 ---------- */
 const FS_NAMES = ['보통', '크게', '아주 크게', '가장 크게'];
 const THEMES = { dark:'어두운 화면 (고대비)', light:'밝은 화면', yellow:'노랑 바탕에 검정 글씨' };
-const VOICES = { sr:'화면 낭독기 (보이스오버·톡백·점자)', tts:'기기 음성으로 읽기', off:'읽지 않기' };
+const VOICES = { sr:'화면 낭독기 (보이스오버·톡백·점자)', cast:'중계 음성 (캐스터 목소리로 중계, 화면 낭독기는 질문만)', tts:'기기 음성으로 읽기', off:'읽지 않기' };
 const onOff = b => b ? '켬' : '끔';
 const sndName = () => !SET.snd ? '끔' : SET.sndKind === 'synth' ? '간단한 소리' : '야구장 소리';
 function cycle(list, cur){ const i = list.indexOf(cur); return list[(i + 1) % list.length]; }

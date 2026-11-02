@@ -107,7 +107,7 @@ function suspenseMs(fx){
 function gameNext(via, res){
   // 감독 모드: 묻지 않는 타석은 바로 진행하고 결과를 모음 (온라인 손님은 방장이 계산)
   if(G.mode === 'manager' && !(NET.on && NET.role === 'guest')) res = mgrAuto(res);
-  if(res){ if(!res.skip) UI.susp = suspenseMs(res.fx || []); playFx(res.fx); UI.lastFx = res.skip ? res.skip.fx : res.fx || []; UI.lastLines = res.lines || []; UI.lastSkip = res.skip || null; }
+  if(res){ if(!res.skip){ UI.susp = suspenseMs(res.fx || []); if(typeof castResult === 'function' && castOn()){ const at = castResult(res, UI.susp); UI.castNow = true; if(at && UI.susp){ UI.susp = Math.max(UI.susp, at * 1000); SFX.castAt = at; } } } playFx(res.fx); UI.lastFx = res.skip ? res.skip.fx : res.fx || []; UI.lastLines = res.lines || []; UI.lastSkip = res.skip || null; }
   const lines = visible(res ? res.lines : []);
   if(NET.on){ netNext(via, res, lines); return; }
   saveGame();
