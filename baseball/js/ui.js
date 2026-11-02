@@ -12,12 +12,48 @@
    - key·auto: 초점은 그대로 두고 숨은 알림 칸으로 읽어 줌 */
 const UI = { make:null, S:null, say:[], logN:0 };
 
+/* ---------- 뜸 들이는 중계 ----------
+   공을 친 결과 문장을 '친 순간'(앞부분)과 '결과'(뒷부분)로 나눔. 앞부분만 먼저 보여 주고 읽은 뒤,
+   타구 종류에 맞춘 시간이 지나면 결과와 다음 질문·선택지를 보여 주고 읽음 (그사이 선택지는 숨기고 키도 받지 않음) */
+const RESULT_WORD = /(잡습니다|잡아|잡아냅니다|잡아 냅니다|잡혔|아웃|안타|2루타|3루타|홈런|파울|세이프|떨어집니다|빠져나갑니다|넘어갑니다|넘어갔|병살|트리플|정면|처리|실책|놓칩니다|빗나갑니다|희생|맞고|가릅니다|살짝 넘|훌쩍)/;
+function splitResult(s){
+  const from = Math.max(0, s.lastIndexOf('… ') + 2);
+  const m = RESULT_WORD.exec(s.slice(from)); if(!m) return null;
+  const at = from + m.index;
+  let cut = Math.max(s.lastIndexOf(', ', at), s.lastIndexOf('. ', at), s.lastIndexOf('! ', at), s.lastIndexOf('… ', at));
+  if(cut < from - 2) cut = at - 1;
+  const head = s.slice(0, cut + 1).trim(), tail = s.slice(cut + 1).trim();
+  return head.length > 4 && tail ? { head, tail } : null;
+}
+function suspend(lines){
+  const ms = UI.susp; UI.susp = 0;
+  // 자동 시험(Playwright)은 window.__susp를 켠 때만 기다림
+  if(!ms || !lines.length || (navigator.webdriver && !window.__susp)) return null;
+  const i = lines.findIndex(l => (l.k === 'r' || l.k === 'p') && splitResult(l.s || ''));
+  if(i < 0) return null;
+  const sp = splitResult(lines[i].s);
+  const out = lines.map((l, j) => j < i ? l : j === i ? { ...l, s: sp.head, tail: sp.tail } : { ...l, after:true });
+  return { lines: out, ms, tail: [sp.tail, ...lines.slice(i + 1).map(l => l.s || l)] };
+}
 function go(make, via = 'init', lines = []){
-  UI.make = make; UI.say = lines || []; UI.note = null;
+  if(UI.holdT){ clearTimeout(UI.holdT); UI.holdT = 0; document.documentElement.classList.remove('hold'); }
+  const sus = suspend(lines || []);
+  UI.make = make; UI.say = sus ? sus.lines : lines || []; UI.note = null;
   UI.S = make(); if(UI.say.length || !UI.S.say) UI.S.say = UI.say;
   addStatusOpt(UI.S);
+  if(sus) document.documentElement.classList.add('hold');
   render();
-  const say = UI.S.say.map(l => l.s || l);
+  const say = UI.S.say.filter(l => !l.after).map(l => l.s || l);
+  if(sus){
+    // 앞부분만 먼저 읽고, 시간이 지나면 결과와 질문
+    speak(say.join(' '));
+    UI.holdT = setTimeout(() => {
+      UI.holdT = 0; document.documentElement.classList.remove('hold');
+      speak([...sus.tail, UI.S.q].filter(Boolean).join(' '));
+      if(via === 'click' && !$('#opts').contains(document.activeElement)) $('#q').focus({ preventScroll:true });
+    }, sus.ms);
+    return;
+  }
   const msg = [...say, UI.S.q].filter(Boolean).join(' ');
   if(via === 'click'){
     setTimeout(() => { const el = UI.S.focusCmd ? $('#cmd') : say.length ? $('#say') : $('#q'); if(el) el.focus({ preventScroll:false }); }, 40);
@@ -49,7 +85,7 @@ function render(){
   }
   else if(S.scene && SET.view === 'gfx' && typeof gfxScene === 'function'){ bs.hidden = false; gfxScene(bs, S.scene); }
   else { bs.hidden = true; bs.innerHTML = ''; if(typeof GX !== 'undefined') GX.scene = null; }
-  $('#say').innerHTML = (S.say || []).map(l => `<p class="${l.k ? 'k-' + l.k : ''}">${esc(l.s || l)}</p>`).join('');
+  $('#say').innerHTML = (S.say || []).map(l => `<p class="${l.k ? 'k-' + l.k : ''}${l.after ? ' after' : ''}">${esc(l.s || l)}${l.tail ? `<span class="tail"> ${esc(l.tail)}</span>` : ''}</p>`).join('');
   $('#say').hidden = !(S.say || []).length;
   // 메모: 화면이 정한 글, 없으면 방금 note()로 띄운 글 (전체화면 전환 같은 다시 그리기에도 남음)
   const nl = S.note || UI.note || [];
@@ -194,6 +230,7 @@ function keyName(e){
   return null;
 }
 document.addEventListener('keydown', e => {
+  if(document.documentElement.classList.contains('hold') && !e.target.closest('input, textarea')) { e.preventDefault(); return; }   // 결과를 기다리는 동안은 고르지 않음
   if(dlgOpen() || e.ctrlKey || e.metaKey || e.altKey) return;
   const t = e.target, tag = t && t.tagName;
   if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;

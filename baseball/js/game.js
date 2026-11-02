@@ -93,11 +93,21 @@ function whoInfo(){
 function recentLines(n){ return G.log.filter(l => l.k !== 'd' || SET.dice).slice(-n).map(l => l.s); }
 
 /* ---------- 진행 ---------- */
+// 결과를 기다리는 시간(ms): 친 공은 타구가 날아가는 만큼, 파울은 잠깐. 그림 모드는 그림 움직임에 맞춤
+function flyMs(){ const bb = G && G.anim && G.anim.bb; return !bb ? 1300 : bb.type === 'gb' ? 1300 : 1900; }
+function suspenseMs(fx){
+  if(!G || !G.anim || G.mode === 'manager') return 0;
+  const gx = SET.view === 'gfx', inplay = G.anim.res === 'inplay' && fx.some(n => /^bat/.test(n)), foul = fx.includes('batF');
+  if(inplay) return gx ? 1000 + flyMs() : 650 + flyMs();
+  if(foul) return gx ? 750 : 900;
+  return 0;
+}
+
 // 결과(res)를 보여 주고, 다음에 누가 무엇을 골라야 하는지 정함
 function gameNext(via, res){
   // 감독 모드: 묻지 않는 타석은 바로 진행하고 결과를 모음 (온라인 손님은 방장이 계산)
   if(G.mode === 'manager' && !(NET.on && NET.role === 'guest')) res = mgrAuto(res);
-  if(res){ playFx(res.fx); UI.lastFx = res.skip ? res.skip.fx : res.fx || []; UI.lastLines = res.lines || []; UI.lastSkip = res.skip || null; }
+  if(res){ if(!res.skip) UI.susp = suspenseMs(res.fx || []); playFx(res.fx); UI.lastFx = res.skip ? res.skip.fx : res.fx || []; UI.lastLines = res.lines || []; UI.lastSkip = res.skip || null; }
   const lines = visible(res ? res.lines : []);
   if(NET.on){ netNext(via, res, lines); return; }
   saveGame();
