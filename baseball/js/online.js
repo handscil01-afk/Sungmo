@@ -117,7 +117,7 @@ function netStartGame(via){
   const c = NET.cfg, teams = [], who = [];
   teams[c.hostSide] = c.hostTeam; teams[1 - c.hostSide] = c.guestTeam;
   who[c.hostSide] = SET.name || '방장'; who[1 - c.hostSide] = NET.peer ? NET.peer.name : '손님';
-  const opts = { mode:c.mode, unit:c.unit, innings:c.innings, teams, ctrl:['human', 'human'], who, diff:1, seed:(Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0 };
+  const opts = { mode:c.mode, unit:c.unit, innings:c.innings, teams, ctrl:['human', 'human'], who, diff:1, easy: SET.easy ?? 1, seed:(Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0 };
   startGame(opts, via);
 }
 
@@ -221,7 +221,7 @@ function onAct(v){
       if(c.k === 'hitrun' && !canSteal(G)) return;
       c = c.k === 'steal' ? { k:'steal', from:c.from } : { k:c.k };
     }
-    else if(G.mode === 'detail'){ if(role === 'def' ? !VALID_PITCH(c) : !VALID_BAT(c)) return; c = role === 'def' ? (c.k === 'ibb' ? { k:'ibb' } : { k:'pitch', t:c.t, r:c.r, c:c.c, e:c.e, w:c.w }) : { k:c.k, g:c.g ?? null, from:c.from }; }
+    else if(G.mode === 'detail'){ if(role === 'def' ? !VALID_PITCH(c) : !VALID_BAT(c)) return; c = role === 'def' ? (c.k === 'ibb' ? { k:'ibb' } : { k:'pitch', t:c.t, r:c.r, c:c.c, e:c.e, w:c.w }) : { k:c.k, g:c.g ?? null, d: ['pull', 'oppo'].includes(c.d) ? c.d : null, from:c.from }; }
     else if(!(role === 'def' ? ['attack', 'nibble', 'ibb'] : ['power', 'normal', 'contact', 'bunt', ...(G.unit === 'pitch' ? ['take'] : [])]).includes(c)) return;
     GS.pend[role] = c;
     if(!tryResolve('auto')) netPushState(null);

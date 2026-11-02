@@ -266,7 +266,7 @@ function handoffScreen(ti){
 /* ---------- 수비 (정밀 모드) ---------- */
 /* ---------- 직접 고를 항목 (설정의 '직접 고를 항목') ----------
    pt 구종 · loc 코스(full 9칸 / height 높낮이만 / none) · edge 붙이는 정도 · pow 세기 · bat 치는 방법(full 네 가지 / simple 치기·지켜보기) · guess 노림수 */
-const picks = () => ({ pt:true, loc:'full', edge:true, pow:true, bat:'full', guess:true, ...(SET.picks || {}) });
+const picks = () => ({ pt:true, loc:'full', edge:true, pow:true, bat:'full', guess:true, dir:false, ...(SET.picks || {}) });
 // 고를 차례인 다음 항목으로 가고, 다 골랐으면 고르지 않은 항목을 컴퓨터가 채워서 던짐
 function pitchNext(v){
   const p = picks(), s = GS.sel || { k:'pitch' };
@@ -400,15 +400,16 @@ function bullpenScreen(){
 
 /* ---------- 공격 (정밀 모드) ---------- */
 const GUESS = { fast:'직구 계열 노리기', break:'변화구 노리기' };
+const DIRN = { pull:'당겨치기', oppo:'밀어치기' };
 function offMain(){
   if(G.mode === 'simple') return simpleOff();
   if(G.mode === 'manager') return mgrOff();
   const ti = batIdx(G), T = G.teams[ti], B = curBatter(G), bs = G.bases;
-  if(GS.guessPA !== G.pa){ GS.guess = null; GS.guessPA = G.pa; }
-  const g = GS.guess;
+  if(GS.guessPA !== G.pa){ GS.guess = null; GS.dir = null; GS.guessPA = G.pa; }
+  const g = GS.guess, dr = GS.dir || null;
   const runner = bs[1] != null && bs[2] == null ? T.bat[bs[1]] : bs[0] != null && bs[1] == null ? T.bat[bs[0]] : null;
   const runners = bs.some(x => x != null);
-  const bat = k => v => submit('off', { k, g }, v), p = picks();
+  const bat = k => v => submit('off', { k, g, d: dr }, v), p = picks();
   return { board:true, q:`${whoLabel(ti)}공격. 타자 ${B.name}, 제${G.pitchNo + 1}구 ${countText(G)}. 어떻게 할까요?`, opts:[
     { n:1, t:'치기', s:'스트라이크면 치고, 볼은 골라냅니다.', act: bat('swing') },
     { n:2, t:'강하게 치기', s:'장타를 노립니다. 헛스윙이 늘고 볼에 잘 속습니다.', hide: p.bat === 'simple', act: bat('power') },
@@ -416,26 +417,31 @@ function offMain(){
     { n:4, t:'지켜보기', s:'이번 공은 치지 않습니다.', act: bat('take') },
     { n:5, t: runners ? '번트' : '기습 번트', s: runners ? '타자는 아웃되더라도 주자를 한 베이스 보냅니다.' : '발로 1루를 노립니다.', act: bat('bunt') },
     stealOpt(6, '타자는 이번 공을 지켜봅니다.', (from, v) => submit('off', { k:'steal', g, from }, v)),
-    { n:7, t:`노림수: ${g ? GUESS[g] : '없음'}`, s:'맞으면 잘 맞고, 틀리면 맞히기 어렵습니다. 이번 타석 동안 유지됩니다.', hide: !p.guess && !g, act: v => go(guessScreen, v) },
+    { n:7, t:`노림수: ${[g ? GUESS[g].replace(' 노리기', '') : '', dr ? DIRN[dr] : ''].filter(Boolean).join(' · ') || '없음'}`, s:'구종이나 치는 방향을 노립니다. 맞으면 잘 맞고, 틀리면 맞히기 어렵습니다. 이번 타석 동안 유지됩니다.', hide: !p.guess && !p.dir && !g && !dr, act: v => go(guessScreen, v) },
     { n:8, t:'코치에게 맡기기', s:'이번 공은 컴퓨터가 골라 줍니다.', act: v => submit('off', aiBat(G), v) },
     { n:9, t:'더 보기', s:'점수판, 선수 정보, 맡기기, 설정', act: v => go(moreScreen, v) },
   ] };
 }
 function guessScreen(){
+  const p = picks();
   const set = (g, v) => { GS.guess = g; GS.guessPA = G.pa; go(offMain, v, [{ s:`노림수: ${g ? GUESS[g] : '없음'}.`, k:'c' }]); };
+  const setD = (d, v) => { GS.dir = d; GS.guessPA = G.pa; go(offMain, v, [{ s:`치는 방향: ${d ? DIRN[d] : '노리지 않음'}.`, k:'c' }]); };
   return { board:true, sub:true, q:'무엇을 노릴까요?', back: v => go(offMain, v), opts:[
-    { n:1, t:GUESS.fast, s:'직구·투심·커터', act: v => set('fast', v) },
-    { n:2, t:GUESS.break, s:'슬라이더·커브·체인지업·포크', act: v => set('break', v) },
-    { n:3, t:'노림수 없음', act: v => set(null, v) },
+    { n:1, t:GUESS.fast, s:'직구·투심·커터', hide: !p.guess, act: v => set('fast', v) },
+    { n:2, t:GUESS.break, s:'슬라이더·커브·체인지업·포크', hide: !p.guess, act: v => set('break', v) },
+    { n:3, t:'구종 노리지 않기', hide: !p.guess, act: v => set(null, v) },
+    { n:4, t:'당겨치기', s:'몸쪽 공을 크게 당겨 칩니다. 바깥쪽 공은 빗맞기 쉽습니다.', hide: !p.dir, act: v => setD('pull', v) },
+    { n:5, t:'밀어치기', s:'바깥쪽 공을 반대쪽으로 밀어 칩니다. 몸쪽 공은 빗맞기 쉽습니다.', hide: !p.dir, act: v => setD('oppo', v) },
+    { n:6, t:'방향 노리지 않기', hide: !p.dir, act: v => setD(null, v) },
   ] };
 }
 
 /* ---------- 간단 모드 ---------- */
 const pct = (rows, ks) => rows.filter(r => ks.includes(r.k)).reduce((a, r) => a + r.to - r.from + 1, 0);
-const simpleOdds = (D, O) => { const t = simpleTable(D, O); return `안타 이상 ${pct(t, ['S1', 'S2', 'S3', 'HR'])}%, 홈런 ${pct(t, ['HR'])}%, 삼진 ${pct(t, ['K'])}%`; };
+const simpleOdds = (D, O) => { const t = simpleTable(D, O, parkOf(G).hr, G.easy || 0); return `안타 이상 ${pct(t, ['S1', 'S2', 'S3', 'HR'])}%, 홈런 ${pct(t, ['HR'])}%, 삼진 ${pct(t, ['K'])}%`; };
 // '공 하나씩'일 때 선택지 설명: 공이 존에 들어갈 확률, 휘둘렀을 때 헛스윙·파울·인플레이 확률
 const spZone = D => `스트라이크 존에 들어갈 확률 ${SP_ZONE[D]}%`;
-const spSwing = O => { const a = SP_SWING.in[O]; return `존에 들어온 공을 치면 헛스윙 ${a[0]}%, 파울 ${a[1]}%, 인플레이 ${100 - a[0] - a[1]}%`; };
+const spSwing = O => { const a0 = SP_SWING.in[O], a = [Math.round(a0[0] * EZ(G, [1, 0.8, 0.62])), a0[1]]; return `존에 들어온 공을 치면 헛스윙 ${a[0]}%, 파울 ${a[1]}%, 인플레이 ${100 - a[0] - a[1]}%`; };
 function simpleDef(){
   const ti = 1 - batIdx(G), B = curBatter(G);
   if(G.unit === 'pitch') return { board:true, q:`${whoLabel(ti)}수비. 타자 ${batTeam(G).bi + 1}번 ${B.name}, 제${G.pitchNo + 1}구 ${countText(G)}. 어떤 공을 던질까요?`, opts:[

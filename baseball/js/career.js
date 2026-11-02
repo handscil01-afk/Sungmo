@@ -177,7 +177,7 @@ function careerPlay(via){
   const L = CR(), g = myGameToday(L), c = C(L), p = myP(L); if(!g) return;
   const opts = leagueGameOpts(L, g.a, g.h, ['cpu', 'cpu'], L.mode === 'simple' ? 'simple' : 'detail', 'pitch');
   // 선발 투수인데 오늘이 내 차례가 아니면 불펜에 대기 / 불펜 투수는 늘 대기
-  G = newGame(opts);
+  G = newGame({ ...opts, easy: SET.easy ?? 1 });
   G.focus = c.id; G.focusTeam = g.a === L.my ? 0 : 1;
   G.career = { season:L.season, day:L.day, phase:L.phase, label: g.label || `${L.season}시즌 ${L.day + 1}일째` };
   saveLeague();
@@ -304,7 +304,7 @@ function simMine(G2, id){
 function careerMinorPlay(via){
   const L = CR(), c = C(L), p = myP(L);
   const { opp, o } = minorGameOpts(L, L.mode === 'simple' ? 'simple' : 'detail');
-  G = newGame(o);
+  G = newGame({ ...o, easy: SET.easy ?? 1 });
   G.focus = c.id; G.focusTeam = 0;
   G.career = { season:L.season, day:L.day, phase:L.phase, minor:true, opp, label:`${L.season}시즌 ${L.day + 1}일째 퓨처스리그` };
   saveLeague();

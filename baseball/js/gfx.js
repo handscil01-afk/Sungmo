@@ -490,6 +490,7 @@ function bannerOf(fx, text){
   const has = n => fx.includes(n);
   if(G && G.over) return [G.walkoff ? '끝내기!' : '게임 셋!', PAL.ink, has('hr')];
   if(has('hr')) return ['홈런!', PAL.red, true];
+  if(/트리플 플레이/.test(text)) return ['트리플 플레이!', PAL.red];
   if(/실책/.test(text)) return ['실책!', PAL.red];
   if(/병살/.test(text)) return ['병살!', '#3cbcfc'];
   if(has('b3')) return ['3루타!', PAL.ink]; if(has('b2')) return ['2루타!', PAL.ink]; if(has('hit')) return ['안타!', PAL.ink];

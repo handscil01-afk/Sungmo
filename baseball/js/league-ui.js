@@ -130,7 +130,7 @@ function leagueInnScreen(){
 function leaguePlay(via){
   const L = LG(), g = myGameToday(L); if(!g) return;
   const ctrl = g.a === L.my ? ['human', 'cpu'] : ['cpu', 'human'];
-  G = newGame(leagueGameOpts(L, g.a, g.h, ctrl, L.mode, L.unit));
+  G = newGame({ ...leagueGameOpts(L, g.a, g.h, ctrl, L.mode, L.unit), easy: SET.easy ?? 1 });
   G.league = { season: L.season, day: L.day, phase: L.phase, n: postN(L), label: g.label || `정규 시즌 ${L.day + 1}일째` };
   saveLeague();
   GS.opts = null; GS.pend = { def:null, off:null }; GS.auto = null; GS.holder = -1; GS.sel = null; UI.logG = null;

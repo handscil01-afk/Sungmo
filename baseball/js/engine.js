@@ -149,6 +149,8 @@ function newGame(o){
     unit: o.mode === 'simple' && o.unit === 'pitch' ? 'pitch' : 'pa',
     innings: o.innings || 3, ctrl: o.ctrl || ['human', 'cpu'],
     who: o.who || ['', ''], diff: o.diff == null ? 1 : o.diff,
+    // 타격 난이도(재미): 0 현실 · 1 보통 · 2 쉬움. 높을수록 잘 맞히고 안타·진루가 많음 (리그 컴퓨터 경기는 0)
+    easy: o.easy == null ? 0 : o.easy,
     inning:1, top:true, outs:0, balls:0, strikes:0, bases:[null, null, null], pitchNo:0, pa:0, half:0,
     over:false, winner:null, prev:null, lastLoc:null, at: Date.now() };
   // 컴퓨터 난이도: 쉬움이면 컴퓨터 팀 능력치를 조금 낮추고, 어려움이면 조금 높임
@@ -384,7 +386,7 @@ function onHit(G, n, ev, simple){
   }
   const spd = i => simple ? 55 : T.bat[i].spd;
   if(n >= 4){ for(let k = 2; k >= 0; k--) if(b[k] != null){ sc.push(b[k]); b[k] = null; } sc.push(T.bi); scoreRuns(G, sc, true); return; }
-  const nb = [null, null, null], ofAdj = [-0.18, 0, 0.1][F.align.of];
+  const nb = [null, null, null], ofAdj = [-0.18, 0, 0.1][F.align.of] + EZ(G, [0, 0.12, 0.18]);
   for(let k = 2; k >= 0; k--){
     const r = b[k]; if(r == null) continue;
     let to = k + n;
@@ -729,7 +731,7 @@ function playPitch(G, Psel, Bsel){
   const guess = Bsel.g ? (Bsel.g === 'fast') === pt.fast ? 9 : -7 : 0;
   const bq = soft(B.con, 0.7) + B.cond * 4 + ({ swing:0, power:-12, contact:10 })[k] + guess + timing;
   const cen = clamp(1 - zd, 0, 1);
-  const pCon = 0.84 + (bq - pq) / 110 - (inZone ? 0.12 * (1 - cen) : 0.14 + (zd - 1) * 1.0);
+  const pCon = 0.84 + EZ(G, [0, 0.04, 0.06]) + (bq - pq) / 110 - (inZone ? 0.12 * (1 - cen) : 0.14 + (zd - 1) * 1.0);
   const kk = ({ power:'power', contact:'contact' })[k] || 'swing';
   if(guess > 0) emit(G, '노리던 공이 들어옵니다.', 'd');
   if(timing < 0) emit(G, '느린 공에 타이밍을 빼앗깁니다.', 'd');
@@ -758,13 +760,16 @@ function playPitch(G, Psel, Bsel){
     emit(G, `${head} ${pickSay(G, SAY.foul[kk])} ${countText(G)}.${tail}`, 'p');
     return flush(G);
   }
-  const q = clamp(rnd(G) * 0.75 + 0.08 + (bq - pq) / 220 + (inZone ? 0.18 * cen : -0.12), 0, 1);
+  // 방향 노리기: 바깥쪽 공을 밀어치거나 몸쪽 공을 당겨치면 잘 맞고, 반대면 빗맞기 쉬움
+  const dirFit = !Bsel.d ? 0 : (Bsel.d === 'oppo' ? x : -x) > 0.25 ? 0.08 : (Bsel.d === 'oppo' ? x : -x) < -0.25 ? -0.08 : 0;
+  if(dirFit) emit(G, dirFit > 0 ? '노린 방향으로 칠 수 있는 공입니다.' : '노린 방향과 반대쪽 공입니다.', 'd');
+  const q = clamp(rnd(G) * 0.75 + 0.08 + dirFit + EZ(G, [0, 0.05, 0.07]) + (bq - pq) / 220 + (inZone ? 0.18 * cen : -0.12), 0, 1);
   const ev = clamp(0.45 * q + 0.45 * soft(B.pow + B.cond * 4, 0.5) / 100 + ({ swing:0, power:0.07, contact:-0.07 })[k] + (pt.fast && vel >= 153 ? 0.02 : 0) + gauss(G) * 0.035, 0, 1.08);
   emit(G, `판정 타구: 정확도 ${Math.round(q * 100)}, 힘 ${Math.round(ev * 100)}.`, 'd');
   fx(G, q > 0.75 ? 'batBig' : 'bat'); G.anim.res = 'inplay';
   G.hrun = hr;
   const hitWord = Psel.e !== 'in' && zd < 0.42 && q > 0.5 ? '가운데로 몰린 실투를 놓치지 않습니다!' : pickSay(G, SAY.hit[kk][q > 0.75 ? 'good' : 'bad']);
-  inPlay(G, { head: `${head} ${hitWord}`, x, y, q, ev, k, pt });
+  inPlay(G, { head: `${head} ${hitWord}`, x, y, q, ev, k, pt, d: Bsel.d });
   G.hrun = false;
   if(G.review) return flush(G);
   return end();
@@ -840,11 +845,12 @@ function runnerMoves(G, before){
 
 /* ---------- 인플레이 타구 (정밀 모드) ---------- */
 function inPlay(G, o){
-  const { x, y, q, ev, k, pt } = o;
+  const { x, y, q, ev, k, pt, d: dir } = o;
   const F = fieldTeam(G), T = batTeam(G), B = curBatter(G), P = curPitcher(G);
   const inf = F.align.inf, of = F.align.of, defMod = (60 - F.def) / 300, pk = parkOf(G);
   // 방향: 몸쪽 공은 당겨 치기 쉬움
   let pull = 0.42; if(x < -0.3) pull += 0.15; if(x > 0.3) pull -= 0.15;
+  if(dir) pull = clamp(pull + (dir === 'pull' ? 0.3 : -0.3), 0.08, 0.62);
   const side = wpick(G, [['pull', pull], ['cen', 0.33], ['oppo', 1 - pull - 0.33]]);
   const fi = side === 'cen' ? 1 : (side === 'pull') === (B.hand === 'R') ? 0 : 2;   // 0 왼쪽 · 1 가운데 · 2 오른쪽
   const pGB = 0.42 - y * 0.10 + pt.gb - (B.pow - 50) / 500 - (k === 'power' ? 0.07 : 0) + (k === 'contact' ? 0.04 : 0);
@@ -872,7 +878,7 @@ function inPlay(G, o){
     const slow = ev < 0.35;
     let pHit = slow ? 0.13 + (B.spd - 50) / 220 + [-0.08, 0, 0.08][inf]
                     : 0.27 + (ev - 0.5) * 0.35 + [0.07, 0, -0.04][inf] + (B.spd - 50) / 500;
-    pHit += defMod + (pk.turf ? 0.03 : 0);
+    pHit += defMod + (pk.turf ? 0.03 : 0) + EZ(G, [0, 0.08, 0.12]);
     const th = Math.round(clamp(pHit, 0, 1) * 100), dd = rint(G, 1, 100), ok = dd <= th;
     emit(G, `판정 땅볼 안타: 확률 ${th}퍼센트, 주사위 ${dd}, ${ok ? '빠져나감' : '잡힘'}.`, 'd');
     if(Math.abs(dd - th) <= 4 && (ok ? slow : !(G.bases[0] != null && G.outs < 2) && !G.hrun)){
@@ -891,7 +897,7 @@ function inPlay(G, o){
     return;
   }
   if(type === 'ld'){
-    let pHit = 0.67 + (ev - 0.5) * 0.4 + [0.04, 0, -0.02][inf] + defMod;
+    let pHit = 0.67 + (ev - 0.5) * 0.4 + [0.04, 0, -0.02][inf] + defMod + EZ(G, [0, 0.07, 0.1]);
     const pos = pickOne(G, fi === 0 ? ['3B', 'SS', 'LF'] : fi === 2 ? ['2B', '1B', 'RF'] : ['SS', '2B', 'CF']);
     if(check(G, '직선 타구 안타', pHit, '떨어짐', '잡힘')){
       const p2 = clamp(0.16 + (ev - 0.5) * 1.0 + [0.12, 0, -0.08][of], 0.05, 0.65);
@@ -904,6 +910,8 @@ function inPlay(G, o){
     out(`잘 맞은 직선 타구, 그러나 ${fielder(F, pos)} 정면. 직선타 아웃.`, () => {
       // 뛰어나갔던 주자가 돌아오지 못하면 함께 아웃
       const b = G.bases, on = [0, 1, 2].filter(i => b[i] != null);
+      // 무사 주자 둘 이상에서 직선타: 아주 드물게 두 주자 모두 못 돌아와 트리플 플레이
+      if(on.length >= 2 && G.outs === 1 && rnd(G) < (G.hrun ? 0.12 : 0.02)){ on.slice(-2).forEach(i => { b[i] = null; }); addOut(G, 2); emit(G, `주자들이 돌아가지 못합니다! 2루, 1루까지! 트리플 플레이!!! 3아웃.`, 'r'); return; }
       if(on.length && G.outs < 3 && rnd(G) < (G.hrun ? 0.45 : 0.08)){ const i = on[on.length - 1]; const R = T.bat[b[i]]; b[i] = null; addOut(G); emit(G, `${R.name}, 돌아가지 못해 함께 아웃! 더블 플레이. ${G.outs}아웃.`, 'r'); }
     });
     return;
@@ -944,16 +952,16 @@ function inPlay(G, o){
   };
   if(d < 40){ out(`높이 떴지만 멀리 가지 못합니다. ${ga(fielder(F, pickOne(G, ['SS', '2B'])))} 잡습니다.`); return; }
   if(d < 58){
-    if(check(G, '짧은 뜬공 안타', [0.10, 0.28, 0.48][of] + defMod, '앞에 떨어짐', '잡힘')){ hit(1, `빗맞은 타구가 ${ofName} 앞에 뚝 떨어집니다. 안타!`); return; }
+    if(check(G, '짧은 뜬공 안타', [0.10, 0.28, 0.48][of] + defMod + EZ(G, [0, 0.1, 0.14]), '앞에 떨어짐', '잡힘')){ hit(1, `빗맞은 타구가 ${ofName} 앞에 뚝 떨어집니다. 안타!`); return; }
     out(`짧은 뜬공, ${ga(ofName)} 달려 나와 잡습니다.`, sacFly); return;
   }
   if(d < fence - 14){
-    if(check(G, '뜬공 안타', [0.07, 0.04, 0.07][of] + defMod, '떨어짐', '잡힘')){ hit(1, `${ofName} 쪽 타구, 글러브에 맞고 떨어집니다. 안타!`); return; }
+    if(check(G, '뜬공 안타', [0.07, 0.04, 0.07][of] + defMod + EZ(G, [0, 0.07, 0.1]), '떨어짐', '잡힘')){ hit(1, `${ofName} 쪽 타구, 글러브에 맞고 떨어집니다. 안타!`); return; }
     if(rnd(G) < errorChance(F) * 0.6){ B.st.ab++; onError(G, posOF); return; }
     out(`${josa(field, '으로', '로')} 뜬 공, ${ga(ofName)} 잡습니다.`, sacFly); return;
   }
   if(d < fence - 5){
-    if(check(G, '깊은 뜬공 안타', [0.55, 0.28, 0.10][of] + defMod, '머리 위로 넘어감', '잡힘')){
+    if(check(G, '깊은 뜬공 안타', [0.55, 0.28, 0.10][of] + defMod + EZ(G, [0, 0.1, 0.14]), '머리 위로 넘어감', '잡힘')){
       if((B.spd >= 65 || pk.tri > 1) && rnd(G) < 0.2 * pk.tri){ hit(3, `깊은 타구가 ${ofName}의 머리 위로 넘어갑니다. 3루까지! 3루타!`); return; }
       hit(2, `깊은 타구가 ${ofName}의 머리 위로 넘어갑니다. 2루타!`); return;
     }
@@ -978,6 +986,12 @@ function groundOut(G, head, pos, inf){
   }
   // 병살: 1루 주자가 있고 아웃이 2개 미만일 때
   if(b[0] != null && G.outs < 2){
+    // 트리플 플레이: 무사 1·2루나 만루에서 아주 드물게 (3루수가 잡아 3루 → 2루 → 1루)
+    if(G.outs === 0 && b[1] != null && ['3B', 'SS'].includes(pos) && rnd(G) < 0.03){
+      B.st.ab++; addOut(G, 3);
+      emit(G, `${head} 땅볼, ${ga(who)} 잡아 3루 베이스를 밟고, 2루로, 다시 1루로! 트리플 플레이!!! 순식간에 세 명이 아웃됩니다! 3아웃.`, 'r'); fx(G, 'out');
+      return;
+    }
     const pDP = clamp(0.32 + [-0.1, 0, 0.1][inf] - (B.spd - 50) / 200, 0.1, 0.75);
     if(rnd(G) < pDP){
       B.st.ab++; addOut(G, 2);
@@ -1006,9 +1020,11 @@ function groundOut(G, head, pos, inf){
    D(수비): 'attack' 정면 승부 · 'nibble' 유인구 승부 · 'ibb' 고의 볼넷
    O(공격): 'power' 강하게 · 'normal' 보통 · 'contact' 맞히기 · 'bunt' 번트 · 'steal' 도루 */
 const SIMPLE_BASE = { K:20, BB:8, S1:15, S2:4.5, S3:0.5, HR:3, GO:25, FO:24 };
+const EZ = (G, a) => a[(G && G.easy) || 0];   // 타격 난이도에 따른 값 [현실, 보통, 쉬움]
 const SIMPLE_NAME = { K:'삼진', BB:'볼넷', S1:'안타', S2:'2루타', S3:'3루타', HR:'홈런', GO:'땅볼', FO:'뜬공' };
-function simpleTable(D, O, hrMul = 1){
+function simpleTable(D, O, hrMul = 1, easy = 0){
   const w = { ...SIMPLE_BASE };
+  if(easy){ const m = [1, 1.3, 1.6][easy]; w.S1 *= m; w.S2 *= m; w.S3 *= m; w.HR *= [1, 1.2, 1.45][easy]; w.BB *= [1, 1.2, 1.35][easy]; w.K *= [1, 0.82, 0.68][easy]; }
   w.HR *= hrMul;
   const mul = (k, m) => { w[k] *= m; };
   if(O === 'power'){ mul('HR', 2.1); mul('S2', 1.3); mul('K', 1.4); mul('S1', 0.85); mul('FO', 1.1); }
@@ -1034,7 +1050,7 @@ function playSimple(G, D, O, from){
   }
   if(O === 'bunt'){ P.n++; buntResult(G, `${B.name}, 번트!`, true); endPA(G); return flush(G); }
   P.n += rint(G, 3, 6);
-  const rows = simpleTable(D, O, parkOf(G).hr), d = rint(G, 1, 100), row = rows.find(r => d >= r.from && d <= r.to);
+  const rows = simpleTable(D, O, parkOf(G).hr, G.easy || 0), d = rint(G, 1, 100), row = rows.find(r => d >= r.from && d <= r.to);
   emit(G, '주사위 표: ' + rows.map(r => `${SIMPLE_NAME[r.k]} ${r.from}~${r.to}`).join(', ') + '.', 'd');
   // 화면 모드 그림용: 타석 한 번에 방식도 마지막 공 하나를 보여 줌 (경기 결과와는 상관없는 꾸밈이라 Math.random)
   G.anim = { n: ((G.anim && G.anim.n) || 0) + 1, t:'FB', x: row.k === 'BB' ? 1.4 : (Math.random() - 0.5) * 1.4, y: row.k === 'BB' ? -0.6 : (Math.random() - 0.5) * 1.4,
@@ -1140,7 +1156,8 @@ function playSimplePitch(G, D, O){
     emit(G, `판정 참기: 1~${hold} 참음, 주사위 ${dh}.`, 'd');
     if(dh <= hold) return ball(`${pickSay(G, SAY.held)} ${pickSay(G, SAY.ball)}`);
   }
-  const [wh, fo] = SP_SWING[inZone ? 'in' : 'out'][O] || SP_SWING.in.normal;
+  let [wh, fo] = SP_SWING[inZone ? 'in' : 'out'][O] || SP_SWING.in.normal;
+  wh = Math.round(wh * EZ(G, [1, 0.8, 0.62]));
   const d2 = rint(G, 1, 100);
   emit(G, `판정 스윙: 1~${wh} 헛스윙, ${wh + 1}~${wh + fo} 파울, ${wh + fo + 1}~100 인플레이, 주사위 ${d2}.`, 'd');
   if(d2 <= wh){ fx(G, 'whiff-' + kk[0]); G.anim.res = 'whiff'; return strike(pickSay(G, SAY.whiff[kk])); }
@@ -1152,6 +1169,7 @@ function playSimplePitch(G, D, O){
   // 인플레이: 안타·홈런·땅볼·뜬공 표를 한 번 더 굴림 (존 밖 공을 치면 약한 타구가 많음)
   fx(G, 'bat'); G.anim.res = 'inplay';
   const w = { ...SP_PLAY[O] };
+  { const m = EZ(G, [1, 1.35, 1.7]); w.S1 *= m; w.S2 *= m; w.S3 *= m; w.HR *= EZ(G, [1, 1.2, 1.45]); }
   w.HR *= parkOf(G).hr;
   if(!inZone){ w.HR *= 0.4; w.S2 *= 0.6; w.S1 *= 0.85; w.GO *= 1.3; w.FO *= 1.15; }
   const tot = Object.values(w).reduce((a, b) => a + b, 0), d3 = rint(G, 1, 100);
