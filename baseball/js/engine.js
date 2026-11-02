@@ -910,25 +910,26 @@ function inPlay(G, o){
   const head = o.head.trim();
   // 뜬공 비거리와 바람으로 홈런·담장 맞는 타구를 먼저 정함 (나머지는 위치와 속도로 계산: playsim.js)
   const opt = {};
-  let d = 0, raw = 0, wind = 0, fence = pk.fence[fi];
+  // 타구 방향(각도)을 먼저 정하고, 그 방향의 담장 거리로 홈런을 판정 (그림의 담장과 같게)
+  const bb = battedBall(G, { type, fi, ev, q, d:60 });
+  let d = 0, raw = 0, wind = 0, fence = Math.round(fenceAng(G, bb.ang));
   if(type === 'fb'){
     wind = (WIND[G.wind.dir] || WIND.none).f[fi] * G.wind.spd * 1.6;
-    raw = 36 + ev * 104 + gauss(G) * 5; d = Math.round(raw + wind);
+    raw = 43 + ev * 104 + gauss(G) * 5; d = Math.round(raw + wind);   // 담장은 타구 방향마다 다름(가운데 쪽이 멂)
     const wallX = Math.max(0, (pk.wall[fi] - 2.5) * 1.6), hrLine = fence + wallX, field = ['왼쪽', '가운데', '오른쪽'][fi];
     emit(G, `판정 비거리: ${Math.round(raw)}미터${wind ? `, 바람 ${wind > 0 ? '더하기' : '빼기'} ${Math.abs(Math.round(wind))}미터` : ''}, 담장 ${fence}미터.`, 'd');
     if(Math.abs(d - hrLine) <= 1){
       // 담장 꼭대기 근처: 심판은 가끔 잘못 봄. 판독하면 실제(계산한 비거리)대로
       const truth = d >= hrLine ? 'hr' : '2b', pW = 0.35, call = rnd(G) < pW ? flipCall(truth) : truth;
       if(G.anim) G.anim.bb = { type, fi, d };
-      const bb0 = battedBall(G, { type, fi, ev, q, d });
+      const bb0 = { ...bb, d, hang: 2.1 + d / 46 };
       openReview(G, { kind:'hr', call, truth, m: d - hrLine, side: call === 'hr' ? 1 - batIdx(G) : batIdx(G), p: pW, data:{ ev, bb: bb0, fence, info:{ d, raw, wind, fence, fi } },
         say: `${head} ${field} 담장 끝으로 날아갑니다… 넘어갔나요? 원심은 ${call === 'hr' ? '홈런' : '담장을 맞고 나온 2루타'}입니다. ${call === 'hr' ? '수비 쪽에서 담장을 맞았다고 강하게 어필합니다.' : '공격 쪽에서 넘어갔다고 강하게 어필합니다.'}` });
       return;
     }
     if(d >= hrLine) opt.hr = true; else if(d >= fence) opt.wall = true;
   }
-  const bb = battedBall(G, { type, fi, ev, q, d });
-  if(opt.wall) bb.d = fence - 1;
+  if(type === 'fb'){ bb.d = opt.wall ? fence - 1 : d; bb.hang = 2.1 + bb.d / 46; }
   const r = simPlay(G, bb, opt);
   playOrReview(G, bb, r, fi, head, { d, raw, wind, fence, fi });
 }
@@ -1126,7 +1127,7 @@ function simpleSim(G, k, head){
   const ok = r => ({ S1: (r.kind === 'hit' && (r.batTried || r.bat) === 1) || r.kind === 'ifh', S2: r.kind === 'hit' && (r.batTried || r.bat) === 2,
     S3: r.kind === 'hit' && (r.batTried || r.bat) === 3, HR: r.kind === 'hr', GO: ['go', 'dp', 'fc'].includes(r.kind), FO: ['fo', 'pu', 'lo', 'ldp'].includes(r.kind) })[k];
   for(let i = 0; i < 40; i++){
-    const fi = rint(G, 0, 2), fence = parkOf(G).fence[fi], u = rnd(G);
+    const fi = rint(G, 0, 2), u = rnd(G), probe = battedBall(G, { type:'fb', fi, ev:0.5, q:0.5, d:60 }), fence = Math.round(fenceAng(G, probe.ang));
     let type, ev, q = 0.3 + rnd(G) * 0.6, d = 0;
     const opt = {};
     if(k === 'HR'){ type = 'fb'; ev = 0.9 + u * 0.15; d = fence + 3 + Math.round(u * 22); opt.hr = true; }
@@ -1136,6 +1137,7 @@ function simpleSim(G, k, head){
     else if(k === 'GO'){ type = 'gb'; ev = 0.1 + rnd(G) * 0.7; }
     else { type = u < 0.15 ? 'pu' : u < 0.35 ? 'ld' : 'fb'; ev = 0.2 + rnd(G) * 0.6; d = 50 + Math.round(rnd(G) * 45); }
     const bb = battedBall(G, { type, fi, ev, q, d });
+    if(type !== 'gb'){ bb.ang = probe.ang; if(type === 'fb'){ bb.d = d; bb.hang = 2.1 + d / 46; } }   // 거리를 정한 그 방향으로
     const r = simPlay(G, bb, opt);
     if(!ok(r)) continue;
     if(G.anim){ G.anim.res = 'inplay'; setAnimPlay(G, bb, r, fi); }

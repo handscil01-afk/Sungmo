@@ -249,6 +249,7 @@ function fm(ang, m){
   return p;
 }
 function fenceAt(G, ang){
+  if(typeof fenceAng === 'function') return fenceAng(G, ang);   // 판정과 같은 담장
   const f = (G && G.park && G.park.fence) || [98, 120, 98], a = Math.abs(ang) / 0.785, side = ang < 0 ? f[0] : f[2];
   return f[1] + (side - f[1]) * Math.min(1, a);
 }
