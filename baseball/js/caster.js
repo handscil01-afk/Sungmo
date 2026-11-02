@@ -3,7 +3,7 @@
    읽어 주기가 '중계 음성'이면 경기 결과는 화면 낭독기 대신 캐스터 목소리로 중계함.
    voice/index.json의 variants에 같은 문장의 녹음이 여러 개면(이름-2) 번갈아 골라 매번 조금씩 다르게 들림.
    공을 친 결과는 뜸 들이는 중계 시간표에 맞춰: '쳤습니다! 높이 뜹니다! 오른쪽으로!' → (타구가 떨어질 때) '잡았습니다! 아웃!' */
-const CAST = { idx:null, buf:{}, loading:{}, until:0, last:{} };
+const CAST = { idx:null, buf:{}, loading:{}, until:0, last:{}, src:[] };
 function castOn(){ return SET.voice === 'cast'; }
 function castLoadIndex(){
   if(CAST.idx || CAST.idxP) return CAST.idxP;
@@ -39,12 +39,14 @@ function castPlay(ids, at = 0){
     const b = CAST.buf[name]; if(!b){ castLoad(name); return; }
     const s = c.createBufferSource(), g = c.createGain();
     s.buffer = b; g.gain.value = 1; s.connect(g); g.connect(c.destination); s.start(t);
+    CAST.src.push(s); s.onended = () => { const i = CAST.src.indexOf(s); if(i >= 0) CAST.src.splice(i, 1); };
     t += b.duration + 0.08;
   });
   CAST.until = t;
   return t - c.currentTime;
 }
-function castStop(){ CAST.until = 0; }
+// 지난 중계가 아직 남아 있으면 끊고 지금 장면부터 (빠르게 진행해도 중계가 밀리지 않게)
+function castStop(){ CAST.src.splice(0).forEach(s => { try{ s.stop(); }catch(e){} }); CAST.until = 0; }
 const pick1 = (...ids) => ids[Math.floor(Math.random() * ids.length)];
 const numClip = n => n >= 0 && n <= 20 ? `num_${n}` : null;
 const runClip = b => { const k = [0, 1, 2].filter(i => b[i] != null).map(i => i + 1).join(''); return ({ '':'run_none', 1:'run_1', 2:'run_2', 3:'run_3', 12:'run_12', 13:'run_13', 23:'run_23', 123:'run_full' })[k]; };
@@ -54,6 +56,7 @@ const teamClip = (T, long) => `team_${T.key}${long ? '' : '_s'}`;
 function castResult(res, susp){
   if(!castOn() || !res || typeof G === 'undefined' || !G) return;
   castLoadIndex();
+  castStop();
   const fx = res.fx || [], text = (res.lines || []).map(l => l.s || l).join(' '), has = n => fx.includes(n), A = G.anim;
   const pre = [], post = [], after = [];
   // 경기 시작
@@ -97,7 +100,7 @@ function castResult(res, susp){
       else if(has('safe')) post.push(pick1('r_safe1', 'r_safe2'));
     }
     else if(A.res === 'bunt') pre.push('r_bunt');
-    else if(has('batF') || has('foul')) post.push(pick1('r_foul1', 'r_foul2', 'r_foul3'));
+    else if(has('batF') || has('foul')){ pre.push(pick1('c_hit3', 'c_hit1', 'c_soft2')); post.push(pick1('r_foul1', 'r_foul2', 'r_foul3')); }
     else if(has('k')) pre.push(A.res === 'whiff' ? 'r_k_swing' : 'r_k_look');
     else if(fx.some(n => /^whiff/.test(n))) pre.push(pick1('r_whiff1', 'r_whiff2'));
     else if(A.res === 'hbp') pre.push('r_hbp');
@@ -113,7 +116,7 @@ function castResult(res, susp){
       'j_score', teamClip(G.teams[0]), numClip(runsOf(G.teams[0])), 'j_vs', numClip(runsOf(G.teams[1])), teamClip(G.teams[1]));
     if(has('pchange')) after.push('r_pitcher_change');
     if(has('batter') || has('change')){
-      after.push(`bat_${batTeam(G).bi + 1}`);
+      after.push(teamClip(batTeam(G)), `bat_${batTeam(G).bi + 1}`);
       if(G.bases.some(x => x != null)) after.push(runClip(G.bases));
       if(G.outs) after.push(`out_${G.outs}`);
     }
