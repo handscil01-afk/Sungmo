@@ -89,6 +89,14 @@ function render(){
   // 화면 보며 하기의 경기 화면: 그림 + 짧은 결과 한 줄 + 선택지만 한 화면에 (머리줄·글 상황판·기록은 숨김)
   const gg = SET.view === 'gfx' && !!S.board && !!G;
   document.documentElement.classList.toggle('gfxgame', gg);
+  // 화면 보며 하기의 메뉴·설정: 따로 꾸밈 (시청각장애인 모드는 그대로)
+  const gu = SET.view === 'gfx' && !gg && !S.board;
+  document.documentElement.classList.toggle('gfxui', gu);
+  document.documentElement.classList.toggle('gfxinput', !!S.input);
+  let hero = $('#hero');
+  if(gu && S.hero){ if(!hero){ hero = document.createElement('div'); hero.id = 'hero'; hero.setAttribute('aria-hidden', 'true'); hero.innerHTML = '<b>손잡다 야구</b><span>공 하나하나를 고르는 확률 야구</span>'; $('#top').before(hero); } hero.hidden = false; }
+  else if(hero) hero.hidden = true;
+  document.documentElement.classList.toggle('hashero', gu && !!S.hero);
   $('#top').innerHTML = S.top || '';
   const bs = $('#boardSec');
   if(S.board && typeof boardHTML === 'function' && G){
@@ -135,8 +143,20 @@ function renderOpts(S){
     const minor = document.documentElement.classList.contains('gfxgame') && /더 보기|지금 상황|맡기기|노림수|사인대로|수비 위치|투수 상태|작전:/.test(o.t);
     el.className = 'opt' + (o.cls ? ' ' + o.cls : '') + (minor ? ' minor' : '');
     el.dataset.n = o.n;
-    const ico = o.icon ? `<span class="oicon" aria-hidden="true" style="--ix:${o.icon[1] % 4};--iy:${Math.floor(o.icon[1] / 4)};background-image:url(img/${o.icon[0]}.png)"></span>` : '';
-    const html = `<span class="num">${o.n}<span class="sr-only">번. </span></span>${ico}<span class="tx"><b>${esc(o.t)}</b>${o.s ? `<span class="sr-only">. </span><small>${esc(o.s)}</small>` : ''}</span>`;
+    let ico = o.icon ? `<span class="oicon" aria-hidden="true" style="--ix:${o.icon[1] % 4};--iy:${Math.floor(o.icon[1] / 4)};background-image:url(img/${o.icon[0]}.png)"></span>` : '';
+    // 화면 보며 하기의 메뉴: 그림 아이콘, "이름: 값"은 이름과 값 알약으로 나눠 보임 (읽는 글은 그대로)
+    const gui = document.documentElement.classList.contains('gfxui');
+    let title = `<b>${esc(o.t)}</b>`, kind = '';
+    if(gui){
+      const tm = !ico && typeof TEAMS !== 'undefined' && TEAMS.find(T => o.t.startsWith(T.name) || o.t.startsWith(T.short));
+      if(tm) ico = `<span class="gico tm" aria-hidden="true" style="--tc:${tm.color}">${esc(tm.short[0])}</span>`;
+      if(!ico){ const g = uiGlyph(o.t); if(g) ico = `<span class="gico g-${g[0]}" aria-hidden="true">${g[1]}</span>`; }
+      if(!ico) kind += ' noico';
+      const m = /^([^:]{2,24}):\s*(.+)$/.exec(o.t);
+      if(m){ const v = m[2], on = /^(켬|켜짐)$/.test(v), off = /^(끔|꺼짐|읽지 않음)$/.test(v); kind = v.length > 8 ? ' set long' : ' set'; title = `<b>${esc(m[1])}<span class="sr-only">: </span></b><span class="val${on ? ' on' : off ? ' off' : ''}">${esc(v)}</span>`; }
+    }
+    const html = `<span class="num">${o.n}<span class="sr-only">번. </span></span>${ico}<span class="tx">${title}${o.s ? `<span class="sr-only">. </span><small>${esc(o.s)}</small>` : ''}</span>`;
+    if(kind) el.className += kind;
     if(el.__h !== html){ el.innerHTML = html; el.__h = html; }
     if(box.children[i] !== el) box.insertBefore(el, box.children[i] || null);
   });
@@ -263,4 +283,39 @@ function bindCmd(){
   });
   inp.addEventListener('keydown', e => { if(e.key === 'Escape'){ e.preventDefault(); inp.value = ''; back('key'); } });
   $('#cmdForm').addEventListener('submit', e => { e.preventDefault(); const v = inp.value; inp.value = ''; textCmd(v); });
+}
+
+// 화면 보며 하기의 메뉴 아이콘 (선택지 이름으로 고름): [색 이름, svg]
+const UI_GLYPHS = [
+  [/^간단 모드/, 'g', '<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.3"/><circle cx="15" cy="15" r="1.3"/><circle cx="15" cy="9" r="1.3"/><circle cx="9" cy="15" r="1.3"/>'],
+  [/^정밀 모드/, 'y', '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>'],
+  [/^감독 모드/, 'o', '<rect x="5.5" y="4.5" width="13" height="16" rx="2"/><path d="M9 4.5V3h6v1.5M8.5 10h7M8.5 13.5h7M8.5 17h4"/>'],
+  [/^공 하나씩|^지금 경기 이어|^새 경기/, 'b', '<circle cx="12" cy="12" r="8.5"/><path d="M7 5.5c2 2 2.8 4 2.8 6.5S9 16.5 7 18.5M17 5.5c-2 2-2.8 4-2.8 6.5s.8 4.5 2.8 6.5"/>'],
+  [/^타석 한 번/, 'p', '<path d="M5 19 16.5 7.5a2.3 2.3 0 0 1 3.2 3.2L8.2 22.2"/><circle cx="6.5" cy="7" r="2.2"/>'],
+  [/혼자|이어 하기/, 'b', '<circle cx="12" cy="7" r="3.5"/><path d="M5 20c0-4 3-6.5 7-6.5s7 2.5 7 6.5"/>'],
+  [/둘이/, 'b', '<circle cx="8" cy="8" r="3"/><circle cx="16.5" cy="8" r="3"/><path d="M2.5 19c0-3.3 2.4-5.4 5.5-5.4s5.5 2.1 5.5 5.4M11.5 19c.3-3 2.3-5.4 5-5.4 3 0 5 2.1 5 5.4"/>'],
+  [/온라인/, 'g', '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.5 3.8 5.3 3.8 8.5s-1.2 6-3.8 8.5c-2.6-2.5-3.8-5.3-3.8-8.5s1.2-6 3.8-8.5z"/>'],
+  [/리그|시즌/, 'y', '<path d="M7 4h10v4a5 5 0 0 1-10 0z"/><path d="M7 6H4v1.5A3 3 0 0 0 7 10.5M17 6h3v1.5a3 3 0 0 1-3 3M12 13v4M8.5 20h7M10 17h4"/>'],
+  [/육성|선수/, 'o', '<path d="M12 3.5l2.4 5 5.4.6-4 3.7 1.1 5.4L12 15.5l-4.9 2.7 1.1-5.4-4-3.7 5.4-.6z"/>'],
+  [/관전|지켜/, 'p', '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>'],
+  [/설정|더 보기/, 's', '<circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.8 1.8M16.7 16.7l1.8 1.8M5.5 18.5l1.8-1.8M16.7 7.3l1.8-1.8"/>'],
+  [/설치/, 'g', '<path d="M12 3.5v11M7.5 10.5 12 15l4.5-4.5M4.5 17.5v2h15v-2"/>'],
+  [/게임 방법|키 안내|도움/, 'p', '<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .8-1 1.5v.6M12 16.6v.4"/>'],
+  [/화면 방식|화면 색/, 'b', '<rect x="3" y="4.5" width="18" height="12" rx="2"/><path d="M9 20h6M12 16.5V20"/>'],
+  [/글자/, 'b', '<path d="M4 18 8.5 6h1L14 18M5.7 14h6.6M15 18v-6.5M15 14.5c0-1.8 1.2-3 2.8-3s2.7 1.2 2.7 3V18"/>'],
+  [/읽어 주기|음성 빠르기|채팅 읽어/, 'p', '<path d="M4.5 9.5h3l4-3.5v12l-4-3.5h-3z"/><path d="M15 9a4 4 0 0 1 0 6M17.5 6.5a7.5 7.5 0 0 1 0 11"/>'],
+  [/중계/, 'o', '<rect x="8.5" y="3" width="7" height="11" rx="3.5"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>'],
+  [/효과음|관중|소리 시험/, 'g', '<path d="M9 17.5V5.5l10-2v12"/><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="16.5" cy="15.5" r="2.5"/>'],
+  [/진동/, 's', '<rect x="8" y="3.5" width="8" height="17" rx="1.8"/><path d="M4.5 8v8M2 10v4M19.5 8v8M22 10v4"/>'],
+  [/전체화면/, 'b', '<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>'],
+  [/난이도/, 'y', '<path d="M4 17a8 8 0 1 1 16 0"/><path d="M12 17l4-5"/>'],
+  [/판정 과정|주사위/, 'p', '<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2"/><circle cx="15" cy="15" r="1.2"/><circle cx="12" cy="12" r="1.2"/>'],
+  [/코스|정밀 모드/, 'y', '<rect x="5" y="5" width="14" height="14"/><path d="M9.7 5v14M14.3 5v14M5 9.7h14M5 14.3h14"/>'],
+  [/명령 칸|숫자/, 's', '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h.01M11 10h.01M15 10h.01M7 14h10"/>'],
+  [/자동 재생|간격/, 'g', '<circle cx="12" cy="12" r="8.5"/><path d="M10 8.5v7l5.5-3.5z"/>'],
+  [/지우기/, 'r', '<path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13"/>'],
+];
+function uiGlyph(t){
+  const g = UI_GLYPHS.find(([re]) => re.test(t));
+  return g ? [g[1], `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${g[2]}</svg>`] : null;
 }
