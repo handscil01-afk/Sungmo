@@ -1,0 +1,641 @@
+/* 기안 도우미 화면 */
+(function () {
+  'use strict';
+  const S = GSTORE, D = GDICT;
+  /* ---------- 작은 도구 ---------- */
+  function h(tag, attrs, ...kids) {
+    const e = document.createElement(tag);
+    if (attrs) for (const k in attrs) {
+      const v = attrs[k];
+      if (v == null || v === false) continue;
+      if (k === 'class') e.className = v;
+      else if (k === 'text') e.textContent = v;
+      else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+      else if (k === 'value') e.value = v;
+      else if (k === 'checked') e.checked = !!v;
+      else if (k === 'style') e.setAttribute('style', v);
+      else e.setAttribute(k, v === true ? '' : v);
+    }
+    add(e, kids);
+    return e;
+  }
+  const ap = (e, ...kids) => add(e, kids);
+  function add(e, kids) { for (const k of kids) { if (k == null || k === false) continue; if (Array.isArray(k)) add(e, k); else e.append(k.nodeType ? k : document.createTextNode(String(k))); } }
+  const fmt = n => (n == null || isNaN(n)) ? '' : Math.round(n).toLocaleString('ko-KR');
+  const won = n => (n == null || isNaN(n)) ? '' : fmt(n) + '원';
+  const uid = () => Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3);
+  const today = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+  const pathText = p => String(p || '').split('/').join(' / ');
+  const LS = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 무시 */ } }
+  };
+  const SET = Object.assign({ tab: 'home', autoFull: true, installDismissed: false, year: new Date().getFullYear(), fund: '보조금', sub: '지역사회체험활동', ptab: 'plan' }, LS.get('gian-set', {}));
+  const saveSet = () => LS.set('gian-set', SET);
+  const PILOT = '지역사회체험활동';
+
+  function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('on'), 2200); }
+  function modal(title, body, buttons, wide) {
+    const back = h('div', { class: 'dim' });
+    const close = () => back.remove();
+    const box = h('div', { class: 'dlg' + (wide ? ' wide' : ''), role: 'dialog' }, h('h3', { text: title }), h('div', { class: 'dlg-body' }, body),
+      h('div', { class: 'dlg-btns' }, (buttons || [{ text: '닫기' }]).map(b => h('button', { class: 'btn' + (b.primary ? ' primary' : '') + (b.danger ? ' danger' : ''), onclick: () => { if (b.onclick) { if (b.onclick(close) === false) return; } close(); } }, b.text))));
+    back.append(box); back.addEventListener('click', e => { if (e.target === back) close(); });
+    document.body.append(back);
+    return close;
+  }
+  const ask = (title, text, okText, fn, danger) => modal(title, h('p', { text }), [{ text: '취소' }, { text: okText, primary: !danger, danger, onclick: fn }]);
+  async function copy(text) { try { await navigator.clipboard.writeText(text); toast('복사했습니다'); } catch (e) { modal('복사', h('textarea', { class: 'copyarea', value: text, rows: 12 })); } }
+  function download(name, text) { const a = h('a', { href: URL.createObjectURL(new Blob([text], { type: 'application/json' })), download: name }); document.body.append(a); a.click(); a.remove(); }
+
+  /* ---------- 설치·전체화면 ---------- */
+  const inFrame = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+  const isStandalone = () => { try { return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true || (matchMedia('(display-mode: fullscreen)').matches && !(document.fullscreenElement || document.webkitFullscreenElement)); } catch (e) { return false; } };
+  const FS = {
+    userExit: false,
+    supported() { const d = document.documentElement; return !!(d.requestFullscreen || d.webkitRequestFullscreen) && !isStandalone() && !inFrame; },
+    on() { return !!(document.fullscreenElement || document.webkitFullscreenElement); },
+    enter() { const d = document.documentElement; try { const r = d.requestFullscreen ? d.requestFullscreen({ navigationUI: 'hide' }) : (d.webkitRequestFullscreen && d.webkitRequestFullscreen()); if (r && r.catch) r.catch(() => {}); } catch (e) { /* 무시 */ } },
+    exit() { try { const r = document.exitFullscreen ? document.exitFullscreen() : (document.webkitExitFullscreen && document.webkitExitFullscreen()); if (r && r.catch) r.catch(() => {}); } catch (e) { /* 무시 */ } },
+    toggle() { if (!FS.supported()) { installHelp(); return; } if (FS.on()) { FS.userExit = true; FS.exit(); } else { FS.userExit = false; FS.enter(); } }
+  };
+  let installEvt = null;
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; });
+  window.addEventListener('appinstalled', () => { installEvt = null; SET.installDismissed = true; saveSet(); render(); toast('홈 화면에 설치했습니다'); });
+  function installHelp() {
+    if (installEvt) {
+      const ev = installEvt; installEvt = null;
+      try { ev.prompt(); ev.userChoice.then(r => { if (r && r.outcome === 'accepted') { SET.installDismissed = true; saveSet(); render(); } }).catch(() => {}); return; } catch (e) { /* 아래 안내 */ }
+    }
+    modal('홈 화면에 설치하기', h('div', { class: 'help' },
+      h('p', { text: '설치하면 바탕화면·홈 화면에서 앱처럼 바로 열리고, 화면을 넓게 씁니다.' }),
+      h('ul', null,
+        h('li', { text: 'PC 크롬·엣지: 주소창 오른쪽의 설치 아이콘(모니터에 화살표)을 누르거나, ⋮ 메뉴 → 앱 → 이 사이트를 앱으로 설치' }),
+        h('li', { text: '아이패드·아이폰 Safari: 공유 버튼 → 홈 화면에 추가' }),
+        h('li', { text: '안드로이드 크롬: ⋮ 메뉴 → 홈 화면에 추가(앱 설치)' }),
+        h('li', { text: '삼성 인터넷: ≡ 메뉴 → 현재 페이지 추가 → 홈 화면' })),
+      inFrame ? h('p', { class: 'muted', text: '지금은 다른 화면 안에 들어 있어서 전체화면을 쓸 수 없습니다. 주소를 새 창으로 열어 설치해 주세요.' }) : null));
+  }
+  document.addEventListener('fullscreenchange', () => renderHeader());
+  document.addEventListener('webkitfullscreenchange', () => renderHeader());
+  document.addEventListener('pointerdown', e => {
+    if (!SET.autoFull || FS.userExit || FS.on() || !FS.supported()) return;
+    if (e.target.closest('[data-nofs]') || e.target.closest('input[type=file]')) return;
+    FS.enter();
+  }, true);
+
+  /* ---------- 예산 계산 ---------- */
+  const B = {
+    versions(year, fund) { return S.data.budgets.filter(b => b.year === year && b.fund === fund).sort((a, b) => (a.date || '').localeCompare(b.date || '') || a.at - b.at); },
+    first(vs) { return vs.find(v => v.kind === '당초 예산') || vs[0] || null; },
+    cur(vs) { return vs[vs.length - 1] || null; },
+    settle(vs) { const s = vs.filter(v => v.kind === '결산'); return s[s.length - 1] || null; },
+    leafPaths(year, fund) {
+      const v = B.cur(B.versions(year, fund));
+      if (!v) return (D.BUILTIN_ACCTS[fund] || []).slice();
+      return v.expense.filter(n => n.level === 4).map(n => n.path.join('/'));
+    },
+    accountsAll(year) { const o = {}; for (const f of ['보조금', '자부담']) o[f] = B.leafPaths(year, f); return o; },
+    node(v, path) { return v ? v.expense.find(n => n.path.join('/') === path) : null; },
+    /* 결산 기준일 뒤에 이 앱에 적은 지출 합(경로 앞부분이 같으면 포함) */
+    appSpent(year, fund, prefix, after) {
+      let s = 0;
+      for (const P of projectsOf(year)) {
+        const lines = allLines(P);
+        for (const r of P.rounds) for (const d of r.docs) {
+          if (after && (d.date || '') <= after) continue;
+          for (const lid in (d.spends || {})) {
+            const ln = lines[lid]; if (!ln || ln.fund !== fund) continue;
+            if ((ln.acct + '/').startsWith(prefix + '/') || ln.acct === prefix) s += +d.spends[lid] || 0;
+          }
+        }
+      }
+      return s;
+    },
+    status(year, fund, path) {
+      const vs = B.versions(year, fund); const cur = B.cur(vs), st = B.settle(vs);
+      const n = B.node(cur, path); if (!n) return null;
+      const settled = st ? ((B.node(st, path) || {}).cum || 0) : 0;
+      const after = B.appSpent(year, fund, path, st ? st.date : null);
+      return { budget: n.budget || 0, settled, after, spent: settled + after, remain: (n.budget || 0) - settled - after, date: st ? st.date : null };
+    }
+  };
+  const projectsOf = year => Object.values(S.data.projects).filter(p => p.year === year);
+  function allLines(P) { const o = {}; for (const v of P.versions) for (const l of v.lines) o[l.id] = l; return o; }
+
+  /* ---------- 사업 데이터 ---------- */
+  function proj(year, sub, create) {
+    const key = year + '|' + sub;
+    let P = S.data.projects[key];
+    if (!P && create) {
+      P = S.data.projects[key] = { key, year, sub, unit: D.unitOf(sub), accts: {}, versions: [], rounds: [] };
+      for (const f of ['보조금', '자부담']) { const m = (D.ACCT_MAP[f] || {})[sub]; if (m && B.leafPaths(year, f).includes(m)) P.accts[f] = m; }
+    }
+    return P || null;
+  }
+  const baseVer = P => { const c = P.versions.filter(v => v.status === '확정'); return c[c.length - 1] || P.versions[P.versions.length - 1] || null; };
+  const prevConfirmed = (P, v) => { const i = P.versions.indexOf(v); for (let k = i - 1; k >= 0; k--) if (P.versions[k].status === '확정') return P.versions[k]; return null; };
+  function qtyProduct(q) { const ns = String(q || '').match(/\d+(?:\.\d+)?/g); return ns ? ns.reduce((a, b) => a * +b, 1) : 1; }
+  const lineAmount = l => Math.round((+l.price || 0) * qtyProduct(l.qty));
+  const sumLines = (v, f) => v ? v.lines.filter(l => !f || f(l)).reduce((a, l) => a + lineAmount(l), 0) : 0;
+  function ensureRounds(P) {
+    const v = baseVer(P); if (!v) return;
+    for (const s of v.schedule || []) if (!P.rounds.some(r => r.n === s.n)) P.rounds.push({ id: uid(), n: s.n, docs: [] });
+    P.rounds.sort((a, b) => a.n - b.n);
+  }
+  const schedOf = (P, n) => { const v = baseVer(P); return v ? (v.schedule || []).find(s => s.n === n) || null : null; };
+  const docSpend = d => Object.values(d.spends || {}).reduce((a, b) => a + (+b || 0), 0);
+  const roundSpend = r => r.docs.filter(d => d.kind !== '결과보고').reduce((a, d) => a + docSpend(d), 0);
+  const lineSpent = (P, lid) => P.rounds.reduce((a, r) => a + r.docs.reduce((b, d) => b + (+((d.spends || {})[lid]) || 0), 0), 0);
+  function attendees(d) { return String(d && d.attend || '').split(/[\n,，、]/).map(s => s.trim()).filter(Boolean); }
+
+  /* ---------- 머리줄 ---------- */
+  const TABS = [['home', '처음'], ['budget', '예산'], ['proj', '사업'], ['review', '기안 검수'], ['guide', '작성 안내'], ['set', '설정']];
+  function renderHeader() {
+    const hd = document.getElementById('hdr'); hd.textContent = '';
+    hd.append(h('div', { class: 'brand' }, h('img', { src: 'icon-192.png', alt: '' }), h('b', { text: '기안 도우미' })),
+      h('nav', { class: 'tabs' }, TABS.map(([k, t]) => h('button', { class: 'tab' + (SET.tab === k ? ' on' : ''), onclick: () => { SET.tab = k; saveSet(); render(); } }, t))),
+      FS.supported() || !isStandalone() ? h('button', { class: 'icon', 'data-nofs': '', title: FS.on() ? '전체화면 끝내기' : '전체화면', onclick: FS.toggle, text: FS.on() ? '⤡' : '⤢' }) : null);
+  }
+  function render() {
+    renderHeader();
+    const m = document.getElementById('main'); m.textContent = '';
+    const view = { home: homeView, budget: budgetView, proj: projView, review: reviewView, guide: guideView, set: setView }[SET.tab] || homeView;
+    m.append(view());
+  }
+  const save = () => { S.save(); };
+
+  /* ---------- 처음 화면 ---------- */
+  function installBanner() {
+    if (SET.installDismissed || isStandalone() || inFrame) return null;
+    return h('div', { class: 'banner' }, h('span', { text: '홈 화면(바탕화면)에 설치하면 앱처럼 바로 열립니다.' }),
+      h('div', { class: 'row' }, h('button', { class: 'btn primary', 'data-nofs': '', onclick: installHelp }, '설치하기'), h('button', { class: 'btn', 'data-nofs': '', onclick: FS.toggle }, '전체화면'),
+        h('button', { class: 'btn', 'data-nofs': '', onclick: () => { SET.installDismissed = true; saveSet(); render(); } }, '다음에')));
+  }
+  function homeView() {
+    const y = SET.year;
+    const nb = S.data.budgets.filter(b => b.year === y).length;
+    const P = proj(y, PILOT, false);
+    return h('div', { class: 'page' }, installBanner(),
+      h('h2', { text: '기안 도우미' }),
+      h('p', { class: 'muted', text: '사업계획에서 결과보고·실적까지 이어서 관리하고, 기안을 규칙대로 검수합니다. 모든 내용은 이 PC와 연결한 폴더에만 저장하고 인터넷으로 보내지 않습니다.' }),
+      h('div', { class: 'cards' },
+        card('기안 검수', '한글 파일을 넣으면 요일·계산·합계·계정과목·연도·다른 사업 이름·붙임 번호를 바로 확인합니다. 간사 누구나 쓸 수 있습니다.', '검수하기', () => go('review')),
+        card('예산', nb ? y + '년 예산서 ' + nb + '개를 불러왔습니다. 보조금·자부담 별로 당초·변경·집행·남은 예산을 봅니다.' : '회계 프로그램에서 내려받은 예산서(.xls)를 불러오면 계정과목과 남은 예산을 관리합니다.', nb ? '예산 보기' : '예산서 불러오기', () => go('budget')),
+        card('시범 사업: ' + PILOT, P && P.versions.length ? '계획 ' + P.versions.length + '개 버전, 회차 ' + P.rounds.length + '개' : '사업계획을 넣으면 회차 기안·잔액·실적이 이어집니다.', '사업 열기', () => { SET.sub = PILOT; go('proj'); }),
+        card('저장 위치', S.dir ? (S.perm === 'granted' ? '‘' + S.dir.name + '’ 폴더에 저장 중' : '‘' + S.dir.name + '’ 폴더 다시 연결 필요') : '아직 이 PC 브라우저에만 저장합니다. 시놀로지의 ‘기안도우미’ 폴더를 연결해 주세요.', S.dir && S.perm !== 'granted' ? '다시 연결' : '설정', () => (S.dir && S.perm !== 'granted') ? reconnect() : go('set'))),
+      isStandalone() || inFrame ? null : h('div', { class: 'row end' }, h('button', { class: 'btn', 'data-nofs': '', onclick: installHelp }, '홈 화면에 설치하기')));
+  }
+  const card = (t, d, b, fn) => h('div', { class: 'card' }, h('h3', { text: t }), h('p', { text: d }), h('button', { class: 'btn primary', onclick: fn }, b));
+  const go = t => { SET.tab = t; saveSet(); render(); window.scrollTo(0, 0); };
+
+  /* ---------- 예산 ---------- */
+  function yearSel(onch) {
+    const ys = new Set([SET.year, new Date().getFullYear()]); S.data.budgets.forEach(b => ys.add(b.year)); Object.values(S.data.projects).forEach(p => ys.add(p.year));
+    return h('select', { class: 'fld', onchange: e => { SET.year = +e.target.value; saveSet(); (onch || render)(); } }, [...ys].sort().map(y => h('option', { value: y, selected: y === SET.year ? 'selected' : null }, y + '년')));
+  }
+  function budgetView() {
+    const y = SET.year, f = SET.fund;
+    const vs = B.versions(y, f), first = B.first(vs), cur = B.cur(vs), st = B.settle(vs);
+    const pick = h('input', { type: 'file', accept: '.xls', multiple: true, class: 'hide', onchange: e => importXls([...e.target.files]) });
+    const top = h('div', { class: 'toolbar' }, yearSel(),
+      h('div', { class: 'seg' }, ['보조금', '자부담'].map(x => h('button', { class: SET.fund === x ? 'on' : '', onclick: () => { SET.fund = x; saveSet(); render(); } }, x))),
+      h('button', { class: 'btn primary', 'data-nofs': '', onclick: () => pick.click() }, '예산서(.xls) 불러오기'), pick);
+    const page = h('div', { class: 'page' }, h('h2', { text: '예산 · ' + f }), top);
+    if (!vs.length) {
+      ap(page, h('div', { class: 'empty' }, h('p', { text: y + '년 ' + f + ' 예산서가 아직 없습니다.' }),
+        h('p', { class: 'muted', text: '회계 프로그램에서 내려받은 예산서·추경(변경 전/후)·결산 파일(.xls)을 불러와 주세요. 보조금과 자부담은 따로 관리합니다.' })));
+      return page;
+    }
+    ap(page, h('div', { class: 'chips' }, vs.map(v => h('span', { class: 'vchip' + (v === cur ? ' cur' : '') },
+      h('b', { text: v.kind }), ' ' + (v.date || '') + (v.label ? ' · ' + v.label : ''),
+      h('button', { class: 'x', title: '지우기', onclick: () => ask('예산서 지우기', '‘' + v.kind + ' ' + (v.date || '') + '’을(를) 지웁니다.', '지우기', () => { S.data.budgets = S.data.budgets.filter(b => b !== v); save(); render(); }, true) }, '×')))));
+    ap(page, h('p', { class: 'muted small', text: '현재 예산은 가장 최근 예산서(' + cur.kind + ' ' + (cur.date || '') + ') 기준입니다. ' + (st ? '집행은 ' + st.date + ' 결산 연누계에 그 뒤 이 앱에 적은 지출 기안을 더했습니다.' : '결산 파일을 불러오면 집행액이 들어갑니다. 지금은 이 앱에 적은 지출 기안만 셉니다.') }));
+    const firstMap = new Map(first.expense.map(n => [n.path.join('/'), n]));
+    const tb = h('tbody');
+    for (const n of cur.expense) {
+      const k = n.path.join('/'), o = firstMap.get(k);
+      const settled = st ? ((B.node(st, k) || {}).cum || 0) : 0;
+      const after = B.appSpent(y, f, k, st ? st.date : null);
+      const spent = settled + after, remain = (n.budget || 0) - spent, diff = o ? (n.budget || 0) - (o.budget || 0) : null;
+      tb.append(h('tr', { class: 'lv' + n.level + (diff ? ' changed' : '') + (!o ? ' added' : '') },
+        h('td', { class: 'acct', style: 'padding-left:' + (6 + (n.level - 1) * 14) + 'px', title: pathText(k) }, n.name, !o && first !== cur ? h('span', { class: 'tag', text: '새 계정' }) : null),
+        h('td', { class: 'num', text: o ? fmt(o.budget) : '-' }), h('td', { class: 'num', text: fmt(n.budget) }),
+        h('td', { class: 'num ' + (diff > 0 ? 'up' : diff < 0 ? 'down' : ''), text: diff ? (diff > 0 ? '+' : '') + fmt(diff) : '' }),
+        h('td', { class: 'num', text: settled ? fmt(settled) : '' }), h('td', { class: 'num', text: after ? fmt(after) : '' }),
+        h('td', { class: 'num strong' + (remain < 0 ? ' neg' : ''), text: fmt(remain) }),
+        h('td', { class: 'num', text: n.budget ? Math.round(spent / n.budget * 100) + '%' : '' })));
+    }
+    const gone = first.expense.filter(n => !cur.expense.some(c => c.path.join('/') === n.path.join('/')));
+    ap(page, h('div', { class: 'twrap' }, h('table', { class: 'tbl' },
+      h('thead', null, h('tr', null, ['계정과목', '당초', '현재 예산', '증감', '결산 집행' + (st ? '(' + st.date.slice(5) + ')' : ''), '이후 기안', '남은 예산', '집행률'].map(t => h('th', { text: t })))), tb)));
+    if (gone.length) ap(page, h('p', { class: 'warnline', text: '당초에만 있고 지금 예산서에는 없는 계정: ' + gone.map(n => pathText(n.path.join('/'))).join(', ') }));
+    if (cur.income && cur.income.length) {
+      const fi = new Map((first.income || []).map(n => [n.path.join('/'), n]));
+      ap(page, h('h3', { text: '세입' }), h('div', { class: 'twrap' }, h('table', { class: 'tbl' },
+        h('thead', null, h('tr', null, ['계정과목', '당초', '현재', '증감'].map(t => h('th', { text: t })))),
+        h('tbody', null, cur.income.map(n => { const o = fi.get(n.path.join('/')), d = o ? (n.budget || 0) - (o.budget || 0) : null; return h('tr', { class: 'lv' + n.level + (d ? ' changed' : '') }, h('td', { class: 'acct', style: 'padding-left:' + (6 + (n.level - 1) * 14) + 'px', text: n.name }), h('td', { class: 'num', text: o ? fmt(o.budget) : '-' }), h('td', { class: 'num', text: fmt(n.budget) }), h('td', { class: 'num', text: d ? (d > 0 ? '+' : '') + fmt(d) : '' })); })))));
+    }
+    return page;
+  }
+  async function importXls(files) {
+    const items = [];
+    for (const file of files) {
+      try {
+        const sheets = GXLS.readBiff(new Uint8Array(await file.arrayBuffer()));
+        const parsed = GXLS.parseBudget(sheets);
+        if (!parsed.length) { toast(file.name + ': 예산서 형식(계정과목·세출합계)을 찾지 못했습니다'); continue; }
+        const p = parsed[0];
+        const ym = /(20\d{2})/.exec(file.name);
+        p.trees.forEach((t, i) => {
+          const fund = GXLS.guessFund(t) || (items.length ? items[items.length - 1].fund : '보조금');
+          let kind = p.format === 'settle' ? '결산' : p.format === 'change' ? (i === 0 ? '당초 예산' : '변경 예산') : '당초 예산';
+          if (p.format === 'change' && i === 0 && S.data.budgets.some(b => b.fund === fund && b.year === (ym ? +ym[1] : SET.year))) kind = '';
+          items.push({ file: file.name, tree: t, fund, kind, year: ym ? +ym[1] : SET.year, date: p.format === 'settle' ? '' : (i === 0 ? (ym ? ym[1] : SET.year) + '-01-01' : today()), label: p.labels[i] || '' });
+        });
+      } catch (e) { toast(file.name + ': 읽지 못했습니다 (' + e.message + ')'); }
+    }
+    if (!items.length) return;
+    const rows = items.map(it => {
+      const leaf = it.tree.expense.filter(n => n.level === 4).length;
+      return h('div', { class: 'imp' },
+        h('div', { class: 'imp-h' }, h('b', { text: it.file }), it.label ? ' · ' + it.label : '', h('span', { class: 'muted', text: ' (세출 세목 ' + leaf + '개' + (it.tree.income.length ? ', 세입 있음' : '') + ')' })),
+        h('div', { class: 'row wrap' },
+          h('label', null, '재원 ', h('select', { class: 'fld', onchange: e => it.fund = e.target.value }, ['보조금', '자부담'].map(x => h('option', { selected: it.fund === x ? 'selected' : null }, x)))),
+          h('label', null, '종류 ', h('select', { class: 'fld', onchange: e => it.kind = e.target.value }, [['', '가져오지 않음'], ['당초 예산', '당초 예산'], ['변경 예산', '변경 예산(추경)'], ['결산', '결산(집행액)']].map(([v, t]) => h('option', { value: v, selected: it.kind === v ? 'selected' : null }, t)))),
+          h('label', null, '연도 ', h('input', { class: 'fld w80', type: 'number', value: it.year, onchange: e => it.year = +e.target.value })),
+          h('label', null, '기준일 ', h('input', { class: 'fld', type: 'date', value: it.date, onchange: e => it.date = e.target.value }))));
+    });
+    modal('예산서 불러오기', h('div', null, h('p', { class: 'muted', text: '재원(보조금·자부담)과 종류를 확인해 주세요. 결산 파일은 기준일(그 날짜까지의 집행)을 꼭 넣어 주세요. 계정과목 문구는 파일에 적힌 그대로 저장합니다.' }), rows), [
+      { text: '취소' },
+      { text: '불러오기', primary: true, onclick: () => {
+        const bad = items.find(it => it.kind === '결산' && !it.date);
+        if (bad) { toast('결산 파일의 기준일을 넣어 주세요'); return false; }
+        let n = 0;
+        for (const it of items) if (it.kind) {
+          S.data.budgets.push({ id: uid(), at: Date.now() + n, year: it.year, fund: it.fund, kind: it.kind, date: it.date, label: it.label, source: it.file,
+            income: it.tree.income.map(x => ({ level: x.level, name: x.name, path: x.path, budget: x.budget })),
+            expense: it.tree.expense.map(x => ({ level: x.level, name: x.name, path: x.path, budget: x.budget, cum: x.cum != null ? x.cum : null })) });
+          n++;
+        }
+        save(); toast('예산서 ' + n + '개를 불러왔습니다'); SET.fund = items.find(i => i.kind) ? items.find(i => i.kind).fund : SET.fund; saveSet(); render();
+      } }], true);
+  }
+
+  /* ---------- 사업 ---------- */
+  function projView() {
+    const y = SET.year;
+    const mob = h('select', { class: 'fld side-sel', onchange: e => { SET.sub = e.target.value; saveSet(); render(); } },
+      Object.keys(D.UNIT_SUBS).map(u => h('optgroup', { label: u }, D.UNIT_SUBS[u].map(s => h('option', { value: s, selected: SET.sub === s ? 'selected' : null }, s + (s === PILOT ? ' (시범)' : ''))))));
+    const side = h('div', { class: 'side' }, yearSel(), mob,
+      Object.keys(D.UNIT_SUBS).map(u => [h('div', { class: 'side-h', text: u }), D.UNIT_SUBS[u].map(s => {
+        const P = proj(y, s, false);
+        return h('button', { class: 'li' + (SET.sub === s ? ' on' : ''), onclick: () => { SET.sub = s; saveSet(); render(); } }, s, s === PILOT ? h('span', { class: 'tag', text: '시범' }) : null, P && P.versions.length ? h('span', { class: 'dot', title: '자료 있음' }) : null);
+      })]));
+    return h('div', { class: 'split' }, side, h('div', { class: 'content' }, subView(y, SET.sub)));
+  }
+  function subView(y, sub) {
+    const P = proj(y, sub, false);
+    const wrap = h('div', { class: 'page' }, h('h2', null, sub, h('small', { class: 'muted', text: '  ' + (D.unitOf(sub) || '') + ' · ' + y + '년' })));
+    if (!P || !P.versions.length) {
+      ap(wrap, h('div', { class: 'empty' }, h('p', { text: '아직 이 사업의 사업계획이 없습니다.' }),
+        h('p', { class: 'muted', text: '연초 사업계획서의 목표·회차 일정·예산(품목별 단가×인원×횟수)을 넣으면, 이후 변경계획·회차 기안·결과보고·잔액·실적이 여기서 이어집니다.' }),
+        h('button', { class: 'btn primary', onclick: () => { const Q = proj(y, sub, true); Q.versions.push({ id: uid(), kind: '사업계획', no: '', date: y + '-01-', status: '작성 중', goals: { real: '', total: '', count: '' }, lines: [], schedule: [] }); save(); SET.ptab = 'plan'; saveSet(); render(); } }, '사업계획 넣기')));
+      return wrap;
+    }
+    ensureRounds(P);
+    const tabs = [['plan', '계획'], ['rounds', '회차 기안'], ['money', '예산·잔액'], ['perf', '실적']];
+    ap(wrap, h('div', { class: 'seg mb' }, tabs.map(([k, t]) => h('button', { class: SET.ptab === k ? 'on' : '', onclick: () => { SET.ptab = k; saveSet(); render(); } }, t))));
+    ap(wrap, { plan: planTab, rounds: roundsTab, money: moneyTab, perf: perfTab }[SET.ptab] ? ({ plan: planTab, rounds: roundsTab, money: moneyTab, perf: perfTab }[SET.ptab])(P) : planTab(P));
+    return wrap;
+  }
+  function acctSelect(P, fund, value, onch) {
+    const opts = B.leafPaths(P.year, fund);
+    const sel = h('select', { class: 'fld acctsel', onchange: e => onch(e.target.value) }, h('option', { value: '', text: '(계정과목 고르기)' }),
+      opts.map(p => h('option', { value: p, selected: p === value ? 'selected' : null, text: p.split('/').slice(2).join(' / ') + '  (' + p.split('/').slice(0, 2).join(' / ') + ')' })));
+    if (value && !opts.includes(value)) sel.append(h('option', { value, selected: 'selected', text: '⚠ 예산서에 없음: ' + pathText(value) }));
+    return sel;
+  }
+  function planTab(P) {
+    const v = SET.ver && P.versions.find(x => x.id === SET.ver) || P.versions[P.versions.length - 1];
+    const edit = v.status !== '확정';
+    const base = baseVer(P);
+    const box = h('div');
+    ap(box, h('div', { class: 'chips' }, P.versions.map((x, i) => h('button', { class: 'vchip' + (x === v ? ' cur' : ''), onclick: () => { SET.ver = x.id; render(); } },
+      h('b', { text: (i ? '변경 ' + i : '당초') + ' · ' + x.kind }), ' ' + (x.date || '') + (x.no ? ' ' + x.no : '') + ' ' + (x.status === '확정' ? '✓' : '(작성 중)'))),
+      base && base.status === '확정' && !P.versions.some(x => x.status !== '확정') ? h('button', { class: 'btn', onclick: () => newChange(P) }, '+ 변경계획 만들기') : null));
+    ap(box, h('p', { class: 'muted small', text: '회차 기안과 잔액은 확정된 가장 최근 계획(' + (base ? (base.kind + ' ' + (base.date || '')) : '없음') + ')을 기준으로 합니다.' }));
+    // 기본 정보
+    const inp = (obj, k, attrs) => h('input', Object.assign({ class: 'fld', value: obj[k] == null ? '' : obj[k], disabled: !edit ? 'disabled' : null, onchange: e => { obj[k] = e.target.type === 'number' ? (e.target.value === '' ? '' : +e.target.value) : e.target.value; save(); render(); } }, attrs || {}));
+    ap(box, h('div', { class: 'form' },
+      h('label', null, '종류', h('select', { class: 'fld', disabled: !edit ? 'disabled' : null, onchange: e => { v.kind = e.target.value; save(); render(); } }, ['사업계획', '변경계획'].map(k => h('option', { selected: v.kind === k ? 'selected' : null }, k)))),
+      h('label', null, '문서번호', inp(v, 'no', { placeholder: '손잡다' + String(P.year).slice(2) + '-0000' })),
+      h('label', null, '기안일', inp(v, 'date', { type: 'date' })),
+      h('label', null, '실인원 목표', inp(v.goals, 'real', { type: 'number', class: 'fld w80' })),
+      h('label', null, '연인원 목표', inp(v.goals, 'total', { type: 'number', class: 'fld w80' })),
+      h('label', null, '횟수 목표', inp(v.goals, 'count', { type: 'number', class: 'fld w80' }))));
+    // 계정 연결
+    ap(box, h('h3', { text: '이 사업의 계정과목' }), h('div', { class: 'form' }, ['보조금', '자부담'].map(f => h('label', null, f, acctSelect(P, f, P.accts[f] || '', val => { P.accts[f] = val; save(); render(); })))),
+      h('p', { class: 'muted small', text: '계정과목은 예산서에 있는 문구 중에서만 고릅니다(직접 입력 불가). 홍보비처럼 다른 계정에서 나가는 품목은 아래 예산 줄에서 따로 고릅니다.' }));
+    // 예산 줄
+    const tb = h('tbody');
+    v.lines.forEach((l, i) => tb.append(h('tr', null,
+      h('td', null, h('input', { class: 'fld', list: 'items', value: l.item || '', disabled: !edit ? 'disabled' : null, onchange: e => { l.item = e.target.value.trim(); if (!l.acct) { if (/홍보/.test(l.item)) { const p = B.leafPaths(P.year, l.fund).find(x => /수용비/.test(x)); if (p) l.acct = p; } else if (P.accts[l.fund]) l.acct = P.accts[l.fund]; } save(); render(); } })),
+      h('td', null, h('select', { class: 'fld', disabled: !edit ? 'disabled' : null, onchange: e => { l.fund = e.target.value; l.acct = P.accts[l.fund] || ''; save(); render(); } }, ['보조금', '자부담'].map(f => h('option', { selected: l.fund === f ? 'selected' : null }, f)))),
+      h('td', null, edit ? acctSelect(P, l.fund, l.acct, val => { l.acct = val; save(); render(); }) : h('span', { class: 'small nowrap', title: pathText(l.acct), text: String(l.acct || '').split('/').slice(2).join(' / ') })),
+      h('td', null, h('input', { class: 'fld w100 num', type: 'number', value: l.price == null ? '' : l.price, disabled: !edit ? 'disabled' : null, onchange: e => { l.price = e.target.value === '' ? '' : +e.target.value; save(); render(); } })),
+      h('td', null, h('input', { class: 'fld w140', value: l.qty || '', placeholder: '8명 × 6회', disabled: !edit ? 'disabled' : null, onchange: e => { l.qty = e.target.value; save(); render(); } })),
+      h('td', { class: 'num strong', text: fmt(lineAmount(l)) }),
+      h('td', null, edit ? h('button', { class: 'x', title: '줄 지우기', onclick: () => { v.lines.splice(i, 1); save(); render(); } }, '×') : null))));
+    const totals = ['보조금', '자부담'].map(f => [f, sumLines(v, l => l.fund === f)]).filter(x => x[1]);
+    ap(box, h('h3', { text: '예산(산출근거)' }), h('div', { class: 'twrap' }, h('table', { class: 'tbl' },
+      h('thead', null, h('tr', null, ['품목', '재원', '계정과목', '단가', '인원·횟수', '금액', ''].map(t => h('th', { text: t })))), tb,
+      h('tfoot', null, h('tr', null, h('td', { colspan: 5, text: '합계 ' + totals.map(([f, s]) => f + ' ' + won(s)).join(' · ') }), h('td', { class: 'num strong', text: fmt(sumLines(v)) }), h('td'))))),
+      edit ? h('button', { class: 'btn', onclick: () => { v.lines.push({ id: uid(), item: '', fund: '보조금', acct: P.accts['보조금'] || '', price: '', qty: '' }); save(); render(); } }, '+ 예산 줄 추가') : null,
+      h('datalist', { id: 'items' }, ['식비', '다과비', '체험비', '통역비', '강사비', '대관료', '홍보비', '배상책임공제', '물품구입비', '재료비', '숙박비', '교통비', '입장료'].map(x => h('option', { value: x }))));
+    // 예산서 대조
+    const chk = [];
+    for (const f of ['보조금', '자부담']) {
+      const path = P.accts[f]; if (!path) continue;
+      const st = B.status(P.year, f, path), s = sumLines(v, l => l.fund === f && l.acct === path);
+      if (st && st.budget !== s) chk.push(h('li', { class: 'warnline', text: f + ' ‘' + pathText(path) + '’ 예산서 금액은 ' + won(st.budget) + '인데 이 계획의 해당 줄 합계는 ' + won(s) + '입니다.' }));
+      else if (st) chk.push(h('li', { class: 'okline', text: f + ' ‘' + pathText(path) + '’ 예산서 금액과 계획 합계(' + won(s) + ')가 같습니다.' }));
+    }
+    const notIn = v.lines.filter(l => l.acct && !B.leafPaths(P.year, l.fund).includes(l.acct));
+    notIn.forEach(l => chk.push(h('li', { class: 'warnline', text: '‘' + (l.item || '이름 없음') + '’ 줄의 계정과목이 지금 예산서에 없습니다: ' + pathText(l.acct) })));
+    if (chk.length) ap(box, h('ul', { class: 'checks' }, chk));
+    // 회차 일정
+    const sb = h('tbody');
+    (v.schedule = v.schedule || []).forEach((s, i) => sb.append(h('tr', null,
+      h('td', null, h('input', { class: 'fld w60 num', type: 'number', value: s.n, disabled: !edit ? 'disabled' : null, onchange: e => { s.n = +e.target.value; save(); render(); } })),
+      h('td', null, h('input', { class: 'fld', value: s.name || '', placeholder: '활동 이름(장소)', disabled: !edit ? 'disabled' : null, onchange: e => { s.name = e.target.value; save(); render(); } })),
+      h('td', null, h('input', { class: 'fld', type: 'date', value: s.date || '', disabled: !edit ? 'disabled' : null, onchange: e => { s.date = e.target.value; save(); render(); } })),
+      h('td', null, h('input', { class: 'fld w80 num', type: 'number', value: s.people == null ? '' : s.people, placeholder: '인원', disabled: !edit ? 'disabled' : null, onchange: e => { s.people = e.target.value === '' ? '' : +e.target.value; save(); render(); } })),
+      h('td', null, edit ? h('button', { class: 'x', onclick: () => { v.schedule.splice(i, 1); save(); render(); } }, '×') : null))));
+    ap(box, h('h3', { text: '회차 일정' }), h('div', { class: 'twrap' }, h('table', { class: 'tbl' }, h('thead', null, h('tr', null, ['회차', '활동', '날짜', '예정 인원', ''].map(t => h('th', { text: t })))), sb)),
+      edit ? h('button', { class: 'btn', onclick: () => { const n = v.schedule.reduce((a, s) => Math.max(a, s.n || 0), 0) + 1; v.schedule.push({ n, name: '', date: '', people: '' }); save(); render(); } }, '+ 회차 추가') : null);
+    // 변경 비교
+    const prev = prevConfirmed(P, v);
+    if (prev) ap(box, compareBox(P, prev, v));
+    // 확정
+    ap(box, h('div', { class: 'row end mt' },
+      edit ? h('button', { class: 'btn danger', onclick: () => ask('이 버전 지우기', '작성 중인 ' + v.kind + '을(를) 지웁니다.', '지우기', () => { P.versions = P.versions.filter(x => x !== v); SET.ver = null; save(); render(); }, true) }, '지우기') : null,
+      edit ? h('button', { class: 'btn primary', onclick: () => ask('확정', '결재가 끝난 계획으로 확정하면, 이후 회차 기안과 잔액이 이 계획을 기준으로 바뀝니다.', '확정', () => { v.status = '확정'; save(); render(); }) }, '결재 완료로 확정')
+        : h('button', { class: 'btn', onclick: () => ask('다시 고치기', '확정을 풀고 작성 중으로 되돌립니다.', '되돌리기', () => { v.status = '작성 중'; save(); render(); }) }, '확정 풀기')));
+    return box;
+  }
+  function newChange(P) {
+    const b = baseVer(P);
+    const c = JSON.parse(JSON.stringify(b));
+    c.id = uid(); c.kind = '변경계획'; c.no = ''; c.date = today(); c.status = '작성 중'; c.reason = '';
+    P.versions.push(c); SET.ver = c.id; save(); render();
+    toast('직전 계획을 복사했습니다. 바뀌는 곳만 고쳐 주세요');
+  }
+  function compareBox(P, a, b) {
+    const key = l => l.fund + '|' + (l.item || '') + '|' + l.acct;
+    const am = new Map(a.lines.map(l => [l.id, l])), rows = [], used = new Set();
+    for (const l of b.lines) {
+      const o = am.get(l.id) || a.lines.find(x => !used.has(x.id) && key(x) === key(l));
+      if (o) used.add(o.id);
+      rows.push({ item: l.item, fund: l.fund, before: o ? lineAmount(o) : 0, after: lineAmount(l), bq: o ? fmt(o.price) + '원 × ' + (o.qty || '') : '', aq: fmt(l.price) + '원 × ' + (l.qty || ''), isNew: !o });
+    }
+    for (const o of a.lines) if (!used.has(o.id) && !b.lines.some(l => l.id === o.id)) rows.push({ item: o.item, fund: o.fund, before: lineAmount(o), after: 0, bq: fmt(o.price) + '원 × ' + (o.qty || ''), aq: '', gone: true });
+    const tb = h('tbody', null, rows.map(r => h('tr', { class: r.before !== r.after || r.bq !== r.aq ? 'changed' : '' }, h('td', { text: (r.item || '') + ' (' + r.fund + ')' }), h('td', { class: 'small', text: r.bq }), h('td', { class: 'num', text: fmt(r.before) }), h('td', { class: 'small', text: r.aq }), h('td', { class: 'num', text: fmt(r.after) }), h('td', { class: 'num ' + (r.after > r.before ? 'up' : r.after < r.before ? 'down' : ''), text: r.after - r.before ? (r.after > r.before ? '+' : '') + fmt(r.after - r.before) : '' }))));
+    const ta = sumLines(a), tbs = sumLines(b);
+    const g = k => [a.goals[k], b.goals[k]];
+    const changes = [];
+    rows.forEach(r => { if (r.isNew) changes.push('- ' + r.item + ' 항목을 추가하였음'); else if (r.gone) changes.push('- ' + r.item + ' 항목을 삭제하였음'); else if (r.before !== r.after || r.bq !== r.aq) changes.push('- ' + r.item + ' 예산 금액을 조정하였음'); });
+    [['real', '실인원'], ['total', '연인원'], ['count', '횟수']].forEach(([k, t]) => { const [x, y] = g(k); if (String(x) !== String(y)) changes.push('- 산출목표 ' + t + '을(를) ' + (x || 0) + '에서 ' + (y || 0) + '(으)로 조정하였음'); });
+    const sa = JSON.stringify((a.schedule || []).map(s => [s.n, s.name, s.date])), sbb = JSON.stringify((b.schedule || []).map(s => [s.n, s.name, s.date]));
+    if (sa !== sbb) changes.push('- 회차 일정을 조정하였음');
+    const reason = tbs < ta ? '사업 운영 비용을 절감하여, 예산을 ' + won(ta - tbs) + ' 감액함' : tbs > ta ? '사업 운영에 필요한 비용을 반영하여, 예산을 ' + won(tbs - ta) + ' 증액함' : '예산 총액은 그대로 두고 세부 항목을 조정함';
+    const text = '변경사유: ' + reason + '\n※ 주요 변경사항\n' + (changes.join('\n') || '- (바뀐 곳 없음)') + '\n\n당초 ' + won(ta) + ' → 변경 ' + won(tbs) + ' (증감 ' + (tbs - ta >= 0 ? '+' : '') + fmt(tbs - ta) + '원)';
+    return h('div', { class: 'cmp' }, h('h3', { text: '당초 / 변경 / 증감 (직전 확정 계획과 비교)' }),
+      h('div', { class: 'twrap' }, h('table', { class: 'tbl' }, h('thead', null, h('tr', null, ['품목', '당초 산출', '당초', '변경 산출', '변경', '증감'].map(t => h('th', { text: t })))), tb,
+        h('tfoot', null, h('tr', null, h('td', { colspan: 2, text: '합계' }), h('td', { class: 'num strong', text: fmt(ta) }), h('td'), h('td', { class: 'num strong', text: fmt(tbs) }), h('td', { class: 'num strong', text: (tbs - ta >= 0 ? '+' : '') + fmt(tbs - ta) }))))),
+      h('div', { class: 'draft' }, h('pre', { text }), h('button', { class: 'btn', onclick: () => copy(text) }, '초안 복사')),
+      h('p', { class: 'muted small', text: '변경사유에는 예산을 어디로 옮기는지 쓰지 않고 바뀌는 내용만 씁니다. 산출목표는 예산 횟수에 맞추지 않습니다.' }));
+  }
+  const TITLE_KIND = { '계획': '계획', '모집': '참여자 모집 홍보', '결과보고': '결과보고' };
+  function suggestTitle(P, r, kind) { return P.sub + ' ' + r.n + '차 ' + (TITLE_KIND[kind] || kind); }
+  function roundsTab(P) {
+    const base = baseVer(P);
+    if (!base) return h('p', { text: '먼저 계획을 넣어 주세요.' });
+    const kinds = D.ROUND_KINDS;
+    const todo = [];
+    const now = today();
+    for (const r of P.rounds) {
+      const s = schedOf(P, r.n) || {};
+      const has = k => r.docs.some(d => d.kind === k);
+      if (s.date && s.date < now && !has('결과보고')) todo.push(r.n + '차(' + s.date + '): 결과보고가 없습니다');
+      if (s.date && s.date >= now && !has('계획')) todo.push(r.n + '차(' + s.date + '): 운영계획을 먼저 써야 합니다');
+      const res = r.docs.find(d => d.kind === '결과보고');
+      if (res && res.settle != null && res.settle !== '' && +res.settle !== roundSpend(r)) todo.push(r.n + '차 결과보고 결산(' + won(+res.settle) + ')과 지출 기안 합계(' + won(roundSpend(r)) + ')가 다릅니다');
+    }
+    const tb = h('tbody');
+    for (const r of P.rounds) {
+      const s = schedOf(P, r.n) || {};
+      tb.append(h('tr', null, h('td', { class: 'strong', text: r.n + '차' }), h('td', { class: 'small', text: (s.name || '') + (s.date ? ' · ' + s.date.slice(5).replace('-', '/') : '') }),
+        kinds.map(k => {
+          const ds = r.docs.filter(d => d.kind === k);
+          const need = k === '계획' || k === '결과보고';
+          return h('td', { class: 'mc' }, ds.map(d => h('button', { class: 'doc ' + (d.status === '결재 완료' ? 'done' : d.status === '결재 요청' ? 'req' : 'draft'), title: d.title || '', onclick: () => docModal(P, r, d) }, (d.no ? d.no.slice(-4) : '0000') + (docSpend(d) ? ' ' + fmt(docSpend(d)) : ''))),
+            h('button', { class: 'plus' + (need && !ds.length ? ' need' : ''), title: k + ' 추가', onclick: () => docModal(P, r, null, k) }, need && !ds.length ? '+ 필요' : '+'));
+        }),
+        h('td', { class: 'num strong', text: fmt(roundSpend(r)) })));
+    }
+    return h('div', null,
+      todo.length ? h('ul', { class: 'checks' }, todo.map(t => h('li', { class: 'warnline', text: t }))) : h('p', { class: 'okline', text: '할 일로 걸리는 회차가 없습니다.' }),
+      h('div', { class: 'twrap' }, h('table', { class: 'tbl mx' }, h('thead', null, h('tr', null, h('th', { text: '회차' }), h('th', { text: '활동' }), kinds.map(k => h('th', { text: k })), h('th', { text: '지출 합' }))), tb)),
+      h('p', { class: 'muted small', text: '칸을 누르면 그 회차의 기안을 적습니다. 지출 기안은 계획의 예산 줄에 금액을 나눠 적으면 남은 예산에서 빠집니다. 결과보고 결산은 같은 회차 지출 기안의 합계로 채워집니다. (기안 파일을 자동으로 만들어 주는 기능은 다음 단계에서 붙입니다.)' }),
+      h('button', { class: 'btn', onclick: () => { const n = P.rounds.reduce((a, r) => Math.max(a, r.n), 0) + 1; P.rounds.push({ id: uid(), n, docs: [] }); save(); render(); } }, '+ 계획에 없는 회차 추가'));
+  }
+  function docModal(P, r, d, kind) {
+    const isNew = !d;
+    d = d ? JSON.parse(JSON.stringify(d)) : { id: uid(), kind, no: '손잡다' + String(P.year).slice(2) + '-0000', date: today(), title: suggestTitle(P, r, kind), status: '작성 중', spends: {}, attend: '', memo: '' };
+    const base = baseVer(P);
+    const body = h('div', { class: 'form col' });
+    const draw = () => {
+      body.textContent = '';
+      ap(body, 
+        h('label', null, '종류', h('select', { class: 'fld', onchange: e => { d.kind = e.target.value; d.title = suggestTitle(P, r, d.kind); draw(); } }, D.ROUND_KINDS.concat(['다과비', '식비', '재료비', '숙박비', '협조요청', '보도자료', '기타']).map(k => h('option', { selected: d.kind === k ? 'selected' : null }, k)))),
+        h('label', null, '제목', h('input', { class: 'fld', value: d.title, onchange: e => d.title = e.target.value })),
+        h('div', { class: 'row wrap' },
+          h('label', null, '문서번호', h('input', { class: 'fld w140', value: d.no, onchange: e => d.no = e.target.value.trim() })),
+          h('label', null, '기안일', h('input', { class: 'fld', type: 'date', value: d.date, onchange: e => d.date = e.target.value })),
+          h('label', null, '상태', h('select', { class: 'fld', onchange: e => d.status = e.target.value }, ['작성 중', '결재 요청', '결재 완료'].map(k => h('option', { selected: d.status === k ? 'selected' : null }, k))))));
+      if (D.SPEND_KINDS.includes(d.kind)) {
+        ap(body, h('h4', { text: '예산 줄별 지출 금액' }), h('table', { class: 'tbl' }, h('thead', null, h('tr', null, ['품목', '계획', '남은 금액', '이번 지출'].map(t => h('th', { text: t })))),
+          h('tbody', null, base.lines.map(l => {
+            const used = lineSpent(P, l.id) - (isNew ? 0 : (+((r.docs.find(x => x.id === d.id) || {}).spends || {})[l.id] || 0));
+            return h('tr', null, h('td', { text: (l.item || '') + ' (' + l.fund + ')' }), h('td', { class: 'num', text: fmt(lineAmount(l)) }), h('td', { class: 'num', text: fmt(lineAmount(l) - used) }),
+              h('td', null, h('input', { class: 'fld w100 num', type: 'number', value: d.spends[l.id] || '', onchange: e => { if (e.target.value === '') delete d.spends[l.id]; else d.spends[l.id] = +e.target.value; draw(); } })));
+          })), h('tfoot', null, h('tr', null, h('td', { colspan: 3, text: '합계' }), h('td', { class: 'num strong', text: fmt(docSpend(d)) })))));
+      }
+      if (d.kind === '결과보고') {
+        const sp = r.docs.filter(x => x.kind !== '결과보고' && x.id !== d.id).reduce((a, x) => a + docSpend(x), 0);
+        if (d.settle == null || d.settle === '') d.settle = sp;
+        const names = attendees(d);
+        ap(body, h('label', null, '결산(지출 기안 합계 ' + won(sp) + ')', h('input', { class: 'fld w140 num', type: 'number', value: d.settle, onchange: e => { d.settle = e.target.value === '' ? '' : +e.target.value; draw(); } })),
+          +d.settle !== sp ? h('p', { class: 'warnline', text: '결산이 지출 기안 합계와 다릅니다. 빠진 지출 기안이 없는지 확인해 주세요.' }) : null,
+          h('label', null, '참여자 명단 (한 줄에 한 명, 실제로 온 사람만) · ' + names.length + '명', h('textarea', { class: 'fld', rows: 6, value: d.attend || '', onchange: e => { d.attend = e.target.value; draw(); } })),
+          h('p', { class: 'muted small', text: '명단은 이 PC와 연결한 폴더에만 저장하고, 실인원(중복 없이)·연인원 계산에 씁니다.' }));
+      }
+      ap(body, h('label', null, '메모', h('textarea', { class: 'fld', rows: 2, value: d.memo || '', onchange: e => d.memo = e.target.value })));
+    };
+    draw();
+    modal(r.n + '차 · ' + (isNew ? '기안 추가' : '기안 고치기'), body, [
+      isNew ? null : { text: '지우기', danger: true, onclick: () => { r.docs = r.docs.filter(x => x.id !== d.id); save(); render(); } },
+      { text: '취소' },
+      { text: '저장', primary: true, onclick: () => { const i = r.docs.findIndex(x => x.id === d.id); if (i >= 0) r.docs[i] = d; else r.docs.push(d); save(); render(); } }].filter(Boolean), true);
+  }
+  function moneyTab(P) {
+    const base = baseVer(P);
+    const tb = h('tbody', null, base.lines.map(l => { const a = lineAmount(l), s = lineSpent(P, l.id); return h('tr', null, h('td', { text: l.item || '' }), h('td', { text: l.fund }), h('td', { class: 'small', text: pathText(l.acct) }), h('td', { class: 'num', text: fmt(a) }), h('td', { class: 'num', text: fmt(s) }), h('td', { class: 'num strong' + (a - s < 0 ? ' neg' : ''), text: fmt(a - s) })); }));
+    const ta = sumLines(base), ts = base.lines.reduce((x, l) => x + lineSpent(P, l.id), 0);
+    const box = h('div', null, h('h3', { text: '계획 예산 줄별 남은 금액' }), h('div', { class: 'twrap' }, h('table', { class: 'tbl' }, h('thead', null, h('tr', null, ['품목', '재원', '계정과목', '계획', '지출 기안', '남은 금액'].map(t => h('th', { text: t })))), tb,
+      h('tfoot', null, h('tr', null, h('td', { colspan: 3, text: '합계' }), h('td', { class: 'num strong', text: fmt(ta) }), h('td', { class: 'num strong', text: fmt(ts) }), h('td', { class: 'num strong', text: fmt(ta - ts) }))))));
+    const rows = [];
+    for (const f of ['보조금', '자부담']) { const p = P.accts[f]; if (!p) continue; const st = B.status(P.year, f, p); if (st) rows.push(h('tr', null, h('td', { text: f }), h('td', { class: 'small', text: pathText(p) }), h('td', { class: 'num', text: fmt(st.budget) }), h('td', { class: 'num', text: fmt(st.settled) + (st.date ? ' (' + st.date + ')' : '') }), h('td', { class: 'num', text: fmt(st.after) }), h('td', { class: 'num strong' + (st.remain < 0 ? ' neg' : ''), text: fmt(st.remain) }))); }
+    ap(box, h('h3', { text: '예산서 기준 (회계 결산 + 그 뒤 기안)' }), rows.length ? h('div', { class: 'twrap' }, h('table', { class: 'tbl' }, h('thead', null, h('tr', null, ['재원', '계정과목', '현재 예산', '결산 집행', '이후 기안', '남은 예산'].map(t => h('th', { text: t })))), h('tbody', null, rows))) : h('p', { class: 'muted', text: '예산서를 불러오고 계획 화면에서 이 사업의 계정과목을 고르면 나타납니다.' }));
+    return box;
+  }
+  function perfTab(P) {
+    const base = baseVer(P);
+    const per = P.rounds.map(r => { const res = r.docs.find(d => d.kind === '결과보고'); return { r, res, names: attendees(res) }; });
+    const done = per.filter(x => x.res);
+    const total = done.reduce((a, x) => a + x.names.length, 0);
+    const uniq = new Set(); done.forEach(x => x.names.forEach(n => uniq.add(n.replace(/\s+/g, ''))));
+    const g = base.goals || {};
+    const row = (t, goal, act) => h('tr', null, h('td', { text: t }), h('td', { class: 'num', text: goal === '' || goal == null ? '-' : fmt(+goal) }), h('td', { class: 'num strong', text: fmt(act) }), h('td', { class: 'num', text: goal ? Math.round(act / goal * 100) + '%' : '' }));
+    return h('div', null, h('h3', { text: '목표 대비 실적 (결과보고 기준)' }),
+      h('div', { class: 'twrap' }, h('table', { class: 'tbl' }, h('thead', null, h('tr', null, ['항목', '목표', '실적', '달성률'].map(t => h('th', { text: t })))),
+        h('tbody', null, row('횟수', g.count, done.length), row('연인원', g.total, total), row('실인원(중복 없이)', g.real, uniq.size)))),
+      h('h3', { text: '회차별' }), h('div', { class: 'twrap' }, h('table', { class: 'tbl' }, h('thead', null, h('tr', null, ['회차', '결과보고', '참여 인원', '결산'].map(t => h('th', { text: t })))),
+        h('tbody', null, per.map(x => h('tr', null, h('td', { text: x.r.n + '차' }), h('td', { text: x.res ? (x.res.no || '') + ' ' + (x.res.status || '') : '없음' }), h('td', { class: 'num', text: x.res ? x.names.length : '' }), h('td', { class: 'num', text: x.res ? fmt(+x.res.settle || 0) : '' })))))),
+      h('p', { class: 'muted small', text: '실인원은 회차별 명단의 이름을 띄어쓰기 없이 비교해 중복을 뺀 수입니다. 동명이인은 명단에 구분 표시(예: 홍길동A)를 해 주세요.' }));
+  }
+
+  /* ---------- 기안 검수 ---------- */
+  const RV = { items: [], prev: null };
+  function reviewView() {
+    const pick = h('input', { type: 'file', accept: '.hwp,.hwpx', multiple: true, class: 'hide', onchange: e => { runReview([...e.target.files]); e.target.value = ''; } });
+    const prevPick = h('input', { type: 'file', accept: '.hwp,.hwpx', class: 'hide', onchange: async e => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; try { const d = await GHWP.readDoc(f); d.name = f.name; RV.prev = d; rerunAll(); } catch (er) { toast(f.name + ': ' + er.message); } } });
+    const drop = h('div', { class: 'drop', 'data-nofs': '', onclick: () => pick.click() }, h('b', { text: '한글 기안 파일(.hwp, .hwpx)을 여기로 끌어 놓거나 눌러서 고르세요' }), h('span', { class: 'muted', text: '여러 개를 한꺼번에 넣어도 됩니다. 파일은 이 PC 안에서만 읽고 인터넷으로 보내지 않습니다.' }));
+    drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+    drop.addEventListener('drop', e => { e.preventDefault(); drop.classList.remove('over'); runReview([...e.dataTransfer.files].filter(f => /\.hwpx?$/i.test(f.name))); });
+    const page = h('div', { class: 'page' }, h('h2', { text: '기안 검수' }), pick, prevPick, drop,
+      h('div', { class: 'row wrap' }, h('button', { class: 'btn', 'data-nofs': '', onclick: () => prevPick.click() }, RV.prev ? '앞 문서: ' + RV.prev.name : '앞 문서(비교할 지난 기안) 고르기'),
+        RV.prev ? h('button', { class: 'btn', onclick: () => { RV.prev = null; rerunAll(); } }, '앞 문서 빼기') : null,
+        RV.items.length ? h('button', { class: 'btn', onclick: () => { RV.items = []; render(); } }, '결과 모두 지우기') : null),
+      h('p', { class: 'muted small', text: '확인하는 것: 파일 이름과 본문 제목, 연도, 다른 사업 이름, 차수·회기, 날짜와 요일, 산출식 계산, 표 합계·소계, 숫자 금액과 한글 금액, 계정과목 문구(예산서와 글자까지 같은지), 남은 예산, 붙임 번호, ‘끝.’ 표시, 금액 쉼표. 앞 문서를 고르면 바뀐 줄과 앞 문서에서 남은 날짜·차수도 봅니다.' }));
+    RV.items.forEach(it => ap(page, resultCard(it)));
+    return page;
+  }
+  async function runReview(files) {
+    for (const f of files) {
+      try { const d = await GHWP.readDoc(f); d.name = f.name; RV.items.unshift({ doc: d, res: doReview(d) }); }
+      catch (e) { RV.items.unshift({ error: e.message, name: f.name }); }
+    }
+    render();
+  }
+  function doReview(d) {
+    const year = (GREVIEW.docMeta(d).year) || SET.year;
+    const hasB = S.data.budgets.some(b => b.year === year);
+    return GREVIEW.review(d, { prev: RV.prev, accounts: hasB ? B.accountsAll(year) : null, budgetOf: hasB ? (f, p) => B.status(year, f, p) : null });
+  }
+  function rerunAll() { RV.items.forEach(it => { if (it.doc) it.res = doReview(it.doc); }); render(); }
+  function resultCard(it) {
+    if (it.error) return h('div', { class: 'rcard' }, h('h3', { text: it.name }), h('p', { class: 'warnline', text: '읽지 못했습니다: ' + it.error }));
+    const r = it.res, label = { high: '고칠 것', mid: '확인', low: '참고' };
+    const vcls = r.verdict === '보완 필요' ? 'high' : r.verdict === '결재 가능' ? 'ok' : 'mid';
+    const body = h('div', { class: 'findings' }, r.findings.length ? r.findings.map(f => h('div', { class: 'f ' + f.sev }, h('span', { class: 'chip ' + f.sev, text: label[f.sev] }), h('b', { text: f.title }),
+      f.detail ? h('div', { class: 'detail', text: f.detail }) : null, f.quotes.length ? h('ul', { class: 'quotes' }, f.quotes.map(q => h('li', { text: q }))) : null)) : h('p', { class: 'okline', text: '규칙으로 확인한 범위에서 걸리는 곳이 없습니다.' }));
+    const card = h('div', { class: 'rcard' }, h('div', { class: 'rhead' }, h('span', { class: 'chip big ' + vcls, text: r.verdict }), h('h3', { text: it.doc.name }),
+      h('span', { class: 'muted small', text: [r.meta.sub, r.meta.kind, r.meta.round ? r.meta.round + '차' : '', r.docTotal != null ? '금액 ' + won(r.docTotal) : ''].filter(Boolean).join(' · ') })), body,
+      r.accounts.length ? h('p', { class: 'muted small', text: '찾은 계정과목: ' + [...new Set(r.accounts)].join(' / ') }) : null,
+      h('div', { class: 'row wrap' }, h('button', { class: 'btn primary', onclick: () => copy(GREVIEW.reportText(r)) }, '보완 요청 문구 복사'),
+        h('button', { class: 'btn', onclick: () => modal('본문 (읽은 글자)', h('pre', { class: 'plain', text: it.doc.lines.join('\n') }), null, true) }, '본문 보기'),
+        r.diff ? h('button', { class: 'btn', onclick: () => modal('앞 문서와 바뀐 줄', diffView(r.diff), null, true) }, '앞 문서와 비교') : null));
+    return card;
+  }
+  function diffView(diff) {
+    const out = h('div', { class: 'diff' });
+    diff.forEach((d, i) => {
+      const near = diff.slice(Math.max(0, i - 1), i + 2).some(x => x[0] !== '=');
+      if (d[0] === '=' && !near) return;
+      ap(out, h('div', { class: 'dl ' + (d[0] === '+' ? 'add' : d[0] === '-' ? 'del' : 'same'), text: (d[0] === '=' ? '  ' : d[0] + ' ') + d[1] }));
+    });
+    if (!out.childNodes.length) ap(out, h('p', { text: '바뀐 줄이 없습니다.' }));
+    return h('div', null, h('p', { class: 'muted small', text: '+ 이번 문서에만 있는 줄, - 앞 문서에만 있는 줄' }), out);
+  }
+
+  /* ---------- 작성 안내 ---------- */
+  const GUIDE = [
+    ['사업계획 (연초)', '한 해 기준이 되는 문서입니다. 이후 회차 기안은 모두 이 계획(또는 그 뒤 변경계획)을 따릅니다.', ['사업 목적·필요성, 추진 전략', '산출목표: 실인원·연인원·횟수', '회차 일정(차수·활동·시기)', '예산: 품목별 단가 × 인원 × 횟수, 계정과목은 예산서 문구 그대로', '수행인력'], ['예산서 세목 금액과 계획 합계가 같은지 확인합니다.']],
+    ['변경계획 · 수정 운영계획', '예산(내역변경)이나 일정·내용이 바뀌면 씁니다. 저장하면 그 뒤 기안의 기준이 바뀝니다.', ['변경사유: 바뀌는 내용만(예산을 어디로 옮기는지는 쓰지 않음)', '※ 주요 변경사항: ‘- ○○ 예산 금액을 조정하였음’', '당초 / 변경 / 증감 비교표', '변경 후 예산과 산출근거'], ['산출목표는 예산의 넉넉한 횟수에 맞추지 않습니다.', '보조금 내역변경이면 줄어드는 사업과 늘어나는 사업 모두 변경계획이 필요합니다.']],
+    ['운영계획 (회차)', '회차마다 씁니다. 계획에서 목적·대상·예산을 가져오고 일시·장소·내용만 새로 씁니다.', ['일시(요일까지)·장소·대상·인원', '프로그램 시간표', '수행인력', '이번 회차 예산'], ['앞 회차 문서를 복사했다면 차수·날짜·장소가 모두 바뀌었는지 확인합니다.']],
+    ['참여자 모집 홍보', '내부결재 + 대외 공문 + 안내문으로 씁니다.', ['모집 기간·대상·인원', '신청 방법', '안내문'], ['모집은 지출 기안보다 앞 번호여야 합니다(홍보비 제외).']],
+    ['홍보비', '현수막·배송비 등. 계정과목이 사업 계정이 아닌 사무비 쪽일 수 있습니다.', ['품목·수량·단가', '계정과목(예산서 문구 그대로)'], []],
+    ['대관료 · 보험(배상책임공제)', '돈이 먼저 나가고 붙임 서류가 따로 있어서 보통 따로 씁니다.', ['대관 신청서·안전수칙 확인서', '공제 가입 증명'], ['행사 날짜 전에 결재가 끝나야 합니다.']],
+    ['진행비', '식비·다과비·재료비·체험비·물품구입비 등을 보통 한 기안으로 묶습니다.', ['품목별 단가 × 인원 = 금액', '합계와 본문 금액(숫자·한글)'], ['예산 인원과 실제 이용 인원은 다를 수 있습니다. 오지 않는 사람을 명단에 넣지 않습니다.']],
+    ['강사비 · 통역비', '진행비 뒤에 씁니다. 지급 서류(확인서 등)가 따로 있습니다.', ['시간 × 단가 × 인원', '강사·통역사 확인 서류'], ['통역비는 시간·인원·횟수 계산이 맞는지 다시 봅니다.']],
+    ['결과보고', '회차마다 반드시 있어야 합니다.', ['출석 인원(실제 온 사람)', '결산 = 이 회차 지출 기안 합계', '만족도', '붙임: 결과보고서·출석부·프로그램 일지'], ['결산이 지출 기안 합계와 다르면 빠진 지출 기안이 없는지 확인합니다.']]
+  ];
+  function guideView() {
+    return h('div', { class: 'page' }, h('h2', { text: '기안 작성 안내' }), h('p', { class: 'muted', text: '종류마다 꼭 들어갈 것과 주의할 점입니다. 틀린 곳이나 더할 내용이 있으면 알려 주세요. 다음 단계에서 고칠 수 있게 바꾸고, 단계별 따라 하기(튜토리얼) 모드도 붙입니다.' }),
+      h('div', { class: 'cards' }, GUIDE.map(([t, d, must, warn]) => h('div', { class: 'card guide' }, h('h3', { text: t }), h('p', { text: d }),
+        h('b', { text: '꼭 들어갈 것' }), h('ul', null, must.map(x => h('li', { text: x }))),
+        warn.length ? [h('b', { text: '주의' }), h('ul', { class: 'warnlist' }, warn.map(x => h('li', { text: x })))] : null))));
+  }
+
+  /* ---------- 설정 ---------- */
+  async function linkFolder() {
+    if (!window.showDirectoryPicker) { modal('폴더 연결', h('p', { text: '이 브라우저는 폴더 연결을 지원하지 않습니다. PC 크롬이나 엣지에서 열어 주세요. 그동안은 이 브라우저에 저장되고, 설정에서 파일로 내보낼 수 있습니다.' })); return; }
+    let dir;
+    try { dir = await window.showDirectoryPicker({ id: 'gian-data', mode: 'readwrite' }); } catch (e) { return; }
+    if (dir.name !== '기안도우미') {
+      const ok = await new Promise(res => modal('폴더 확인', h('p', { text: '고른 폴더 ‘' + dir.name + '’ 안에 ‘기안도우미’ 폴더를 만들어(있으면 그대로) 거기에 저장할까요? 연도 폴더(2026 등) 바깥, ‘손잡다’ 폴더를 고르는 것을 권합니다.' }), [{ text: '취소', onclick: () => res(false) }, { text: '그렇게 하기', primary: true, onclick: () => res(true) }]));
+      if (!ok) return;
+      try { dir = await dir.getDirectoryHandle('기안도우미', { create: true }); } catch (e) { toast('폴더를 만들지 못했습니다'); return; }
+    }
+    const j = await S.link(dir);
+    const mine = S.data.budgets.length || Object.keys(S.data.projects).length;
+    if (j && mine && j.savedAt !== S.data.savedAt) {
+      modal('저장된 내용이 이미 있음', h('p', { text: '폴더에 저장된 내용(' + new Date(j.savedAt).toLocaleString('ko-KR') + ')과 이 PC의 내용이 다릅니다. 어느 쪽을 쓸까요?' }), [
+        { text: '폴더 내용 불러오기', primary: true, onclick: async () => { await S.replace(j); render(); toast('폴더 내용을 불러왔습니다'); } },
+        { text: '이 PC 내용으로 덮어쓰기', danger: true, onclick: async () => { S.lastSync = j.savedAt; S.save(); await S.flush(); render(); toast('폴더에 저장했습니다'); } }]);
+    } else if (j) { await S.replace(j); render(); toast('폴더 내용을 불러왔습니다'); }
+    else { S.save(); await S.flush(); render(); toast('‘기안도우미’ 폴더에 저장했습니다'); }
+  }
+  async function reconnect() { const p = await S.reconnect(); toast(p === 'granted' ? '다시 연결했습니다' : '연결하지 못했습니다'); render(); }
+  S.onConflict = j => modal('다른 PC에서 바뀐 내용', h('p', { text: '폴더의 파일이 다른 곳에서 ' + new Date(j.savedAt).toLocaleString('ko-KR') + '에 바뀌었습니다. 어느 쪽을 쓸까요?' }), [
+    { text: '폴더 내용 불러오기', primary: true, onclick: async () => { await S.replace(j); render(); } },
+    { text: '이 PC 내용으로 덮어쓰기', danger: true, onclick: async () => { S.lastSync = j.savedAt; await S.flush(); } }]);
+  function setView() {
+    const imp = h('input', { type: 'file', accept: '.json', class: 'hide', onchange: async e => { const f = e.target.files[0]; if (!f) return; try { const j = JSON.parse(await f.text()); if (!j.v) throw new Error('형식'); ask('가져오기', '지금 내용을 이 파일 내용으로 바꿉니다.', '바꾸기', async () => { await S.replace(j); S.save(); render(); toast('가져왔습니다'); }, true); } catch (er) { toast('기안 도우미 파일이 아닙니다'); } } });
+    return h('div', { class: 'page narrow' }, h('h2', { text: '설정' }), imp,
+      h('section', { class: 'card' }, h('h3', { text: '저장 위치' }),
+        h('p', { text: S.dir ? '연결한 폴더: ‘' + S.dir.name + '’ (' + (S.perm === 'granted' ? '저장 중' : '다시 연결 필요') + ')' : '아직 이 브라우저에만 저장합니다.' }),
+        h('p', { class: 'muted small', text: '시놀로지의 ‘손잡다’ 폴더(연도 폴더 바깥)를 고르면 그 안에 ‘기안도우미’ 폴더를 만들어 기안도우미.json 하나와 날짜별 백업만 씁니다. 해가 바뀌어도 같은 파일을 계속 쓰고, 다른 PC에서도 같은 내용을 봅니다. 기안·스캔 폴더에는 쓰지 않습니다.' }),
+        S.status ? h('p', { class: 'muted small', text: '최근: ' + S.status }) : null,
+        h('div', { class: 'row wrap' }, h('button', { class: 'btn primary', 'data-nofs': '', onclick: linkFolder }, S.dir ? '다른 폴더 연결' : '폴더 연결'),
+          S.dir && S.perm !== 'granted' ? h('button', { class: 'btn', 'data-nofs': '', onclick: reconnect }, '다시 연결') : null,
+          S.dir ? h('button', { class: 'btn', onclick: async () => { await S.unlink(); render(); } }, '연결 끊기') : null)),
+      h('section', { class: 'card' }, h('h3', { text: '내보내기 · 가져오기' }),
+        h('div', { class: 'row wrap' }, h('button', { class: 'btn', onclick: () => download('기안도우미-' + today() + '.json', JSON.stringify(S.data)) }, '파일로 내보내기'), h('button', { class: 'btn', 'data-nofs': '', onclick: () => imp.click() }, '파일 가져오기'))),
+      h('section', { class: 'card' }, h('h3', { text: '화면' }),
+        h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: SET.autoFull, onchange: e => { SET.autoFull = e.target.checked; saveSet(); } }), ' 자동 전체화면 (화면을 처음 누를 때 전체화면으로)'),
+        h('div', { class: 'row wrap' }, h('button', { class: 'btn', 'data-nofs': '', onclick: FS.toggle }, FS.on() ? '전체화면 끝내기' : '전체화면 켜기'), isStandalone() ? null : h('button', { class: 'btn', 'data-nofs': '', onclick: installHelp }, '홈 화면에 설치하기'))),
+      h('section', { class: 'card' }, h('h3', { text: '모두 지우기' }), h('p', { class: 'muted small', text: '이 브라우저에 저장한 내용을 지웁니다. 연결한 폴더의 파일과 백업은 그대로 둡니다.' }),
+        h('button', { class: 'btn danger', onclick: () => ask('모두 지우기', '예산서와 사업 자료를 이 브라우저에서 지웁니다.', '지우기', async () => { await S.unlink(); await S.replace(S.empty()); render(); }, true) }, '모두 지우기')));
+  }
+
+  /* ---------- 시작 ---------- */
+  // Artifact 등에서 head 밖으로 나간 태그를 head로 옮김
+  document.querySelectorAll('body > link[rel=manifest], body > link[rel=icon], body > link[rel=apple-touch-icon], body > meta').forEach(n => document.head.appendChild(n));
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  window.__gian = { S, B, SET, render, runReview, RV };
+  S.load().then(() => { if (!TABS.some(t => t[0] === SET.tab)) SET.tab = 'home'; render(); }).catch(() => render());
+})();

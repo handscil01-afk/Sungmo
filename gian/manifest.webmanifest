@@ -1,0 +1,16 @@
+{
+ "name": "기안 도우미",
+ "short_name": "기안 도우미",
+ "description": "사업계획부터 결과보고·실적까지 이어서 관리하고, 기안을 규칙대로 검수하는 도구",
+ "scope": "./",
+ "display": "fullscreen",
+ "display_override": ["fullscreen", "standalone"],
+ "background_color": "#f3f5f4",
+ "theme_color": "#25634a",
+ "lang": "ko",
+ "icons": [
+  { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+  { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+  { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+ ]
+}
