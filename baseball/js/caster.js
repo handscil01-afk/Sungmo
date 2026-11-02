@@ -146,15 +146,15 @@ function castResult(res){
       'j_score', teamClip(G.teams[0]), numClip(runsOf(G.teams[0])), teamClip(G.teams[1]), numClip(runsOf(G.teams[1])));
     if(has('pchange')) after.push('r_pitcher_change');
     if((has('batter') && !has('start')) || has('change')){
-      if(!has('change')) after.push(teamClip(batTeam(G)));
       after.push(`bat_${batTeam(G).bi + 1}`);
       if(G.bases.some(x => x != null)) after.push(runClip(G.bases));
       if(G.outs) after.push(`out_${G.outs}`);
     }
   }
-  at(resAt, after);
-  // 시각 순서대로 이어서 틂 (앞 조각이 안 끝났으면 끝난 뒤에)
+  // 시각 순서대로 이어서 틂 (앞 조각이 안 끝났으면 끝난 뒤에). 안내(after)는 언제나 맨 끝: 도루·득점 중계가 공수 교대 안내 뒤로 밀리지 않게
+  plan.sort((a, b) => a[0] - b[0]);
+  if(after.length) plan.push([plan.length ? plan[plan.length - 1][0] : resAt, after.flat(3).filter(Boolean)]);
   let end = 0;
-  plan.sort((a, b) => a[0] - b[0]).forEach(([t, ids]) => { end = castPlay(ids, t); });
+  plan.forEach(([t, ids]) => { end = castPlay(ids, t); });
   return { at: resAt, end };
 }
