@@ -54,6 +54,7 @@ input,select{font:inherit;color:inherit}
 .side h4{font-size:12.5px;color:var(--muted);padding:5px 8px 1px;font-weight:700;letter-spacing:.02em}
 .li{display:flex;align-items:center;gap:6px;width:100%;min-height:27px;padding:2px 8px;border:1px solid transparent;border-radius:7px;background:none;text-align:left}
 .li:hover{background:var(--line2)}
+@media (max-height:840px){.side{gap:0;padding:6px}.side .li{min-height:24px;padding:0 8px}.side h4{padding:2px 8px 0}}
 .li.on{background:var(--accent-bg);border-color:#bcd5ec;font-weight:700}
 .li .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .li .n{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px;min-width:22px;text-align:right}
@@ -858,7 +859,10 @@ function analyze(snap, opt) {
     if (!subs.has(d.subKey)) subs.set(d.subKey, { key: d.subKey, unit: d.unit, sub: d.sub, ops, docs: [], rows: new Map() });
     const s = subs.get(d.subKey); s.docs.push(d);
     if (ops) continue;
-    const r = roundOf(d.sub, d.title, d.kind, d.date);
+    let r = roundOf(d.sub, d.title, d.kind, d.date);
+    if (r.type !== 'round') {   // 대장 제목에 회차·이름이 없으면 파일 이름의 제목에서 찾음
+      for (const f of d.files) { const fr = roundOf(d.sub, f.title, d.kind, d.date); if (fr.type === 'round') { r = fr; break; } }
+    }
     d.row = r.label; d.rowInfo = r;
     if (!s.rows.has(r.label)) s.rows.set(r.label, { label: r.label, type: r.type, sortN: r.sortN, req: r.req, single: r.single, docs: [], also: new Map() });
     const row = s.rows.get(r.label); row.docs.push(d);
@@ -942,7 +946,8 @@ function analyze(snap, opt) {
       const firstPlan = plans.length ? Math.min(...plans) : null;
       const lastResult = results.length ? Math.max(...results) : null;
       for (const d of cmp) {
-        if (firstPlan != null && d.n < firstPlan && (SPEND_SET.has(d.kind) || d.kind === '모집' || d.kind === '결과보고')) {
+        const preMeeting = /사전\s*회의/.test(d.title || '');   // 사전회의 비용은 계획보다 먼저 나오는 것이 정상
+        if (firstPlan != null && d.n < firstPlan && !preMeeting && (SPEND_SET.has(d.kind) || d.kind === '모집' || d.kind === '결과보고')) {
           add(d, 'order', d.kind + '(' + pad4(d.n) + ')이 계획(' + pad4(firstPlan) + ')보다 앞선 번호임', '번호 순서가 맞는지 확인하고, 필요하면 파일·대장 번호를 고쳐 주세요');
           d.orderFlag = true;
         }
@@ -1734,7 +1739,7 @@ function bizView() {
   const colW = Math.max(60, Math.floor(70));
   const tbl = pagedTable(content, {
     key: 'biz-' + cur.key, rows, rowH: 54, cls: 'mx', unit: '줄', empty: '이 사업에 문서가 없습니다',
-    cols: [{ label: '회차', w: '132px', thCls: 'rl', tdCls: 'rl', get: r => { const n = r.docs.reduce((a, d) => a + d.problems.filter(p => !DISMISS[p.key] && (SET.showLow || p.sev > 1)).length, 0) + r.missing.length * 0; return h('div', { class: 'cell', title: r.label }, r.label, r.docs.some(d => d.sub && false) ? '' : '', r.missing.length ? h('small', { style: 'color:var(--high);margin-left:4px' }, '✕' + r.missing.length) : null); } }]
+    cols: [{ label: '회차', w: '132px', thCls: 'rl', tdCls: 'rl', get: r => { const n = r.docs.reduce((a, d) => a + d.problems.filter(p => !DISMISS[p.key] && (SET.showLow || p.sev > 1)).length, 0) + r.missing.length * 0; return h('div', { class: 'cell', title: r.label }, r.label, r.missing.length ? h('small', { style: 'color:var(--high);margin-left:4px' }, '✕' + r.missing.length) : null); } }]
       .concat(cols.map(k => ({ label: k, get: r => cellOf(r, k) })))
   });
   later(() => {
