@@ -85,8 +85,10 @@ function castResult(res, susp){
       // 날아가는 동안(맞는 순간 ~ 결과가 정해지는 순간) 말할 것: 중요한 것부터, 시간 안에 들어가는 만큼만
       fly.push(bb.type === 'gb' ? pick1('c_ground1', 'c_ground2') : bb.type === 'ld' ? 'c_liner' : pick1('c_high1', 'c_high2'));
       fly.push(['c_left', 'c_center', 'c_right'][bb.fi ?? 1]);
+      const ps = bb.ps || {}, ev = ps.ev || [], dive = ev.find(e => e.k === 'dive'), caught = ev.find(e => e.k === 'catch');
       if(bb.type === 'fb' && (bb.d || 0) >= fence - 18) fly.push(pick1('c_far1', 'c_far2', 'c_far3'), 'c_back');
       else if(bb.type !== 'gb') fly.push('c_chase');
+      if(dive) fly.push('c_dive');   // 계산한 플레이에서 수비수가 몸을 날렸을 때만
       // 결과
       if(/트리플 플레이/.test(text)) post.push('r_tp');
       else if(/병살/.test(text)) post.push('r_dp');
@@ -97,10 +99,13 @@ function castResult(res, susp){
       else if(has('hit')) post.push(pick1('r_hit1', 'r_hit2', 'r_hit3'));
       else if(has('out')){
         if(bb.type === 'gb') post.push(pick1('r_groundout1', 'r_groundout2'));
-        else if((bb.d || 0) >= fence - 12) post.push(pick1('r_supercatch1', 'r_supercatch2'));
+        else if((caught && (caught.dive || caught.far)) || (!bb.ps && (bb.d || 0) >= fence - 12)) post.push(pick1('r_supercatch1', 'r_supercatch2'));
         else post.push(Math.random() < 0.25 ? 'r_out_sad' : pick1('r_catch1', 'r_catch2', 'r_catch3'));
       }
       else if(has('safe')) post.push(pick1('r_safe1', 'r_safe2'));
+      // 안타 뒤 송구로 주자가 잡혔으면(무리하게 더 가다가) 이어서
+      if(bb.ps && (has('hit') || has('b2') || has('b3')) && (bb.ps.rm || []).some(m => m.to == null)) post.push('r_steal_out');
+      else if(dive && !caught && has('hit')) post.unshift('r_sigh2');
     }
     else if(A.res === 'bunt') pre.push('r_bunt');
     else if(has('batF') || has('foul')){ fly.push(pick1('c_hit3', 'c_hit1', 'c_soft2')); post.push(pick1('r_foul1', 'r_foul2', 'r_foul3')); }

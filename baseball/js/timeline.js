@@ -11,6 +11,16 @@ function playTL(A, fx){
   fx = fx || [];
   const t = { ...TL_BASE, kind:'pitch', result: TL_BASE.contact };
   const c = t.contact, bb = A.bb;
+  // 위치·속도로 계산한 플레이(playsim.js)가 있으면 그 기록의 시간을 그대로 (그림은 ANIM_SCALE배 빠르게 재생)
+  if(A.res === 'inplay' && bb && bb.ps){
+    const S = typeof ANIM_SCALE === 'number' ? ANIM_SCALE : 0.6, ps = bb.ps;
+    t.kind = bb.type; t.scale = S;
+    const fe = (ps.ev || []).find(e => e.k === 'field'); if(fe) t.field = c + fe.t * S;
+    t.result = c + Math.max(0.6, ps.result) * S;
+    if(ps.runT) t.runner = c + ps.runT * S;
+    t.end = t.result + 1.5;
+    return t;
+  }
   if(A.res === 'inplay' && bb){
     const d = bb.d || 60;
     t.kind = bb.type;
