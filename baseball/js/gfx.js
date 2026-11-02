@@ -608,7 +608,9 @@ function gfxStart(G, fx, lines, pre, skip){
   const now = performance.now(), text = (lines || []).map(l => l.s || l).join(' ');
   // skip: 육성 모드에서 내 차례 뒤 다음 내 차례까지 건너뜀. 내 공(skip.snap.anim)만 보여 주고, 건너뛴 장면 대신 '건너뜀' 카드
   const A0 = skip ? skip.snap.anim : G.anim, P0 = skip ? skip.snap.play : G.play;
-  const newPitch = !!(A0 && A0.n !== GX.lastAnimN), newPlay = !!(P0 && P0.n !== GX.lastPlayN);
+  const newPitch = !!(A0 && A0.n !== GX.lastAnimN);
+  // 이번 결과에서 새로 일어난 플레이만 (이 공에서, 또는 이 공 바로 전의 견제, 공 없이 일어난 판독 결과). 옛 견제를 다시 보여 주지 않게
+  const newPlay = !!(P0 && P0.n !== GX.lastPlayN && (P0.an == null || !A0 || P0.an === A0.n || (newPitch && P0.an === A0.n - 1) || !newPitch));
   GX.lastAnimN = G.anim ? G.anim.n : null; GX.lastPlayN = G.play ? G.play.n : null;
   const list = [];
   if(newPitch){

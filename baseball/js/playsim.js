@@ -75,7 +75,10 @@ function simPlay0(G, bb, opt = {}){
     ev.push({ k:'ball', t0:0, t1: best ? best.t : Math.min(tStop, 3.2), from:[0, 0], to: best ? best.p : ballAt(Math.min(tStop, 3.2)), h:0 });
     if(!best){
       // 내야를 빠져나감: 외야수가 길목에서 주움 → 안타 처리
+      // 공은 외야수가 줍는 자리까지만 굴러감 (그 전에 멈추면 멈춘 자리에서 기다림)
       const pick = retrieve(G, F, ballAt, tStop, bb);
+      ev.pop(); ev.push({ k:'ball', t0:0, t1: Math.max(0.3, Math.min(pick.t - 0.35, tStop)), from:[0, 0], to: pick.p, h:0 });
+      mv(pick.pos, [[0, F[pick.pos].at], [pick.t - 0.35, pick.p]]);
       return hitPlay(G, F, res, pick, 1, runners, vB, tB1);
     }
     const f = F[best.pos]; res.pos = best.pos;
@@ -113,7 +116,7 @@ function simPlay0(G, bb, opt = {}){
     const f = F[catcher.pos];
     ev.push({ k:'ball', t0:0, t1: hang, from:[0, 0], to: L, h: 20 + bb.d / 5 });
     mv(catcher.pos, [[0, f.at], [Math.min(hang, reachT(f, polar(bb.ang, fence - 3))), polar(bb.ang, fence - 3)]]);
-    res.kind = 'hr'; res.bat = 4; res.result = hang * 0.8;
+    res.kind = 'hr'; res.bat = 4; res.result = Math.min(hang, hang * fence / Math.max(fence, bb.d) + 0.15);   // 공이 담장을 넘는 순간
     runners.forEach(r => res.runners.push({ from: r.i, to: 3 }));
     return res;
   }

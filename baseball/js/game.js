@@ -402,9 +402,12 @@ function stealScreen(fn){
 }
 function bullpenScreen(){
   const ti = 1 - batIdx(G), T = G.teams[ti];
-  const opts = benchPitchers(G, ti).slice(0, 8).map((x, i) => ({ n: i + 1, t: x.p.name, s: pitcherInfo(G, T, x.i, true), act: v => {
+  const doIt = (x, v) => {
     if(NET.on && NET.role === 'guest'){ netSendAct({ k:'pitcher', idx:x.i }); go(defMain, v, [`투수를 ${josa(x.p.name, '으로', '로')} 바꿉니다.`]); return; }
-    const r = changePitcher(G, ti, x.i); saveGame(); if(NET.on) netPushState(r); go(defMain, v, visible(r.lines)); } }));
+    const r = changePitcher(G, ti, x.i); saveGame(); if(NET.on) netPushState(r); go(defMain, v, visible(r.lines)); };
+  // 고르면 먼저 그 투수의 상태를 보여 주고 '교체하기 / 취소'
+  const opts = benchPitchers(G, ti).slice(0, 8).map((x, i) => ({ n: i + 1, t: x.p.name, s: pitcherInfo(G, T, x.i, true),
+    act: v => go(() => confirmSub(`${josa(x.p.name, '으로', '로')} 바꿀까요?`, ['지금 투수: ' + pitcherInfo(G, T, T.pi, true), '바꿀 투수: ' + pitcherInfo(G, T, x.i, true)], '교체하기', w => doIt(x, w), w => go(bullpenScreen, w)), v) }));
   return { board:true, sub:true, q:'누구로 바꿀까요?', opts, back: v => go(G.mode === 'manager' ? defMain : tacticScreen, v) };
 }
 
@@ -604,4 +607,9 @@ function logScreen(){
   const say = G.log.filter(l => l.k !== 'd' || SET.dice).slice(-300);
   return { board:true, sub:true, q:'경기 기록입니다. 위 글을 한 줄씩 읽어 보세요.', say, back: v => go(G.over ? endScreen : moreScreen, v),
     opts:[{ n:1, t:'돌아가기', act: v => go(G.over ? endScreen : moreScreen, v) }] };
+}
+
+// 선수 교체 확인: 상태를 먼저 보여 주고 '교체하기 / 취소'
+function confirmSub(q, info, yes, act, back){
+  return { board:true, sub:true, q, note: info, back, opts:[{ n:1, t: yes, act }, { n:2, t:'취소', act: back }] };
 }

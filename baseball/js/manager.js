@@ -45,13 +45,15 @@ function benchPreScreen(ti, b){
   const p = T.bench[b];
   return { board:true, sub:true, q:`${josa(p.name, '을', '를')} 누구 자리에 넣을까요? 수비 위치는 빠지는 선수의 자리를 이어받습니다.`, back: v => go(() => benchPreScreen(ti, -1), v),
     opts: T.bat.map((x, i) => ({ n: i + 1, t: `${i + 1}번 ${POS[x.pos]} ${x.name}`, s: statLine(x),
-      act: v => mgrDo({ k:'lineup', a:'bench', slot:i, b }, () => useBench(G, ti, i, b, 'pre'), v, back) })) };
+      act: v => go(() => confirmSub(`${x.name} 대신 ${josa(p.name, '을', '를')} 넣을까요?`, [`빠지는 선수: ${x.name}, ${statLine(x)}`, `들어갈 선수: ${p.name}, ${p.role}, ${handText(p.hand)}. ${statLine(p)}`], '교체하기',
+        w => mgrDo({ k:'lineup', a:'bench', slot:i, b }, () => useBench(G, ti, i, b, 'pre'), w, back), w => go(() => benchPreScreen(ti, b), w)), v) })) };
 }
 function starterScreen(ti){
   const T = G.teams[ti], back = (v, lines) => go(() => pregameScreen(ti), v, lines);
   return { board:true, sub:true, q:'선발 투수를 고르세요. 불펜 투수는 체력이 적어 일찍 지칩니다.', back: v => go(() => pregameScreen(ti), v),
     opts: T.pit.map((p, i) => ({ n: i + 1, t: `${p.name}${i === T.pi ? ' (지금 선발)' : ''}`, s: pitcherInfo(G, T, i, true),
-      act: v => mgrDo({ k:'lineup', a:'starter', idx:i }, () => setStarter(G, ti, i), v, back) })) };
+      act: v => i === T.pi ? back(v) : go(() => confirmSub(`선발을 ${josa(p.name, '으로', '로')} 바꿀까요?`, ['지금 선발: ' + pitcherInfo(G, T, T.pi, true), '바꿀 투수: ' + pitcherInfo(G, T, i, true)], '선발로 정하기',
+        w => mgrDo({ k:'lineup', a:'starter', idx:i }, () => setStarter(G, ti, i), w, back), w => go(() => starterScreen(ti), w)), v) })) };
 }
 
 /* ---------- 경기 중 작전 ---------- */
@@ -92,7 +94,8 @@ function phScreen(){
   const ti = batIdx(G), T = G.teams[ti], B = curBatter(G);
   return { board:true, sub:true, q:`${B.name}(${statLine(B)}) 대신 누구를 낼까요? 바뀐 선수는 이번 경기에 다시 나오지 못합니다.`, back: v => go(offMain, v),
     opts: T.bench.map((p, i) => ({ n: i + 1, t: `${p.name}, ${p.role}`, s: `${handText(p.hand)}. ${statLine(p)}`,
-      act: v => mgrDo({ k:'ph', b:i }, () => useBench(G, ti, T.bi, i, 'ph'), v, (vv, lines) => go(offMain, vv, lines)) })) };
+      act: v => go(() => confirmSub(`${B.name} 대신 ${josa(p.name, '을', '를')} 대타로 낼까요?`, [`지금 타자: ${B.name}, ${statLine(B)}`, `대타: ${p.name}, ${p.role}, ${handText(p.hand)}. ${statLine(p)}`], '대타 내기',
+        w => mgrDo({ k:'ph', b:i }, () => useBench(G, ti, T.bi, i, 'ph'), w, (vv, lines) => go(offMain, vv, lines)), w => go(phScreen, w)), v) })) };
 }
 function prScreen(slot){
   const ti = batIdx(G), T = G.teams[ti], bs = G.bases;
@@ -100,7 +103,8 @@ function prScreen(slot){
     opts: [0, 1, 2].filter(i => bs[i] != null).map(i => ({ n: i + 1, t: `${i + 1}루 주자 ${T.bat[bs[i]].name}`, s:`스피드 ${T.bat[bs[i]].spd}`, act: v => go(() => prScreen(bs[i]), v) })) };
   return { board:true, sub:true, q:`${T.bat[slot].name} 대신 누가 뛸까요?`, back: v => go(() => prScreen(-1), v),
     opts: T.bench.map((p, i) => ({ n: i + 1, t: `${p.name}, ${p.role}`, s:`스피드 ${p.spd}`,
-      act: v => mgrDo({ k:'pr', slot, b:i }, () => useBench(G, ti, slot, i, 'pr'), v, (vv, lines) => go(offMain, vv, lines)) })) };
+      act: v => go(() => confirmSub(`${T.bat[slot].name} 대신 ${josa(p.name, '을', '를')} 대주자로 낼까요?`, [`지금 주자: ${T.bat[slot].name}, 스피드 ${T.bat[slot].spd}`, `대주자: ${p.name}, 스피드 ${p.spd}, ${statLine(p)}`], '대주자 내기',
+        w => mgrDo({ k:'pr', slot, b:i }, () => useBench(G, ti, slot, i, 'pr'), w, (vv, lines) => go(offMain, vv, lines)), w => go(() => prScreen(slot), w)), v) })) };
 }
 
 /* ---------- 묻지 않는 타석은 선수들이 진행 ----------
