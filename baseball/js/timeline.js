@@ -1,0 +1,32 @@
+'use strict';
+/* ===================== 공 하나의 시간표 =====================
+   그림(gfx.js)·효과음(speech.js)·글(ui.js의 뜸 들이기)·중계 음성(caster.js)·점수판이 모두 이 시간표 하나를 따름.
+   (초 단위, 고른 순간이 0)
+   release 공을 놓음(피칭 소리) · contact 공이 타자에게 옴(방망이 소리, 헛스윙·볼·스트라이크는 여기서 결정)
+   field   땅볼을 야수가 잡음(그다음 1루로 던짐) · result 결과가 정해지는 순간(뜬공을 잡음, 송구가 1루에 도착, 공이 떨어짐, 담장을 넘음)
+   runner  타자가 1루에 닿는 순간(아웃이면 송구보다 늦게, 내야 안타면 먼저) */
+const TL_BASE = { release:0.3, contact:0.7 };
+function playTL(A, fx){
+  if(!A) return null;
+  fx = fx || [];
+  const t = { ...TL_BASE, kind:'pitch', result: TL_BASE.contact };
+  const c = t.contact, bb = A.bb;
+  if(A.res === 'inplay' && bb){
+    const d = bb.d || 60;
+    t.kind = bb.type;
+    if(bb.type === 'gb'){
+      t.field = c + 0.75 + Math.min(0.55, d / 70);
+      if(bb.hit){ t.result = c + 1.25; t.runner = t.result - 0.1; }          // 내야를 빠져나가는 안타
+      else { t.result = t.field + 0.55; t.runner = t.result + 0.25; }       // 1루 송구가 먼저 도착
+    }
+    else if(bb.type === 'ld') t.result = c + 0.85;
+    else if(bb.type === 'pu') t.result = c + 2.1;
+    else t.result = c + (bb.hit === 4 ? 2.0 : 1.3 + Math.min(0.9, d / 130));  // 뜬공: 멀리 갈수록 오래 뜸
+    if(bb.hit && bb.hit < 4 && bb.type !== 'gb') t.runner = t.result + 0.6;
+  }
+  else if(A.res === 'bunt'){ t.kind = 'bunt'; t.field = c + 0.9; t.result = c + 1.5; }
+  else if(A.res === 'foul' || fx.includes('batF')){ t.kind = 'foul'; t.result = c + 0.8; }
+  else t.kind = A.res || 'take';
+  t.end = t.result + (t.kind === 'pitch' || t.kind === 'take' || t.kind === 'whiff' || t.kind === 'hbp' ? 0.9 : 1.5);
+  return t;
+}

@@ -29,9 +29,10 @@ function suspend(lines){
   const ms = UI.susp; UI.susp = 0;
   // 자동 시험(Playwright)은 window.__susp를 켠 때만 기다림
   if(!ms || !lines.length || (navigator.webdriver && !window.__susp)) return null;
-  const i = lines.findIndex(l => (l.k === 'r' || l.k === 'p') && splitResult(l.s || ''));
-  if(i < 0) return null;
-  const sp = splitResult(lines[i].s);
+  let i = lines.findIndex(l => (l.k === 'r' || l.k === 'p') && splitResult(l.s || ''));
+  let sp = i >= 0 ? splitResult(lines[i].s) : null;
+  // 친 공이 아니면(스트라이크·볼·헛스윙) 공 설명까지만 먼저, 판정은 공이 미트에 들어갈 때
+  if(!sp){ i = lines.findIndex(l => (l.k === 'r' || l.k === 'p') && /… ./.test(l.s || '')); if(i < 0) return null; const s0 = lines[i].s, at = s0.indexOf('… ') + 1; sp = { head: s0.slice(0, at), tail: s0.slice(at + 1) }; }
   const out = lines.map((l, j) => j < i ? l : j === i ? { ...l, s: sp.head, tail: sp.tail } : { ...l, after:true });
   return { lines: out, ms, tail: [sp.tail, ...lines.slice(i + 1).map(l => l.s || l)] };
 }

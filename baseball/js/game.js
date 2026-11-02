@@ -93,14 +93,12 @@ function whoInfo(){
 function recentLines(n){ return G.log.filter(l => l.k !== 'd' || SET.dice).slice(-n).map(l => l.s); }
 
 /* ---------- 진행 ---------- */
-// 결과를 기다리는 시간(ms): 친 공은 타구가 날아가는 만큼, 파울은 잠깐. 그림 모드는 그림 움직임에 맞춤
-function flyMs(){ const bb = G && G.anim && G.anim.bb; return !bb ? 1300 : bb.type === 'gb' ? 1300 : 1900; }
+// 결과를 기다리는 시간(ms): 이번 공의 시간표(timeline.js)에서 결과가 정해지는 순간까지. 두 모드 같음
 function suspenseMs(fx){
-  if(!G || !G.anim || G.mode === 'manager') return 0;
-  const gx = SET.view === 'gfx', inplay = G.anim.res === 'inplay' && fx.some(n => /^bat/.test(n)), foul = fx.includes('batF');
-  if(inplay) return gx ? 1000 + flyMs() : 650 + flyMs();
-  if(foul) return gx ? 750 : 900;
-  return 0;
+  if(!G || !G.anim || G.mode === 'manager' || G.anim.n === UI.tlAnimN) return 0;
+  UI.tlAnimN = G.anim.n;
+  const t = playTL(G.anim, fx);
+  return t ? Math.round(t.result * 1000) : 0;
 }
 
 // 결과(res)를 보여 주고, 다음에 누가 무엇을 골라야 하는지 정함
