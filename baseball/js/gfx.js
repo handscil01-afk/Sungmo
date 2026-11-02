@@ -291,10 +291,15 @@ function drawFieldScene(G, A){
   const ang = FIELD_ANG[bb.fi ?? 1] + (A.jit || 0);
   const dist = landDist(G, bb, ang), land = fm(ang, dist), home = fm(0, 0);
   // 타구: 그림자는 땅을 따라가고, 공은 높이만큼 위에 크게 (높이 뜨면 화면에 가까워지는 것처럼)
-  const gx = home.x + (land.x - home.x) * k, gy = home.y + (land.y - home.y) * k;
+  // 시간표: 땅볼 아웃은 야수가 잡는 순간(field)까지 공이 굴러가고, 그다음 1루로 송구(result에 도착)
+  const TL = A.tl || playTL(A, []), fs = TL.contact + 0.25, now = A.ph === 'fresult' ? TL.result : fs + k * (TL.result - fs);
+  const b1 = fm(...BASE_POL[0]), gbOut = bb.type === 'gb' && !bb.hit && TL.field;
+  const kRoll = gbOut ? Math.min(1, (now - fs) / (TL.field - fs)) : k;
+  let gx = home.x + (land.x - home.x) * kRoll, gy = home.y + (land.y - home.y) * kRoll;
+  if(gbOut && now > TL.field){ const q = Math.min(1, (now - TL.field) / (TL.result - TL.field)); gx = land.x + (b1.x - land.x) * q; gy = land.y + (b1.y - land.y) * q; }
   const apex = { fb: 22 + dist / 5, pu: 38, ld: 5, gb: 0 }[bb.type] ?? 15;
   let h = 4 * apex * k * (1 - k);
-  if(bb.type === 'gb') h = Math.abs(Math.sin(k * Math.PI * 3)) * 2.5 * (1 - k);
+  if(bb.type === 'gb') h = gbOut && now > TL.field ? 3 : Math.abs(Math.sin(kRoll * Math.PI * 3)) * 2.5 * (1 - kRoll);
   const lift = h * (wide() ? 1.1 : 0.9);
   // 화면(카메라): 처음엔 내야 전체, 그다음 공을 부드럽게 따라감
   const W = worldW(), H = worldH(), clampC = c => ({ x: Math.max(0, Math.min(W - 256, c.x)), y: Math.max(0, Math.min(H - 224, c.y)) });
@@ -311,13 +316,15 @@ function drawFieldScene(G, A){
   const people = Object.keys(FPOS).map(p => {
     const hp = pts[p];
     if(p !== near) return [hp.x, hp.y, F.color, 'ready', 0, hp.x < chase.x];
-    const go = Math.min(1, k * (bb.hit ? 0.8 : 1.15)), x = hp.x + (chase.x - hp.x) * go, y = hp.y + (chase.y - hp.y) * go;
-    const mode = go < 1 ? 'run' : bb.hit ? 'throw' : 'catch';
+    // 땅볼은 잡는 순간(field)에 도착, 뜬공 아웃은 떨어지기 직전에 도착, 안타는 늦게
+    const go = gbOut ? Math.min(1, (now - fs) / (TL.field - fs)) : Math.min(1, k * (bb.hit ? 0.8 : 1.12)), x = hp.x + (chase.x - hp.x) * go, y = hp.y + (chase.y - hp.y) * go;
+    const mode = go < 1 ? 'run' : bb.hit || gbOut ? 'throw' : 'catch';
     return [x, y, F.color, A.ph === 'fresult' ? (bb.hit ? 'throw' : 'catch') : mode, Math.floor(k * 12), x < home.x];
   });
   people.push([home.x, home.y + 12, F.color, 'ready', 0, false]);   // 포수
   // 타자 주자: 1루로 뜀 / 결과가 나오면 지금 주자 자리
-  if(A.ph === 'fly'){ const b1 = fm(...BASE_POL[0]), q = Math.min(1, k * 1.3); people.push([home.x + (b1.x - home.x) * q, home.y + (b1.y - home.y) * q, T.color, q < 1 ? 'runner' : 'base', Math.floor(k * 12), false]); }
+  // 타자 주자: 시간표의 runner 순간에 1루에 닿음 (땅볼 아웃이면 송구보다 조금 늦게)
+  if(A.ph === 'fly'){ const arr = TL.runner || TL.contact + 1.7, q = Math.min(1, Math.max(0, (now - TL.contact) / (arr - TL.contact))); people.push([home.x + (b1.x - home.x) * q, home.y + (b1.y - home.y) * q, T.color, q < 1 ? 'runner' : 'base', Math.floor(now * 12), false]); }
   else G.bases.forEach((r, i) => { if(r != null){ const b = fm(...BASE_POL[i]); people.push([b.x, b.y + 2, T.color, 'base', 0, false]); } });
   people.sort((p, q) => p[1] - q[1]).forEach(p => tinyPlayer(...p));   // 먼 사람부터 그려서 가까운 사람이 앞에
   // 심판: 결과가 나오면 1루심(세이프·아웃) 또는 주심(홈런)이 콜
@@ -514,7 +521,7 @@ function gfxStart(G, fx, lines, pre, skip){
     const pfx = newPlay && A0.res !== 'inplay' ? fx.filter(n => n !== 'safe' && n !== 'out') : fx;
     let bn = bannerOf(pfx, text);
     if(A0.res === 'hbp') bn = ['몸에 맞는 공', '#58d854'];
-    list.push({ kind:'pitch', ...A0, view: skip ? skip.snap : null, ph:'windup', t0:0, banner: bn && bn[0], bannerColor: bn && bn[1], hr: bn && bn[2], jit: (Math.random() - 0.5) * 0.3 });
+    list.push({ kind:'pitch', ...A0, tl: playTL(A0, pfx), view: skip ? skip.snap : null, ph:'windup', t0:0, banner: bn && bn[0], bannerColor: bn && bn[1], hr: bn && bn[2], jit: (Math.random() - 0.5) * 0.3 });
   }
   if(newPlay){
     const p = P0;
@@ -539,20 +546,24 @@ function stepAnim(A, el){
   if(A.kind === 'base'){ A.t0 = Math.min(1, el / 1500); return el < 2400; }
   if(A.kind === 'review'){ A.t0 = (el % 2600) / 2600; return true; }   // 판독을 고르는 동안 계속 다시 보여 줌
   if(A.kind === 'reviewEnd'){ A.t0 = Math.min(1, el / 2600); A.phase = el < 2600 ? 'replay' : 'end'; return el < 4400; }
-  // 투구: 투구 동작 0.3초 → 공 0.4초 → 결과 0.9초 (치면 공이 튀어 나가고) → 타구 1.1초 → 결과 1.2초
-  if(el < 300){ A.ph = 'windup'; A.t0 = el / 300; return true; }
-  if(el < 700){ A.ph = 'flight'; A.t0 = (el - 300) / 400; return true; }
-  if(A.res !== 'inplay' || !A.bb){ A.ph = 'result'; A.t0 = 1; return el < 1600; }
-  if(el < 1000){ A.ph = 'result'; A.t0 = (el - 700) / 300; return true; }
-  const fly = A.bb.type === 'gb' ? 1300 : 1900;
-  if(el < 1000 + fly){ A.ph = 'fly'; A.t0 = (el - 1000) / fly; return true; }
-  A.ph = 'fresult'; A.t0 = 1; return el < 1000 + fly + 1500;
+  // 투구: 공 하나의 시간표(timeline.js) 그대로. 투구 동작 → 공이 날아옴(방망이) → (치면) 위에서 본 야구장에서 결과가 정해질 때까지 → 결과
+  const T = A.tl || (A.tl = playTL(A, [])), ms = x => x * 1000;
+  A.tt = el / 1000;
+  if(el < ms(T.release)){ A.ph = 'windup'; A.t0 = el / ms(T.release); return true; }
+  if(el < ms(T.contact)){ A.ph = 'flight'; A.t0 = (el - ms(T.release)) / ms(T.contact - T.release); return true; }
+  if(A.res !== 'inplay' || !A.bb){ A.ph = 'result'; A.t0 = 1; return el < ms(T.end); }
+  const fs = T.contact + 0.25;
+  if(el < ms(fs)){ A.ph = 'result'; A.t0 = (el - ms(T.contact)) / 250; return true; }
+  if(el < ms(T.result)){ A.ph = 'fly'; A.t0 = (el - ms(fs)) / ms(T.result - fs); return true; }
+  A.ph = 'fresult'; A.t0 = 1; return el < ms(T.end);
 }
 const REDUCED = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 // 그림에 쓸 경기 상태: 마지막 공으로 공수가 바뀌었거나 경기가 끝났으면, 움직임이 끝날 때까지 공을 던지기 전 상태(팀 색·타자·투수·주자)로 그림
 function viewOf(A){
   if(A && A.view) return A.view;   // 육성 건너뛰기: 내 공은 건너뛰기 전 모습으로
   const p = A && A.pre;
+  // 결과가 정해지기 전(공이 날아가는 동안)에는 던지기 전 상태로: 아웃 카운트·주자·점수는 잡히는 순간에 바뀜
+  if(p && A.kind === 'pitch' && (A.ph === 'windup' || A.ph === 'flight' || A.ph === 'fly' || (A.ph === 'result' && A.res === 'inplay' && A.bb))) return p;
   return p && (p.top !== G.top || p.inning !== G.inning || (G.over && !p.over)) ? p : G;
 }
 const snapOf = G => ({ ...G, teams: G.teams.map(T => ({ ...T, R: [...T.R] })), bases: [...G.bases] });

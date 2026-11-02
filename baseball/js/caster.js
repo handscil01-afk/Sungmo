@@ -46,6 +46,7 @@ function castPlay(ids, at = 0){
   return t - c.currentTime;
 }
 // 지난 중계가 아직 남아 있으면 끊고 지금 장면부터 (빠르게 진행해도 중계가 밀리지 않게)
+function castDur(id){ const b = CAST.buf[id]; return b ? b.duration + 0.08 : 0.7; }
 function castStop(){ CAST.src.splice(0).forEach(s => { try{ s.stop(); }catch(e){} }); CAST.until = 0; }
 const pick1 = (...ids) => ids[Math.floor(Math.random() * ids.length)];
 const numClip = n => n >= 0 && n <= 20 ? `num_${n}` : null;
@@ -58,7 +59,7 @@ function castResult(res, susp){
   castLoadIndex();
   castStop();
   const fx = res.fx || [], text = (res.lines || []).map(l => l.s || l).join(' '), has = n => fx.includes(n), A = G.anim;
-  const pre = [], post = [], after = [];
+  const pre = [], fly = [], post = [], after = [];
   // 경기 시작
   if(has('start')){ pre.push('intro', teamClip(G.teams[0], true), 'j_vs', teamClip(G.teams[1], true), 'playball'); }
   // 도루·견제·판독
@@ -74,16 +75,15 @@ function castResult(res, susp){
   const fresh = A && A.n !== CAST.animN; if(A) CAST.animN = A.n;
   const contact = fx.some(n => /^bat/.test(n));
   if(fresh && (has('pitch') || contact)){
-    // 친 공은 앞 중계를 짧게 (던짐·구종 가운데 하나만)
-    if(contact){ if(Math.random() < 0.5) pre.push(G.mode !== 'simple' && A.t ? `pt_${A.t}` : pick1('p_throw1', 'p_throw2', 'p_throw3')); }
-    else { if(Math.random() < 0.5) pre.push(pick1('p_throw1', 'p_throw2', 'p_throw3')); if(G.mode !== 'simple' && A.t && Math.random() < 0.5) pre.push(`pt_${A.t}`); }
+    // 친 공은 공을 놓는 순간 말하지 않고 맞는 순간부터 중계. 안 친 공은 던질 때 짧게
+    if(!contact && Math.random() < 0.6) pre.push(G.mode !== 'simple' && A.t && Math.random() < 0.5 ? `pt_${A.t}` : pick1('p_throw1', 'p_throw2', 'p_throw3'));
     if(A.res === 'inplay' && A.bb){
       const bb = A.bb, fence = (G.park && G.park.fence && G.park.fence[bb.fi]) || 110;
-      pre.push(fx.includes('batBig') ? pick1('c_hit1', 'c_hit2', 'c_hit3') : pick1('c_hit1', 'c_hit3', 'c_soft1', 'c_soft2'));
-      pre.push(bb.type === 'gb' ? pick1('c_ground1', 'c_ground2') : bb.type === 'ld' ? 'c_liner' : pick1('c_high1', 'c_high2'));
-      pre.push(['c_left', 'c_center', 'c_right'][bb.fi ?? 1]);
-      if(bb.type === 'fb' && (bb.d || 0) >= fence - 18) pre.push(pick1('c_far1', 'c_far2', 'c_far3'), 'c_back');
-      else if(bb.type !== 'gb' && Math.random() < 0.4) pre.push('c_chase');
+      // 날아가는 동안(맞는 순간 ~ 결과가 정해지는 순간) 말할 것: 중요한 것부터, 시간 안에 들어가는 만큼만
+      fly.push(bb.type === 'gb' ? pick1('c_ground1', 'c_ground2') : bb.type === 'ld' ? 'c_liner' : pick1('c_high1', 'c_high2'));
+      fly.push(['c_left', 'c_center', 'c_right'][bb.fi ?? 1]);
+      if(bb.type === 'fb' && (bb.d || 0) >= fence - 18) fly.push(pick1('c_far1', 'c_far2', 'c_far3'), 'c_back');
+      else if(bb.type !== 'gb') fly.push('c_chase');
       // 결과
       if(/트리플 플레이/.test(text)) post.push('r_tp');
       else if(/병살/.test(text)) post.push('r_dp');
@@ -100,7 +100,7 @@ function castResult(res, susp){
       else if(has('safe')) post.push(pick1('r_safe1', 'r_safe2'));
     }
     else if(A.res === 'bunt') pre.push('r_bunt');
-    else if(has('batF') || has('foul')){ pre.push(pick1('c_hit3', 'c_hit1', 'c_soft2')); post.push(pick1('r_foul1', 'r_foul2', 'r_foul3')); }
+    else if(has('batF') || has('foul')){ fly.push(pick1('c_hit3', 'c_hit1', 'c_soft2')); post.push(pick1('r_foul1', 'r_foul2', 'r_foul3')); }
     else if(has('k')) pre.push(A.res === 'whiff' ? 'r_k_swing' : 'r_k_look');
     else if(fx.some(n => /^whiff/.test(n))) pre.push(pick1('r_whiff1', 'r_whiff2'));
     else if(A.res === 'hbp') pre.push('r_hbp');
@@ -116,16 +116,24 @@ function castResult(res, susp){
       'j_score', teamClip(G.teams[0]), numClip(runsOf(G.teams[0])), 'j_vs', numClip(runsOf(G.teams[1])), teamClip(G.teams[1]));
     if(has('pchange')) after.push('r_pitcher_change');
     if(has('batter') || has('change')){
-      after.push(teamClip(batTeam(G)), `bat_${batTeam(G).bi + 1}`);
+      if(!has('change')) after.push(teamClip(batTeam(G)));   // 공수 교대 때는 팀 이름을 이미 말함
+      after.push(`bat_${batTeam(G).bi + 1}`);
       if(G.bases.some(x => x != null)) after.push(runClip(G.bases));
       if(G.outs) after.push(`out_${G.outs}`);
     }
     else if(G.balls === 3 && G.strikes === 2 && fresh) after.push('full');
   }
-  const t1 = castPlay(pre, 0);
-  // 결과는 타구가 떨어지는 순간에 (앞 중계가 길면 그 뒤에). 그 시각을 돌려줘서 글·효과음도 맞춤
-  let at = 0;
-  if(post.length){ at = Math.max(t1, (susp || 0) / 1000); castPlay(post, at); }
+  // 공 하나의 시간표(timeline.js)에 맞춤: 던질 때 pre, 맞는 순간 fly(결과 전까지 들어가는 만큼), 결과가 정해지는 순간 post
+  const tl = fresh ? playTL(A, fx) : null;
+  let t1 = castPlay(pre, 0), at = 0;
+  if(tl && fly.length){
+    const room = tl.result - tl.contact - 0.1, fit = [];
+    if(contact && room >= 1.5) fly.unshift(fx.includes('batBig') ? pick1('c_hit1', 'c_hit2') : pick1('c_hit3', 'c_soft1', 'c_soft2'));
+    let used = 0;
+    fly.forEach((id, i) => { const d = castDur(id); if(i === 0 || used + d <= room){ fit.push(id); used += d; } });
+    t1 = castPlay(fit, tl.contact);
+  }
+  if(post.length){ at = Math.max(t1, tl ? tl.result : (susp || 0) / 1000); castPlay(post, at); }
   if(after.length) castPlay(after, 0);
   return at;
 }

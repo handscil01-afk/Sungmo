@@ -135,18 +135,17 @@ function playRec(c, uniq){
   // 투구(짧은 바람 소리) → 방망이(헛스윙·타격음) → 결과 → 공수교대 순서로, 겹치지 않게 조금씩 띄움
   let t = 0.02;
   // 화면 보며 하기: 그림 움직임에 맞춤 (공이 손을 떠날 때 피칭, 공이 올 때 타격, 잡거나 떨어질 때 결과)
-  // 공 하나의 시간표 (두 모드 같음, 그림 모드는 그림 움직임에 맞춰 조금 느림): 피칭 → 방망이 → (타구가 날아가는 동안 관중이 술렁임) → 결과
-  const anim = pitch && typeof G !== 'undefined' && G && G.anim && G.mode !== 'manager' ? G.anim : null, gxv = SET.view === 'gfx';
-  const gx = !!anim;
+  // 공 하나의 시간표(timeline.js)를 따름: 공을 놓을 때 피칭, 공이 올 때 방망이, 결과가 정해질 때 결과 소리. 친 뒤에는 관중이 술렁임
+  const anim = pitch && typeof G !== 'undefined' && G && G.anim && G.mode !== 'manager' ? G.anim : null;
+  const tl = anim ? playTL(anim, uniq) : null, gx = !!tl;
   if(gx){
-    const fly = (typeof flyMs === 'function' ? flyMs() : 1300) / 1000, inplay = anim.res === 'inplay' && /^bat(Big)?$/.test(contact || ''), foul = contact === 'batF';
-    const tc = gxv ? 0.7 : 0.35;
-    recPlay(c, 'pitch', gxv ? 0.3 : 0.02, 0.6);
-    if(contact) recPlay(c, recPick(contact), tc, 0.9);
-    t = inplay ? tc + 0.3 + fly : foul ? (gxv ? 0.75 : 0.9) : gxv ? 0.8 : 0.45;
+    const inplay = anim.res === 'inplay' && /^bat(Big)?$/.test(contact || ''), foul = contact === 'batF';
+    recPlay(c, 'pitch', tl.release - 0.15, 0.6);
+    if(contact) recPlay(c, recPick(contact), tl.contact, 0.95);
+    t = tl.result;
     if(SFX.castAt){ t = Math.max(t, SFX.castAt); SFX.castAt = 0; }   // 중계 음성이 결과를 말하는 순간에 맞춤
     const won = ['hr', 'b3', 'b2', 'hit'].find(n => uniq.includes(n));
-    if(inplay || foul) crowdSwell(c, tc + 0.05, t, won ? (won === 'hr' ? 'big' : 'hit') : 'fade');
+    if(inplay || foul) crowdSwell(c, tl.contact + 0.05, t, won ? (won === 'hr' ? 'big' : 'hit') : 'fade');
   } else {
     if(pitch){ recPlay(c, 'pitch', t, 0.6); t += 0.35; }
     if(contact){ recPlay(c, recPick(contact), t, 0.9); t += contact === 'batBig' ? 0.45 : 0.3; }
