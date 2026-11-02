@@ -40,7 +40,7 @@
 <main id="list">불러오는 중…</main>
 <script>
 'use strict';
-const KEY = 'bb_voice_check';
+const KEY = 'bb_voice_check2';   // 다시 자른 뒤 처음부터 확인
 const load = () => { try{ return JSON.parse(localStorage.getItem(KEY)) || {}; }catch(e){ return {}; } };
 const save = s => { try{ localStorage.setItem(KEY, JSON.stringify(s)); }catch(e){} };
 let st = load(), onlyTodo = false, audio = null;
