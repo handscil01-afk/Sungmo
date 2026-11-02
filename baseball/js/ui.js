@@ -53,6 +53,7 @@ function go(make, via = 'init', lines = []){
     document.documentElement.classList.add('castwait'); UI.castEnd = performance.now() + lock;
     UI.castT = setTimeout(() => {
       UI.castT = 0; document.documentElement.classList.remove('castwait');
+      if(typeof castIdleArm === 'function' && UI.S && UI.S.board) castIdleArm();
       if(castNow && !sus) speak(UI.S.q || '');
       if(via === 'click' && !$('#opts').contains(document.activeElement)) $('#q').focus({ preventScroll:true });
     }, Math.max(lock, sus ? sus.ms : 0) + 50);

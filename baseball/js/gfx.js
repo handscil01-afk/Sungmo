@@ -8,7 +8,7 @@
 const GX = { W:256, H:224, cv:null, ctx:null, key:'', anim:null, queue:[], raf:0, img:{}, tinted:{}, meta:{}, cam:{ x:0, y:0 }, lastAnimN:null, lastPlayN:null };
 const PAL = { sky:'#5c94fc', stand:'#3c3c64', fence:'#00682c', grass:'#38a838', grass2:'#4cbc4c', dirt:'#c88850', dirt2:'#b87840', line:'#fcfcfc',
   skin:'#f8b878', white:'#fcfcfc', black:'#000000', glove:'#a85010', bat:'#e4a050', ball:'#fcfcfc', ink:'#fcfc54', red:'#f83800' };
-const GX_FILES = ['bg-pitch', 'bg-field', 'pitcher', 'batter', 'catcher', 'fielder', 'banners', 'banners2', 'umpire', 'umpire-s', 'runner', 'tv', 'fielder2', 'runner-s', 'fielder-set', 'runner-t', 'cr-cage', 'cr-gym', 'cr-bullpen', 'cr-track', 'cr-room', 'cr-shop', 'cr-fansign', 'cr-rehab', 'cr-train', 'cr-life', 'cr-people', 'cr-props'];
+const GX_FILES = ['bg-pitch', 'bg-field', 'pitcher', 'batter', 'catcher', 'fielder', 'banners', 'banners2', 'umpire', 'umpire-s', 'runner', 'tv', 'fielder2', 'runner-s', 'fielder-set', 'run-g', 'run-b', 'slide', 'run-f', 'run-k', 'cr-cage', 'cr-gym', 'cr-bullpen', 'cr-track', 'cr-room', 'cr-shop', 'cr-fansign', 'cr-rehab', 'cr-train', 'cr-life', 'cr-people', 'cr-props'];
 // 결과 글씨 (banners.png를 쓸 때는 이 순서로 한 줄에 하나씩, 128×32)
 const BANNERS = ['스트라이크!', '볼', '헛스윙!', '파울', '안타!', '2루타!', '3루타!', '홈런!', '아웃!', '삼진!', '볼넷', '세이프!', '몸에 맞는 공'];
 const BANNERS2 = ['비디오 판독', '판정 번복!', '원심 유지', '견제!', '도루!', '병살!', '끝내기!', '게임 셋!'];
@@ -210,10 +210,10 @@ function drawPitchScene(G, A){
   // 주자: 베이스에서 리드하고 있는 모습 (1루는 오른쪽, 3루는 왼쪽, 2루는 투수 뒤)
   if(L === LAY_IMG && GX.meta['runner-s']){
     // 다음 베이스 쪽을 바라봄: 1루·2루 주자는 왼쪽(2루·3루 쪽), 3루 주자는 오른쪽(홈 쪽)
-    (GX.meta['runner-t'] ? [[226, 146, true], [160, 100, true], [30, 146, false]] : [[226, 146, false], [160, 100, true], [30, 146, true]]).forEach(([x, y, flip], i) => {
+    (GX.meta['run-b'] ? [[226, 146, true], [160, 100, true], [30, 146, false]] : [[226, 146, false], [160, 100, true], [30, 146, true]]).forEach(([x, y, flip], i) => {
       if(G.bases[i] == null) return;
       R(x - 4 + (flip ? 6 : -6), y - 1, 8, 3, PAL.white);   // 베이스
-      if(GX.meta['runner-t']) drawPerson('runner-t', x + (flip ? -6 : 6), y, T.color, 'p0', flip); else drawPerson('runner-s', x + (flip ? -6 : 6), y, T.color, 'p0', flip);
+      if(GX.meta['run-b']) drawPerson('run-b', x + (flip ? -6 : 6), y, T.color, 'p0', flip); else drawPerson('runner-s', x + (flip ? -6 : 6), y, T.color, 'p0', flip);
     });
   }
   const bp = left ? L.batL : L.batR;
@@ -272,10 +272,16 @@ function bgField(G){
 const BASE_POL = [[0.785, 27.4], [0, 38.8], [-0.785, 27.4]];
 const FPOS = { P:[0, 18.4], '1B':[0.6, 30], '2B':[0.2, 39], SS:[-0.2, 39], '3B':[-0.6, 30], LF:[-0.5, 82], CF:[0, 94], RF:[0.5, 82] };
 // 수비 화면의 작은 사람. mode: ready 서 있음 · run 달림 · catch 공 잡음 · throw 던짐 · runner 주자 달림 · base 베이스 위 주자
-function tinyPlayer(x, y, team, mode, frame = 0, flip = false){
+function tinyPlayer(x, y, team, mode, frame = 0, flip = false, dir = null){
   const has = n => GX.meta[n] && tinted(n, team);
+  // 달리기: 움직이는 방향에 맞는 그림 (옆 · 정면(화면 아래로) · 뒷모습(화면 위로)). 수비는 글러브 낀 그림, 주자는 맨손. 옆 그림은 오른쪽을 보므로 왼쪽으로 갈 때 뒤집음
+  if((mode === 'run' || mode === 'runner') && has('run-f')){
+    const dx = dir ? dir[0] : (flip ? -1 : 1), dy = dir ? dir[1] : 0, f = 'p' + (frame % 4);
+    if(Math.abs(dy) > Math.abs(dx) * 1.3) return drawPerson(dy > 0 ? 'run-f' : 'run-k', x, y, team, f, false);
+    return drawPerson(mode === 'run' ? 'run-g' : 'run-b', x, y, team, f, dx < 0);
+  }
+  if(mode === 'slide' && has('slide')) return drawPerson('slide', x, y, team, 'p' + Math.min(3, frame), flip);
   // 달리는 수비수도 주자와 같은 달리기 그림(팀 색), 가는 쪽을 바라봄
-  if((mode === 'run' || mode === 'runner') && has('runner-t')) return drawPerson('runner-t', x, y, team, ['p1', 'p2'][frame % 2], flip);   // 옆모습으로 가볍게 달림
   if(mode === 'base' && has('fielder-set')) return drawPerson('fielder-set', x, y, team, 'p0', false);
   if(mode === 'run' && has('fielder')) return drawPerson('fielder', x, y, team, ['set', 'lift', 'throw', 'follow'][frame % 4], false);
   if((mode === 'runner' || mode === 'base') && has('runner-s')) return drawPerson('runner-s', x, y, team, mode === 'base' ? 'p0' : ['p0', 'p1'][frame % 2], flip);
@@ -396,14 +402,17 @@ function drawPlayReplay(G, A){
     const path = ps.fm && ps.fm[pos], p = path ? pathAt(path, ts) : Fs[pos].at, p0 = path ? pathAt(path, ts - 0.06) : p, w = mw(p), w0 = mw(p0);
     const moving = Math.hypot(w.x - w0.x, w.y - w0.y) > 0.15;
     const got = holds.some(e => e.pos === pos && ts >= e.t && ts < e.t + 0.7);
-    people.push([w.x, w.y + (pos === 'C' ? 10 : 0), F.color, moving ? 'run' : got ? 'catch' : 'ready', Math.floor(ts * 10), moving ? w.x < w0.x : w.x > bw.x]);
+    people.push([w.x, w.y + (pos === 'C' ? 10 : 0), F.color, moving ? 'run' : got ? 'catch' : 'ready', Math.floor(ts * 10), moving ? w.x < w0.x : w.x > bw.x, [w.x - w0.x, w.y - w0.y]]);
   });
   // 주자: 저마다 출발(t0)·도착(t) 시각대로 베이스 길을 따라 달림. 아웃된 주자는 잠시 뒤 사라짐. 달리는 쪽을 바라봄(1→2루, 2→3루는 왼쪽)
   const runner = (b0, b1, t0, t1, gone) => {
     if(gone != null && ts > gone + 0.5) return;
     const k = t1 > t0 ? clamp((ts - t0) / (t1 - t0), 0, 1) : 1, p = basePath(b0, b1, k), q = basePath(b0, b1, Math.max(0, k - 0.02)), w = mw(p), wq = mw(q);
     const run = k > 0 && k < 1 && b1 !== b0;
-    people.push([w.x, w.y, T.color, run ? 'runner' : 'base', Math.floor(ts * 12), run ? w.x < wq.x : false]);
+    // 아슬아슬하게 베이스에 들어가면(그 베이스에 판정이 있으면) 마지막 0.4초는 슬라이딩
+    const called = b1 >= 0 && b1 < 4 && (ps.call || []).some(c => c.base === (b1 === -1 ? 3 : b1) && Math.abs(c.t - t1) < 0.5);
+    if(called && b1 > b0 + 0 && ts > t1 - 0.4 && ts < t1 + 0.6 && b1 !== 0){ const sk = clamp((ts - (t1 - 0.4)) / 0.4, 0, 1); people.push([w.x, w.y, T.color, 'slide', Math.floor(sk * 3.99), w.x < wq.x]); return; }
+    people.push([w.x, w.y, T.color, run ? 'runner' : 'base', Math.floor(ts * 12), run ? w.x < wq.x : false, [w.x - wq.x, w.y - wq.y]]);
   };
   const batTo = ps.kind === 'hr' ? 3 : Math.max(1, ps.batTried || ps.bat || 1) - 1;
   if(ps.batOut) runner(-1, ps.batOut.base, 0.6, ps.batOut.t, ps.batOut.t);
@@ -649,11 +658,12 @@ function stepAnim(A, el){
 const REDUCED = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 // 그림에 쓸 경기 상태: 마지막 공으로 공수가 바뀌었거나 경기가 끝났으면, 움직임이 끝날 때까지 공을 던지기 전 상태(팀 색·타자·투수·주자)로 그림
 function viewOf(A){
-  if(A && A.view) return A.view;   // 육성 건너뛰기: 내 공은 건너뛰기 전 모습으로
-  const p = A && A.pre;
+  // 육성 건너뛰기: '지금'은 내 타석이 끝난 직후 모습(A.view), 그 전은 던지기 전 모습(A.pre)
+  const now = (A && A.view) || G, p = A && A.pre;
   // 결과가 정해지기 전(공이 날아가는 동안)에는 던지기 전 상태로: 아웃 카운트·주자·점수는 잡히는 순간에 바뀜
   if(p && A.kind === 'pitch' && (A.ph === 'windup' || A.ph === 'flight' || A.ph === 'fly' || (A.ph === 'result' && A.res === 'inplay' && A.bb))) return p;
-  return p && (p.top !== G.top || p.inning !== G.inning || (G.over && !p.over)) ? p : G;
+  // 공수가 바뀌었으면 움직임이 끝날 때까지 바뀌기 전 팀 색·자리로
+  return p && (p.top !== now.top || p.inning !== now.inning || (now.over && !p.over)) ? p : now;
 }
 const snapOf = G => ({ ...G, teams: G.teams.map(T => ({ ...T, R: [...T.R] })), bases: [...G.bases] });
 function gfxTick(){

@@ -50,6 +50,8 @@ function castPlay(ids, at = 0){
 }
 // 지난 중계가 아직 남아 있으면 끊고 지금 장면부터 (빠르게 진행해도 중계가 밀리지 않게)
 function castDur(id){ const b = CAST.buf[id]; return b ? b.duration + 0.08 : 0.7; }
+// 중계하지 않은 결과(건너뛰기·중계 끔)도 '이미 본 것'으로 적어 둠: 나중에 옛 견제·판독을 말하지 않게
+function castSeen(){ if(typeof G === 'undefined' || !G) return; if(G.play) CAST.playN = G.play.n; if(G.anim) CAST.animN = G.anim.n; }
 function castStop(){ CAST.src.splice(0).forEach(s => { try{ s.stop(); }catch(e){} }); CAST.until = 0; }
 const pick1 = (...ids) => ids[Math.floor(Math.random() * ids.length)];
 const numClip = n => n >= 0 && n <= 20 ? `num_${n}` : null;   // 녹음: 영~이십
@@ -60,7 +62,7 @@ const teamClip = (T, long) => `team_${T.key}${long ? '' : '_s'}`;
    공 하나의 시간표(timeline.js)대로: 투구 동작 중 "던졌습니다" → 공이 미트에 들어가는 순간 "스트라이크!/볼." → 볼카운트
    / 친 공은 맞는 순간부터 "쳤습니다! 높이 뜹니다!" → 잡히거나 떨어지는 순간 결과 → 득점 → 새 타자·주자·아웃 안내.
    조각은 겹치지 않게 이어서 틂. 다음 선택은 중계가 끝날 때까지 기다림(game.js). 돌려주는 값: { at 결과를 말하는 시각, end 다 끝나는 시각 } (초) */
-function castResult(res){
+function castResult(res, opt = {}){
   if(!castOn() || !res || typeof G === 'undefined' || !G) return null;
   castLoadIndex();
   castStop();
@@ -121,15 +123,17 @@ function castResult(res){
       else if(has('strike')) call.push(pick1('r_strike1', 'r_strike2'));
       else if(has('ballc')) call.push(pick1('r_ball1', 'r_ball2'));
       const endPA = has('batter') || has('change') || G.over || has('k') || has('ball');
-      if(!endPA && (G.balls || G.strikes)) call.push(G.balls === 3 && G.strikes === 2 ? 'full' : [`cnt_b${G.balls}`, `cnt_s${G.strikes}`]);
+      if(!endPA && (G.balls || G.strikes) && SET.castCount === 'always') call.push(G.balls === 3 && G.strikes === 2 ? 'full' : [`cnt_b${G.balls}`, `cnt_s${G.strikes}`]);
       at(resAt, call);
     }
   }
   // 도루·견제·판독 (공이 미트에 들어간 뒤)
+  // 이번 결과에서 새로 일어난 플레이만: 이 공에서 일어났으면 공이 미트에 들어간 뒤, 이 공 전(견제)이나 공 없이(판독 결과)면 맨 앞
   const P = G.play;
-  if(P && P.n !== CAST.playN){
-    CAST.playN = P.n;
-    const t = tl ? tl.contact + 0.2 : 0;
+  const freshPlay = P && P.n !== CAST.playN && (A ? (P.an === A.n || (fresh && P.an === A.n - 1) || !fresh) : true);
+  if(P) CAST.playN = P.n;
+  if(freshPlay){
+    const t = tl && P.an === A.n ? tl.contact + 0.2 : 0;
     if(P.k === 'steal') at(t, 'r_steal_go', P.safe ? 'r_steal_safe' : 'r_steal_out');
     else if(P.k === 'pick') at(t, 'r_pickoff', P.safe ? 'r_safe1' : 'r_steal_out');
     else if(P.k === 'review') at(t, 'r_review');
@@ -138,8 +142,9 @@ function castResult(res){
   }
   // 득점
   if(/홈인|들어옵니다/.test(text) && !has('hr')) at(resAt, pick1('r_score1', 'r_score2'));
-  // 끝·공수 교대·새 타자 안내 (앞 중계가 끝난 뒤)
+  // 끝·공수 교대·새 타자 안내 (앞 중계가 끝난 뒤). 육성처럼 바로 건너뛸 때는 빼고, 건너뛴 뒤 지금 상황을 따로 말함(castSkip)
   const after = [];
+  if(!opt.noAfter){
   if(G.over){ after.push(G.walkoff ? 'r_walkoff' : 'end', 'j_score', teamClip(G.teams[0]), numClip(runsOf(G.teams[0])), 'j_vs', numClip(runsOf(G.teams[1])), teamClip(G.teams[1])); }
   else {
     if(has('change')) after.push('change', `inn_${Math.min(12, G.inning)}${G.top ? 't' : 'b'}`, teamClip(batTeam(G)), 'j_attack',
@@ -151,6 +156,7 @@ function castResult(res){
       if(G.outs) after.push(`out_${G.outs}`);
     }
   }
+  }
   // 시각 순서대로 이어서 틂 (앞 조각이 안 끝났으면 끝난 뒤에). 안내(after)는 언제나 맨 끝: 도루·득점 중계가 공수 교대 안내 뒤로 밀리지 않게
   plan.sort((a, b) => a[0] - b[0]);
   if(after.length) plan.push([plan.length ? plan[plan.length - 1][0] : resAt, after.flat(3).filter(Boolean)]);
@@ -158,3 +164,35 @@ function castResult(res){
   plan.forEach(([t, ids]) => { end = castPlay(ids, t); });
   return { at: resAt, end };
 }
+
+// 지금 상황 조각: 이닝 · 점수 · 아웃 · 주자 · 타자 (볼카운트 포함 여부는 count)
+function situationClips(count){
+  const out = [`inn_${Math.min(12, G.inning)}${G.top ? 't' : 'b'}`, teamClip(batTeam(G)), 'j_attack',
+    'j_score', teamClip(G.teams[0]), numClip(runsOf(G.teams[0])), 'j_vs', numClip(runsOf(G.teams[1])), teamClip(G.teams[1]),
+    `out_${G.outs}`, runClip(G.bases), `bat_${batTeam(G).bi + 1}`];
+  if(count && (G.balls || G.strikes)) out.push(G.balls === 3 && G.strikes === 2 ? 'full' : [`cnt_b${G.balls}`, `cnt_s${G.strikes}`]);
+  return out.flat();
+}
+// 육성에서 내 차례까지 건너뛴 뒤: 앞 중계에 이어서 지금 상황(경기가 끝났으면 끝과 점수). 다 끝나는 시각(초)을 돌려줌
+function castSkip(){
+  if(!castOn() || !G) return 0;
+  castLoadIndex();
+  const ids = G.over ? [G.walkoff ? 'r_walkoff' : 'end', 'j_score', teamClip(G.teams[0]), numClip(runsOf(G.teams[0])), 'j_vs', numClip(runsOf(G.teams[1])), teamClip(G.teams[1])] : situationClips(true);
+  castSeen();
+  return castPlay(ids, 0.3);
+}
+// 고르는 데 오래 걸리면(6초) 볼카운트·아웃·주자를 한 번 말함. 고르면(다음 결과) castResult가 멈춤
+function castIdleArm(){
+  clearTimeout(CAST.idleT);
+  if(!castOn() || (SET.castCount || 'idle') !== 'idle' || typeof G === 'undefined' || !G || G.over) return;
+  const key = `${G.at}:${G.pitchNo}:${G.balls}:${G.strikes}:${G.outs}`;
+  CAST.idleT = setTimeout(() => {
+    if(!G || G.over || key !== `${G.at}:${G.pitchNo}:${G.balls}:${G.strikes}:${G.outs}` || CAST.idleKey === key) return;
+    CAST.idleKey = key;
+    const ids = [];
+    if(G.balls || G.strikes) ids.push(G.balls === 3 && G.strikes === 2 ? 'full' : [`cnt_b${G.balls}`, `cnt_s${G.strikes}`]);
+    ids.push(`out_${G.outs}`, runClip(G.bases));
+    castPlay(ids.flat(), 0);
+  }, 6000);
+}
+['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => clearTimeout(CAST.idleT), { capture:true }));

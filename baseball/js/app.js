@@ -220,6 +220,8 @@ function settings3(backTo){
     { n:5, t:`타격 난이도: ${EASY_NAME[SET.easy ?? 1]}`, s:'쉬움일수록 잘 맞히고 안타·볼넷·진루가 많아집니다. 다음 경기부터 적용합니다. (리그의 다른 팀 경기는 늘 현실)', act: ch(() => { SET.easy = cycle([1, 2, 0], SET.easy ?? 1); }, () => `타격 난이도 ${EASY_NAME[SET.easy]}`) },
     { n:6, t:`관중 소리: ${onOff(SET.crowd)}`, s:'화면 보며 하기에서 경기 내내 야구장 관중 소리를 작게 깔아 줍니다. 효과음이 꺼져 있으면 나지 않습니다.',
       act: ch(() => { SET.crowd = !SET.crowd; crowdSync(); }, () => `관중 소리 ${onOff(SET.crowd)}`) },
+    { n:7, t:`중계 볼카운트: ${({ always:'매번', idle:'오래 고를 때만', off:'읽지 않음' })[SET.castCount || 'idle']}`, s:'중계 음성이 공마다 볼카운트를 말할지 정합니다. "오래 고를 때만"이면 고르는 데 6초가 넘게 걸릴 때 볼카운트·아웃·주자를 한 번 말하고, 고르면 바로 멈춥니다.',
+      act: ch(() => { SET.castCount = cycle(['idle', 'always', 'off'], SET.castCount || 'idle'); }, () => `중계 볼카운트 ${({ always:'매번', idle:'오래 고를 때만', off:'읽지 않음' })[SET.castCount]}`) },
     { n:4, t:`정밀 모드에서 직접 고를 것: ${pickName()}`, s:'구종만 · 구종과 코스 · 전부 · 내 맘대로', act: v => go(() => picksScreen(w => go(() => settings3(backTo), w)), v) },
     { n:2, t:`받은 채팅 읽어 주기: ${onOff(SET.chatRead)}`, s:'온라인 대전에서 상대가 보낸 채팅을 바로 읽어 줍니다. 채팅 목록은 늘 화면에 남습니다.',
       act: ch(() => { SET.chatRead = !SET.chatRead; }, () => `채팅 읽어 주기 ${onOff(SET.chatRead)}`) },
