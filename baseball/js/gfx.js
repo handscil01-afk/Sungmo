@@ -8,7 +8,7 @@
 const GX = { W:256, H:224, cv:null, ctx:null, key:'', anim:null, queue:[], raf:0, img:{}, tinted:{}, meta:{}, cam:{ x:0, y:0 }, lastAnimN:null, lastPlayN:null };
 const PAL = { sky:'#5c94fc', stand:'#3c3c64', fence:'#00682c', grass:'#38a838', grass2:'#4cbc4c', dirt:'#c88850', dirt2:'#b87840', line:'#fcfcfc',
   skin:'#f8b878', white:'#fcfcfc', black:'#000000', glove:'#a85010', bat:'#e4a050', ball:'#fcfcfc', ink:'#fcfc54', red:'#f83800' };
-const GX_FILES = ['bg-pitch', 'bg-field', 'pitcher', 'batter', 'catcher', 'fielder', 'banners', 'banners2', 'umpire', 'umpire-s', 'runner', 'tv', 'fielder2', 'runner-s', 'fielder-set', 'cr-cage', 'cr-gym', 'cr-bullpen', 'cr-track', 'cr-room', 'cr-shop', 'cr-fansign', 'cr-rehab', 'cr-train', 'cr-life', 'cr-people', 'cr-props'];
+const GX_FILES = ['bg-pitch', 'bg-field', 'pitcher', 'batter', 'catcher', 'fielder', 'banners', 'banners2', 'umpire', 'umpire-s', 'runner', 'tv', 'fielder2', 'runner-s', 'fielder-set', 'runner-t', 'cr-cage', 'cr-gym', 'cr-bullpen', 'cr-track', 'cr-room', 'cr-shop', 'cr-fansign', 'cr-rehab', 'cr-train', 'cr-life', 'cr-people', 'cr-props'];
 // 결과 글씨 (banners.png를 쓸 때는 이 순서로 한 줄에 하나씩, 128×32)
 const BANNERS = ['스트라이크!', '볼', '헛스윙!', '파울', '안타!', '2루타!', '3루타!', '홈런!', '아웃!', '삼진!', '볼넷', '세이프!', '몸에 맞는 공'];
 const BANNERS2 = ['비디오 판독', '판정 번복!', '원심 유지', '견제!', '도루!', '병살!', '끝내기!', '게임 셋!'];
@@ -209,10 +209,11 @@ function drawPitchScene(G, A){
   else if(A && (ph === 'flight' && A.t0 > 0.8 || ph === 'result')){ if(A.res === 'bunt') bPose = 'bunt'; else if(['whiff', 'foul', 'inplay'].includes(A.res)) bPose = ph === 'result' && A.t0 > 0.3 ? 'swfollow' : 'swing'; }
   // 주자: 베이스에서 리드하고 있는 모습 (1루는 오른쪽, 3루는 왼쪽, 2루는 투수 뒤)
   if(L === LAY_IMG && GX.meta['runner-s']){
-    [[226, 146, false], [160, 100, true], [30, 146, true]].forEach(([x, y, flip], i) => {
+    // 다음 베이스 쪽을 바라봄: 1루·2루 주자는 왼쪽(2루·3루 쪽), 3루 주자는 오른쪽(홈 쪽)
+    (GX.meta['runner-t'] ? [[226, 146, true], [160, 100, true], [30, 146, false]] : [[226, 146, false], [160, 100, true], [30, 146, true]]).forEach(([x, y, flip], i) => {
       if(G.bases[i] == null) return;
       R(x - 4 + (flip ? 6 : -6), y - 1, 8, 3, PAL.white);   // 베이스
-      drawPerson('runner-s', x + (flip ? -6 : 6), y, T.color, 'p0', flip);
+      if(GX.meta['runner-t']) drawPerson('runner-t', x + (flip ? -6 : 6), y, T.color, 'p0', flip); else drawPerson('runner-s', x + (flip ? -6 : 6), y, T.color, 'p0', flip);
     });
   }
   const bp = left ? L.batL : L.batR;
@@ -274,7 +275,8 @@ const FPOS = { P:[0, 18.4], '1B':[0.6, 30], '2B':[0.2, 39], SS:[-0.2, 39], '3B':
 function tinyPlayer(x, y, team, mode, frame = 0, flip = false){
   const has = n => GX.meta[n] && tinted(n, team);
   // 달리는 수비수도 주자와 같은 달리기 그림(팀 색), 가는 쪽을 바라봄
-  if(mode === 'run' && has('runner-s')) return drawPerson('runner-s', x, y, team, ['p0', 'p1'][frame % 2], flip);
+  if((mode === 'run' || mode === 'runner') && has('runner-t')) return drawPerson('runner-t', x, y, team, ['p1', 'p2'][frame % 2], flip);   // 옆모습으로 가볍게 달림
+  if(mode === 'base' && has('fielder-set')) return drawPerson('fielder-set', x, y, team, 'p0', false);
   if(mode === 'run' && has('fielder')) return drawPerson('fielder', x, y, team, ['set', 'lift', 'throw', 'follow'][frame % 4], false);
   if((mode === 'runner' || mode === 'base') && has('runner-s')) return drawPerson('runner-s', x, y, team, mode === 'base' ? 'p0' : ['p0', 'p1'][frame % 2], flip);
   // 서 있거나 잡거나 던질 때: 투수의 준비 자세(글러브를 가슴에)를 작게. 공 그림이 섞이지 않아 깔끔함
