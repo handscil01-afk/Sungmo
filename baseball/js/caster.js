@@ -52,7 +52,7 @@ function castPlay(ids, at = 0){
 function castDur(id){ const b = CAST.buf[id]; return b ? b.duration + 0.08 : 0.7; }
 function castStop(){ CAST.src.splice(0).forEach(s => { try{ s.stop(); }catch(e){} }); CAST.until = 0; }
 const pick1 = (...ids) => ids[Math.floor(Math.random() * ids.length)];
-const numClip = n => n >= 0 && n <= 20 ? `num_${n}` : null;
+const numClip = n => n >= 0 && n <= 20 ? `num_${n}` : null;   // 녹음: 영~이십
 const runClip = b => { const k = [0, 1, 2].filter(i => b[i] != null).map(i => i + 1).join(''); return ({ '':'run_none', 1:'run_1', 2:'run_2', 3:'run_3', 12:'run_12', 13:'run_13', 23:'run_23', 123:'run_full' })[k]; };
 const teamClip = (T, long) => `team_${T.key}${long ? '' : '_s'}`;
 
@@ -67,14 +67,15 @@ function castResult(res){
   const fx = res.fx || [], text = (res.lines || []).map(l => l.s || l).join(' '), has = n => fx.includes(n), A = G.anim;
   const plan = [];   // [시각(초), [조각…]] 시각 순서대로
   const at = (t, ...ids) => { ids = ids.flat(3).filter(Boolean); if(ids.length) plan.push([t, ids]); };
-  if(has('start')) at(0, 'intro', teamClip(G.teams[0], true), 'j_vs', teamClip(G.teams[1], true), 'playball');
+  if(has('start')) at(0, 'intro', teamClip(G.teams[0], true), teamClip(G.teams[1], true), 'playball');
   const fresh = A && A.n !== CAST.animN; if(A) CAST.animN = A.n;
   const contact = fx.some(n => /^bat/.test(n)), pitched = fresh && (has('pitch') || contact);
   const tl = pitched ? playTL(A, fx) : null;
   let resAt = 0;
   if(pitched){
     // 던질 때: 구종 이름이나 "던졌습니다!" (공을 놓는 순간 끝나게)
-    at(Math.max(0, tl.release - 0.55), G.mode !== 'simple' && A.t && Math.random() < 0.45 ? `pt_${A.t}` : pick1('p_throw1', 'p_throw2', 'p_throw3'));
+    const thr = G.mode !== 'simple' && A.t && Math.random() < 0.45 ? `pt_${A.t}` : pick1('p_throw1', 'p_throw2', 'p_throw3');
+    at(Math.max(0, tl.contact - 0.05 - castDur(thr)), thr);   // 공이 도착하기 전에 끝나게
     const ps = A.bb && A.bb.ps;
     if(A.res === 'inplay' && A.bb){
       const bb = A.bb, fence = (G.park && G.park.fence && G.park.fence[bb.fi]) || 110, ev = (ps && ps.ev) || [];
@@ -139,12 +140,12 @@ function castResult(res){
   if(/홈인|들어옵니다/.test(text) && !has('hr')) at(resAt, pick1('r_score1', 'r_score2'));
   // 끝·공수 교대·새 타자 안내 (앞 중계가 끝난 뒤)
   const after = [];
-  if(G.over){ after.push(G.walkoff ? 'r_walkoff' : 'end', 'j_score', teamClip(G.teams[0]), numClip(runsOf(G.teams[0])), 'j_vs', numClip(runsOf(G.teams[1])), teamClip(G.teams[1])); }
+  if(G.over){ after.push(G.walkoff ? 'r_walkoff' : 'end', 'j_score', teamClip(G.teams[0]), numClip(runsOf(G.teams[0])), teamClip(G.teams[1]), numClip(runsOf(G.teams[1]))); }
   else {
     if(has('change')) after.push('change', `inn_${Math.min(12, G.inning)}${G.top ? 't' : 'b'}`, teamClip(batTeam(G)), 'j_attack',
-      'j_score', teamClip(G.teams[0]), numClip(runsOf(G.teams[0])), 'j_vs', numClip(runsOf(G.teams[1])), teamClip(G.teams[1]));
+      'j_score', teamClip(G.teams[0]), numClip(runsOf(G.teams[0])), teamClip(G.teams[1]), numClip(runsOf(G.teams[1])));
     if(has('pchange')) after.push('r_pitcher_change');
-    if(has('batter') || has('change') || has('start')){
+    if((has('batter') && !has('start')) || has('change')){
       if(!has('change')) after.push(teamClip(batTeam(G)));
       after.push(`bat_${batTeam(G).bi + 1}`);
       if(G.bases.some(x => x != null)) after.push(runClip(G.bases));
