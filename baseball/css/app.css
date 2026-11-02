@@ -169,7 +169,7 @@ html.gfxgame #chatSec{ max-height:20vh; overflow:auto; }
   html.gfxgame #turn{ padding-top:36px; }
   html.gfxgame .opts:not(.grid){ grid-template-columns:repeat(2, minmax(0, 1fr)); }
 }
-html.gfxgame.gfxhold #say{ visibility:hidden; }
+html.gfxgame.gfxhold:not(.hold) #say{ visibility:hidden; }   /* 뜸 들이는 중(hold)이면 앞부분(투구 설명)만 보임 */
 /* 화면 보며 하기: 방금 결과는 게임 대화 상자처럼, 질문은 할 일을 크게 */
 html.gfxgame #say p:last-child{ background:#0d1430; border:2px solid #f8d030; border-radius:10px; padding:6px 10px; color:#fff; font-size:0.9rem; font-weight:600; line-height:1.4; -webkit-line-clamp:3; box-shadow:0 2px 0 #000; }
 [data-theme="light"] html.gfxgame #say p:last-child, html.gfxgame[data-theme="light"] #say p:last-child{ background:#fff; color:#0b1020; }
@@ -253,7 +253,10 @@ html.gfxgame .opts:not(.grid) .opt.minor .num{ position:static; flex:none; }
 html.gfxgame .opts:not(.grid) .opt.minor b{ line-height:1.2; }
 /* 뜸 들이는 중계: 결과를 기다리는 동안 결과 글·다음 질문·선택지를 숨김 */
 html.hold .tail, html.hold #say p.after{ display:none !important; }
-html.hold #q, html.hold #opts, html.hold #extra, html.hold #gstat, html.hold #cmdForm{ visibility:hidden; }
+html.hold #q, html.hold #cmdForm{ visibility:hidden; }
+/* 결과를 기다리는 동안 선택지·능력치는 흐리게 남겨 둠 (화면 아래가 통째로 비지 않게), 누를 수는 없음 */
+html.hold #opts, html.hold #extra, html.hold #gstat{ opacity:0.22; pointer-events:none; filter:grayscale(0.6); transition:opacity .15s; }
+html:not(.gfxgame).hold #opts, html:not(.gfxgame).hold #extra{ visibility:hidden; }
 
 
 /* ===== 화면 보며 하기: 메뉴·설정 화면 (경기 화면이 아닐 때) =====
@@ -373,3 +376,5 @@ html.gfxui:not(.gfxinput) #cmd::placeholder{ color:#6b789f; }
   html.gfxui #main{ gap:6px; }
   html.gfxui .banner{ margin-bottom:6px; padding:6px 10px; }
 }
+/* 뜸 들이는 중: 맨 끝 줄(결과)은 숨겨지므로, 지금 공의 앞부분(투구 설명)을 보여 줌 */
+html.gfxgame.hold #say p.cur{ display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; overflow:hidden; font-size:0.9rem; font-weight:600; line-height:1.4; color:#fff; margin:0; }
