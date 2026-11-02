@@ -133,11 +133,16 @@ function playRec(c, uniq){
   // 투구(짧은 바람 소리) → 방망이(헛스윙·타격음) → 결과 → 공수교대 순서로, 겹치지 않게 조금씩 띄움
   let t = 0.02;
   // 화면 보며 하기: 그림 움직임에 맞춤 (공이 손을 떠날 때 피칭, 공이 올 때 타격, 잡거나 떨어질 때 결과)
-  const gx = SET.view === 'gfx' && pitch && typeof G !== 'undefined' && G && G.anim;
+  // 공 하나의 시간표 (두 모드 같음, 그림 모드는 그림 움직임에 맞춰 조금 느림): 피칭 → 방망이 → (타구가 날아가는 동안 관중이 술렁임) → 결과
+  const anim = pitch && typeof G !== 'undefined' && G && G.anim && G.mode !== 'manager' ? G.anim : null, gxv = SET.view === 'gfx';
+  const gx = !!anim;
   if(gx){
-    recPlay(c, 'pitch', 0.3, 0.6);
-    if(contact) recPlay(c, recPick(contact), 0.7, 0.9);
-    t = G.anim.res === 'inplay' && G.anim.bb ? 1.0 + (G.anim.bb.type === 'gb' ? 1.3 : 1.9) : 0.8;
+    const fly = (typeof flyMs === 'function' ? flyMs() : 1300) / 1000, inplay = anim.res === 'inplay' && /^bat(Big)?$/.test(contact || ''), foul = contact === 'batF';
+    const tc = gxv ? 0.7 : 0.35;
+    recPlay(c, 'pitch', gxv ? 0.3 : 0.02, 0.6);
+    if(contact) recPlay(c, recPick(contact), tc, 0.9);
+    t = inplay ? tc + 0.3 + fly : foul ? (gxv ? 0.75 : 0.9) : gxv ? 0.8 : 0.45;
+    if(inplay || foul) crowdSwell(c, tc + 0.05, t, ['hr', 'b3', 'b2', 'hit'].includes(main) ? (main === 'hr' ? 'big' : 'hit') : 'fade');
   } else {
     if(pitch){ recPlay(c, 'pitch', t, 0.6); t += 0.35; }
     if(contact){ recPlay(c, recPick(contact), t, 0.9); t += contact === 'batBig' ? 0.45 : 0.3; }
@@ -153,6 +158,17 @@ function playRec(c, uniq){
   if(change) recPlay(c, 'change', t, 0.7, 4);
   else if(!pitch && !main && !contact && uniq.includes('batter')) recPlay(c, 'atbat', t, 0.6, 3);
   return true;
+}
+// 타구가 날아가는 동안 관중이 술렁이며 커지고, 결과에 따라 길게 환호(hit·big)하거나 금세 사그라듦(fade)
+function crowdSwell(c, t0, t1, kind){
+  const buf = RECBUF.crowd; if(!buf){ recLoad('crowd'); return; }
+  const s = c.createBufferSource(), g = c.createGain(), now = c.currentTime;
+  s.buffer = buf; s.connect(g); g.connect(c.destination);
+  const a = now + t0, b = now + t1, peak = kind === 'big' ? 1.0 : 0.75;
+  g.gain.setValueAtTime(0.05, a); g.gain.linearRampToValueAtTime(0.45, b);
+  if(kind === 'fade'){ g.gain.linearRampToValueAtTime(0.5, b + 0.15); g.gain.linearRampToValueAtTime(0, b + 0.9); s.start(a, Math.random() * 40); s.stop(b + 1); }
+  else { const hold = kind === 'big' ? 3.5 : 1.6; g.gain.linearRampToValueAtTime(peak, b + 0.3); g.gain.setValueAtTime(peak, b + hold); g.gain.linearRampToValueAtTime(0, b + hold + 1.5); s.start(a, Math.random() * 40); s.stop(b + hold + 1.6); }
+  RECNOW.push({ s, g });
 }
 // 화면 모드의 배경 관중 소리 (설정에서 켜고 끔)
 const CROWD = { src:null };
