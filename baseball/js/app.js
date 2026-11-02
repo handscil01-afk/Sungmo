@@ -90,7 +90,7 @@ function newOpts(){
   let ctrl = ['cpu', 'cpu'], who = ['', ''];
   if(NEW.kind === '1p') ctrl = meFirst ? ['human', 'cpu'] : ['cpu', 'human'];
   if(NEW.kind === '2p'){ ctrl = ['human', 'human']; who = meFirst ? ['첫째 사람', '둘째 사람'] : ['둘째 사람', '첫째 사람']; }
-  return { mode: NEW.mode, unit: NEW.unit, innings: NEW.innings, teams, ctrl, who, diff: NEW.diff, seed: (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0 };
+  return { mode: NEW.mode, unit: NEW.unit, innings: NEW.innings, teams, ctrl, who, diff: NEW.diff, easy: SET.easy ?? 1, seed: (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0 };
 }
 function readyScreen(){
   const o = newOpts();
@@ -166,22 +166,36 @@ function settings2(backTo){
   ] };
 }
 /* ---------- 직접 고를 항목 ---------- */
+// 정밀 모드 단계: 1단계는 간단 모드. 2단계는 구종·코스·세기 가운데 하나, 3단계는 둘, 4단계는 전부를 고름
+const PICK_ONE = { pt:'구종', loc:'코스(9칸)', pow:'세기' };
+const pickOf = keys => ({ pt: keys.includes('pt'), loc: keys.includes('loc') ? 'full' : 'none', edge: keys.length === 3, pow: keys.includes('pow'), bat:'full', guess: keys.length >= 2 });
 const PICK_SETS = {
-  type:    { name:'구종만', desc:'던질 때는 구종만, 칠 때는 치기·강하게·맞히기·지켜보기만 고릅니다. 코스와 세기는 컴퓨터가 정합니다.', p:{ pt:true, loc:'none', edge:false, pow:false, bat:'full', guess:false } },
-  typeloc: { name:'구종과 코스', desc:'구종과 코스(9칸)를 고르고, 붙이는 정도와 세기는 컴퓨터가 정합니다. 노림수도 쓸 수 있습니다.', p:{ pt:true, loc:'full', edge:false, pow:false, bat:'full', guess:true } },
-  full:    { name:'전부', desc:'구종, 코스, 붙이는 정도, 세기를 모두 고릅니다. 지금까지의 정밀 모드입니다.', p:{ pt:true, loc:'full', edge:true, pow:true, bat:'full', guess:true } },
+  s2pt:  { name:'2단계: 구종만', p: pickOf(['pt']) },
+  s2loc: { name:'2단계: 코스만', p: pickOf(['loc']) },
+  s2pow: { name:'2단계: 세기만', p: pickOf(['pow']) },
+  s3a:   { name:'3단계: 구종과 코스', p: pickOf(['pt', 'loc']) },
+  s3b:   { name:'3단계: 구종과 세기', p: pickOf(['pt', 'pow']) },
+  s3c:   { name:'3단계: 코스와 세기', p: pickOf(['loc', 'pow']) },
+  full:  { name:'4단계: 전부', p: pickOf(['pt', 'loc', 'pow']) },
 };
+const EASY_NAME = { 0:'현실 (안타가 적음)', 1:'보통 (재미)', 2:'쉬움 (안타가 많음)' };
 const LOC_NAME = { full:'9칸', height:'높낮이만', none:'고르지 않음' };
 function pickName(){
   const p = picks(), k = Object.keys(PICK_SETS).find(k => Object.entries(PICK_SETS[k].p).every(([a, b]) => p[a] === b));
-  return k ? PICK_SETS[k].name : '내 맘대로';
+  return (k ? PICK_SETS[k].name : '내 맘대로') + (p.dir ? ' + 방향 노리기' : '');
 }
 // after: 고른 뒤 갈 곳 · back: 뒤로
 function picksScreen(after, back){
-  const use = (k, v) => { SET.picks = { ...PICK_SETS[k].p }; saveSet(); after(v); };
-  return { q:`정밀 모드에서 무엇을 직접 고를까요? 지금: ${pickName()}. 고르지 않는 것은 컴퓨터가 알아서 정합니다.`, back: back || (v => after(v)), opts:[
-    ...Object.keys(PICK_SETS).map((k, i) => ({ n: i + 1, t: PICK_SETS[k].name, s: PICK_SETS[k].desc, act: v => use(k, v) })),
-    { n:4, t:'내 맘대로 고르기', s:'구종, 코스, 붙이는 정도, 세기, 치는 방법, 노림수를 하나씩 켜고 끕니다.', act: v => go(() => picksCustom(after, back), v) },
+  const use = (k, v) => { SET.picks = { ...PICK_SETS[k].p, dir: picks().dir }; saveSet(); after(v); };
+  const sub = (title, keys) => v => go(() => ({ q:`${title}: 무엇을 직접 고를까요? 나머지는 컴퓨터가 정합니다.`, back: w => go(() => picksScreen(after, back), w),
+    opts: keys.map((k, i) => ({ n: i + 1, t: PICK_SETS[k].name.replace(/^\d단계: /, ''), act: w => use(k, w) })) }), v);
+  return { q:`정밀 모드 단계를 고르세요. 지금: ${pickName()}. 고르지 않는 것은 컴퓨터가 정합니다. (1단계는 간단 모드입니다)`, back: back || (v => after(v)), opts:[
+    { n:2, t:'2단계: 하나만 고르기', s:'구종·코스·세기 가운데 하나만 직접 고릅니다.', act: sub('2단계', ['s2pt', 's2loc', 's2pow']) },
+    { n:3, t:'3단계: 둘 고르기', s:'구종·코스·세기 가운데 둘을 직접 고릅니다. 노림수도 씁니다.', act: sub('3단계', ['s3a', 's3b', 's3c']) },
+    { n:4, t:'4단계: 전부 고르기', s:'구종, 코스, 붙이는 정도, 세기를 모두 고릅니다.', act: v => use('full', v) },
+    { n:5, t:`타자 방향 노리기 (밀어치기·당겨치기): ${picks().dir ? '켬' : '끔'}`, s:'칠 때 노림수에서 당겨치기·밀어치기를 고를 수 있습니다. 공 코스와 맞으면 잘 맞습니다.', act: () => { SET.picks = { ...picks(), dir: !picks().dir }; saveSet(); stay(`방향 노리기 ${picks().dir ? '켬' : '끔'}`); } },
+    { n:6, t:'내 맘대로 고르기', s:'구종, 코스, 붙이는 정도, 세기, 치는 방법, 노림수를 하나씩 켜고 끕니다.', act: v => go(() => picksCustom(after, back), v) },
+    { n:9, t:'다 됐어요', act: v => after(v) },
   ] };
 }
 function picksCustom(after, back){
@@ -194,6 +208,7 @@ function picksCustom(after, back){
     { n:4, t:`세기: ${p.pow ? '직접 고름' : '늘 보통'}`, s:'전력·보통·힘 빼고', act: ch(q => { q.pow = !q.pow; }, q => `세기 ${q.pow ? '직접 고름' : '늘 보통'}`) },
     { n:5, t:`치는 방법: ${p.bat === 'full' ? '치기·강하게·맞히기·지켜보기' : '치기·지켜보기만'}`, act: ch(q => { q.bat = q.bat === 'full' ? 'simple' : 'full'; }, q => `치는 방법 ${q.bat === 'full' ? '네 가지' : '치기와 지켜보기만'}`) },
     { n:6, t:`노림수: ${p.guess ? '씀' : '쓰지 않음'}`, s:'직구 계열이나 변화구를 노립니다.', act: ch(q => { q.guess = !q.guess; }, q => `노림수 ${q.guess ? '씀' : '쓰지 않음'}`) },
+    { n:7, t:`타자 방향 노리기: ${p.dir ? '씀' : '쓰지 않음'}`, s:'밀어치기·당겨치기', act: ch(q => { q.dir = !q.dir; }, q => `방향 노리기 ${q.dir ? '씀' : '쓰지 않음'}`) },
     { n:9, t:'다 됐어요', act: v => after(v) },
   ] };
 }
@@ -201,6 +216,7 @@ function settings3(backTo){
   const ch = (fn, label) => () => { fn(); saveSet(); stay(label()); };
   return { q:'설정 더 보기 (마지막)', back: v => go(() => settings2(backTo), v), opts:[
     { n:1, t:'소리 시험', s:'읽어 주기, 효과음, 진동을 시험합니다.', act: v => { playFx(['pitch', 'bat', 'hit']); speak('소리 시험입니다. 딱! 잘 맞은 타구, 안타!'); if(v === 'click' && SET.voice === 'sr') note(['소리 시험입니다. 딱! 잘 맞은 타구, 안타!'], v); } },
+    { n:5, t:`타격 난이도: ${EASY_NAME[SET.easy ?? 1]}`, s:'쉬움일수록 잘 맞히고 안타·볼넷·진루가 많아집니다. 다음 경기부터 적용합니다. (리그의 다른 팀 경기는 늘 현실)', act: ch(() => { SET.easy = cycle([1, 2, 0], SET.easy ?? 1); }, () => `타격 난이도 ${EASY_NAME[SET.easy]}`) },
     { n:4, t:`정밀 모드에서 직접 고를 것: ${pickName()}`, s:'구종만 · 구종과 코스 · 전부 · 내 맘대로', act: v => go(() => picksScreen(w => go(() => settings3(backTo), w)), v) },
     { n:2, t:`받은 채팅 읽어 주기: ${onOff(SET.chatRead)}`, s:'온라인 대전에서 상대가 보낸 채팅을 바로 읽어 줍니다. 채팅 목록은 늘 화면에 남습니다.',
       act: ch(() => { SET.chatRead = !SET.chatRead; }, () => `채팅 읽어 주기 ${onOff(SET.chatRead)}`) },

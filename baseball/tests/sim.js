@@ -4,12 +4,12 @@ const dir = path.join(__dirname, '..', 'js');
 ['data.js', 'engine.js', 'ai.js'].forEach(f => vm.runInThisContext(fs.readFileSync(path.join(dir, f), 'utf8'), { filename: f }));
 
 const N = +process.argv[2] || 300;
-function run(mode, unit){
+function run(mode, unit, easy){
   const parks = {};
   const tot = { g:0, runs:0, pa:0, ab:0, h:0, hr:0, k:0, bb:0, sb:0, e:0, pitches:0, xbh:0, extra:0, draws:0, lines:0, walkoff:0 };
   for(let n = 0; n < N; n++){
     const keys = TEAMS.map(t => t.key), K = keys.length, a = n % K, h = (a + 1 + (n >> 4) % (K - 1)) % K;
-    const G = newGame({ mode, innings:9, teams:[keys[a], keys[h]], ctrl:['cpu', 'cpu'], unit, seed: 1000 + n });
+    const G = newGame({ mode, innings:9, teams:[keys[a], keys[h]], ctrl:['cpu', 'cpu'], unit, easy, seed: 1000 + n });
     flush(G);
     let guard = 0;
     while(!G.over){
@@ -40,7 +40,7 @@ function run(mode, unit){
     });
   }
   const per = v => (v / tot.g / 2).toFixed(2);
-  console.log(`[${mode}${unit ? ' ' + unit : ''}] ${tot.g}경기 · 팀당 경기당 득점 ${per(tot.runs)} · 안타 ${per(tot.h)} · 홈런 ${per(tot.hr)} · 삼진 ${per(tot.k)} · 볼넷 ${per(tot.bb)} · 도루 ${per(tot.sb)} · 실책 ${per(tot.e)}`);
+  console.log(`[${mode}${unit ? ' ' + unit : ''}${easy ? ' 난이도' + easy : ''}] ${tot.g}경기 · 팀당 경기당 득점 ${per(tot.runs)} · 안타 ${per(tot.h)} · 홈런 ${per(tot.hr)} · 삼진 ${per(tot.k)} · 볼넷 ${per(tot.bb)} · 도루 ${per(tot.sb)} · 실책 ${per(tot.e)}`);
   console.log(`   판독: 아슬아슬 ${(tot.close / tot.g).toFixed(2)} · 신청 ${(tot.rev / tot.g).toFixed(2)} · 번복 ${(tot.over / tot.g).toFixed(2)} (경기당)
    구장별 경기당 득점·홈런: ${Object.entries(parks).map(([k, v]) => `${PARKS[k].name} ${(v.runs / v.g).toFixed(1)}·${(v.hr / v.g).toFixed(1)}`).join(', ')}
    타율 ${(tot.h / tot.ab).toFixed(3)} · 삼진율 ${(tot.k / tot.pa * 100).toFixed(1)}% · 볼넷률 ${(tot.bb / tot.pa * 100).toFixed(1)}% · 타석당 투구 ${(tot.pitches / tot.pa).toFixed(2)} · 연장 ${tot.extra} · 무승부 ${tot.draws} · 끝내기 ${tot.walkoff} · 경기당 문장 ${(tot.lines / tot.g).toFixed(0)}`);
@@ -49,3 +49,5 @@ run('detail');
 run('simple');
 run('simple', 'pitch');
 run('manager');
+// 타격 난이도 보통(1)·쉬움(2)
+run('detail', null, 1); run('detail', null, 2); run('simple', 'pitch', 1); run('simple', null, 1);
