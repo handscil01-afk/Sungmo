@@ -180,11 +180,22 @@
       h('h2', { text: '기안 도우미' }),
       h('p', { class: 'muted', text: '사업계획에서 결과보고·실적까지 이어서 관리하고, 기안을 규칙대로 검수합니다. 모든 내용은 이 PC와 연결한 폴더에만 저장하고 인터넷으로 보내지 않습니다.' }),
       h('div', { class: 'cards' },
+        folderCard(),
         card('기안 검수', '한글 파일을 넣으면 요일·계산·합계·계정과목·연도·다른 사업 이름·붙임 번호를 바로 확인합니다. 간사 누구나 쓸 수 있습니다.', '검수하기', () => go('review')),
         card('예산', nb ? y + '년 예산서 ' + nb + '개를 불러왔습니다. 보조금·자부담 별로 당초·변경·집행·남은 예산을 봅니다.' : '회계 프로그램에서 내려받은 예산서(.xls)를 불러오면 계정과목과 남은 예산을 관리합니다.', nb ? '예산 보기' : '예산서 불러오기', () => go('budget')),
         card('시범 사업: ' + PILOT, P && P.versions.length ? '계획 ' + P.versions.length + '개 버전, 회차 ' + P.rounds.length + '개' : '사업계획을 넣으면 회차 기안·잔액·실적이 이어집니다.', '사업 열기', () => { SET.sub = PILOT; go('proj'); }),
         card('저장 위치', S.dir ? (S.perm === 'granted' ? '‘' + S.dir.name + '’ 폴더에 저장 중' : '‘' + S.dir.name + '’ 폴더 다시 연결 필요') : '아직 이 PC 브라우저에만 저장합니다. 시놀로지의 ‘기안도우미’ 폴더를 연결해 주세요.', S.dir && S.perm !== 'granted' ? '다시 연결' : '설정', () => (S.dir && S.perm !== 'granted') ? reconnect() : go('set'))),
       isStandalone() || inFrame ? null : h('div', { class: 'row end' }, h('button', { class: 'btn', 'data-nofs': '', onclick: installHelp }, '홈 화면에 설치하기')));
+  }
+  function folderCard() {
+    const need = ROOT.h && ROOT.perm !== 'granted';
+    return h('div', { class: 'card' }, h('h3', { text: '기안 폴더 자동 읽기' }),
+      h('p', { text: ROOT.h ? scanStatus() : '‘손잡다’ 폴더를 한 번 연결하면, 앱을 열 때마다 연도 폴더의 내부기안·예산서를 읽어 사업 계획·회차 기안·예산을 채웁니다. 폴더는 읽기만 합니다.' }),
+      h('div', { class: 'row wrap' },
+        !ROOT.h ? h('button', { class: 'btn primary', 'data-nofs': '', onclick: () => S.dir ? linkRoot() : linkFolder() }, '‘손잡다’ 폴더 연결') : null,
+        need ? h('button', { class: 'btn primary', 'data-nofs': '', onclick: reconnect }, '다시 연결') : null,
+        ROOT.h && !need ? h('button', { class: 'btn', 'data-nofs': '', disabled: ROOT.busy ? 'disabled' : null, onclick: () => runScan(true) }, '지금 다시 읽기') : null,
+        ROOT.last ? h('button', { class: 'btn', onclick: scanReport }, '읽은 결과' + (ROOT.last.rep.notes.length ? ' (확인 ' + ROOT.last.rep.notes.length + ')' : '')) : null));
   }
   const card = (t, d, b, fn) => h('div', { class: 'card' }, h('h3', { text: t }), h('p', { text: d }), h('button', { class: 'btn primary', onclick: fn }, b));
   const go = t => { SET.tab = t; saveSet(); render(); window.scrollTo(0, 0); };
@@ -437,7 +448,7 @@
       const s = schedOf(P, r.n) || {};
       tb.append(h('tr', null, h('td', { class: 'strong', text: r.n + '차' }), h('td', { class: 'small', text: (s.name || '') + (s.date ? ' · ' + s.date.slice(5).replace('-', '/') : '') }),
         kinds.map(k => {
-          const ds = r.docs.filter(d => d.kind === k);
+          const ds = r.docs.filter(d => d.kind === k || (!kinds.includes(d.kind) && (D.SPEND_KINDS.includes(d.kind) ? k === '진행비' : k === '계획')));
           const need = k === '계획' || k === '결과보고';
           return h('td', { class: 'mc' }, ds.map(d => h('button', { class: 'doc ' + (d.status === '결재 완료' ? 'done' : d.status === '결재 요청' ? 'req' : 'draft'), title: d.title || '', onclick: () => docModal(P, r, d) }, (d.no ? d.no.slice(-4) : '0000') + (docSpend(d) ? ' ' + fmt(docSpend(d)) : ''))),
             h('button', { class: 'plus' + (need && !ds.length ? ' need' : ''), title: k + ' 추가', onclick: () => docModal(P, r, null, k) }, need && !ds.length ? '+ 필요' : '+'));
@@ -447,7 +458,7 @@
     return h('div', null,
       todo.length ? h('ul', { class: 'checks' }, todo.map(t => h('li', { class: 'warnline', text: t }))) : h('p', { class: 'okline', text: '할 일로 걸리는 회차가 없습니다.' }),
       h('div', { class: 'twrap' }, h('table', { class: 'tbl mx' }, h('thead', null, h('tr', null, h('th', { text: '회차' }), h('th', { text: '활동' }), kinds.map(k => h('th', { text: k })), h('th', { text: '지출 합' }))), tb)),
-      h('p', { class: 'muted small', text: '칸을 누르면 그 회차의 기안을 적습니다. 지출 기안은 계획의 예산 줄에 금액을 나눠 적으면 남은 예산에서 빠집니다. 결과보고 결산은 같은 회차 지출 기안의 합계로 채워집니다. (기안 파일을 자동으로 만들어 주는 기능은 다음 단계에서 붙입니다.)' }),
+      h('p', { class: 'muted small', text: '‘손잡다’ 폴더를 연결해 두면 내부기안 폴더의 회차 기안이 저절로 들어옵니다. 칸을 누르면 그 회차의 기안을 적거나 고칩니다. 지출 기안은 계획의 예산 줄에 금액을 나눠 적으면 남은 예산에서 빠집니다. 결과보고 결산은 같은 회차 지출 기안의 합계로 채워집니다. (기안 파일을 자동으로 만들어 주는 기능은 다음 단계에서 붙입니다.)' }),
       h('button', { class: 'btn', onclick: () => { const n = P.rounds.reduce((a, r) => Math.max(a, r.n), 0) + 1; P.rounds.push({ id: uid(), n, docs: [] }); save(); render(); } }, '+ 계획에 없는 회차 추가'));
   }
   function docModal(P, r, d, kind) {
@@ -590,16 +601,84 @@
         warn.length ? [h('b', { text: '주의' }), h('ul', { class: 'warnlist' }, warn.map(x => h('li', { text: x })))] : null))));
   }
 
+  /* ---------- 기안 폴더 자동 읽기 ---------- */
+  // ‘손잡다’ 폴더를 한 번 연결하면 앱을 열 때마다 연도 폴더의 내부기안·예산서를 읽어 사업 자료를 채움(읽기만 함)
+  const ROOT = { h: null, mode: 'read', perm: 'none', busy: false, last: LS.get('gian-scan', null) };
+  async function rootPerm() { try { return await ROOT.h.queryPermission({ mode: ROOT.mode }); } catch (e) { return 'denied'; } }
+  async function setRoot(h, mode) { ROOT.h = h; ROOT.mode = mode; ROOT.perm = 'granted'; await S.kv.put('root', h ? { h, mode } : null); }
+  function scanBar(text) {
+    let b = document.getElementById('scanbar');
+    if (!text) { if (b) b.remove(); return; }
+    if (!b) { b = h('div', { id: 'scanbar', class: 'scanbar', role: 'status' }); document.body.append(b); }
+    b.textContent = text;
+  }
+  async function runScan(manual) {
+    if (!ROOT.h || ROOT.busy) return;
+    ROOT.perm = await rootPerm();
+    if (ROOT.perm !== 'granted') { if (manual) await reconnectRoot(); if (ROOT.perm !== 'granted') { render(); return; } }
+    ROOT.busy = true; scanBar('기안 폴더를 살펴보는 중…');
+    try {
+      const cache = (await S.kv.get('scan')) || {};
+      const res = await GSCAN.scan(ROOT.h, cache, (i, n) => scanBar('기안 폴더 읽는 중 ' + i + ' / ' + n));
+      const rep = GSCAN.apply(S.data, res, { proj: (y, s) => proj(y, s, true), leafPaths: B.leafPaths });
+      await S.kv.put('scan', cache);
+      const changed = rep.budgets + rep.versions + rep.docs + rep.updated;
+      if (changed) save();
+      ROOT.last = { at: Date.now(), total: res.total, read: res.read, errors: res.errors.slice(0, 20), rep };
+      LS.set('gian-scan', ROOT.last);
+      render();
+      if (manual) scanReport();
+      else if (changed) toast('기안 폴더에서 새로 읽음: 예산서 ' + rep.budgets + ' · 계획 ' + rep.versions + ' · 회차 기안 ' + rep.docs + (rep.updated ? ' · 바뀐 것 ' + rep.updated : ''));
+    } catch (e) { toast('기안 폴더를 읽지 못했습니다: ' + (e && e.message || e)); }
+    ROOT.busy = false; scanBar('');
+  }
+  async function reconnectRoot() {
+    try { ROOT.perm = await ROOT.h.requestPermission({ mode: ROOT.mode }); } catch (e) { ROOT.perm = 'denied'; }
+    return ROOT.perm;
+  }
+  async function linkRoot() {
+    if (!window.showDirectoryPicker) { modal('기안 폴더 연결', h('p', { text: '이 브라우저는 폴더 연결을 지원하지 않습니다. PC 크롬이나 엣지에서 열어 주세요.' })); return; }
+    let dir; try { dir = await window.showDirectoryPicker({ id: 'gian-root', mode: 'read' }); } catch (e) { return; }
+    if (!(await GSCAN.hasYears(dir))) { modal('기안 폴더 연결', h('p', { text: '‘' + dir.name + '’ 안에서 연도 폴더(' + GSCAN.START_YEAR + ' 등)의 ‘02. 내부기안’을 찾지 못했습니다. 연도 폴더들이 들어 있는 ‘손잡다’ 폴더를 골라 주세요.' })); return; }
+    await setRoot(dir, 'read'); toast('‘' + dir.name + '’ 폴더를 연결했습니다'); runScan(true);
+  }
+  function scanStatus() {
+    if (!ROOT.h) return '아직 연결하지 않았습니다.';
+    if (ROOT.busy) return '읽는 중입니다…';
+    if (ROOT.perm !== 'granted') return '‘' + ROOT.h.name + '’ 폴더를 다시 연결해 주세요(브라우저를 새로 열면 한 번 묻습니다).';
+    const l = ROOT.last;
+    return '‘' + ROOT.h.name + '’ 폴더 연결됨' + (l ? ' · ' + new Date(l.at).toLocaleString('ko-KR') + '에 기안 ' + l.total + '개 확인' + (l.rep.notes.length ? ', 확인할 것 ' + l.rep.notes.length + '건' : '') : '');
+  }
+  function scanReport() {
+    const l = ROOT.last; if (!l) return;
+    const r = l.rep, by = {};
+    r.notes.forEach(n => (by[n.sub || '기타'] = by[n.sub || '기타'] || []).push(n));
+    modal('기안 폴더 읽은 결과', h('div', { class: 'scanrep' },
+      h('p', { text: '파일 ' + l.total + '개 중 새로 읽은 것 ' + l.read + '개 · 새로 넣은 예산서 ' + r.budgets + ', 계획 버전 ' + r.versions + ', 회차 기안 ' + r.docs + (r.updated ? ', 바뀐 것 ' + r.updated : '') }),
+      h('p', { class: 'muted small', text: '사람이 고친 계획·기안은 덮어쓰지 않습니다. 같은 문서번호가 결재요청 폴더와 내부기안 폴더에 다 있으면 내부기안(결재 완료) 것을 씁니다.' }),
+      Object.keys(by).length ? [h('h4', { text: '확인할 것' }), Object.keys(by).map(s => [h('b', { text: s }), h('ul', null, by[s].map(n => h('li', { class: n.lv === 'mid' ? 'warnline' : 'muted', text: n.text })))])] : h('p', { class: 'okline', text: '확인할 것이 없습니다.' }),
+      Object.keys(r.skipped).length ? [h('h4', { text: '읽고 넣지 않은 것' }), h('ul', null, Object.entries(r.skipped).map(([k, v]) => h('li', { class: 'muted', text: k + ': ' + v + '개' })))] : null,
+      l.errors.length ? [h('h4', { text: '읽지 못한 파일' }), h('ul', null, l.errors.map(e => h('li', { class: 'warnline', text: e })))] : null), null, true);
+  }
+
   /* ---------- 설정 ---------- */
   async function linkFolder() {
     if (!window.showDirectoryPicker) { modal('폴더 연결', h('p', { text: '이 브라우저는 폴더 연결을 지원하지 않습니다. PC 크롬이나 엣지에서 열어 주세요. 그동안은 이 브라우저에 저장되고, 설정에서 파일로 내보낼 수 있습니다.' })); return; }
     let dir;
     try { dir = await window.showDirectoryPicker({ id: 'gian-data', mode: 'readwrite' }); } catch (e) { return; }
+    let root = null;
     if (dir.name !== '기안도우미') {
-      const ok = await new Promise(res => modal('폴더 확인', h('p', { text: '고른 폴더 ‘' + dir.name + '’ 안에 ‘기안도우미’ 폴더를 만들어(있으면 그대로) 거기에 저장할까요? 연도 폴더(2026 등) 바깥, ‘손잡다’ 폴더를 고르는 것을 권합니다.' }), [{ text: '취소', onclick: () => res(false) }, { text: '그렇게 하기', primary: true, onclick: () => res(true) }]));
+      const years = await GSCAN.hasYears(dir);
+      const ok = await new Promise(res => modal('폴더 확인', h('div', null,
+        h('p', { text: '고른 폴더 ‘' + dir.name + '’ 안에 ‘기안도우미’ 폴더를 만들어(있으면 그대로) 거기에 저장합니다.' }),
+        years ? h('p', { text: '연도 폴더도 들어 있으니, 앱을 열 때마다 연도 폴더의 ‘02. 내부기안’과 ‘40. 결산, 사업별 계정과목’을 읽어 사업 계획·회차 기안·예산서를 자동으로 채웁니다. 기안·예산 폴더는 읽기만 하고 고치지 않습니다.' })
+          : h('p', { class: 'muted', text: '연도 폴더(2026 등) 바깥, ‘손잡다’ 폴더를 고르면 기안도 자동으로 읽습니다.' })),
+        [{ text: '취소', onclick: () => res(false) }, { text: '그렇게 하기', primary: true, onclick: () => res(true) }]));
       if (!ok) return;
+      if (years) root = dir;
       try { dir = await dir.getDirectoryHandle('기안도우미', { create: true }); } catch (e) { toast('폴더를 만들지 못했습니다'); return; }
     }
+    if (root) { await setRoot(root, 'readwrite'); setTimeout(() => runScan(true), 300); }
     const j = await S.link(dir);
     const mine = S.data.budgets.length || Object.keys(S.data.projects).length;
     if (j && mine && j.savedAt !== S.data.savedAt) {
@@ -609,7 +688,13 @@
     } else if (j) { await S.replace(j); render(); toast('폴더 내용을 불러왔습니다'); }
     else { S.save(); await S.flush(); render(); toast('‘기안도우미’ 폴더에 저장했습니다'); }
   }
-  async function reconnect() { const p = await S.reconnect(); toast(p === 'granted' ? '다시 연결했습니다' : '연결하지 못했습니다'); render(); }
+  async function reconnect() {
+    if (ROOT.h && ROOT.perm !== 'granted') await reconnectRoot();
+    // ‘손잡다’ 폴더를 허락하면 그 안의 저장 폴더는 다시 묻지 않음
+    const p = S.dir ? (S.perm === 'granted' ? 'granted' : await S.reconnect()) : ROOT.perm;
+    toast(p === 'granted' ? '다시 연결했습니다' : '연결하지 못했습니다'); render();
+    if (ROOT.h && ROOT.perm === 'granted') runScan(false);
+  }
   S.onConflict = j => modal('다른 PC에서 바뀐 내용', h('p', { text: '폴더의 파일이 다른 곳에서 ' + new Date(j.savedAt).toLocaleString('ko-KR') + '에 바뀌었습니다. 어느 쪽을 쓸까요?' }), [
     { text: '폴더 내용 불러오기', primary: true, onclick: async () => { await S.replace(j); render(); } },
     { text: '이 PC 내용으로 덮어쓰기', danger: true, onclick: async () => { S.lastSync = j.savedAt; await S.flush(); } }]);
@@ -636,19 +721,31 @@
         h('div', { class: 'row wrap' }, h('button', { class: 'btn primary', 'data-nofs': '', onclick: linkFolder }, S.dir ? '다른 폴더 연결' : '폴더 연결'),
           S.dir && S.perm !== 'granted' ? h('button', { class: 'btn', 'data-nofs': '', onclick: reconnect }, '다시 연결') : null,
           S.dir ? h('button', { class: 'btn', onclick: async () => { await S.unlink(); render(); } }, '연결 끊기') : null)),
+      h('section', { class: 'card' }, h('h3', { text: '기안 폴더 자동 읽기' }), h('p', { text: scanStatus() }),
+        h('p', { class: 'muted small', text: '읽는 곳: 연도 폴더(' + GSCAN.START_YEAR + '년부터)의 ‘02. 내부기안’(결재요청 폴더 포함)과 ‘40. 결산, 사업별 계정과목’. 예산서는 자립지원사업(보조금)·자체사업(자부담) 파일만 넣습니다. 새로 생기거나 바뀐 파일만 다시 읽고, 사람이 고친 계획·기안은 덮어쓰지 않습니다.' }),
+        h('div', { class: 'row wrap' }, h('button', { class: 'btn primary', 'data-nofs': '', onclick: linkRoot }, ROOT.h ? '다른 폴더 연결' : '‘손잡다’ 폴더 연결'),
+          ROOT.h && ROOT.perm !== 'granted' ? h('button', { class: 'btn', 'data-nofs': '', onclick: reconnect }, '다시 연결') : null,
+          ROOT.h && ROOT.perm === 'granted' ? h('button', { class: 'btn', 'data-nofs': '', onclick: () => runScan(true) }, '지금 다시 읽기') : null,
+          ROOT.h ? h('button', { class: 'btn', onclick: async () => { await setRoot(null, 'read'); ROOT.perm = 'none'; render(); } }, '연결 끊기') : null)),
       h('section', { class: 'card' }, h('h3', { text: '내보내기 · 가져오기' }),
         h('div', { class: 'row wrap' }, h('button', { class: 'btn', onclick: () => download('기안도우미-' + today() + '.json', JSON.stringify(S.data)) }, '파일로 내보내기'), h('button', { class: 'btn', 'data-nofs': '', onclick: () => imp.click() }, '파일 가져오기'))),
       h('section', { class: 'card' }, h('h3', { text: '화면' }),
         h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: SET.autoFull, onchange: e => { SET.autoFull = e.target.checked; saveSet(); } }), ' 자동 전체화면 (화면을 처음 누를 때 전체화면으로)'),
         h('div', { class: 'row wrap' }, h('button', { class: 'btn', 'data-nofs': '', onclick: FS.toggle }, FS.on() ? '전체화면 끝내기' : '전체화면 켜기'), isStandalone() ? null : h('button', { class: 'btn', 'data-nofs': '', onclick: installHelp }, '홈 화면에 설치하기'))),
       h('section', { class: 'card' }, h('h3', { text: '모두 지우기' }), h('p', { class: 'muted small', text: '이 브라우저에 저장한 내용을 지웁니다. 연결한 폴더의 파일과 백업은 그대로 둡니다.' }),
-        h('button', { class: 'btn danger', onclick: () => ask('모두 지우기', '예산서와 사업 자료를 이 브라우저에서 지웁니다.', '지우기', async () => { await S.unlink(); await S.replace(S.empty()); render(); }, true) }, '모두 지우기')));
+        h('button', { class: 'btn danger', onclick: () => ask('모두 지우기', '예산서와 사업 자료를 이 브라우저에서 지웁니다.', '지우기', async () => { await S.unlink(); await setRoot(null, 'read'); ROOT.perm = 'none'; ROOT.last = null; LS.set('gian-scan', null); await S.kv.put('scan', {}); await S.replace(S.empty()); render(); }, true) }, '모두 지우기')));
   }
 
   /* ---------- 시작 ---------- */
   // Artifact 등에서 head 밖으로 나간 태그를 head로 옮김
   document.querySelectorAll('body > link[rel=manifest], body > link[rel=icon], body > link[rel=apple-touch-icon], body > meta').forEach(n => document.head.appendChild(n));
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
-  window.__gian = { S, B, SET, render, runReview, RV };
-  S.load().then(() => { if (!TABS.some(t => t[0] === SET.tab)) SET.tab = 'home'; render(); }).catch(() => render());
+  window.__gian = { S, B, SET, render, runReview, RV, ROOT, runScan, setRoot };
+  S.load().then(async () => {
+    if (!TABS.some(t => t[0] === SET.tab)) SET.tab = 'home';
+    const r = await S.kv.get('root');
+    if (r && r.h) { ROOT.h = r.h; ROOT.mode = r.mode || 'read'; ROOT.perm = await rootPerm(); }
+    render();
+    if (ROOT.h && ROOT.perm === 'granted') runScan(false);
+  }).catch(() => render());
 })();

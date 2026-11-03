@@ -67,7 +67,8 @@
       } catch (e) { S.status = '폴더에 저장하지 못함: ' + (e && e.message || e); }
     },
     async replace(j) { S.data = Object.assign(empty(), j); S.lastSync = j.savedAt || 0; await IDB.put('data', S.data); },
-    empty
+    empty,
+    kv: IDB // 기안 폴더 연결·읽은 결과 기억용
   };
   window.GSTORE = S;
 })();
