@@ -529,7 +529,7 @@
       h('div', { class: 'row wrap' }, h('button', { class: 'btn', 'data-nofs': '', onclick: () => prevPick.click() }, RV.prev ? '앞 문서: ' + RV.prev.name : '앞 문서(비교할 지난 기안) 고르기'),
         RV.prev ? h('button', { class: 'btn', onclick: () => { RV.prev = null; rerunAll(); } }, '앞 문서 빼기') : null,
         RV.items.length ? h('button', { class: 'btn', onclick: () => { RV.items = []; render(); } }, '결과 모두 지우기') : null),
-      h('p', { class: 'muted small', text: '확인하는 것: 파일 이름과 본문 제목, 연도, 다른 사업 이름, 차수·회기, 날짜와 요일, 산출식 계산, 표 합계·소계, 숫자 금액과 한글 금액, 계정과목 문구(예산서와 글자까지 같은지), 남은 예산, 붙임 번호, ‘끝.’ 표시, 금액 쉼표. 앞 문서를 고르면 바뀐 줄과 앞 문서에서 남은 날짜·차수도 봅니다.' }));
+      h('p', { class: 'muted small', text: '확인하는 것: 파일 이름과 본문 제목(차수·월·사업명), 시행 칸 번호·날짜, 이 문서 날짜의 연도, 다른 사업 이름(본문 첫 문장·목표·내용 칸·‘○○ N차’), 차수·회기, 대상자 이름, 회의 시간·장소, 날짜와 요일, 산출식 계산, 표 합계·소계, 숫자 금액과 한글 금액, 계정과목 문구(예산서와 같은지, 띄어쓰기는 넘어감), 남은 예산, 본문 항목 번호, 붙임 번호, ‘끝.’ 표시, 결과보고 평가 빈칸, 서식 자리표시, 금액 쉼표, 자주 틀리는 맞춤법(‘보고 하오니’ 등). 앞 문서를 고르면 바뀐 줄과 앞 문서에서 남은 날짜·차수도 봅니다.' }));
     RV.items.forEach(it => ap(page, resultCard(it)));
     return page;
   }
@@ -614,7 +614,20 @@
     { text: '폴더 내용 불러오기', primary: true, onclick: async () => { await S.replace(j); render(); } },
     { text: '이 PC 내용으로 덮어쓰기', danger: true, onclick: async () => { S.lastSync = j.savedAt; await S.flush(); } }]);
   function setView() {
-    const imp = h('input', { type: 'file', accept: '.json', class: 'hide', onchange: async e => { const f = e.target.files[0]; if (!f) return; try { const j = JSON.parse(await f.text()); if (!j.v) throw new Error('형식'); ask('가져오기', '지금 내용을 이 파일 내용으로 바꿉니다.', '바꾸기', async () => { await S.replace(j); S.save(); render(); toast('가져왔습니다'); }, true); } catch (er) { toast('기안 도우미 파일이 아닙니다'); } } });
+    const imp = h('input', { type: 'file', accept: '.json', class: 'hide', onchange: async e => {
+      const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+      let j; try { j = JSON.parse(await f.text()); if (!j.v) throw new Error('형식'); } catch (er) { toast('기안 도우미 파일이 아닙니다'); return; }
+      const keys = Object.keys(j.projects || {});
+      // 예산서 없이 사업만 든 파일(기존 기안에서 뽑은 계획 등)은 지금 내용에 합침
+      if (!(j.budgets || []).length && keys.length) {
+        const same = keys.filter(k => S.data.projects[k]);
+        modal('사업 가져오기', h('div', null, h('p', { text: '이 파일에는 사업 ' + keys.length + '개가 들어 있습니다: ' + keys.map(k => k.replace('|', '년 ')).join(', ') }),
+          h('p', { text: '지금 내용(예산서 등)은 그대로 두고 이 사업만 합칩니다.' + (same.length ? ' 이미 있는 사업(' + same.map(k => k.split('|')[1]).join(', ') + ')은 파일 내용으로 바뀝니다.' : '') })),
+          [{ text: '취소' }, { text: '합치기', primary: true, onclick: () => { keys.forEach(k => { S.data.projects[k] = j.projects[k]; }); S.save(); render(); toast('사업을 가져왔습니다'); } }]);
+        return;
+      }
+      ask('가져오기', '지금 내용을 이 파일 내용으로 바꿉니다.', '바꾸기', async () => { await S.replace(j); S.save(); render(); toast('가져왔습니다'); }, true);
+    } });
     return h('div', { class: 'page narrow' }, h('h2', { text: '설정' }), imp,
       h('section', { class: 'card' }, h('h3', { text: '저장 위치' }),
         h('p', { text: S.dir ? '연결한 폴더: ‘' + S.dir.name + '’ (' + (S.perm === 'granted' ? '저장 중' : '다시 연결 필요') + ')' : '아직 이 브라우저에만 저장합니다.' }),

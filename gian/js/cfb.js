@@ -63,10 +63,16 @@
     for (const p of parts) { out.set(p, o); o += p.length; }
     return out;
   }
+  /* 한글(.hwp) 본문은 압축 끝 뒤에 여분 바이트가 붙어 있는 경우가 많음.
+     브라우저는 이때 끝에서 오류를 내므로, 그때까지 풀린 내용을 그대로 씀 */
   async function inflateRaw(u8) {
     const ds = new DecompressionStream('deflate-raw');
-    const stream = new Blob([u8]).stream().pipeThrough(ds);
-    return new Uint8Array(await new Response(stream).arrayBuffer());
+    const w = ds.writable.getWriter();
+    w.write(u8).catch(() => {}); w.close().catch(() => {});
+    const rd = ds.readable.getReader(), parts = [];
+    try { for (;;) { const { done, value } = await rd.read(); if (done) break; parts.push(value); } }
+    catch (e) { if (!parts.length) throw e; }
+    return concat(parts);
   }
   /* zip(.hwpx, .xlsx) 안의 파일 읽기 */
   async function unzip(buf, want) {
