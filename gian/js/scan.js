@@ -221,7 +221,7 @@
     }
     return rows;
   }
-  /* 대장 줄: { no: '손잡다26-0149', date, title, who } (번호만 있고 날짜·제목이 비면 빈 번호) */
+  /* 대장 줄: { no: '손잡다26-0000', date, title, who } (번호만 있고 날짜·제목이 비면 빈 번호) */
   function ledgerOf(rows) {
     const hi = rows.findIndex(r => r.some(c => /^기안번호$/.test(nospace(c))));
     if (hi < 0) return [];
@@ -301,6 +301,27 @@
   const dHash1 = d => JSON.stringify([d.kind, d.no, d.date, d.title, d.status, d.spends, d.attend || '', d.settle == null ? '' : d.settle]);
   const dHash2 = d => JSON.stringify([d.kind, d.no, d.date, d.title, d.status, d.spends, d.attend || '', d.settle == null ? '' : d.settle, d.planned == null ? '' : d.planned, d.settled == null ? '' : d.settled, !!d.hasSettle, !!d.hasInspect, !!d.scan, d.budget == null ? '' : d.budget, (d.persons || []).join(','), d.link || '']);
   const isAuto = d => !!d.auto && (d.auto === dHash(d) || d.auto === dHash2(d) || d.auto === dHash1(d));
+  /* 번호를 새로 받을 기안 o({title, date})에 대장 기준 번호 추천: 대장에 이미 올라 있으면 그 번호, 아니면 그 날짜 앞뒤 빈 번호 */
+  function numberTip(o, ledger, used, skipNo) {
+    const L = ledger || [], md = d => (d || '').slice(5).replace('-', '/'), sim = (a, b) => lcsRatio(normT(a), normT(b));
+    if (!L.length) return '문서대장을 아직 읽지 않아 번호를 추천하지 못함';
+    // 같은 기안: 제목이 거의 같고, 제목 속 숫자(차수·월·회 등)가 모두 같을 때만
+    const nums = t => (String(t).match(/\d+/g) || []).join(',');
+    const reg = L.find(e => e.no !== skipNo && e.title && nums(e.title) === nums(o.title) && sim(e.title, o.title) >= 0.85);
+    if (reg && used && used.has(reg.no)) return '‘' + o.title + '’은(는) 대장과 내부기안 폴더에 이미 ' + reg.no.slice(-4) + '로 있음 → 이 파일이 미리 작성한 사본인지 확인';
+    if (reg) return '‘' + o.title + '’은(는) 대장에 ' + reg.no.slice(-4) + '로 올라 있음 → 파일 이름과 시행 칸을 ' + reg.no.slice(-4) + '로 고치면 됨';
+    const d = o.date || '', cand = [];
+    let prevDate = '';
+    L.forEach((e, i) => {
+      if (e.date) { prevDate = e.date; return; }
+      if (e.title || (used && used.has(e.no))) return;
+      const next = (L.slice(i + 1).find(x => x.date) || {}).date || '9999';
+      if (prevDate <= d && d <= next) cand.push({ e, prevDate, next });
+    });
+    if (cand.length) return '‘' + o.title + '’(' + md(d) + ')은(는) 대장의 빈 번호 ' + cand.slice(0, 3).map(c => c.e.no.slice(-4)).join(', ') + ' 중 하나를 추천(앞뒤 기안 ' + md(cand[0].prevDate) + ' ~ ' + (cand[0].next === '9999' ? '끝' : md(cand[0].next)) + ' 사이)';
+    const last = L.filter(e => e.title || e.date).slice(-1)[0];
+    return '‘' + o.title + '’은(는) 그 날짜 근처에 대장의 빈 번호가 없음 → 대장 다음 번호(' + (last ? String(+last.no.slice(-4) + 1).padStart(4, '0') : '?') + ')를 받으세요';
+  }
   /* 같은 번호를 쓴 기안: 대장에 그 번호로 올라 있는 것은 그대로 두고, 나머지에 대장의 빈 번호를 추천 */
   function dupText(no, docs, ledger, used) {
     const md = s => (s.date || '').slice(5).replace('-', '/');
@@ -311,23 +332,7 @@
     const keep = led && led.title ? docs.slice().sort((a, b) => sim(b.title, led.title) - sim(a.title, led.title))[0] : null;
     if (led && led.title) text += '. 문서대장에는 ‘' + led.title + '’(' + (led.date || '').slice(5).replace('-', '/') + ')로 올라 있음';
     const others = docs.filter(d => d !== keep);
-    const tips = others.map(o => {
-      // 대장에 이미 다른 번호로 올라 있으면 그 번호
-      const reg = L.find(e => e.no !== no && e.title && sim(e.title, o.title) >= 0.85);
-      if (reg) return '‘' + o.title + '’은(는) 대장에 ' + reg.no.slice(-4) + '로 올라 있음 → 파일 이름과 시행 칸을 ' + reg.no.slice(-4) + '로 고치면 됨';
-      // 그 날짜 앞뒤의 빈 번호(날짜·제목이 비고, 그 번호를 쓴 파일도 없는 것)
-      const d = o.date || '', cand = [];
-      let prevDate = '';
-      L.forEach((e, i) => {
-        if (e.date) { prevDate = e.date; return; }
-        if (e.title || used.has(e.no)) return;
-        const next = (L.slice(i + 1).find(x => x.date) || {}).date || '9999';
-        if (prevDate <= d && d <= next) cand.push({ e, prevDate, next });
-      });
-      if (cand.length) return '‘' + o.title + '’(' + md(o) + ')은(는) 대장의 빈 번호 ' + cand.slice(0, 3).map(c => c.e.no.slice(-4)).join(', ') + ' 중 하나를 추천(앞뒤 기안 ' + (cand[0].prevDate || '').slice(5).replace('-', '/') + ' ~ ' + (cand[0].next === '9999' ? '끝' : cand[0].next.slice(5).replace('-', '/')) + ' 사이)';
-      const last = L.filter(e => e.title || e.date).slice(-1)[0];
-      return '‘' + o.title + '’은(는) 그 날짜 근처에 빈 번호가 없음 → 대장 다음 번호(' + (last ? String(+last.no.slice(-4) + 1).padStart(4, '0') : '?') + ')를 받으세요';
-    });
+    const tips = others.map(o => numberTip(o, L, used, no));
     return text + ' → ' + (keep ? '‘' + keep.title + '’은(는) 그대로, ' : '') + tips.join('; ');
   }
   /* 빈 회차 정리: 기안이 없고, 계획 회차 일정에 없고, 사람이 만든 것도 아닌 회차는 뺌. 분기 → 차 → 회기 순 */
@@ -548,5 +553,5 @@
     }
     return rep;
   }
-  window.GSCAN = { places, hasYears, scan, apply, extract, parseBasis, budgetEntries, suggestAcct, START_YEAR };
+  window.GSCAN = { places, hasYears, scan, apply, extract, parseBasis, budgetEntries, suggestAcct, numberTip, START_YEAR };
 })();

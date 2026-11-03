@@ -105,7 +105,7 @@
     if (!G) add('low', 'notgian', '기안문이 아닌 문서로 보임', '붙임·일지·조사지 같은 문서로 보고 날짜·계산·합계·표기만 확인했습니다.');
     else {
       if (!meta.fileOk) add('low', 'name', '파일 이름이 기안 형식이 아님', '‘손잡다26-번호 MMDD 제목’ 형식이면 번호·날짜·제목을 함께 확인할 수 있습니다.');
-      if (meta.fileOk && /^0+$/.test(meta.no)) add('low', 'no', '문서번호를 아직 받지 않음(' + meta.no + ')', '결재 전에 문서대장에서 번호를 받아 파일 이름과 시행 칸에 넣어 주세요.');
+      if (meta.fileOk && /^0+$/.test(meta.no)) add('low', 'no', '문서번호를 아직 받지 않음(' + meta.no + ')', '결재 전에 문서대장에서 번호를 받아 파일 이름과 시행 칸에 넣어 주세요.' + (opts.numberTip ? '\n' + opts.numberTip({ title: meta.fileTitle || meta.bodyTitle, date: meta.mmdd && meta.mmdd !== '0000' ? meta.year + '-' + meta.mmdd.slice(0, 2) + '-' + meta.mmdd.slice(2) : '' }) : ''));
       if (meta.fileTitle && meta.bodyTitle && normTitle(meta.fileTitle) !== normTitle(meta.bodyTitle)) {
         const a = titleKeys(meta.fileTitle), b = titleKeys(meta.bodyTitle);
         const diff = Object.keys(a).filter(k => b[k] && ![...a[k]].some(v => b[k].has(v))); // 겹치는 값이 하나도 없을 때만

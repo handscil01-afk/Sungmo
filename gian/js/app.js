@@ -203,7 +203,7 @@
         !ROOT.h ? h('button', { class: 'btn primary', 'data-nofs': '', onclick: () => S.dir ? linkRoot() : linkFolder() }, '‘손잡다’ 폴더 연결') : null,
         need ? h('button', { class: 'btn primary', 'data-nofs': '', onclick: reconnect }, '다시 연결') : null,
         ROOT.h && !need ? h('button', { class: 'btn', 'data-nofs': '', disabled: ROOT.busy ? 'disabled' : null, onclick: () => runScan(true) }, '지금 다시 읽기') : null,
-        ROOT.last ? h('button', { class: 'btn', onclick: scanReport }, '읽은 결과' + (ROOT.last.rep.notes.length ? ' (확인 ' + ROOT.last.rep.notes.length + ')' : '')) : null));
+        ROOT.last ? h('button', { class: 'btn', onclick: scanReport }, '읽은 결과' + (midCount() ? ' (확인 ' + midCount() + ')' : '')) : null));
   }
   const card = (t, d, b, fn) => h('div', { class: 'card' }, h('h3', { text: t }), h('p', { text: d }), h('button', { class: 'btn primary', onclick: fn }, b));
   const go = t => { SET.tab = t; saveSet(); render(); window.scrollTo(0, 0); };
@@ -660,7 +660,8 @@
     const year = (GREVIEW.docMeta(d).year) || SET.year;
     const hasB = S.data.budgets.some(b => b.year === year);
     return GREVIEW.review(d, { prev: RV.prev, accounts: hasB ? B.accountsAll(year) : null, budgetOf: hasB ? (f, p) => B.status(year, f, p) : null,
-      scanHas: ROOT.scans.size ? n => ROOT.scans.has('손잡다' + String(year).slice(2) + '-' + n) : null });
+      scanHas: ROOT.scans.size ? n => ROOT.scans.has('손잡다' + String(year).slice(2) + '-' + n) : null,
+      numberTip: ROOT.ledger && ROOT.ledger.length ? o => GSCAN.numberTip(o, ROOT.ledger.filter(e => e.no.startsWith('손잡다' + String(year).slice(2) + '-')), new Set(ROOT.used || [])) : null });
   }
   function rerunAll() { RV.items.forEach(it => { if (it.doc) it.res = doReview(it.doc); }); render(); }
   function resultCard(it) {
@@ -710,7 +711,7 @@
 
   /* ---------- 기안 폴더 자동 읽기 ---------- */
   // ‘손잡다’ 폴더를 한 번 연결하면 앱을 열 때마다 연도 폴더의 내부기안·예산서를 읽어 사업 자료를 채움(읽기만 함)
-  const ROOT = { h: null, mode: 'read', perm: 'none', busy: false, last: LS.get('gian-scan', null), scans: new Set(LS.get('gian-scans', [])) };
+  const ROOT = { h: null, mode: 'read', perm: 'none', busy: false, last: LS.get('gian-scan', null), scans: new Set(LS.get('gian-scans', [])), ledger: [], used: [] };
   async function rootPerm() { try { return await ROOT.h.queryPermission({ mode: ROOT.mode }); } catch (e) { return 'denied'; } }
   async function setRoot(h, mode) { ROOT.h = h; ROOT.mode = mode; ROOT.perm = 'granted'; await S.kv.put('root', h ? { h, mode } : null); }
   function scanBar(text) {
@@ -729,6 +730,7 @@
       const res = await GSCAN.scan(ROOT.h, cache, (i, n) => scanBar('기안 폴더 읽는 중 ' + i + ' / ' + n));
       const rep = GSCAN.apply(S.data, res, { proj: (y, s) => proj(y, s, true), leafPaths: B.leafPaths });
       ROOT.scans = new Set(res.scans); LS.set('gian-scans', res.scans);
+      ROOT.ledger = res.ledger || []; ROOT.used = res.docs.map(x => x.no).filter(Boolean); await S.kv.put('ledger', { rows: ROOT.ledger, used: ROOT.used });
       await S.kv.put('scan', cache);
       const changed = rep.budgets + rep.versions + rep.docs + rep.updated;
       if (changed) save();
@@ -750,12 +752,13 @@
     if (!(await GSCAN.hasYears(dir))) { modal('기안 폴더 연결', h('p', { text: '‘' + dir.name + '’ 안에서 연도 폴더(' + GSCAN.START_YEAR + ' 등)의 ‘02. 내부기안’을 찾지 못했습니다. 연도 폴더들이 들어 있는 ‘손잡다’ 폴더를 골라 주세요.' })); return; }
     await setRoot(dir, 'read'); toast('‘' + dir.name + '’ 폴더를 연결했습니다'); runScan(true);
   }
+  const midCount = () => ROOT.last ? ROOT.last.rep.notes.filter(n => n.lv === 'mid').length : 0;
   function scanStatus() {
     if (!ROOT.h) return '아직 연결하지 않았습니다.';
     if (ROOT.busy) return '읽는 중입니다…';
     if (ROOT.perm !== 'granted') return '‘' + ROOT.h.name + '’ 폴더를 다시 연결해 주세요(브라우저를 새로 열면 한 번 묻습니다).';
     const l = ROOT.last;
-    return '‘' + ROOT.h.name + '’ 폴더 연결됨' + (l ? ' · ' + new Date(l.at).toLocaleString('ko-KR') + '에 기안 ' + l.total + '개 확인' + (l.rep.notes.length ? ', 확인할 것 ' + l.rep.notes.length + '건' : '') : '');
+    return '‘' + ROOT.h.name + '’ 폴더 연결됨' + (l ? ' · ' + new Date(l.at).toLocaleString('ko-KR') + '에 기안 ' + l.total + '개 확인' + (midCount() ? ', 확인할 것 ' + midCount() + '건' : '') : '');
   }
   /* 세부사업을 알 수 없는 기안(회계·행정 등)을 제목으로 대략 나눔 */
   const CATS = [['회계·급여', /임대료|관리비|공공요금|기장료|가지출|여입|인건비|급여|수당|사회보험|퇴직|이자|반납|반환|회계\s*보고|정산|통장|예치|세입|세출|추경|추가\s*경정|원천|연말\s*정산|보험료|부족분|전기|수도|가스|통신|인터넷/],
@@ -876,6 +879,7 @@
   window.__gian = { S, B, SET, render, runReview, RV, ROOT, runScan, setRoot };
   S.load().then(async () => {
     if (!TABS.some(t => t[0] === SET.tab)) SET.tab = 'home';
+    const lg = await S.kv.get('ledger'); if (lg) { ROOT.ledger = lg.rows || []; ROOT.used = lg.used || []; }
     const r = await S.kv.get('root');
     if (r && r.h) { ROOT.h = r.h; ROOT.mode = r.mode || 'read'; ROOT.perm = await rootPerm(); }
     render();
