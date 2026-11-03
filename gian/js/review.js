@@ -331,6 +331,18 @@
       if (!cells.has(T) && !pair) add('high', 'total', '본문 금액이 표 어디에도 없음', '본문 ' + fmt(T) + '원, 표 합계 ' + [...new Set(tableTotals.map(Math.abs))].map(fmt).join('·') + '원입니다.', [moneyHits[0][3]]);
     }
 
+    // 11-2. 정산서·물품검수조서: 결산(집행액)이 예산보다 많으면 안 됨. 적게 썼으면 지출기안에 정산서가 있어야 함
+    const st = settleOf(doc);
+    if (G && D().SPEND_KINDS.includes(meta.kind) && !/여입|반납|반환/.test(meta.title)) {
+      const scanNote = opts.scanHas && meta.no && !/^0+$/.test(meta.no) ? (opts.scanHas(meta.no) ? ' 스캔본이 있으니 스캔본에 정산서가 있는지 확인해 주세요.' : ' 스캔본도 아직 없습니다.') : '';
+      if (st && st.spent != null && st.budget != null) {
+        if (st.spent > st.budget) add('high', 'settle', '집행액이 예산보다 많음', '정산서 예산액 ' + fmt(st.budget) + '원, 집행액 ' + fmt(st.spent) + '원입니다. 결산은 예산을 넘을 수 없습니다.', [st.line]);
+        else if (st.spent < st.budget && !st.reason) add('mid', 'settle', '차액 발생 사유가 비어 있음', '예산 ' + fmt(st.budget) + '원 중 ' + fmt(st.spent) + '원을 썼습니다. ‘예산대비 집행금액 차액 발생 사유’를 적어 주세요.', [st.line]);
+      } else if (st) add('low', 'settle', '정산서의 예산액·집행액 합계를 찾지 못함', '정산서 합계 줄을 확인해 주세요.');
+      else if (['진행비', '다과비', '식비', '재료비', '숙박비', '물품구입비'].includes(meta.kind)) add(meta.kind === '진행비' ? 'mid' : 'low', 'settle', '정산서가 없음', '예산대로 썼으면 괜찮고, 예산보다 적게 썼으면 지출기안에 정산서를 붙여야 합니다.' + scanNote);
+      if (['물품구입비', '홍보비'].includes(meta.kind) && !L.some(l => /검\s*수\s*조\s*서|검수하였음/.test(l))) add('mid', 'inspect', '물품검수조서가 없음', '물품을 산 지출기안에는 물품검수조서를 함께 넣습니다.' + scanNote);
+    }
+
     // 12. 계정과목 (띄어쓰기만 다른 것은 같은 계정으로 봄: 기안 계정 표는 ‘수용비 및 수수료’처럼 띄어 쓰고, 예산서는 붙여 씀)
     const acc = opts.accounts || D().BUILTIN_ACCTS;
     const known = [];
@@ -467,6 +479,25 @@
     return { meta, findings: F, diff, verdict, docTotal, accounts: found.map(k => k.fund + ': ' + k.segs.join(' / ')) };
   }
 
+  /* 사업비 정산서: ‘항 | 목 | 세목 | 예산액/산출근거 | 집행액 | 산출근거’ 표의 합계 줄과 차액 발생 사유 */
+  function settleOf(doc) {
+    if (!doc.lines.some(l => /정\s*산\s*서|\|\s*집행액\s*\|/.test(l))) return null;
+    const num = c => { const m = /^\s*([\d,]+)\s*원?\s*$/.exec(c || ''); return m ? +m[1].replace(/,/g, '') : null; };
+    const out = { budget: null, spent: null, reason: '', line: '', spentBasis: '' };
+    for (const t of doc.blocks.filter(b => b.type === 'table')) {
+      const hi = t.rows.findIndex(r => r.some(c => /^집행액$/.test(nospace(c))));
+      if (hi < 0) continue;
+      const head = t.rows[hi].map(nospace), si = head.findIndex(c => c === '집행액');
+      const tot = t.rows.slice(hi + 1).find(r => /^(합계|총계|계)$/.test(nospace(r.find(c => c.trim()) || '')));
+      if (tot) { const ns = tot.map(num).filter(v => v != null); if (ns.length >= 2) { out.budget = ns[0]; out.spent = ns[1]; out.line = tot.join(' | '); } }
+      out.spentBasis = t.rows.slice(hi + 1).filter(r => r !== tot).map(r => r.slice(si + 1).join(' ')).join(' ');
+      break;
+    }
+    const rl = doc.lines.find(l => /차액\s*발생\s*사유/.test(l));
+    if (rl) out.reason = rl.replace(/^.*차액\s*발생\s*사유\s*>?\s*/, '').replace(/^[\s\-–:]+/, '').replace(/\d{4}년\s*\d+월\s*\d+일\s*계획한.*$/, '').trim();
+    return out;
+  }
+
   function lineDiff(a, b) {
     const A = a.map(x => x.replace(/\s+/g, ' ').trim()), B = b.map(x => x.replace(/\s+/g, ' ').trim());
     const n = A.length, m = B.length;
@@ -500,5 +531,5 @@
     lines.push('', '※ 정해진 규칙으로 자동 확인한 결과입니다. 내용 판단(욕구·목표 연결 등)은 따로 봐 주세요.');
     return lines.join('\n');
   }
-  window.GREVIEW = { review, docMeta, reportText, korNum, lineDiff };
+  window.GREVIEW = { review, docMeta, reportText, korNum, lineDiff, settleOf };
 })();

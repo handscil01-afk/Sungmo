@@ -24,12 +24,16 @@
   async function kids(dir) { const out = []; for await (const [name, h] of dir.entries()) if (h.kind === 'directory') out.push({ name, h }); return out; }
   const isGianDir = n => /내부기안$/.test(n.trim()) && !/스캔/.test(n);
   const isBudgetDir = n => /^40\b|계정과목/.test(n.trim());
+  const isScanDir = n => /내부기안\s*스캔/.test(n);
   /* 고른 폴더가 ‘손잡다’(연도 폴더 위)인지, 연도 폴더인지, 내부기안 폴더인지 보고 읽을 곳을 정함 */
   async function places(root) {
     const out = [], ym = /^(20\d{2})$/.exec(root.name);
     const yearDir = async (y, h, base) => {
-      const p = { year: y, gian: null, budget: null, base };
-      for (const k of await kids(h)) { if (isGianDir(k.name)) p.gian = { h: k.h, path: base + '/' + k.name }; else if (isBudgetDir(k.name)) p.budget = { h: k.h, path: base + '/' + k.name }; }
+      const p = { year: y, gian: null, budget: null, scan: null, base };
+      for (const k of await kids(h)) {
+        const v = { h: k.h, path: base + '/' + k.name };
+        if (isGianDir(k.name)) p.gian = v; else if (isScanDir(k.name)) p.scan = v; else if (isBudgetDir(k.name)) p.budget = v;
+      }
       if (p.gian || p.budget) out.push(p);
     };
     if (ym) await yearDir(+ym[1], root, root.name);
@@ -100,6 +104,11 @@
     const q = /([1-4])\s*분기/.exec(meta.title);
     sum.n = meta.round || meta.session || (q ? +q[1] : null);
     sum.rows = acctRows(doc).map(r => ({ acct: r.acct, fund: r.fund, amount: r.amount, items: r.items }));
+    const st = RV().settleOf(doc);
+    if (st) sum.settle = { budget: st.budget, spent: st.spent, reason: st.reason, items: parseBasis(st.spentBasis) };
+    sum.inspect = L.some(l => /검\s*수\s*조\s*서|검수하였음/.test(l));
+    const pm = /(?:개별자립지원|개별동료상담)\s*\(([^)]+)\)\s*(.*)$/.exec(meta.title);
+    if (pm) { sum.persons = pm[1].split(/[,，、]/).map(x => x.trim()).filter(Boolean); if (meta.kind === '연계') sum.link = pm[2].replace(/\s*연계\s*$/, '').trim(); }
     const planKinds = ['사업계획', '변경계획'];
     if (planKinds.includes(meta.kind) && !sum.n && /사업\s*(변경\s*)?계획/.test(meta.title)) {
       sum.plan = true;
@@ -146,8 +155,10 @@
 
   /* ---------- 읽기 ---------- */
   async function scan(root, cache, onProgress) {
-    const list = [], out = { docs: [], budgets: [], errors: [], read: 0, reused: 0 };
+    const list = [], out = { docs: [], budgets: [], errors: [], read: 0, reused: 0, scans: [] };
     for (const p of await places(root)) {
+      // 스캔본은 이름만 봄(대부분 사진이라 글자를 읽을 수 없음): 문서번호별로 스캔본이 있는지
+      if (p.scan) try { for await (const f of walk(p.scan.h, p.scan.path, 0)) { const m = /손잡다(\d{2})-(\d+)/.exec(f.name); if (m) out.scans.push('손잡다' + m[1] + '-' + m[2]); } } catch (e) { out.errors.push(p.scan.path + ': ' + (e && e.message || e)); }
       if (p.gian) for await (const f of walk(p.gian.h, p.gian.path, 0)) if (/\.hwpx?$/i.test(f.name)) list.push(Object.assign(f, { area: 'gian', year: p.year }));
       if (p.budget) for await (const f of walk(p.budget.h, p.budget.path, 0)) if (/\.xls$/i.test(f.name)) list.push(Object.assign(f, { area: 'budget', year: p.year }));
     }
@@ -188,10 +199,20 @@
 
   /* ---------- 앱 자료에 합치기 ---------- */
   const vHash = v => JSON.stringify([v.kind, v.no, v.date, v.status, v.goals, v.reason || '', v.lines.map(l => [l.item, l.fund, l.acct, l.price, l.qty])]);
-  const dHash = d => JSON.stringify([d.kind, d.no, d.date, d.title, d.status, d.spends, d.attend || '', d.settle == null ? '' : d.settle]);
+  const dHash = d => JSON.stringify([d.kind, d.no, d.date, d.title, d.status, d.spends, d.attend || '', d.settle == null ? '' : d.settle, d.planned == null ? '' : d.planned, d.settled == null ? '' : d.settled, !!d.hasSettle, !!d.hasInspect, !!d.scan, d.budget == null ? '' : d.budget, (d.persons || []).join(','), d.link || '']);
+  /* 품목 금액 합을 target에 맞춤(정산서 품목을 못 나눴을 때 큰 품목부터 덜어 냄) */
+  function fitTo(items, target) {
+    const out = items.map(x => Object.assign({}, x)); let diff = out.reduce((a, x) => a + x.amount, 0) - target;
+    for (const x of out.slice().sort((a, b) => b.amount - a.amount)) { if (diff <= 0) break; const t = Math.min(diff, x.amount); x.amount -= t; diff -= t; }
+    return out;
+  }
   const ROUND_KIND = k => k === '변경계획' ? '계획' : k;
+  const normT = t => nospace(t).replace(/[()（）‘’'"“”]/g, '');
+  const docKey = s => /-0+$/.test(s.no) || !s.no ? s.path : s.no + '|' + normT(s.title);
+  const sameDoc = (d, s) => d.src === s.path || (s.no && !/-0+$/.test(s.no) && d.no === s.no && normT(d.title) === normT(s.title));
   function apply(data, res, ctx) {
     const rep = { budgets: 0, versions: 0, docs: 0, updated: 0, notes: [], skipped: {} };
+    const scans = new Set(res.scans || []);
     const note = (sub, text, lv) => rep.notes.push({ sub, text, lv: lv || 'mid' });
     const skip = (why, n) => { rep.skipped[why] = (rep.skipped[why] || 0) + (n || 1); };
     // 예산서
@@ -207,8 +228,13 @@
     }
     // 같은 문서번호가 결재요청·내부기안 두 곳에 있으면 내부기안(결재 완료) 것을 씀
     const docs = res.docs.filter(s => !s.skip).sort((a, b) => (a.status === '결재 완료' ? 0 : 1) - (b.status === '결재 완료' ? 0 : 1));
-    const seen = new Set(), use = [];
-    for (const s of docs) { const k = /-0+$/.test(s.no) ? s.path : s.no; if (seen.has(k)) continue; seen.add(k); use.push(s); }
+    // 같은 기안인지는 문서번호와 제목으로 봄(번호를 잘못 같이 쓴 서로 다른 기안도 있어서)
+    const seen = new Set(), use = [], byNo = {};
+    for (const s of docs) {
+      const k = docKey(s); if (seen.has(k)) continue; seen.add(k); use.push(s);
+      if (!/-0+$/.test(s.no)) (byNo[s.no] = byNo[s.no] || []).push(s);
+    }
+    for (const no in byNo) if (byNo[no].length > 1) note(byNo[no][0].sub || '기타', no + ': 같은 문서번호를 쓴 기안이 ' + byNo[no].length + '건 있음(' + byNo[no].map(s => s.title).join(' / ') + ') → 하나는 번호를 새로 받아야 함');
     res.docs.filter(s => s.skip).forEach(s => skip(s.skip));
     const groups = {};
     for (const s of use) (groups[s.year + '|' + s.sub] = groups[s.year + '|' + s.sub] || []).push(s);
@@ -254,19 +280,19 @@
         P.versions.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
         for (const f of ['보조금', '자부담']) if (!P.accts[f]) { const a = lines.find(l => l.fund === f && leaf(f).includes(l.acct)); if (a) P.accts[f] = a.acct; }
       }
-      if (PERSON.includes(sub)) { const n = rounds.length; if (n) skip('사람별 사업(개별자립지원·개별동료상담) 기안: 사람별 화면은 다음 단계', n); continue; }
-      // 회차 기안
       const KIND_ITEM = { 물품구입비: /물품/, 대관료: /대관|임차/, 다과비: /다과/, 식비: /식비/, 재료비: /재료/, 숙박비: /숙박/, 강사비: /강사|ILP/i, 통역비: /통역/, 홍보비: /홍보/, 교육비: /교육/, '보험·공제': /공제|보험/, 활동비: /활동비/ };
-      for (const s of rounds) {
-        if (['실적보고', '사업계획', '내역변경'].includes(s.kind) || (s.kind === '변경계획' && !s.n)) { skip('회차가 없는 기안(실적보고·내역변경 등)'); continue; }
-        const n = s.n || 1;
-        let r = P.rounds.find(x => x.n === n);
-        const ex = r && r.docs.find(d => d.src === s.path || (s.no && !/-0+$/.test(s.no) && d.no === s.no));
-        const ver = P.versions.filter(v => v.status === '확정' && (v.date || '') <= s.date).slice(-1)[0] || P.versions[P.versions.length - 1];
-        const d = { id: ex ? ex.id : uid(), kind: ROUND_KIND(s.kind), no: s.no, date: s.date, title: s.title, status: s.status, spends: {}, attend: '', memo: ex ? ex.memo || '' : '', src: s.path };
-        const tag = n + '차 ' + d.kind + '(' + s.no + ')';
-        if (D().SPEND_KINDS.includes(d.kind) && ver) {
-          for (const row of s.rows) {
+      const fillSpend = (d, s, ver, tag) => {
+        d.planned = s.money; d.hasSettle = !!s.settle; d.hasInspect = !!s.inspect; d.scan = scans.has(s.no);
+        d.settled = s.settle && s.settle.spent != null ? s.settle.spent : null;
+        if (!(D().SPEND_KINDS.includes(d.kind) && ver)) return;
+        let rows = s.rows;
+        // 정산서가 있으면 집행액으로(적게 쓴 만큼 덜 뺌). 정산서 품목 합이 집행액과 같으면 그 품목을, 아니면 예산 품목을 집행액에 맞춰 줄임
+        if (d.settled != null && rows.length) {
+          const its = s.settle.items, sumIts = its.reduce((a, x) => a + x.amount, 0), planned = rows.reduce((a, r) => a + (r.amount || 0), 0);
+          if (rows.length === 1) rows = [Object.assign({}, rows[0], { amount: d.settled, items: its.length && sumIts === d.settled ? its : fitTo(rows[0].items, d.settled) })];
+          else if (d.settled !== planned) { let left = planned - d.settled; rows = rows.map(r => { const t = Math.min(left, r.amount || 0); left -= t; return Object.assign({}, r, { amount: (r.amount || 0) - t, items: fitTo(r.items, (r.amount || 0) - t) }); }); }
+        }
+          for (const row of rows) {
             if (nospace(row.acct[0]) === '가지출') { note(sub, tag + ': 가지출은 남은 예산에 넣지 않음(나중에 본 계정으로 지출하는 기안이 따로 있음)', 'low'); continue; }
             const fund = fundOf(row.acct, row.fund), acct = canonAcct(row.acct, fund, leaf);
             const own = ver.lines.filter(x => x.fund === fund && x.acct === acct);
@@ -289,8 +315,35 @@
             }
             if (row.amount != null && row.items.length > 1 && used && used !== row.amount) note(sub, tag + ': 표 금액 ' + row.amount.toLocaleString('ko-KR') + '원 가운데 산출근거로 나눈 ' + used.toLocaleString('ko-KR') + '원만 넣음');
           }
+      };
+      if (PERSON.includes(sub)) {
+        P.pdocs = P.pdocs || [];
+        for (const s of rounds) {
+          if (['실적보고', '사업계획', '내역변경', '모집'].includes(s.kind)) { skip('사람별 화면에 넣지 않는 기안(모집·실적보고·내역변경 등)'); continue; }
+          const ex = P.pdocs.find(d => sameDoc(d, s));
+          const ver = P.versions.filter(v => v.status === '확정' && (v.date || '') <= s.date).slice(-1)[0] || P.versions[P.versions.length - 1];
+          const d = { id: ex ? ex.id : uid(), kind: s.kind, no: s.no, date: s.date, title: s.title, status: s.status, spends: {}, attend: '', memo: ex ? ex.memo || '' : '', src: s.path, persons: s.persons || [], link: s.link || '' };
+          fillSpend(d, s, ver, (d.persons.join(', ') || '공통') + ' ' + d.kind + '(' + s.no + ')');
+          d.auto = dHash(d);
+          if (ex && (!ex.auto || ex.auto !== dHash(ex))) continue;
+          if (ex && ex.auto === d.auto) continue;
+          if (ex) { P.pdocs[P.pdocs.indexOf(ex)] = d; rep.updated++; } else { P.pdocs.push(d); rep.docs++; }
         }
+        P.pdocs.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+        continue;
+      }
+      // 회차 기안
+      for (const s of rounds) {
+        if (['실적보고', '사업계획', '내역변경'].includes(s.kind) || (s.kind === '변경계획' && !s.n)) { skip('회차가 없는 기안(실적보고·내역변경 등)'); continue; }
+        const n = s.n || 1;
+        let r = P.rounds.find(x => x.n === n);
+        const ex = r && r.docs.find(d => sameDoc(d, s));
+        const ver = P.versions.filter(v => v.status === '확정' && (v.date || '') <= s.date).slice(-1)[0] || P.versions[P.versions.length - 1];
+        const d = { id: ex ? ex.id : uid(), kind: ROUND_KIND(s.kind), no: s.no, date: s.date, title: s.title, status: s.status, spends: {}, attend: '', memo: ex ? ex.memo || '' : '', src: s.path };
+        const tag = n + '차 ' + d.kind + '(' + s.no + ')';
+        fillSpend(d, s, ver, tag);
         if (d.kind === '결과보고') { d.settle = s.money == null ? '' : s.money; d.attend = (s.names || []).join('\n'); }
+        if (d.kind === '계획') d.budget = s.money;
         d.auto = dHash(d);
         if (ex && (!ex.auto || ex.auto !== dHash(ex))) continue; // 사람이 고친 기안은 그대로
         if (ex && ex.auto === d.auto) continue;
