@@ -84,6 +84,12 @@
       }
       out.push(it);
     }
+    // ×·= 없이 금액만 적은 줄: 배송비·할인·쿠폰 등(할인·쿠폰은 빼기)
+    const rest = String(text || '').replace(/\s+/g, ' ').replace(IT, ' ');
+    for (const m of rest.matchAll(/(배송비|택배비|운송비|할인|쿠폰\s*할인|쿠폰|적립금\s*사용|포인트\s*사용)\s*[:：]?\s*([-△▲−]?)\s*([\d,]+)\s*원/g)) {
+      const neg = !!m[2] || /할인|쿠폰|적립|포인트/.test(m[1]), v = (neg ? -1 : 1) * toNum(m[3]);
+      out.push({ item: m[1].replace(/\s+/g, ' '), price: v, qty: '1식', amount: v });
+    }
     return out;
   }
   /* 예산과목 표(관·항·목·세목): 줄마다 계정 경로·재원·금액·품목 */
@@ -190,13 +196,58 @@
     return { fund, year, date: date || dayOf(mt) };
   }
 
+  /* ---------- 문서대장(.xlsx) ---------- */
+  async function xlsxRows(buf) {
+    const files = await GCFB.unzip(buf, n => /^xl\/(sharedStrings|workbook)\.xml$|^xl\/worksheets\/sheet\d+\.xml$|^xl\/_rels\/workbook\.xml\.rels$/.test(n));
+    const dec = new TextDecoder('utf-8'), txt = n => files[n] ? dec.decode(files[n]) : '';
+    const ent = x => x.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&#(\d+);/g, (_, n) => String.fromCharCode(+n)).replace(/&amp;/g, '&');
+    const tOf = x => ent([...x.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(m => m[1]).join(''));
+    const ss = [...txt('xl/sharedStrings.xml').matchAll(/<si>([\s\S]*?)<\/si>/g)].map(m => tOf(m[1]));
+    const wb = txt('xl/workbook.xml'), rels = txt('xl/_rels/workbook.xml.rels');
+    const sheets = [...wb.matchAll(/<sheet\b([^>]*)\/?>/g)].map(m => ({ hidden: /state="(hidden|veryHidden)"/.test(m[1]), rid: (/r:id="([^"]+)"/.exec(m[1]) || [])[1] }));
+    const pick = sheets.find(x => !x.hidden) || sheets[0];
+    let target = 'xl/worksheets/sheet1.xml';
+    if (pick && pick.rid) for (const r of rels.matchAll(/<Relationship\b([^>]*)\/?>/g)) if (new RegExp('Id="' + pick.rid + '"').test(r[1])) { const t = (/Target="([^"]+)"/.exec(r[1]) || [])[1]; if (t) target = 'xl/' + t.replace(/^\/?(xl\/)?/, ''); }
+    const rows = [];
+    for (const rm of (txt(target) || txt('xl/worksheets/sheet1.xml')).matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)) {
+      const row = [];
+      for (const cm of rm[1].matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+        const ref = (/r="([A-Z]+)\d+"/.exec(cm[1]) || [])[1], t = (/t="([^"]+)"/.exec(cm[1]) || [])[1], body = cm[2] || '';
+        let v = (/<v>([\s\S]*?)<\/v>/.exec(body) || [])[1];
+        if (t === 's') v = ss[+v]; else if (t === 'inlineStr') v = tOf(body); else if (v != null) v = ent(v);
+        if (ref) { let ci = 0; for (const ch of ref) ci = ci * 26 + ch.charCodeAt(0) - 64; row[ci - 1] = v == null ? '' : String(v); }
+      }
+      rows.push(Array.from(row, x => x == null ? '' : x));
+    }
+    return rows;
+  }
+  /* 대장 줄: { no: '손잡다26-0149', date, title, who } (번호만 있고 날짜·제목이 비면 빈 번호) */
+  function ledgerOf(rows) {
+    const hi = rows.findIndex(r => r.some(c => /^기안번호$/.test(nospace(c))));
+    if (hi < 0) return [];
+    const head = rows[hi].map(nospace), col = re => head.findIndex(c => re.test(c));
+    const cd = col(/^날짜$|^일자$|기안일/), cn = col(/^기안번호$/), ct = col(/제목/), cw = col(/담당/);
+    const out = [];
+    for (const r of rows.slice(hi + 1)) {
+      const m = /(\d{2})\s*-\s*(\d+)/.exec(r[cn] || ''); if (!m) continue;
+      let d = String(r[cd] || '').trim();
+      if (/^\d+(\.\d+)?$/.test(d)) d = dayOf(Date.UTC(1899, 11, 30) + Math.floor(+d) * 864e5 + new Date().getTimezoneOffset() * 6e4);
+      else { const x = /(20\d{2})\D+(\d{1,2})\D+(\d{1,2})/.exec(d); d = x ? iso(+x[1], +x[2], +x[3]) : ''; }
+      out.push({ no: '손잡다' + m[1] + '-' + m[2].padStart(4, '0'), date: d, title: String(r[ct] || '').trim(), who: cw >= 0 ? String(r[cw] || '').trim() : '' });
+    }
+    return out;
+  }
+
   /* ---------- 읽기 ---------- */
   async function scan(root, cache, onProgress) {
-    const list = [], out = { docs: [], budgets: [], errors: [], read: 0, reused: 0, scans: [] };
+    const list = [], ledgers = [], out = { docs: [], budgets: [], errors: [], read: 0, reused: 0, scans: [], ledger: [] };
     for (const p of await places(root)) {
       // 스캔본은 이름만 봄(대부분 사진이라 글자를 읽을 수 없음): 문서번호별로 스캔본이 있는지
       if (p.scan) try { for await (const f of walk(p.scan.h, p.scan.path, 0)) { const m = /손잡다(\d{2})-(\d+)/.exec(f.name); if (m) out.scans.push('손잡다' + m[1] + '-' + m[2]); } } catch (e) { out.errors.push(p.scan.path + ': ' + (e && e.message || e)); }
-      if (p.gian) for await (const f of walk(p.gian.h, p.gian.path, 0)) if (/\.hwpx?$/i.test(f.name)) list.push(Object.assign(f, { area: 'gian', year: p.year }));
+      if (p.gian) for await (const f of walk(p.gian.h, p.gian.path, 0)) {
+        if (/\.hwpx?$/i.test(f.name)) list.push(Object.assign(f, { area: 'gian', year: p.year }));
+        else if (/문서\s*대장.*\.xlsx$/i.test(f.name) && f.path.split('/').length === 3) ledgers.push(Object.assign(f, { year: p.year })); // 내부기안 폴더 바로 아래 것만
+      }
       if (p.budget) for await (const f of walk(p.budget.h, p.budget.path, 0)) if (/\.xls$/i.test(f.name)) list.push(Object.assign(f, { area: 'budget', year: p.year }));
     }
     let i = 0;
@@ -229,7 +280,16 @@
         out.read++; (f.area === 'gian' ? out.docs : out.budgets).push(sum);
       } catch (e) { out.errors.push(f.path + ': ' + (e && e.message || e)); }
     }
-    for (const k of Object.keys(cache)) if (!list.some(f => f.path === k)) delete cache[k]; // 없어진 파일
+    for (const f of ledgers) {
+      try {
+        const file = await f.handle.getFile(), c = cache[f.path];
+        let rows;
+        if (c && c.mt === file.lastModified && c.size === file.size) rows = c.ledger;
+        else { rows = ledgerOf(await xlsxRows(await file.arrayBuffer())); cache[f.path] = { mt: file.lastModified, size: file.size, ledger: rows }; }
+        out.ledger.push(...rows);
+      } catch (e) { out.errors.push(f.path + ': ' + (e && e.message || e)); }
+    }
+    for (const k of Object.keys(cache)) if (!list.some(f => f.path === k) && !ledgers.some(f => f.path === k)) delete cache[k]; // 없어진 파일
     out.total = list.length;
     return out;
   }
@@ -241,6 +301,35 @@
   const dHash1 = d => JSON.stringify([d.kind, d.no, d.date, d.title, d.status, d.spends, d.attend || '', d.settle == null ? '' : d.settle]);
   const dHash2 = d => JSON.stringify([d.kind, d.no, d.date, d.title, d.status, d.spends, d.attend || '', d.settle == null ? '' : d.settle, d.planned == null ? '' : d.planned, d.settled == null ? '' : d.settled, !!d.hasSettle, !!d.hasInspect, !!d.scan, d.budget == null ? '' : d.budget, (d.persons || []).join(','), d.link || '']);
   const isAuto = d => !!d.auto && (d.auto === dHash(d) || d.auto === dHash2(d) || d.auto === dHash1(d));
+  /* 같은 번호를 쓴 기안: 대장에 그 번호로 올라 있는 것은 그대로 두고, 나머지에 대장의 빈 번호를 추천 */
+  function dupText(no, docs, ledger, used) {
+    const md = s => (s.date || '').slice(5).replace('-', '/');
+    let text = no + ': 같은 문서번호를 쓴 기안이 ' + docs.length + '건(' + docs.map(s => s.title + ' ' + md(s)).join(' / ') + ')';
+    if (!ledger.length) return text + ' → 하나는 번호를 새로 받아야 함(문서대장을 찾지 못해 추천은 못 함)';
+    const L = ledger.filter(e => e.no.slice(0, 6) === no.slice(0, 6)), led = L.find(e => e.no === no);
+    const sim = (a, b) => lcsRatio(normT(a), normT(b));
+    const keep = led && led.title ? docs.slice().sort((a, b) => sim(b.title, led.title) - sim(a.title, led.title))[0] : null;
+    if (led && led.title) text += '. 문서대장에는 ‘' + led.title + '’(' + (led.date || '').slice(5).replace('-', '/') + ')로 올라 있음';
+    const others = docs.filter(d => d !== keep);
+    const tips = others.map(o => {
+      // 대장에 이미 다른 번호로 올라 있으면 그 번호
+      const reg = L.find(e => e.no !== no && e.title && sim(e.title, o.title) >= 0.85);
+      if (reg) return '‘' + o.title + '’은(는) 대장에 ' + reg.no.slice(-4) + '로 올라 있음 → 파일 이름과 시행 칸을 ' + reg.no.slice(-4) + '로 고치면 됨';
+      // 그 날짜 앞뒤의 빈 번호(날짜·제목이 비고, 그 번호를 쓴 파일도 없는 것)
+      const d = o.date || '', cand = [];
+      let prevDate = '';
+      L.forEach((e, i) => {
+        if (e.date) { prevDate = e.date; return; }
+        if (e.title || used.has(e.no)) return;
+        const next = (L.slice(i + 1).find(x => x.date) || {}).date || '9999';
+        if (prevDate <= d && d <= next) cand.push({ e, prevDate, next });
+      });
+      if (cand.length) return '‘' + o.title + '’(' + md(o) + ')은(는) 대장의 빈 번호 ' + cand.slice(0, 3).map(c => c.e.no.slice(-4)).join(', ') + ' 중 하나를 추천(앞뒤 기안 ' + (cand[0].prevDate || '').slice(5).replace('-', '/') + ' ~ ' + (cand[0].next === '9999' ? '끝' : cand[0].next.slice(5).replace('-', '/')) + ' 사이)';
+      const last = L.filter(e => e.title || e.date).slice(-1)[0];
+      return '‘' + o.title + '’은(는) 그 날짜 근처에 빈 번호가 없음 → 대장 다음 번호(' + (last ? String(+last.no.slice(-4) + 1).padStart(4, '0') : '?') + ')를 받으세요';
+    });
+    return text + ' → ' + (keep ? '‘' + keep.title + '’은(는) 그대로, ' : '') + tips.join('; ');
+  }
   /* 빈 회차 정리: 기안이 없고, 계획 회차 일정에 없고, 사람이 만든 것도 아닌 회차는 뺌. 분기 → 차 → 회기 순 */
   function tidyRounds(P) {
     const inSched = n => P.versions.some(v => (v.schedule || []).some(x => x.n === n));
@@ -259,14 +348,18 @@
   const docKey = s => /-0+$/.test(s.no) || !s.no ? s.path : s.no + '|' + normT(s.title);
   const sameDoc = (d, s) => d.src === s.path || (s.no && !/-0+$/.test(s.no) && d.no === s.no && normT(d.title) === normT(s.title));
   function apply(data, res, ctx) {
-    const rep = { budgets: 0, versions: 0, docs: 0, updated: 0, notes: [], skipped: {} };
+    const rep = { budgets: 0, versions: 0, docs: 0, updated: 0, notes: [], skipped: {}, skippedList: {}, pending: {} };
     const scans = new Set(res.scans || []);
     const leafAll = y => ['보조금', '자부담'].flatMap(f => (ctx.leafPaths(y, f) || []).map(path => ({ fund: f, path })));
     const note = (sub, text, lv) => rep.notes.push({ sub, text, lv: lv || 'mid' });
-    const skip = (why, n) => { rep.skipped[why] = (rep.skipped[why] || 0) + (n || 1); };
+    const skip = (why, n, s) => {
+      rep.skipped[why] = (rep.skipped[why] || 0) + (n || 1);
+      const L = rep.skippedList[why] = rep.skippedList[why] || [];
+      if (s && L.length < 600) L.push({ no: s.no || '', title: s.title || s.name || '', kind: s.kind || '' });
+    };
     // 예산서
     for (const b of res.budgets) {
-      if (b.skip) { skip(b.skip); continue; }
+      if (b.skip) { skip(b.skip, 1, b); continue; }
       if (!b.expense) continue;
       const old = data.budgets.find(x => x.src === b.path);
       if (old && old.srcMt === b.mt) continue;
@@ -283,8 +376,14 @@
       const k = docKey(s); if (seen.has(k)) continue; seen.add(k); use.push(s);
       if (!/-0+$/.test(s.no)) (byNo[s.no] = byNo[s.no] || []).push(s);
     }
-    for (const no in byNo) if (byNo[no].length > 1) note(byNo[no][0].sub || '기타', no + ': 같은 문서번호를 쓴 기안이 ' + byNo[no].length + '건 있음(' + byNo[no].map(s => s.title).join(' / ') + ') → 하나는 번호를 새로 받아야 함');
-    res.docs.filter(s => s.skip).forEach(s => skip(s.skip));
+    const used = new Set(res.docs.map(s => s.no).filter(Boolean));
+    for (const no in byNo) if (byNo[no].length > 1) note(byNo[no][0].sub || '기타', dupText(no, byNo[no], res.ledger || [], used));
+    res.docs.filter(s => s.skip).forEach(s => skip(s.skip, 1, s));
+    // 결재 요청 중인 기안: 결재요청 폴더(사람별 폴더 포함)별로
+    for (const s of use) if (s.status === '결재 요청') {
+      const parts = s.path.split('/'), i = parts.findIndex(x => /^결재요청/.test(x)), folder = i >= 0 && i + 2 < parts.length ? parts[i + 1] : '결재요청';
+      (rep.pending[folder] = rep.pending[folder] || []).push({ no: s.no, title: s.title, kind: s.kind });
+    }
     const groups = {};
     for (const s of use) (groups[s.year + '|' + s.sub] = groups[s.year + '|' + s.sub] || []).push(s);
     for (const key in groups) {
@@ -365,8 +464,11 @@
           let pool = own.length ? own : ver.lines.filter(x => x.acct === acct), loose = false;
           // 계획서나 지출 기안의 계정 문구가 조금 틀린 경우: 사업비 계정이면 이 사업의 예산 줄에서 품목으로 맞춤
           if (!pool.length && nospace(row.acct[0]) === '사업비') { pool = ver.lines.filter(x => /^사업비\//.test(x.acct)); loose = true; }
-          if (!pool.length && nospace(row.acct[0]) !== '사업비') { skip('사업비가 아닌 계정(홍보비 = 운영비 ‘수용비 및 수수료’ 등)에서 나간 지출: 남은 예산은 예산 화면에서 봄'); continue; }
+          if (!pool.length && nospace(row.acct[0]) !== '사업비') { skip('사업비가 아닌 계정(홍보비 = 운영비 ‘수용비 및 수수료’ 등)에서 나간 지출: 남은 예산은 예산 화면에서 봄', 1, s); continue; }
           let its = row.items.length ? row.items.map(x => Object.assign({}, x)) : [{ item: '', amount: row.amount || 0 }];
+          // 할인(빼기)은 가장 큰 품목에서 덜어 냄
+          const negs = its.filter(x => x.amount < 0);
+          if (negs.length && its.some(x => x.amount > 0)) { its = its.filter(x => x.amount >= 0); const big = its.reduce((m, x) => x.amount > m.amount ? x : m, its[0]); negs.forEach(x => { big.amount += x.amount; }); }
           // 표 금액(할인·배송비 포함 총액)이 기준
           const sumIt = its.reduce((a, x) => a + x.amount, 0);
           if (row.amount != null && row.items.length && sumIt !== row.amount) {
@@ -396,7 +498,7 @@
       if (PERSON.includes(sub)) {
         P.pdocs = P.pdocs || [];
         for (const s of rounds) {
-          if (['실적보고', '사업계획', '내역변경', '모집'].includes(s.kind)) { skip('사람별 화면에 넣지 않는 기안(모집·실적보고·내역변경 등)'); continue; }
+          if (['실적보고', '사업계획', '내역변경', '모집'].includes(s.kind)) { skip('사람별 화면에 넣지 않는 기안(모집·실적보고·내역변경 등)', 1, s); continue; }
           for (const rr of P.rounds) { const i = rr.docs.findIndex(d => sameDoc(d, s) && isAuto(d)); if (i >= 0) rr.docs.splice(i, 1); }
           const ex = P.pdocs.find(d => sameDoc(d, s));
           const ver = P.versions.filter(v => v.status === '확정' && (v.date || '') <= s.date).slice(-1)[0] || P.versions[P.versions.length - 1];
@@ -413,7 +515,7 @@
       }
       // 회차 기안
       for (const s of rounds) {
-        if (['실적보고', '사업계획', '내역변경'].includes(s.kind) || (s.kind === '변경계획' && !s.n)) { skip('회차가 없는 기안(실적보고·내역변경 등)'); continue; }
+        if (['실적보고', '사업계획', '내역변경'].includes(s.kind) || (s.kind === '변경계획' && !s.n)) { skip('회차가 없는 기안(실적보고·내역변경 등)', 1, s); continue; }
         const hasQ = rounds.some(x => x.per === '분기'), t = s.eventDate || s.date || '';
         const n = s.n || (hasQ && t ? Math.ceil(+t.slice(5, 7) / 3) : 1), per = s.per || (hasQ && t ? '분기' : '차');
         let r = P.rounds.find(x => x.n === n && (x.unit || '차') === per);

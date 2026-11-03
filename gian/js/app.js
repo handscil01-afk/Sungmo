@@ -757,15 +757,40 @@
     const l = ROOT.last;
     return '‘' + ROOT.h.name + '’ 폴더 연결됨' + (l ? ' · ' + new Date(l.at).toLocaleString('ko-KR') + '에 기안 ' + l.total + '개 확인' + (l.rep.notes.length ? ', 확인할 것 ' + l.rep.notes.length + '건' : '') : '');
   }
+  /* 세부사업을 알 수 없는 기안(회계·행정 등)을 제목으로 대략 나눔 */
+  const CATS = [['회계·급여', /임대료|관리비|공공요금|기장료|가지출|여입|인건비|급여|수당|사회보험|퇴직|이자|반납|반환|회계\s*보고|정산|통장|예치|세입|세출|추경|추가\s*경정|원천|연말\s*정산|보험료|부족분|전기|수도|가스|통신|인터넷/],
+    ['운영위원회·이사회·회의', /운영\s*위원회|이사회|총회|회의/], ['인사·복무', /채용|임용|퇴사|입사|업무\s*분장|인수\s*인계|복무|출장|여비|연가|휴가|직원|종사자|범죄\s*경력/],
+    ['공모·지원 신청·보고', /공모|지원\s*사업|신청|교부|보고서|제출|재단|공동모금|국고/], ['물품·시설·계약', /구입|계약|렌탈|공사|수리|설치|소모품|사무용품|명함|소화기|비품|소프트웨어|교통카드/],
+    ['홍보·대외·후원', /홍보|보도|안내|협조|후원|기부|위촉|개소식|방문/]];
+  const catOf = t => (CATS.find(([, re]) => re.test(t || '')) || ['기타'])[0];
   function scanReport() {
     const l = ROOT.last; if (!l) return;
     const r = l.rep, by = {};
     r.notes.forEach(n => (by[n.sub || '기타'] = by[n.sub || '기타'] || []).push(n));
+    const fold = (title, body) => h('details', { class: 'fold' }, h('summary', null, title), h('div', { class: 'fold-b' }, body));
+    const docLi = x => h('li', { text: (x.no ? x.no.slice(-4) + ' ' : '') + (x.title || '') });
+    const mids = sb => by[sb].filter(n => n.lv === 'mid');
+    const subs = Object.keys(by).sort((a, b) => mids(b).length - mids(a).length || a.localeCompare(b, 'ko'));
+    const pend = Object.entries(r.pending || {}), skipped = Object.entries(r.skipped || {});
+    const totalMid = r.notes.filter(n => n.lv === 'mid').length;
     modal('기안 폴더 읽은 결과', h('div', { class: 'scanrep' },
       h('p', { text: '파일 ' + l.total + '개 중 새로 읽은 것 ' + l.read + '개 · 새로 넣은 예산서 ' + r.budgets + ', 계획 버전 ' + r.versions + ', 회차 기안 ' + r.docs + (r.updated ? ', 바뀐 것 ' + r.updated : '') }),
-      h('p', { class: 'muted small', text: '사람이 고친 계획·기안은 덮어쓰지 않습니다. 같은 문서번호가 결재요청 폴더와 내부기안 폴더에 다 있으면 내부기안(결재 완료) 것을 씁니다.' }),
-      Object.keys(by).length ? [h('h4', { text: '확인할 것' }), Object.keys(by).map(s => [h('b', { text: s }), h('ul', null, by[s].map(n => h('li', { class: n.lv === 'mid' ? 'warnline' : 'muted', text: n.text })))])] : h('p', { class: 'okline', text: '확인할 것이 없습니다.' }),
-      Object.keys(r.skipped).length ? [h('h4', { text: '읽고 넣지 않은 것' }), h('ul', null, Object.entries(r.skipped).map(([k, v]) => h('li', { class: 'muted', text: k + ': ' + v + '개' })))] : null,
+      h('p', { class: 'muted small', text: '사람이 고친 계획·기안은 덮어쓰지 않습니다. 같은 문서번호가 결재요청 폴더와 내부기안 폴더에 다 있으면 내부기안(결재 완료) 것을 씁니다. 줄을 누르면 펼쳐집니다.' }),
+      h('h4', { text: '확인할 것 · 사업별' + (totalMid ? ' (확인 ' + totalMid + '건)' : '') }),
+      subs.length ? subs.map(sb => { const ms = mids(sb), ls = by[sb].filter(n => n.lv !== 'mid');
+        return fold([h('b', { text: sb }), ' ', ms.length ? h('span', { class: 'chip mid', text: '확인 ' + ms.length }) : null, ' ', ls.length ? h('span', { class: 'chip low', text: '참고 ' + ls.length }) : null],
+          h('ul', null, ms.concat(ls).map(n => h('li', { class: n.lv === 'mid' ? 'warnline' : 'muted', text: n.text })))); }) : h('p', { class: 'okline', text: '확인할 것이 없습니다.' }),
+      pend.length ? [h('h4', { text: '결재 요청 중인 기안 · 폴더별' }), pend.map(([f, xs]) => fold([h('b', { text: f }), ' · ' + xs.length + '건'], h('ul', null, xs.map(docLi))))] : null,
+      skipped.length ? [h('h4', { text: '읽고 넣지 않은 것' }), skipped.map(([k, v]) => {
+        const xs = (r.skippedList || {})[k] || [];
+        let body;
+        if (/세부사업을 알 수 없음/.test(k) && xs.length) {
+          const g = {}; xs.forEach(x => (g[catOf(x.title)] = g[catOf(x.title)] || []).push(x));
+          body = [h('p', { class: 'muted small', text: '사업 이름이 제목에 없어 사업 화면에 넣지 않은 기안입니다(회계·행정 기안이 대부분). 제목으로 대략 나눴습니다.' }),
+            Object.entries(g).sort((a, b) => b[1].length - a[1].length).map(([c, ys]) => fold(c + ' · ' + ys.length + '개', h('ul', null, ys.map(docLi))))];
+        } else body = xs.length ? h('ul', null, xs.map(docLi)) : h('p', { class: 'muted small', text: '목록 없음' });
+        return fold(k + ': ' + v + '개', body);
+      })] : null,
       l.errors.length ? [h('h4', { text: '읽지 못한 파일' }), h('ul', null, l.errors.map(e => h('li', { class: 'warnline', text: e })))] : null), null, true);
   }
 
