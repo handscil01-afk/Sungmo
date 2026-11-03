@@ -108,6 +108,7 @@
             const ln = lines[lid]; if (!ln || ln.fund !== fund) continue;
             if ((ln.acct + '/').startsWith(prefix + '/') || ln.acct === prefix) s += +d.spends[lid] || 0;
           }
+          for (const e of d.extra || []) if (e.fund === fund && ((e.acct + '/').startsWith(prefix + '/') || e.acct === prefix)) s += +e.amount || 0;
         }
       }
       return s;
@@ -144,20 +145,23 @@
     P.rounds.sort((a, b) => a.n - b.n);
   }
   const schedOf = (P, n) => { const v = baseVer(P); return v ? (v.schedule || []).find(s => s.n === n) || null : null; };
-  const docSpend = d => Object.values(d.spends || {}).reduce((a, b) => a + (+b || 0), 0);
+  const docSpend = d => Object.values(d.spends || {}).reduce((a, b) => a + (+b || 0), 0) + (d.extra || []).reduce((a, x) => a + (+x.amount || 0), 0);
   const roundSpend = r => r.docs.filter(d => d.kind !== '결과보고').reduce((a, d) => a + docSpend(d), 0);
   const allDocs = P => P.rounds.flatMap(r => r.docs).concat(P.pdocs || []);
   const lineSpent = (P, lid) => allDocs(P).reduce((b, d) => b + (+((d.spends || {})[lid]) || 0), 0);
-  const PERSON_SUBS = ['개별자립지원', '개별동료상담'];
+  const PERSON_SUBS = ['개별자립지원', '개별동료상담', '자립생활프로그램'];
   const isPerson = P => PERSON_SUBS.includes(P.sub);
-  const SETTLE_KINDS = ['진행비', '다과비', '식비', '재료비', '숙박비', '물품구입비'];
+  const isCourse = P => P.sub === '자립생활프로그램'; // 교육(강좌)별, 월별 강사비는 공통
+  const runit = r => r.n + (r.unit || '차'); // 1차 · 3회기 · 2분기
+  const SETTLE_KINDS = ['진행비', '다과비', '식비', '재료비', '숙박비']; // 물품구입비는 정산서 대신 물품검수조서
+  const isRefund = d => /여입|반납|반환/.test(d.title || '');
   function attendees(d) { return String(d && d.attend || '').split(/[\n,，、]/).map(s => s.trim()).filter(Boolean); }
 
   /* ---------- 머리줄 ---------- */
   const TABS = [['home', '처음'], ['budget', '예산'], ['proj', '사업'], ['review', '기안 검수'], ['guide', '작성 안내'], ['set', '설정']];
   function renderHeader() {
     const hd = document.getElementById('hdr'); hd.textContent = '';
-    hd.append(h('div', { class: 'brand' }, h('img', { src: 'icon-192.png', alt: '' }), h('b', { text: '기안 도우미' })),
+    ap(hd, h('div', { class: 'brand' }, h('img', { src: 'icon-192.png', alt: '' }), h('b', { text: '기안 도우미' })),
       h('nav', { class: 'tabs' }, TABS.map(([k, t]) => h('button', { class: 'tab' + (SET.tab === k ? ' on' : ''), onclick: () => { SET.tab = k; saveSet(); render(); } }, t))),
       FS.supported() || !isStandalone() ? h('button', { class: 'icon', 'data-nofs': '', title: FS.on() ? '전체화면 끝내기' : '전체화면', onclick: FS.toggle, text: FS.on() ? '⤡' : '⤢' }) : null);
   }
@@ -319,7 +323,7 @@
       return wrap;
     }
     ensureRounds(P);
-    const tabs = [['plan', '계획'], isPerson(P) ? ['rounds', '사람별'] : ['rounds', '회차 기안'], ['money', '예산·잔액'], ['perf', '실적']];
+    const tabs = [['plan', '계획'], isPerson(P) ? ['rounds', isCourse(P) ? '교육별' : '사람별'] : ['rounds', '회차 기안'], ['money', '예산·잔액'], ['perf', '실적']];
     ap(wrap, h('div', { class: 'seg mb' }, tabs.map(([k, t]) => h('button', { class: SET.ptab === k ? 'on' : '', onclick: () => { SET.ptab = k; saveSet(); render(); } }, t))));
     const views = { plan: planTab, rounds: isPerson(P) ? peopleTab : roundsTab, money: moneyTab, perf: isPerson(P) ? personPerfTab : perfTab };
     ap(wrap, (views[SET.ptab] || planTab)(P));
@@ -378,7 +382,16 @@
       else if (st) chk.push(h('li', { class: 'okline', text: f + ' ‘' + pathText(path) + '’ 예산서 금액과 계획 합계(' + won(s) + ')가 같습니다.' }));
     }
     const notIn = v.lines.filter(l => l.acct && !B.leafPaths(P.year, l.fund).includes(l.acct));
-    notIn.forEach(l => chk.push(h('li', { class: 'warnline', text: '‘' + (l.item || '이름 없음') + '’ 줄의 계정과목이 지금 예산서에 없습니다: ' + pathText(l.acct) })));
+    notIn.forEach(l => {
+      const sg = GSCAN.suggestAcct(String(l.acct).split('/'), ['보조금', '자부담'].flatMap(f => B.leafPaths(P.year, f).map(path => ({ fund: f, path }))));
+      chk.push(h('li', { class: 'warnline' }, '‘' + (l.item || '이름 없음') + '’ 줄의 계정과목 ‘' + pathText(l.acct) + '’이(가) 예산서에 없습니다. ' + (sg ? '예산서의 ‘' + pathText(sg.path) + '’(' + sg.fund + ')을(를) 이렇게 쓴 것 같습니다. ' : '예산서 문구가 기준입니다.'),
+        sg ? h('button', { class: 'btn', onclick: () => ask('계정과목을 예산서 문구로', '‘' + pathText(l.acct) + '’을(를) ‘' + pathText(sg.path) + '’(' + sg.fund + ')(으)로 바꿉니다. 이 사업의 모든 계획 버전에서 같은 문구를 쓴 줄을 함께 바꿉니다. 기안 파일은 바뀌지 않습니다.', '바꾸기', () => {
+          const old = l.acct;
+          for (const vv of P.versions) for (const x of vv.lines) if (x.acct === old) { x.acct = sg.path; x.fund = sg.fund; }
+          for (const f of ['보조금', '자부담']) if (P.accts[f] === old) P.accts[f] = ''; if (!P.accts[sg.fund]) P.accts[sg.fund] = sg.path;
+          save(); render(); toast('예산서 문구로 바꿨습니다. 다시 읽으면 지출도 이 계정으로 맞춥니다');
+        }) }, '예산서 문구로 바꾸기') : null));
+    });
     if (chk.length) ap(box, h('ul', { class: 'checks' }, chk));
     // 회차 일정
     const sb = h('tbody');
@@ -436,8 +449,8 @@
   const TITLE_KIND_P = { '사전회의': '사전회의 진행 보고', '중간회의': '중간회의 진행 보고', '변경계획': '변경 계획', '연계': '연계' };
   const PERSON_KINDS = ['사전회의', '계획', '연계', '중간회의', '변경계획', '결과보고'];
   function suggestTitle(P, r, kind) {
-    if (r.person != null) return P.sub + (r.person ? '(' + r.person + ')' : '') + ' ' + (TITLE_KIND_P[kind] || kind);
-    return P.sub + ' ' + r.n + '차 ' + (TITLE_KIND[kind] || kind);
+    if (r.person != null) return P.sub === '자립생활프로그램' ? P.sub + ' ' + (r.person ? r.person + ' ' : '') + (TITLE_KIND_P[kind] || kind) : P.sub + (r.person ? '(' + r.person + ')' : '') + ' ' + (TITLE_KIND_P[kind] || kind);
+    return P.sub + ' ' + runit(r) + ' ' + (r.unit === '분기' && kind === '계획' ? '운영 계획' : r.unit === '분기' && kind === '결과보고' ? '운영 결과보고' : (TITLE_KIND[kind] || kind));
   }
   function roundsTab(P) {
     const base = baseVer(P);
@@ -445,40 +458,43 @@
     const kinds = D.ROUND_KINDS;
     const todo = [];
     const now = today();
+    // 분기 결과보고(자조모임 등)의 결산은 그 분기에 열린 회기·차수의 지출과 견줌
+    const inQ = (q, d) => { const t = String(d.when || d.date || ''); return t.slice(0, 4) === String(P.year) && Math.ceil(+t.slice(5, 7) / 3) === q; };
+    const spendOf = r => r.docs.filter(d => D.SPEND_KINDS.includes(d.kind)).concat(r.unit === '분기' ? P.rounds.filter(x => x.unit !== '분기').flatMap(x => x.docs).filter(d => D.SPEND_KINDS.includes(d.kind) && inQ(r.n, d)) : []);
     for (const r of P.rounds) {
-      const s = schedOf(P, r.n) || {};
+      const s = (r.unit || '차') === '차' ? schedOf(P, r.n) || {} : {}, u = runit(r);
       const has = k => r.docs.some(d => d.kind === k);
-      if (s.date && s.date < now && !has('결과보고')) todo.push(r.n + '차(' + s.date + '): 결과보고가 없습니다');
-      if (s.date && s.date >= now && !has('계획')) todo.push(r.n + '차(' + s.date + '): 운영계획을 먼저 써야 합니다');
+      if (s.date && s.date < now && !has('결과보고')) todo.push(u + '(' + s.date + '): 결과보고가 없습니다');
+      if (s.date && s.date >= now && !has('계획')) todo.push(u + '(' + s.date + '): 운영계획을 먼저 써야 합니다');
       const res = r.docs.find(d => d.kind === '결과보고'), plan = r.docs.find(d => d.kind === '계획');
-      const spendDocs = r.docs.filter(d => D.SPEND_KINDS.includes(d.kind));
+      const spendDocs = spendOf(r), actual = spendDocs.reduce((a, d) => a + docSpend(d), 0);
       const plannedSum = spendDocs.reduce((a, d) => a + (d.planned != null ? +d.planned : docSpend(d)), 0);
       if (res && res.settle != null && res.settle !== '') {
         const st = +res.settle, budget = plan && plan.budget ? +plan.budget : plannedSum;
-        if (budget && st > budget) todo.push(r.n + '차 결과보고 결산(' + won(st) + ')이 예산(' + won(budget) + ')보다 많습니다');
-        if (st !== roundSpend(r)) todo.push(r.n + '차 결과보고 결산(' + won(st) + ')과 지출 기안 집행 합계(' + won(roundSpend(r)) + ')가 다릅니다');
-        if (st < plannedSum) spendDocs.filter(d => SETTLE_KINDS.includes(d.kind) && !d.hasSettle).forEach(d => todo.push(r.n + '차: 예산보다 적게 썼는데 ' + d.kind + '(' + (d.no || '').slice(-4) + ')에 정산서가 없습니다' + (d.scan ? ' · 스캔본에서 확인해 주세요' : ' · 스캔본도 없습니다')));
+        if (budget && st > budget) todo.push(u + ' 결과보고 결산(' + won(st) + ')이 예산(' + won(budget) + ')보다 많습니다');
+        if (st !== actual) todo.push(u + ' 결과보고 결산(' + won(st) + ')과 ' + (r.unit === '분기' ? '그 분기 ' : '') + '지출 기안 집행 합계(' + won(actual) + ')가 다릅니다');
+        if (st < plannedSum) spendDocs.filter(d => SETTLE_KINDS.includes(d.kind) && !d.hasSettle && !isRefund(d)).forEach(d => todo.push(u + ': 예산보다 적게 썼는데 ' + d.kind + '(' + (d.no || '').slice(-4) + ')에 정산서가 없습니다' + (d.scan ? ' · 스캔본에서 확인해 주세요' : ' · 스캔본도 없습니다')));
       }
-      spendDocs.filter(d => d.settled != null && d.planned != null && +d.settled > +d.planned).forEach(d => todo.push(r.n + '차 ' + d.kind + '(' + (d.no || '').slice(-4) + '): 집행액(' + won(+d.settled) + ')이 기안 예산(' + won(+d.planned) + ')보다 많습니다'));
-      spendDocs.filter(d => ['물품구입비', '홍보비'].includes(d.kind) && d.hasInspect === false).forEach(d => todo.push(r.n + '차 ' + d.kind + '(' + (d.no || '').slice(-4) + '): 물품검수조서가 없습니다' + (d.scan ? ' · 스캔본에서 확인해 주세요' : '')));
+      r.docs.filter(d => D.SPEND_KINDS.includes(d.kind) && d.settled != null && d.planned != null && +d.settled > +d.planned).forEach(d => todo.push(u + ' ' + d.kind + '(' + (d.no || '').slice(-4) + '): 집행액(' + won(+d.settled) + ')이 기안 예산(' + won(+d.planned) + ')보다 많습니다'));
+      r.docs.filter(d => ['물품구입비', '홍보비'].includes(d.kind) && d.hasInspect === false).forEach(d => todo.push(u + ' ' + d.kind + '(' + (d.no || '').slice(-4) + '): 물품검수조서가 없습니다' + (d.scan ? ' · 스캔본에서 확인해 주세요' : '')));
     }
     const tb = h('tbody');
     for (const r of P.rounds) {
-      const s = schedOf(P, r.n) || {};
-      tb.append(h('tr', null, h('td', { class: 'strong', text: r.n + '차' }), h('td', { class: 'small', text: (s.name || '') + (s.date ? ' · ' + s.date.slice(5).replace('-', '/') : '') }),
+      const s = (r.unit || '차') === '차' ? schedOf(P, r.n) || {} : {};
+      tb.append(h('tr', null, h('td', { class: 'strong nowrap', text: runit(r) }), h('td', { class: 'small', text: (s.name || '') + (s.date ? ' · ' + s.date.slice(5).replace('-', '/') : '') }),
         kinds.map(k => {
           const ds = r.docs.filter(d => d.kind === k || (!kinds.includes(d.kind) && (D.SPEND_KINDS.includes(d.kind) ? k === '진행비' : k === '계획')));
-          const need = k === '계획' || k === '결과보고';
+          const need = (k === '계획' || k === '결과보고') && (r.unit || '차') !== '회기'; // 회기는 분기 계획·결과보고로 묶음
           return h('td', { class: 'mc' }, ds.map(d => h('button', { class: 'doc ' + (d.status === '결재 완료' ? 'done' : d.status === '결재 요청' ? 'req' : 'draft'), title: d.title || '', onclick: () => docModal(P, r, d) }, (d.no ? d.no.slice(-4) : '0000') + (docSpend(d) ? ' ' + fmt(docSpend(d)) : '') + (d.settled != null && d.planned != null && +d.settled !== +d.planned ? ' (예산 ' + fmt(+d.planned) + ')' : ''))),
             h('button', { class: 'plus' + (need && !ds.length ? ' need' : ''), title: k + ' 추가', onclick: () => docModal(P, r, null, k) }, need && !ds.length ? '+ 필요' : '+'));
         }),
-        h('td', { class: 'num strong', text: fmt(roundSpend(r)) })));
+        h('td', { class: 'num strong', title: r.unit === '분기' ? '그 분기 회기 지출 합' : '', text: fmt(r.unit === '분기' ? spendOf(r).reduce((a, d) => a + docSpend(d), 0) : roundSpend(r)) })));
     }
     return h('div', null,
       todo.length ? h('ul', { class: 'checks' }, todo.map(t => h('li', { class: 'warnline', text: t }))) : h('p', { class: 'okline', text: '할 일로 걸리는 회차가 없습니다.' }),
       h('div', { class: 'twrap' }, h('table', { class: 'tbl mx' }, h('thead', null, h('tr', null, h('th', { text: '회차' }), h('th', { text: '활동' }), kinds.map(k => h('th', { text: k })), h('th', { text: '지출 합' }))), tb)),
       h('p', { class: 'muted small', text: '‘손잡다’ 폴더를 연결해 두면 내부기안 폴더의 회차 기안이 저절로 들어옵니다. 칸을 누르면 그 회차의 기안을 적거나 고칩니다. 지출 기안은 계획의 예산 줄에 금액을 나눠 적으면 남은 예산에서 빠집니다. 결과보고 결산은 같은 회차 지출 기안의 합계로 채워집니다. (기안 파일을 자동으로 만들어 주는 기능은 다음 단계에서 붙입니다.)' }),
-      h('button', { class: 'btn', onclick: () => { const n = P.rounds.reduce((a, r) => Math.max(a, r.n), 0) + 1; P.rounds.push({ id: uid(), n, docs: [] }); save(); render(); } }, '+ 계획에 없는 회차 추가'));
+      h('button', { class: 'btn', onclick: () => { const n = P.rounds.reduce((a, r) => Math.max(a, r.n), 0) + 1; P.rounds.push({ id: uid(), n, docs: [], manual: true }); save(); render(); } }, '+ 계획에 없는 회차 추가'));
   }
   function docModal(P, r, d, kind) {
     const isNew = !d;
@@ -516,7 +532,7 @@
       ap(body, h('label', null, '메모', h('textarea', { class: 'fld', rows: 2, value: d.memo || '', onchange: e => d.memo = e.target.value })));
     };
     draw();
-    modal((r.person != null ? r.person || '공통' : r.n + '차') + ' · ' + (isNew ? '기안 추가' : '기안 고치기'), body, [
+    modal((r.person != null ? r.person || '공통' : runit(r)) + ' · ' + (isNew ? '기안 추가' : '기안 고치기'), body, [
       isNew ? null : { text: '지우기', danger: true, onclick: () => { const i = r.docs.findIndex(x => x.id === d.id); if (i >= 0) r.docs.splice(i, 1); save(); render(); } },
       { text: '취소' },
       { text: '저장', primary: true, onclick: () => { const i = r.docs.findIndex(x => x.id === d.id); if (i >= 0) r.docs[i] = d; else r.docs.push(d); save(); render(); } }].filter(Boolean), true);
@@ -540,7 +556,8 @@
     return out;
   }
   function peopleTab(P) {
-    const names = personNames(P), cols = P.sub === '개별자립지원' ? ['사전회의', '계획', '연계', '중간회의', '변경계획', '결과보고'] : ['계획', '결과보고'];
+    const names = personNames(P), course = isCourse(P), who = course ? '교육' : '사람';
+    const cols = P.sub === '개별자립지원' ? ['사전회의', '계획', '연계', '중간회의', '변경계획', '결과보고'] : course ? ['계획', '변경계획', '결과보고'] : ['계획', '결과보고'];
     const chip = (d, r, long) => h('button', { class: 'doc ' + (d.status === '결재 완료' ? 'done' : d.status === '결재 요청' ? 'req' : 'draft'), title: d.title || '', onclick: () => docModal(P, r, d) }, (d.no ? d.no.slice(-4) : '0000') + (long ? ' ' + (d.title || d.kind) : d.link ? ' ' + d.link : '') + (docSpend(d) ? ' ' + fmt(docSpend(d)) : ''));
     const todo = [];
     const tb = h('tbody', null, names.map(n => {
@@ -552,24 +569,25 @@
         h('td', { class: 'num strong', text: fmt(ds.reduce((a, d) => a + docSpend(d), 0)) }));
     }));
     const common = P.pdocs.filter(d => !(d.persons || []).length), cr = { person: '', docs: P.pdocs };
-    const addPerson = () => { const inp = h('input', { class: 'fld', placeholder: '이름' }); modal('사람 추가', h('div', { class: 'form col' }, h('label', null, '이름', inp), h('p', { class: 'muted small', text: '이름은 이 PC와 연결한 폴더에만 저장합니다.' })), [{ text: '취소' }, { text: '추가', primary: true, onclick: () => { const v = inp.value.trim(); if (!v) return false; P.people = (P.people || []).concat(v); save(); render(); } }]); };
+    const addPerson = () => { const inp = h('input', { class: 'fld', placeholder: course ? '예: 한소네 교육(이름)' : '이름' }); modal(who + ' 추가', h('div', { class: 'form col' }, h('label', null, course ? '교육' : '이름', inp), h('p', { class: 'muted small', text: '이름은 이 PC와 연결한 폴더에만 저장합니다.' })), [{ text: '취소' }, { text: '추가', primary: true, onclick: () => { const v = inp.value.trim(); if (!v) return false; P.people = (P.people || []).concat(v); save(); render(); } }]); };
     return h('div', null,
-      todo.length ? h('ul', { class: 'checks' }, todo.map(t => h('li', { class: 'warnline', text: t }))) : h('p', { class: 'okline', text: names.length ? '순서로 걸리는 사람이 없습니다.' : '아직 사람별 기안이 없습니다.' }),
-      h('div', { class: 'twrap' }, h('table', { class: 'tbl mx' }, h('thead', null, h('tr', null, h('th', { text: '이름' }), cols.map(k => h('th', { text: k === '변경계획' ? '변경 계획' : k })), h('th', { text: '지출 기안' }), h('th', { text: '지출 합' }))), tb)),
-      common.length ? [h('h3', { text: '사람을 정하지 않은 기안(월별 강사비 등)' }), h('div', { class: 'chips' }, common.map(d => chip(d, cr, true)))] : null,
-      h('p', { class: 'muted small', text: '‘손잡다’ 폴더를 연결해 두면 제목의 괄호 안 이름으로 기안이 저절로 들어옵니다. 욕구·목표 연결과 세부사업계획서 개수는 기안 검수 화면의 점검 항목으로 사람이 확인합니다.' }),
-      h('button', { class: 'btn', onclick: addPerson }, '+ 사람 추가'));
+      todo.length ? h('ul', { class: 'checks' }, todo.map(t => h('li', { class: 'warnline', text: t }))) : h('p', { class: 'okline', text: names.length ? '순서로 걸리는 ' + who + '이(가) 없습니다.' : '아직 ' + who + '별 기안이 없습니다.' }),
+      h('div', { class: 'twrap' }, h('table', { class: 'tbl mx' }, h('thead', null, h('tr', null, h('th', { text: course ? '교육' : '이름' }), cols.map(k => h('th', { text: k === '변경계획' ? '변경 계획' : k })), h('th', { text: '지출 기안' }), h('th', { text: '지출 합' }))), tb)),
+      common.length ? [h('h3', { text: who + '을(를) 정하지 않은 기안(월별 강사비 등)' }), h('div', { class: 'chips' }, common.map(d => chip(d, cr, true)))] : null,
+      h('p', { class: 'muted small', text: course ? '‘손잡다’ 폴더를 연결해 두면 제목의 교육 이름(예: 한소네 교육(이름))으로 기안이 저절로 들어옵니다. 월별 강사비처럼 여러 교육에 걸친 기안은 아래 공통에 둡니다.' : '‘손잡다’ 폴더를 연결해 두면 제목의 괄호 안 이름으로 기안이 저절로 들어옵니다. 욕구·목표 연결과 세부사업계획서 개수는 기안 검수 화면의 점검 항목으로 사람이 확인합니다.' }),
+      h('button', { class: 'btn', onclick: addPerson }, '+ ' + who + ' 추가'));
   }
   function personPerfTab(P) {
     const base = baseVer(P), g = (base && base.goals) || {}, names = personNames(P);
+    const ks = P.sub === '개별자립지원' ? ['사전회의', '계획', '연계', '중간회의', '변경계획', '결과보고'] : isCourse(P) ? ['계획', '변경계획', '결과보고'] : ['계획', '결과보고'];
     const rows = names.map(n => { const ds = P.pdocs.filter(d => (d.persons || []).includes(n)); const c = k => ds.filter(d => d.kind === k).length; return { n, c, sum: ds.reduce((a, d) => a + docSpend(d), 0) }; });
     const cnt = P.sub === '개별자립지원' ? rows.reduce((a, x) => a + x.c('연계') + x.c('사전회의') + x.c('중간회의'), 0) : rows.reduce((a, x) => a + x.c('계획'), 0);
     const row = (t, goal, act) => h('tr', null, h('td', { text: t }), h('td', { class: 'num', text: goal === '' || goal == null ? '-' : fmt(+goal) }), h('td', { class: 'num strong', text: fmt(act) }), h('td', { class: 'num', text: goal ? Math.round(act / goal * 100) + '%' : '' }));
     return h('div', null, h('h3', { text: '목표 대비 (기안 기준, 참고용)' }),
       h('div', { class: 'twrap' }, h('table', { class: 'tbl' }, h('thead', null, h('tr', null, ['항목', '목표', '기안 수', '비율'].map(t => h('th', { text: t })))),
-        h('tbody', null, row('실인원(기안이 있는 사람)', g.real, names.length), row(P.sub === '개별자립지원' ? '회의·연계 기안 수' : '상담 계획 수', g.count, cnt)))),
-      h('h3', { text: '사람별' }), h('div', { class: 'twrap' }, h('table', { class: 'tbl' }, h('thead', null, h('tr', null, ['이름', '사전회의', '계획', '연계', '중간회의', '변경 계획', '결과보고', '지출'].map(t => h('th', { text: t })))),
-        h('tbody', null, rows.map(x => h('tr', null, h('td', { text: x.n }), ['사전회의', '계획', '연계', '중간회의', '변경계획', '결과보고'].map(k => h('td', { class: 'num', text: x.c(k) || '' })), h('td', { class: 'num', text: fmt(x.sum) })))))),
+        h('tbody', null, row(isCourse(P) ? '교육 수' : '실인원(기안이 있는 사람)', isCourse(P) ? '' : g.real, names.length), row(P.sub === '개별자립지원' ? '회의·연계 기안 수' : '상담 계획 수', g.count, cnt)))),
+      h('h3', { text: isCourse(P) ? '교육별' : '사람별' }), h('div', { class: 'twrap' }, h('table', { class: 'tbl' }, h('thead', null, h('tr', null, [isCourse(P) ? '교육' : '이름'].concat(ks.map(k => k === '변경계획' ? '변경 계획' : k), ['지출']).map(t => h('th', { text: t })))),
+        h('tbody', null, rows.map(x => h('tr', null, h('td', { text: x.n }), ks.map(k => h('td', { class: 'num', text: x.c(k) || '' })), h('td', { class: 'num', text: fmt(x.sum) })))))),
       h('p', { class: 'muted small', text: '실제 상담·지원 횟수(연인원)는 일지 기준이라 여기 숫자와 다를 수 있습니다.' }));
   }
   function moneyTab(P) {
@@ -580,6 +598,21 @@
       h('tfoot', null, h('tr', null, h('td', { colspan: 3, text: '합계' }), h('td', { class: 'num strong', text: fmt(ta) }), h('td', { class: 'num strong', text: fmt(ts) }), h('td', { class: 'num strong', text: fmt(ta - ts) }))))));
     const rows = [];
     for (const f of ['보조금', '자부담']) { const p = P.accts[f]; if (!p) continue; const st = B.status(P.year, f, p); if (st) rows.push(h('tr', null, h('td', { text: f }), h('td', { class: 'small', text: pathText(p) }), h('td', { class: 'num', text: fmt(st.budget) }), h('td', { class: 'num', text: fmt(st.settled) + (st.date ? ' (' + st.date + ')' : '') }), h('td', { class: 'num', text: fmt(st.after) }), h('td', { class: 'num strong' + (st.remain < 0 ? ' neg' : ''), text: fmt(st.remain) }))); }
+    const extra = allDocs(P).flatMap(d => (d.extra || []).map(e => Object.assign({ no: d.no, kind: d.kind }, e)));
+    if (extra.length) ap(box, h('h3', { text: '계획 품목 밖 지출 (같은 세목 안, 세목 합계로 셈)' }),
+      h('div', { class: 'twrap' }, h('table', { class: 'tbl' }, h('thead', null, h('tr', null, ['기안', '품목', '재원', '세목', '금액'].map(t => h('th', { text: t })))),
+        h('tbody', null, extra.map(e => h('tr', null, h('td', { text: (e.no || '').slice(-4) + ' ' + e.kind }), h('td', { text: e.item }), h('td', { text: e.fund }), h('td', { class: 'small', text: pathText(e.acct) }), h('td', { class: 'num', text: fmt(e.amount) })))),
+        h('tfoot', null, h('tr', null, h('td', { colspan: 4, text: '합계' }), h('td', { class: 'num strong', text: fmt(extra.reduce((a, e) => a + e.amount, 0)) }))))),
+      h('p', { class: 'muted small', text: '산출근거 안의 품목은 센터장 재량으로 바꿀 수 있어 틀린 것은 아닙니다. 세목 합계(아래 예산서 기준)에는 들어갑니다.' }));
+    const pend = P.versions.filter(v => v.status !== '확정' && (v.date || '') >= (base.date || '') && v !== base).slice(-1)[0];
+    if (pend) {
+      const pt = pend.lines.reduce((a, l) => a + lineAmount(l), 0), ps = pend.lines.reduce((a, l) => a + lineSpent(P, l.id), 0);
+      ap(box, h('h3', { text: '결재 전 ' + pend.kind + '(' + (pend.no || '') + ') 기준으로 맞춰 보기' }),
+        h('div', { class: 'twrap' }, h('table', { class: 'tbl' }, h('thead', null, h('tr', null, ['품목', '재원', '변경 계획', '지출 기안', '남은 금액'].map(t => h('th', { text: t })))),
+          h('tbody', null, pend.lines.map(l => { const a = lineAmount(l), sp = lineSpent(P, l.id); return h('tr', null, h('td', { text: l.item || '' }), h('td', { text: l.fund }), h('td', { class: 'num', text: fmt(a) }), h('td', { class: 'num', text: fmt(sp) }), h('td', { class: 'num strong' + (a - sp < 0 ? ' neg' : ''), text: fmt(a - sp) })); })),
+          h('tfoot', null, h('tr', null, h('td', { colspan: 2, text: '합계' }), h('td', { class: 'num strong', text: fmt(pt) }), h('td', { class: 'num strong', text: fmt(ps) }), h('td', { class: 'num strong', text: fmt(pt - ps) }))))),
+        h('p', { class: 'muted small', text: '결재가 끝나면(내부기안 폴더로 옮겨지면) 이 표가 위의 기준이 됩니다.' }));
+    }
     ap(box, h('h3', { text: '예산서 기준 (회계 결산 + 그 뒤 기안)' }), rows.length ? h('div', { class: 'twrap' }, h('table', { class: 'tbl' }, h('thead', null, h('tr', null, ['재원', '계정과목', '현재 예산', '결산 집행', '이후 기안', '남은 예산'].map(t => h('th', { text: t })))), h('tbody', null, rows))) : h('p', { class: 'muted', text: '예산서를 불러오고 계획 화면에서 이 사업의 계정과목을 고르면 나타납니다.' }));
     return box;
   }
@@ -595,7 +628,7 @@
       h('div', { class: 'twrap' }, h('table', { class: 'tbl' }, h('thead', null, h('tr', null, ['항목', '목표', '실적', '달성률'].map(t => h('th', { text: t })))),
         h('tbody', null, row('횟수', g.count, done.length), row('연인원', g.total, total), row('실인원(중복 없이)', g.real, uniq.size)))),
       h('h3', { text: '회차별' }), h('div', { class: 'twrap' }, h('table', { class: 'tbl' }, h('thead', null, h('tr', null, ['회차', '결과보고', '참여 인원', '결산'].map(t => h('th', { text: t })))),
-        h('tbody', null, per.map(x => h('tr', null, h('td', { text: x.r.n + '차' }), h('td', { text: x.res ? (x.res.no || '') + ' ' + (x.res.status || '') : '없음' }), h('td', { class: 'num', text: x.res ? x.names.length : '' }), h('td', { class: 'num', text: x.res ? fmt(+x.res.settle || 0) : '' })))))),
+        h('tbody', null, per.map(x => h('tr', null, h('td', { text: runit(x.r) }), h('td', { text: x.res ? (x.res.no || '') + ' ' + (x.res.status || '') : '없음' }), h('td', { class: 'num', text: x.res ? x.names.length : '' }), h('td', { class: 'num', text: x.res ? fmt(+x.res.settle || 0) : '' })))))),
       h('p', { class: 'muted small', text: '실인원은 회차별 명단의 이름을 띄어쓰기 없이 비교해 중복을 뺀 수입니다. 동명이인은 명단에 구분 표시(예: 홍길동A)를 해 주세요.' }));
   }
 

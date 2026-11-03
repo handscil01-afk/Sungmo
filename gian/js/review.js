@@ -339,7 +339,7 @@
         if (st.spent > st.budget) add('high', 'settle', '집행액이 예산보다 많음', '정산서 예산액 ' + fmt(st.budget) + '원, 집행액 ' + fmt(st.spent) + '원입니다. 결산은 예산을 넘을 수 없습니다.', [st.line]);
         else if (st.spent < st.budget && !st.reason) add('mid', 'settle', '차액 발생 사유가 비어 있음', '예산 ' + fmt(st.budget) + '원 중 ' + fmt(st.spent) + '원을 썼습니다. ‘예산대비 집행금액 차액 발생 사유’를 적어 주세요.', [st.line]);
       } else if (st) add('low', 'settle', '정산서의 예산액·집행액 합계를 찾지 못함', '정산서 합계 줄을 확인해 주세요.');
-      else if (['진행비', '다과비', '식비', '재료비', '숙박비', '물품구입비'].includes(meta.kind)) add(meta.kind === '진행비' ? 'mid' : 'low', 'settle', '정산서가 없음', '예산대로 썼으면 괜찮고, 예산보다 적게 썼으면 지출기안에 정산서를 붙여야 합니다.' + scanNote);
+      else if (['진행비', '다과비', '식비', '재료비', '숙박비'].includes(meta.kind)) add(meta.kind === '진행비' ? 'mid' : 'low', 'settle', '정산서가 없음', '예산대로 썼으면 괜찮고, 예산보다 적게 썼으면 지출기안에 정산서를 붙여야 합니다.' + scanNote);
       if (['물품구입비', '홍보비'].includes(meta.kind) && !L.some(l => /검\s*수\s*조\s*서|검수하였음/.test(l))) add('mid', 'inspect', '물품검수조서가 없음', '물품을 산 지출기안에는 물품검수조서를 함께 넣습니다.' + scanNote);
     }
 
@@ -435,17 +435,19 @@
     }
 
     // 14. 표기
-    const ty = [], sp = { fix: new Set(), lines: [] };
+    const ty = [], sp = { fix: new Set(), lines: [] }, moneyComma = [];
     for (const l of L) {
       if (/(?<![\d,.])\d{5,}\s*원/.test(l)) ty.push(['천 단위 쉼표가 없는 금액', l]);
       const l2 = l.replace(/\d{1,2}:\d{2}/g, '');
       for (const x of l2.matchAll(/(?<![\d.,])\d{1,3}(?:,\d+)+(?![\d.]|\s*[월일차회층대번호동명])(원?)/g)) {
         const groups = x[0].replace(/원$/, '').split(','), digits = groups.join('').length;
-        if (groups.slice(1).some(g => g.length !== 3) && (x[1] || digits >= 4)) { ty.push(['쉼표 위치가 이상한 숫자', l]); break; }
+        if (groups.slice(1).some(g => g.length !== 3) && (x[1] || digits >= 4)) { if (x[1]) moneyComma.push([x[0], l]); else ty.push(['쉼표 위치가 이상한 숫자', l]); break; }
       }
       if (/(?<![\d.])[^.\d]\.\.(?!\.)|,,/.test(l)) ty.push(['문장 부호가 겹침', l]);
       for (const [re, msg] of SPELL) { const m = re.exec(l); if (m) { sp.fix.add(msg(m).replace(/\s{2,}/g, ' ')); sp.lines.push(l); } }
     }
+    // 금액 쉼표 오타(‘12,0000원’)는 금액이 열 배로 읽히므로 확인으로
+    if (moneyComma.length) add('mid', 'typo', '금액의 쉼표 자리가 틀림: ' + [...new Set(moneyComma.map(x => x[0]))].join(', '), '쉼표는 세 자리마다 찍습니다(예: 12,0000원 → 12,000원). 금액이 다르게 읽힐 수 있습니다.', [...new Set(moneyComma.map(x => x[1]))]);
     const tyg = {}; ty.forEach(([k, l]) => (tyg[k] = tyg[k] || []).push(l));
     for (const k in tyg) add('low', 'typo', k, '', [...new Set(tyg[k])]);
     if (sp.fix.size) add('low', 'typo', '맞춤법·띄어쓰기 ' + sp.fix.size + '곳', [...sp.fix].join('\n'), [...new Set(sp.lines)]);
