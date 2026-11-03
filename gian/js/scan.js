@@ -305,9 +305,11 @@
   function numberTip(o, ledger, used, skipNo) {
     const L = ledger || [], md = d => (d || '').slice(5).replace('-', '/'), sim = (a, b) => lcsRatio(normT(a), normT(b));
     if (!L.length) return '문서대장을 아직 읽지 않아 번호를 추천하지 못함';
-    // 같은 기안: 제목이 거의 같고, 제목 속 숫자(차수·월·회 등)가 모두 같을 때만
-    const nums = t => (String(t).match(/\d+/g) || []).join(',');
-    const reg = L.find(e => e.no !== skipNo && e.title && nums(e.title) === nums(o.title) && sim(e.title, o.title) >= 0.85);
+    // 같은 기안: 제목이 거의 같고, 제목 속 숫자(차수·월·회 등)와 기안 종류(계획·변경계획 등)가 모두 같을 때만
+    // 변경 계획처럼 같은 제목이 다시 나오는 기안이 있어 날짜가 한 달 넘게 떨어지면 다른 기안으로 봄
+    const nums = t => (String(t).match(/\d+/g) || []).join(','), kind = t => window.GDICT.kindOf(t);
+    const near = e => !o.date || !e.date || Math.abs(Date.parse(e.date) - Date.parse(o.date)) <= 31 * 864e5;
+    const reg = L.find(e => e.no !== skipNo && e.title && nums(e.title) === nums(o.title) && kind(e.title) === kind(o.title) && near(e) && sim(e.title, o.title) >= 0.85);
     if (reg && used && used.has(reg.no)) return '‘' + o.title + '’은(는) 대장과 내부기안 폴더에 이미 ' + reg.no.slice(-4) + '로 있음 → 이 파일이 미리 작성한 사본인지 확인';
     if (reg) return '‘' + o.title + '’은(는) 대장에 ' + reg.no.slice(-4) + '로 올라 있음 → 파일 이름과 시행 칸을 ' + reg.no.slice(-4) + '로 고치면 됨';
     const d = o.date || '', cand = [];
@@ -325,7 +327,7 @@
   /* 같은 번호를 쓴 기안: 대장에 그 번호로 올라 있는 것은 그대로 두고, 나머지에 대장의 빈 번호를 추천 */
   function dupText(no, docs, ledger, used) {
     const md = s => (s.date || '').slice(5).replace('-', '/');
-    let text = no + ': 같은 문서번호를 쓴 기안이 ' + docs.length + '건(' + docs.map(s => s.title + ' ' + md(s)).join(' / ') + ')';
+    let text = no.slice(-4) + ': 같은 문서번호를 쓴 기안이 ' + docs.length + '건(' + docs.map(s => s.title + ' ' + md(s)).join(' / ') + ')';
     if (!ledger.length) return text + ' → 하나는 번호를 새로 받아야 함(문서대장을 찾지 못해 추천은 못 함)';
     const L = ledger.filter(e => e.no.slice(0, 6) === no.slice(0, 6)), led = L.find(e => e.no === no);
     const sim = (a, b) => lcsRatio(normT(a), normT(b));
@@ -334,6 +336,48 @@
     const others = docs.filter(d => d !== keep);
     const tips = others.map(o => numberTip(o, L, used, no));
     return text + ' → ' + (keep ? '‘' + keep.title + '’은(는) 그대로, ' : '') + tips.join('; ');
+  }
+  /* 시놀로지 충돌 사본 이름 꼬리(…_PC이름_월-일-시각-연도_Conflict) */
+  const CONFLICT = /_[^_]*_[^_]*-\d{4}_Conflict$/i;
+  /* 읽은 기안 정리: 세 자리 번호(26-123) → 네 자리, 충돌 사본 꼬리 떼기, 세부사업을 몰라 건너뛴 기안도 상태·날짜는 채움 */
+  function tidyDoc(s) {
+    const t = Object.assign({}, s), m = /^(손잡다(\d{2})-)(\d+)$/.exec(s.no || '');
+    if (m && m[3].length < 4) { t.no = m[1] + m[3].padStart(4, '0'); t.shortNo = s.no; }
+    if (CONFLICT.test(s.title || '')) { t.title = s.title.replace(CONFLICT, '').trim(); t.conflict = true; }
+    if (t.no && !t.status) t.status = /-0+$/.test(t.no) ? '작성 중' : /(^|\/)결재요청/.test(s.path.split('/').slice(2).join('/')) ? '결재 요청' : '결재 완료';
+    const d = m && /^손잡다\d{2}-\d+\s+(\d{2})(\d{2})\b/.exec(s.name || '');
+    if (!t.date && d && d[1] !== '00') t.date = iso(2000 + +m[2], +d[1], +d[2]);
+    return t;
+  }
+  /* 파일 제목과 대장 제목이 같은 기안인지: 앞의 연도·‘제’·띄어쓰기를 빼고, 글자 순서(LCS)나 글자 묶음이 75% 넘게 겹치거나 한쪽이 다른 쪽을 품으면 같음 */
+  function titleSim(a, b) {
+    const k = t => normT(String(t || '').replace(/^\s*20\d{2}\s*년?\s*/, '').replace(/제\s*(?=\d)/g, ''));
+    const x = k(a), y = k(b);
+    if (!x || !y) return 0;
+    if (x.includes(y) || y.includes(x)) return 1;
+    const bag = {}; for (const c of x) bag[c] = (bag[c] || 0) + 1;
+    let both = 0; for (const c of y) if (bag[c] > 0) { bag[c]--; both++; }
+    return Math.max(lcsRatio(x, y), 2 * both / (x.length + y.length));
+  }
+  /* 번호가 있는 기안 s({no, title, date, status})를 대장과 맞춰 봄 → { lv, text: '무엇 → 어떻게' } 또는 null
+     (대장에 없는 번호, 대장 줄의 제목이 빔, 대장 제목과 다름) */
+  function ledgerTip(s, ledger, used) {
+    const md = d => (d || '').slice(5).replace('-', '/'), no4 = s.no.slice(-4);
+    const e = ledger.find(x => x.no === s.no);
+    if (!e) return { lv: 'low', text: no4 + ': 문서대장에 없는 번호(‘' + s.title + '’) → 대장에 올렸는지 확인' };
+    if (!e.title) return { lv: 'low', text: no4 + ': 대장의 이 번호 줄에 제목이 비어 있음 → 대장에 ‘' + s.title + '’' + (s.date ? '(' + md(s.date) + ')' : '') + ' 적기' };
+    const sim = titleSim(s.title, e.title);
+    if (sim >= 0.75) return null;
+    if (sim < 0.5) return { lv: 'mid', text: no4 + ': 파일은 ‘' + s.title + '’인데 대장에는 ‘' + e.title + '’(' + md(e.date) + ')로 올라 있음 → ' + numberTip(s, ledger.filter(x => x.no.slice(0, 6) === s.no.slice(0, 6)), used, s.no) };
+    return { lv: 'low', text: no4 + ': 제목이 조금 다름(파일 ‘' + s.title + '’ / 대장 ‘' + e.title + '’) → 같은 기안이면 한쪽으로 맞추기' };
+  }
+  function ledgerCheck(docs, ledger, used, note) {
+    const N = '문서번호·문서대장';
+    for (const s of docs) {
+      if (s.shortNo) note(N, s.shortNo.replace(/^손잡다\d{2}-/, '') + ': 파일 이름의 번호가 네 자리가 아님(‘' + s.title + '’) → ' + s.no.slice(-4) + '로 고치기');
+      const t = ledger.length ? ledgerTip(s, ledger, used) : null;
+      if (t) note(N, t.text + (s.status === '결재 요청' && /비어 있음/.test(t.text) ? '(결재 요청 중)' : ''), t.lv);
+    }
   }
   /* 빈 회차 정리: 기안이 없고, 계획 회차 일정에 없고, 사람이 만든 것도 아닌 회차는 뺌. 분기 → 차 → 회기 순 */
   function tidyRounds(P) {
@@ -373,17 +417,24 @@
       if (old) data.budgets[data.budgets.indexOf(old)] = e; else data.budgets.push(e);
       rep.budgets++;
     }
-    // 같은 문서번호가 결재요청·내부기안 두 곳에 있으면 내부기안(결재 완료) 것을 씀
-    const docs = res.docs.filter(s => !s.skip).sort((a, b) => (a.status === '결재 완료' ? 0 : 1) - (b.status === '결재 완료' ? 0 : 1));
+    res.docs = res.docs.map(tidyDoc);
+    // 같은 문서번호가 결재요청·내부기안 두 곳에 있으면 내부기안(결재 완료) 것을 씀, 충돌 사본은 원본 뒤로
+    const rank = s => (s.status === '결재 완료' ? 0 : 2) + (s.conflict ? 1 : 0);
+    const all = res.docs.filter(s => s.skip !== '기안문이 아님').sort((a, b) => rank(a) - rank(b));
     // 같은 기안인지는 문서번호와 제목으로 봄(번호를 잘못 같이 쓴 서로 다른 기안도 있어서)
     const seen = new Set(), use = [], byNo = {};
-    for (const s of docs) {
-      const k = docKey(s); if (seen.has(k)) continue; seen.add(k); use.push(s);
+    for (const s of all) {
+      const k = docKey(s);
+      if (seen.has(k)) { if (s.conflict) { skip('시놀로지 충돌 사본(원본이 따로 있음)', 1, s); note('문서번호·문서대장', s.no.slice(-4) + ': 시놀로지 충돌 사본이 원본 옆에 있음(' + s.name + ') → 원본과 같은지 보고 정리', 'low'); } continue; }
+      seen.add(k);
       if (!/-0+$/.test(s.no)) (byNo[s.no] = byNo[s.no] || []).push(s);
+      if (s.skip) skip(s.skip, 1, s); else use.push(s);
     }
+    res.docs.filter(s => s.skip === '기안문이 아님').forEach(s => skip(s.skip, 1, s));
     const used = new Set(res.docs.map(s => s.no).filter(Boolean));
-    for (const no in byNo) if (byNo[no].length > 1) note(byNo[no][0].sub || '기타', dupText(no, byNo[no], res.ledger || [], used));
-    res.docs.filter(s => s.skip).forEach(s => skip(s.skip, 1, s));
+    const dups = Object.keys(byNo).filter(no => byNo[no].length > 1);
+    for (const no of dups) note('문서번호·문서대장', dupText(no, byNo[no], res.ledger || [], used));
+    ledgerCheck(Object.keys(byNo).filter(no => byNo[no].length === 1).map(no => byNo[no][0]), res.ledger || [], used, note);
     // 결재 요청 중인 기안: 결재요청 폴더(사람별 폴더 포함)별로
     for (const s of use) if (s.status === '결재 요청') {
       const parts = s.path.split('/'), i = parts.findIndex(x => /^결재요청/.test(x)), folder = i >= 0 && i + 2 < parts.length ? parts[i + 1] : '결재요청';
@@ -553,5 +604,5 @@
     }
     return rep;
   }
-  window.GSCAN = { places, hasYears, scan, apply, extract, parseBasis, budgetEntries, suggestAcct, numberTip, START_YEAR };
+  window.GSCAN = { places, hasYears, scan, apply, extract, parseBasis, budgetEntries, suggestAcct, numberTip, ledgerTip, START_YEAR };
 })();

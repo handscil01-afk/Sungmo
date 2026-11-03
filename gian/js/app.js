@@ -661,7 +661,8 @@
     const hasB = S.data.budgets.some(b => b.year === year);
     return GREVIEW.review(d, { prev: RV.prev, accounts: hasB ? B.accountsAll(year) : null, budgetOf: hasB ? (f, p) => B.status(year, f, p) : null,
       scanHas: ROOT.scans.size ? n => ROOT.scans.has('손잡다' + String(year).slice(2) + '-' + n) : null,
-      numberTip: ROOT.ledger && ROOT.ledger.length ? o => GSCAN.numberTip(o, ROOT.ledger.filter(e => e.no.startsWith('손잡다' + String(year).slice(2) + '-')), new Set(ROOT.used || [])) : null });
+      numberTip: ROOT.ledger && ROOT.ledger.length ? o => GSCAN.numberTip(o, ROOT.ledger.filter(e => e.no.startsWith('손잡다' + String(year).slice(2) + '-')), new Set(ROOT.used || [])) : null,
+      ledgerTip: ROOT.ledger && ROOT.ledger.length ? o => { const yy = '손잡다' + String(year).slice(2) + '-'; return GSCAN.ledgerTip(Object.assign({}, o, { no: yy + o.no }), ROOT.ledger.filter(e => e.no.startsWith(yy)), new Set(ROOT.used || [])); } : null });
   }
   function rerunAll() { RV.items.forEach(it => { if (it.doc) it.res = doReview(it.doc); }); render(); }
   function resultCard(it) {
