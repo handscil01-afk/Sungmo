@@ -21,10 +21,14 @@ def segs(a, minsil):
             if sil >= int(minsil * 100): out.append([st / 100, (end + 1) / 100]); st = None
     if st is not None: out.append([st / 100, (end + 1) / 100])
     return [x for x in out if x[1] - x[0] > 0.12]
+SPANS = {}
+if sys.argv[1].startswith('--spans='): SPANS = json.load(open(sys.argv.pop(1).split('=', 1)[1]))
 idx = json.load(open(os.path.join(V, 'index.json')))
 made, report = list(idx['made']), []
 for arg in sys.argv[1:]:
     code, f = arg.split('=', 1); L = lines[code]; a = load(f); S = segs(a, 0.7)
+    # 문장 사이를 덜 쉰 묶음: 따로 맞춘 경계(--spans 파일, 문장 길이·쉬는 길이로 맞춤)가 있으면 그걸 씀
+    if SPANS.get(code) and len(SPANS[code]) == len(L): S = SPANS[code]
     if len(S) != len(L):
         report.append(f'{code}: 조각 {len(S)}개, 문장 {len(L)}개 → 건너뜀. 길이 {[round(e - s, 2) for s, e in S]}'); continue
     for k, ((i, t), (s, e)) in enumerate(zip(L, S)):

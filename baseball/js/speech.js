@@ -165,6 +165,14 @@ function playRec(c, uniq){
   else if(!cast && !pitch && !main && !contact && uniq.includes('batter')) recPlay(c, 'atbat', t, 0.6, 3);
   return true;
 }
+// 관중 함성 (녹음): 안타·득점은 cheer1의 한 부분을 짧게, 홈런은 cheer2를 길게. 중계가 들리게 조금 작게
+function cheer(c, at, big){
+  const name = big ? 'cheer2' : 'cheer1', buf = RECBUF[name]; if(!buf){ recLoad(name); return; }
+  const s = c.createBufferSource(), g = c.createGain(); s.buffer = buf; s.connect(g); g.connect(c.destination);
+  const t = c.currentTime + at, dur = big ? 7 : 3.8, off = big ? 0 : Math.random() * Math.max(0, buf.duration - dur - 0.5), v = big ? 0.7 : 0.45;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + 0.25); g.gain.setValueAtTime(v, t + dur - 1.2); g.gain.linearRampToValueAtTime(0, t + dur);
+  s.start(t, off); s.stop(t + dur + 0.05); RECNOW.push({ s, g });
+}
 // 타구가 날아가는 동안 관중이 술렁이며 커지고, 결과에 따라 길게 환호(hit·big)하거나 금세 사그라듦(fade)
 function crowdSwell(c, t0, t1, kind){
   const buf = RECBUF.crowd; if(!buf){ recLoad('crowd'); return; }
@@ -173,9 +181,11 @@ function crowdSwell(c, t0, t1, kind){
   const a = now + t0, b = now + t1, peak = kind === 'big' ? 1.0 : 0.75;
   g.gain.setValueAtTime(0.05, a); g.gain.linearRampToValueAtTime(0.45, b);
   if(kind === 'fade'){ g.gain.linearRampToValueAtTime(0.5, b + 0.15); g.gain.linearRampToValueAtTime(0, b + 0.9); s.start(a, Math.random() * 40); s.stop(b + 1); }
-  else { const hold = kind === 'big' ? 3.5 : 1.6; g.gain.linearRampToValueAtTime(peak, b + 0.3); g.gain.setValueAtTime(peak, b + hold); g.gain.linearRampToValueAtTime(0, b + hold + 1.5); s.start(a, Math.random() * 40); s.stop(b + hold + 1.6); }
+  else { cheer(c, t1 + 0.05, kind === 'big'); const hold = kind === 'big' ? 3.5 : 1.6; g.gain.linearRampToValueAtTime(peak, b + 0.3); g.gain.setValueAtTime(peak, b + hold); g.gain.linearRampToValueAtTime(0, b + hold + 1.5); s.start(a, Math.random() * 40); s.stop(b + hold + 1.6); }
   RECNOW.push({ s, g });
 }
+// 함성은 처음 누를 때 미리 불러 둠 (첫 홈런에도 바로 나오게)
+['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { if(SET.snd !== false){ recLoad('cheer1'); recLoad('cheer2'); } }, { capture:true, once:true }));
 // 화면 모드의 배경 관중 소리 (설정에서 켜고 끔)
 const CROWD = { src:null };
 function crowdSync(){
