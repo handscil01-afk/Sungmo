@@ -50,6 +50,12 @@ function teamScreen(which, page = 0){
   };
   // 10팀이라 한 쪽에 8팀씩: 9번은 다음 쪽 / 앞 쪽
   const desc = t => `${STYLES[t.style].name}. 홈구장 ${parkInfo(t.key).name}: ${parkInfo(t.key).desc}`;
+  // 화면 보며 하기: 한 화면에 모든 팀 (번호 키는 1~9, 그 뒤는 눌러서)
+  if(SET.view === 'gfx'){
+    const opts = list.map((t, i) => ({ n: i + 1, t: t.name, s: desc(t), act: v => set(t.key, v) }));
+    opts.push({ n: list.length + 1, t:'아무 팀이나', s:'무작위로 고릅니다.', act: v => set(list[Math.floor(Math.random() * list.length)].key, v) });
+    return { q, opts, back: v => go(which ? () => teamScreen(0) : NEW.kind === 'career' ? careerTypeScreen : NEW.mode === 'simple' ? unitScreen : modeScreen, v) };
+  }
   const shown = page ? list.slice(8) : list.slice(0, 8);
   const opts = shown.map((t, i) => ({ n: i + 1, t: t.name, s: desc(t), act: v => set(t.key, v) }));
   if(page) opts.push({ n: shown.length + 1, t:'아무 팀이나', s:'무작위로 고릅니다.', act: v => set(list[Math.floor(Math.random() * list.length)].key, v) });
@@ -132,7 +138,16 @@ function viewScreen(after){
     { n:2, t: VIEWS.a11y, s:'보이스오버·톡백, 점자 단말기, 숫자판 키보드로 합니다. 모든 상황을 말과 글로 알려 줍니다.', act: v => { setView('a11y'); after(v); } },
   ] };
 }
+// 화면 보며 하기: 설정 세 쪽을 한 화면에 (번호는 이어서)
 function settingsScreen(backTo){
+  const S = settingsPage(backTo);
+  if(SET.view !== 'gfx') return S;
+  const more = o => o.t === '더 보기';
+  const all = [...S.opts, ...settings2(backTo).opts, ...settings3(backTo).opts].filter(o => !more(o) && !o.hide);
+  const seen = new Set(), opts = all.filter(o => !seen.has(o.t) && seen.add(o.t)).map((o, i) => ({ ...o, n: i + 1 }));
+  return { ...S, q:'설정', opts };
+}
+function settingsPage(backTo){
   const ch = (fn, label) => () => { fn(); saveSet(); stay(label()); };
   return { q:'설정입니다. 고를 때마다 값이 바뀝니다.', back: v => backTo(v), opts:[
     { n:1, t:`화면 방식: ${VIEWS[SET.view] || VIEWS.a11y}`, s:'고르면 화면 방식 고르기로 갑니다. 읽어 주기와 관중 소리도 그 방식에 맞게 바뀝니다.', act: v => go(() => viewScreen(w => go(() => settingsScreen(backTo), w)), v) },

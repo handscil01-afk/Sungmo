@@ -37,7 +37,6 @@ function suspend(lines){
   return { lines: out, ms, tail: [sp.tail, ...lines.slice(i + 1).map(l => l.s || l)] };
 }
 function go(make, via = 'init', lines = []){
-  UI.gsel = null;   // 화면 보며 하기 메뉴: 설명을 보려고 한 번 누른 선택지
   if(UI.holdT){ clearTimeout(UI.holdT); UI.holdT = 0; document.documentElement.classList.remove('hold'); }
   // 중계 음성이 끝날 때까지 다음 선택을 받지 않음 (자동 시험은 window.__susp를 켠 때만)
   const lock = UI.castLock && !(navigator.webdriver && !window.__susp) ? UI.castLock : 0; UI.castLock = 0;
@@ -109,7 +108,10 @@ function render(){
   else if(S.scene && SET.view === 'gfx' && typeof gfxScene === 'function'){ bs.hidden = false; gfxScene(bs, S.scene); }
   else { bs.hidden = true; bs.innerHTML = ''; if(typeof GX !== 'undefined') GX.scene = null; }
   $('#say').innerHTML = (S.say || []).map(l => `<p class="${l.k ? 'k-' + l.k : ''}${l.after ? ' after' : ''}${l.tail ? ' cur' : ''}">${esc(l.s || l)}${l.tail ? `<span class="tail"> ${esc(l.tail)}</span>` : ''}</p>`).join('');
-  $('#say').hidden = !(S.say || []).length;
+  // 시청각장애인 모드에서 중계 음성이 켜져 있으면 경기 중 결과 글은 소리로만 (화면 낭독기가 같은 내용을 또 읽지 않게): 지금 내 차례의 질문과 선택지만
+  const castOnly = SET.view !== 'gfx' && !!S.board && typeof G !== 'undefined' && G && !G.over && typeof castOn === 'function' && castOn();
+  $('#say').hidden = !(S.say || []).length || castOnly;
+  if($('#logSec')) $('#logSec').dataset.castOnly = castOnly ? '1' : '';
   // 메모: 화면이 정한 글, 없으면 방금 note()로 띄운 글 (전체화면 전환 같은 다시 그리기에도 남음)
   const nl = S.note || UI.note || [];
   const nt = $('#note'); nt.innerHTML = nl.map(l => `<p>${esc(l)}</p>`).join(''); nt.hidden = !nl.length;
@@ -119,11 +121,10 @@ function render(){
   if(gg && qs.length >= 2) $('#q').innerHTML = `<span class="qchip ${/수비/.test(qs[0]) ? 'def' : /공격/.test(qs[0]) ? 'off' : ''}">${esc(qs[0].replace(/\.$/, ''))}</span> <span class="qt">${esc(qs[qs.length - 1])}</span>${qs.length > 2 ? ` <span class="qd">${esc(qs.slice(1, -1).join(' '))}</span>` : ''}`;
   else $('#q').textContent = S.q || '';
   renderOpts(S);
-  gdescRender(S, gu);
   if(typeof gstatRender === 'function'){ if(gg) gstatRender(G); else if($('#gstat')) $('#gstat').hidden = true; }
   const ex = $('#extra');
   ex.innerHTML = S.back ? '<button type="button" class="btn back" id="backBtn">뒤로<span class="kh" aria-hidden="true"> (점 키)</span></button>' : '';
-  $('#logSec').hidden = !S.board;
+  $('#logSec').hidden = !S.board || $('#logSec').dataset.castOnly === '1';
   if(S.board) renderLog();
   if(typeof renderChat === 'function') renderChat(true);
   if(typeof voiceUI === 'function') voiceUI();
@@ -166,19 +167,6 @@ function renderOpts(S){
   // 화면 보며 하기 메뉴: 설정(이름: 값)이 많으면 한 줄에 하나, 아니면 바둑판
   const sets = box.querySelectorAll('.opt.set').length;
   box.classList.toggle('setlist', sets * 2 >= want.length && sets > 0);
-}
-// 화면 보며 하기 메뉴의 설명 창: 선택지를 한 번 누르면(또는 키보드 초점) 위에 설명, 한 번 더 누르면 결정
-function gdescRender(S, gu){
-  let d = $('#gdesc');
-  if(!gu){ if(d) d.hidden = true; return; }
-  if(!d){ d = document.createElement('div'); d.id = 'gdesc'; d.setAttribute('aria-hidden', 'true'); $('#opts').before(d); }
-  const opts = (S.opts || []).filter(o => !o.hide), withS = opts.filter(o => o.s);
-  if(!withS.length){ d.hidden = true; return; }
-  const o = opts.find(x => String(x.key || x.n) === UI.gsel);
-  d.hidden = false;
-  d.innerHTML = o && o.s ? `<b>${esc(o.t)}</b><span>${esc(o.s)}</span>${/ set/.test(' ' + ($(`#opts .opt[data-k="${UI.gsel}"]`) || {}).className) ? '' : '<em>한 번 더 누르면 고릅니다</em>'}`
-    : '<span class="hint">항목을 누르면 여기에 설명이 나옵니다. 한 번 더 누르면 고릅니다.</span>';
-  $('#opts').querySelectorAll('.opt').forEach(el => el.classList.toggle('sel', el.dataset.k === UI.gsel));
 }
 // 중계 기록: 새 줄만 덧붙이고 최근 80줄만 둠
 function renderLog(){
@@ -268,12 +256,7 @@ function textCmd(v){
 document.addEventListener('click', e => {
   const o = e.target.closest && e.target.closest('#opts .opt');
   if(o){
-    // 화면 보며 하기 메뉴: 설명이 있는 선택지는 처음 누르면 위 창에 설명만, 한 번 더 누르면 결정 (설정 값은 바로 바뀜)
-    const gu = document.documentElement.classList.contains('gfxui'), hasS = !!o.querySelector('small');
-    if(gu && hasS && !o.classList.contains('set') && UI.gsel !== o.dataset.k){ UI.gsel = o.dataset.k; gdescRender(UI.S, true); return; }
-    if(gu && o.classList.contains('set')) UI.gselNext = o.dataset.k;
     choose(o.dataset.n, 'click');
-    if(UI.gselNext){ UI.gsel = UI.gselNext; UI.gselNext = null; gdescRender(UI.S, document.documentElement.classList.contains('gfxui')); }
     return;
   }
   if(e.target.closest && e.target.closest('#backBtn')){ back('click'); return; }
@@ -345,8 +328,3 @@ function uiGlyph(t){
   const g = UI_GLYPHS.find(([re]) => re.test(t));
   return g ? [g[1], `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${g[2]}</svg>`] : null;
 }
-
-document.addEventListener('focusin', e => {
-  const o = e.target.closest && e.target.closest('#opts .opt');
-  if(o && document.documentElement.classList.contains('gfxui') && o.matches(':focus-visible')){ UI.gsel = o.dataset.k; gdescRender(UI.S, true); }
-});
