@@ -1,5 +1,5 @@
 // 이 파일은 tools/make_sw.py 로 만든다. 파일을 추가·변경하면 버전을 올려 다시 만든다.
-const CACHE = 'dicebound-v2';
+const CACHE = 'dicebound-v3';
 const CORE = [
   './',
   './index.html',

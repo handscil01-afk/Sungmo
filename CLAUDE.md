@@ -25,6 +25,11 @@
 - 전체화면이 막힌 환경(iframe, 아이폰 등)에서는 버튼을 눌렀을 때 홈 화면 설치 방법을 안내한다.
 - 게임처럼 오래 켜 두는 앱은 Wake Lock으로 화면이 꺼지지 않게 한다(실패해도 조용히 넘어간다).
 
+### 3. 카카오톡 등 앱 안 브라우저에서 열리면 바로 기본 브라우저로 (사용자 요청)
+- 카톡으로 공유한 링크를 카톡 안 브라우저로 열면 홈 화면 설치가 안 되고, 저장된 정보(온라인 방 등)가 그 브라우저에만 남는다. 그래서 모든 HTML 페이지의 `<head>` 맨 앞(`<meta charset>` 바로 뒤)에 다시 열기 스크립트를 넣는다.
+- 카카오톡: `kakaotalk://web/openExternal?url=…`로 기본 브라우저에서 열고 잠시 뒤 카톡 안 창을 닫는다(`kakaotalk://inappbrowser/close`, 아이폰은 `kakaoweb://closeBrowser`). 라인: 주소에 `openExternalBrowser=1`. 안드로이드의 네이버·인스타그램·페이스북·밴드·에브리타임 앱 안 브라우저: `intent://…#Intent;scheme=https;package=com.android.chrome;end`.
+- 스크립트는 기존 앱의 `index.html`에 있는 것을 그대로 복사해 쓴다. 보통 브라우저에서는 아무것도 하지 않는다.
+
 ## 그 밖의 관례
 - UI 문구는 한국어로 쓰고, 휴대폰·태블릿(가로 화면 포함)을 먼저 고려한다.
 - 사용자 설정과 진행 상황은 localStorage에 저장하되, 모든 읽기·쓰기를 try/catch로 감싼다.
