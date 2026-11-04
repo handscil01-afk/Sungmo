@@ -44,6 +44,17 @@ const SFX = { ctx:null };
 function audio(){
   if(SFX.ctx) return SFX.ctx;
   try{ const C = window.AudioContext || window.webkitAudioContext; if(C) SFX.ctx = new C(); }catch(e){}
+  // 전체 소리를 크게: 모든 소리를 압축기(큰 소리는 눌러 찢어지지 않게) → 키우기(1.8배)를 거쳐 내보냄.
+  // 소리마다 c.destination에 잇는 코드가 많아서, 이 기기의 destination 자리를 그 입구로 바꿔 끼움
+  if(SFX.ctx && !SFX.master){
+    try{
+      const c = SFX.ctx, out = c.destination, comp = c.createDynamicsCompressor(), boost = c.createGain();
+      comp.threshold.value = -20; comp.knee.value = 10; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.25;
+      boost.gain.value = 1.8; comp.connect(boost); boost.connect(out);
+      Object.defineProperty(c, 'destination', { value: comp, configurable: true });
+      SFX.master = boost;
+    }catch(e){}
+  }
   // 휴대폰에서 음성 대화(마이크)를 켜거나 다른 앱 소리가 끼어들면 소리 장치가 멈출(interrupted·suspended) 수 있음 → 다시 켬
   if(SFX.ctx) SFX.ctx.onstatechange = () => { const c = SFX.ctx; if(c.state !== 'running' && c.state !== 'closed' && !document.hidden) c.resume().catch(() => {}); };
   return SFX.ctx;
@@ -196,7 +207,7 @@ function crowdSync(){
   if(c.state !== 'running'){ c.resume().then(() => crowdSync()).catch(() => {}); return; }
   if(!RECBUF.crowd){ recLoad('crowd'); if(RECLOAD.crowd) RECLOAD.crowd.then(() => crowdSync()); return; }
   const s = c.createBufferSource(), g = c.createGain();
-  s.buffer = RECBUF.crowd; s.loop = true; g.gain.value = 0.35; s.connect(g); g.connect(c.destination); s.start();
+  s.buffer = RECBUF.crowd; s.loop = true; g.gain.value = 0.22;   // 전체를 키웠으므로 배경 관중은 조금 낮춤 s.connect(g); g.connect(c.destination); s.start();
   CROWD.src = s;
 }
 ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => setTimeout(crowdSync, 50), { capture:true }));
