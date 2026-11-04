@@ -301,7 +301,16 @@ function selDesc(s){
   else if(s.r != null) a.push(['높게', '가운데 높이로', '낮게'][s.r]);
   return a.length ? a.join(', ') + '. ' : '';
 }
+// 선택지를 방향대로 배치: 화면 보며 하기는 늘, 시청각장애인 모드는 설정(숫자판 방향 배치)을 켰을 때.
+// 왼손 타자면 몸쪽이 오른쪽 (투구 화면과 같은 방향)
+const dirLayout = () => SET.view === 'gfx' || !!SET.padDir;
+const dispCol = c => dirLayout() && G && curBatter(G).hand === 'L' ? 2 - c : c;
 function heightScreen(){
+  if(dirLayout()){
+    const opts = [['높게', '헛스윙을 끌어내기 좋지만 맞으면 멀리 갑니다.'], ['가운데 높이', '스트라이크를 잡기 쉽지만 맞기도 쉽습니다.'], ['낮게', '땅볼을 끌어내기 좋습니다. 빠지면 볼이 됩니다.']]
+      .map(([t, sub], r) => ({ n: zoneNum(r, 1), pos:[r, 1], t, s: sub, cls:'z', act: v => { GS.sel = { ...GS.sel, r }; pitchNext(v); } }));
+    return { board:true, sub:true, grid:true, q:`${selDesc(GS.sel)}어느 높이로 던질까요? 좌우는 포수가 정합니다.`, opts, back: v => go(defMain, v) };
+  }
   const opts = [['높게', '높은 공은 헛스윙을 끌어내기 좋지만 맞으면 멀리 갑니다.'], ['가운데 높이', '스트라이크를 잡기 쉽지만 맞기도 쉽습니다.'], ['낮게', '땅볼을 끌어내기 좋습니다. 빠지면 볼이 됩니다.']]
     .map(([t, sub], r) => ({ n: r + 1, t, s: sub, act: v => { GS.sel = { ...GS.sel, r }; pitchNext(v); } }));
   return { board:true, sub:true, q:`${selDesc(GS.sel)}어느 높이로 던질까요? 좌우는 포수가 정합니다.`, opts, back: v => go(defMain, v) };
@@ -326,7 +335,7 @@ const zoneNum = (r, c) => SET.pad === 'pc' ? (2 - r) * 3 + c + 1 : r * 3 + c + 1
 function locScreen(){
   const opts = [];
   for(let r = 0; r < 3; r++) for(let c = 0; c < 3; c++)
-    opts.push({ n: zoneNum(r, c), t: ZONE_NAME[r][c], cls:'z', act: v => {
+    opts.push({ n: zoneNum(r, dispCol(c)), pos:[r, dispCol(c)], t: ZONE_NAME[r][c], cls:'z', act: v => {
       GS.sel = { ...GS.sel, r, c };
       if(r === 1 && c === 1) GS.sel.e = 'in';
       pitchNext(v);
@@ -335,6 +344,13 @@ function locScreen(){
 }
 function edgeScreen(){
   const s = GS.sel, name = ZONE_NAME[s.r][s.c];
+  if(dirLayout()){
+    // 존 가운데 → 바깥 방향으로: 안쪽 · 구석 · 빼기. 고른 칸이 왼쪽이면 왼쪽으로, 위면 위로 늘어놓음
+    const dc = dispCol(s.c), vert = s.c === 1, outward = vert ? (s.r === 0 ? -1 : 1) : (dc === 0 ? -1 : 1);
+    const place = i => { const k = outward < 0 ? 2 - i : i; return vert ? [k, 1] : [0, k]; };   // 가로는 한 줄만(번호는 숫자판 가운데 줄 4 5 6)
+    const opts = ['in', 'edge', 'out'].map((e, i) => { const pos = place(i); return { n: zoneNum(vert ? pos[0] : 1, pos[1]), pos, cls:'z', t: EDGE[e].name, s: EDGE[e].sub, act: v => { GS.sel = { ...GS.sel, e }; pitchNext(v); } }; });
+    return { board:true, sub:true, grid:true, q:`${s.t ? PITCH[s.t].name + ', ' : ''}${name}. 얼마나 붙일까요? 바깥쪽 칸일수록 존에서 멀어집니다.`, opts, back: v => go(locScreen, v) };
+  }
   const opts = ['in', 'edge', 'out'].map((e, i) => ({ n: i + 1, t: EDGE[e].name, s: EDGE[e].sub, act: v => { GS.sel = { ...GS.sel, e }; pitchNext(v); } }));
   return { board:true, sub:true, q:`${s.t ? PITCH[s.t].name + ', ' : ''}${name}. 얼마나 붙일까요?`, opts, back: v => go(locScreen, v) };
 }

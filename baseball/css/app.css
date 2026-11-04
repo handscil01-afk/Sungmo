@@ -390,3 +390,20 @@ html.gfxui .opts.setlist .gico svg{ width:17px; height:17px; }
 @media (min-width: 560px){ html.gfxui .opts.setlist{ grid-template-columns:repeat(3, minmax(0, 1fr)); } }
 @media (min-width: 900px){ html.gfxui .opts.setlist{ grid-template-columns:repeat(4, minmax(0, 1fr)); } }
 html.gfxui .opts.setlist .opt b{ font-size:0.76rem; line-height:1.2; }
+
+/* 시청각장애인 모드: 평소에는 단추를 작게(한 화면에 더 많이), '저시력 크게 보기'를 켜면 지금처럼 크게 */
+html:not(.lowvis):not(.gfxgame):not(.gfxui) .opts{ gap:6px; }
+html:not(.lowvis):not(.gfxgame):not(.gfxui) .opt{ min-height:46px; padding:6px 10px; border-radius:11px; gap:10px; }
+html:not(.lowvis):not(.gfxgame):not(.gfxui) .opt .num{ width:1.7rem; height:1.7rem; font-size:0.9rem; }
+html:not(.lowvis):not(.gfxgame):not(.gfxui) .opt b{ font-size:0.92rem; }
+html:not(.lowvis):not(.gfxgame):not(.gfxui) .opt small{ font-size:0.74rem; line-height:1.3; }
+html:not(.lowvis):not(.gfxgame):not(.gfxui) .opt.z{ min-height:3.4rem; padding:6px 4px; }
+html:not(.lowvis):not(.gfxgame):not(.gfxui) .btn{ min-height:42px; padding:6px 14px; }
+html:not(.lowvis):not(.gfxgame):not(.gfxui) #q{ font-size:1.02rem; }
+html:not(.lowvis):not(.gfxgame):not(.gfxui) #say, html:not(.lowvis):not(.gfxgame):not(.gfxui) #note{ padding:8px 12px; font-size:0.92rem; }
+html:not(.lowvis):not(.gfxgame):not(.gfxui) .board{ padding:8px 12px; }
+html:not(.lowvis):not(.gfxgame):not(.gfxui) #cmd{ min-height:42px; padding:6px 10px; }
+/* 방향대로 놓는 칸(코스·높이·붙이기): 빈칸이 있어도 3×3 자리를 지킴 */
+.opts.grid{ grid-auto-rows:minmax(3rem, auto); }
+.opts.grid .opt:not(.z){ min-height:40px; flex-direction:row; justify-content:center; }
+.opts.grid .opt:not(.z) small{ display:none; }

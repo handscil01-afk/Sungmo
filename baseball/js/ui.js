@@ -160,6 +160,11 @@ function renderOpts(S){
     }
     const html = `<span class="num">${o.n}<span class="sr-only">번. </span></span>${ico}<span class="tx">${title}${o.s ? `<span class="sr-only">. </span><small>${esc(o.s)}</small>` : ''}</span>`;
     if(kind) el.className += kind;
+    // 방향대로 배치하는 칸(코스·높이·붙이기): 정해진 자리에
+    const placed = S.grid && (S.opts || []).some(x => x.pos);
+    const lastRow = placed ? Math.max(...(S.opts || []).filter(x => x.pos).map(x => x.pos[0])) + 2 : 0;
+    el.style.gridRow = placed && o.pos ? String(o.pos[0] + 1) : placed ? String(lastRow) : '';
+    el.style.gridColumn = placed && o.pos ? String(o.pos[1] + 1) : placed ? '1 / -1' : '';   // 칸 밖 선택지(지금 상황 등)는 아래 한 줄
     if(el.__h !== html){ el.innerHTML = html; el.__h = html; }
     if(box.children[i] !== el) box.insertBefore(el, box.children[i] || null);
   });

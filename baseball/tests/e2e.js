@@ -104,7 +104,7 @@ const PORT = 8766;
       for(const k of ['1', '3', '1', '1', '1', '2', '2', '1']) await page.keyboard.press(k);
       if(!(await q(page)).includes('타순과 선발 투수')) errors.push('감독 모드 경기 전 준비 화면이 아님: ' + await q(page));
       await shot(page, `${name}-pregame`);
-      for(const k of ['2', '3', '1', '2', '4', '1', '3', '5', '2']) await page.keyboard.press(k);
+      for(const k of ['2', '3', '1', '2', '4', '1', '3', '1', '5', '2', '1']) await page.keyboard.press(k);   // 벤치·선발 교체는 '교체하기'로 확인
       const lineupLog = await page.evaluate(() => G.log.filter(l => l.k === 'c').map(l => l.s).join(' / '));
       console.log('경기 전 변경:', lineupLog);
       await page.keyboard.press('1');
