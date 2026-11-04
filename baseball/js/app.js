@@ -165,12 +165,14 @@ function settingsPage(backTo){
     { n:9, t:'게임 방법과 키 안내', act: v => go(() => helpScreen(() => go(() => settingsScreen(backTo), 'click')), v) },
   ] };
 }
+const castKey = () => SET.cast === false ? 'off' : (SET.analyst || 'some') === 'off' ? 'c' : SET.analyst || 'some';
+const castName = () => ({ off:'끔', c:'캐스터만', some:'캐스터 + 해설 가끔', often:'캐스터 + 해설 자주' })[castKey()];
 function settings2(backTo){
   const ch = (fn, label) => () => { fn(); saveSet(); stay(label()); };
   return { q:'설정 더 보기', back: v => go(() => settingsScreen(backTo), v), opts:[
     { n:1, t:`진동: ${onOff(SET.vib)}`, s:'안드로이드 휴대폰에서 안타, 홈런, 삼진, 득점 때 진동합니다.', act: ch(() => { SET.vib = !SET.vib; }, () => `진동 ${onOff(SET.vib)}`) },
-    { n:2, t:`중계 음성: ${onOff(SET.cast !== false)}`, s:'캐스터 목소리로 경기를 중계합니다. 켜면 경기 결과는 중계로 듣고, 화면 낭독기는 질문과 선택지만 읽습니다. 켤 때 예시를 들려 줍니다.',
-      act: ch(() => { SET.cast = SET.cast === false; if(SET.cast){ SET.snd = true; castSample(); } }, () => `중계 음성 ${onOff(SET.cast !== false)}`) },
+    { n:2, t:`중계 음성: ${castName()}`, s:'캐스터 목소리로 경기를 중계하고, 해설위원이 맞장구와 한마디를 합니다. 끔 → 캐스터만 → 해설 가끔 → 해설 자주 순서로 바뀝니다. 켜면 경기 결과는 중계로 듣고, 화면 낭독기는 질문과 선택지만 읽습니다.',
+      act: ch(() => { const k = ['off', 'c', 'some', 'often'], i = (k.indexOf(castKey()) + 1) % k.length; SET.cast = k[i] !== 'off'; SET.analyst = k[i] === 'c' ? 'off' : k[i] === 'off' ? (SET.analyst || 'some') : k[i]; if(SET.cast){ SET.snd = true; castSample(); } }, () => `중계 음성 ${castName()}`) },
     { n:3, t:`명령 칸 숫자 바로 고르기: ${onOff(SET.quick)}`, s:'켜면 명령 칸에 숫자 하나만 적어도 바로 고릅니다. 끄면 입력 키를 눌러야 고릅니다.',
       act: ch(() => { SET.quick = !SET.quick; }, () => `숫자 바로 고르기 ${onOff(SET.quick)}`) },
     { n:4, t:`관전 자동 재생 간격: ${SET.watch}초`, act: ch(() => { SET.watch = cycle([2, 4, 6, 8, 12], SET.watch); }, () => `자동 재생 ${SET.watch}초`) },

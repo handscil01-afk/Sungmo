@@ -45,9 +45,11 @@ const load = () => { try{ return JSON.parse(localStorage.getItem(KEY)) || {}; }c
 const save = s => { try{ localStorage.setItem(KEY, JSON.stringify(s)); }catch(e){} };
 let st = load(), onlyTodo = false, audio = null;
 const $ = s => document.querySelector(s);
-Promise.all([fetch('script.txt').then(r => r.text()), fetch('index.json').then(r => r.json())]).then(([txt, idx]) => {
+Promise.all([fetch('script.txt').then(r => r.text()), fetch('script2.txt').then(r => r.ok ? r.text() : '').catch(() => ''), fetch('index.json').then(r => r.json())]).then(([txt, txt2, idx]) => {
   const have = new Set(idx.made || []);
-  const rows = txt.split('\n').filter(Boolean).map(l => l.split('\t')).map(([n, id, t]) => ({ n, id, t: (t || '').replace(/^\(.+?\)\s*/, '') })).filter(r => have.has(r.id));
+  // 1차(script.txt: 번호·아이디·문장)와 2차(script2.txt: 번호·묶음·아이디·문장) 녹음
+  const rows = [...txt.split('\n').filter(Boolean).map(l => l.split('\t')).map(([n, id, t]) => ({ n, id, t: (t || '').replace(/^\(.+?\)\s*/, '') })),
+    ...txt2.split('\n').filter(Boolean).map(l => l.split('\t')).map(([n, code, id, t]) => ({ n, id, t: `[${code}] ${t}` }))].filter(r => have.has(r.id));
   const list = $('#list');
   const draw = () => {
     list.innerHTML = '';
