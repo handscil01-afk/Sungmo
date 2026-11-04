@@ -60,7 +60,7 @@ function castStop(){ CAST.src.splice(0).forEach(s => { try{ s.stop(); }catch(e){
 const pick1 = (...ids) => { const have = CAST.idx ? ids.filter(id => CAST.idx[id]) : ids, L = have.length ? have : ids; return L[Math.floor(Math.random() * L.length)]; };
 // 해설: 설정(자주·가끔·끔)에 따라 확률을 곱함. 녹음이 없으면 말하지 않음
 const anaRate = () => ({ often:1.7, some:1, off:0 })[SET.analyst || 'some'];
-const ana = (p, ...ids) => Math.random() < p * anaRate() ? pick1(...ids) : null;
+const ana = (p, ...ids) => Math.random() < Math.min(0.95, p * anaRate()) ? pick1(...ids) : null;
 const numClip = n => n >= 0 && n <= 20 ? `num_${n}` : null;   // 녹음: 영~이십
 const runClip = b => { const k = [0, 1, 2].filter(i => b[i] != null).map(i => i + 1).join(''); return ({ '':'run_none', 1:'run_1', 2:'run_2', 3:'run_3', 12:'run_12', 13:'run_13', 23:'run_23', 123:'run_full' })[k]; };
 const teamClip = (T, long) => `team_${T.key}${long ? '' : '_s'}`;
@@ -173,18 +173,24 @@ function castResult(res, opt = {}){
     const ps = A.bb && A.bb.ps, ev = (ps && ps.ev) || [], caught = ev.find(e => e.k === 'catch');
     const sc = G.teams.map(runsOf), prev = CAST.score || sc, bi = batIdx(G), diff = d => d[bi] - d[1 - bi];
     let line = null;
-    if(has('hr')) line = ana(0.75, 'a_hr1', 'a_hr2', 'a_hr3', 'a_wow');
-    else if(caught && (caught.dive || caught.far)) line = ana(0.7, 'a_def1', 'a_def2', 'a_def3');
-    else if(has('b2') || has('b3')) line = ana(0.5, 'a_hit1', 'a_hit2', 'a_hit3');
-    else if(has('hit')) line = ana(0.3, 'a_hit1', 'a_hit2', 'a_hit3');
-    else if(ps && (ps.kind === 'dp' || ps.kind === 'ldp')) line = ana(0.6, 'a_dp1', 'a_dp2');
-    else if(ps && ps.kind === 'err') line = ana(0.6, 'a_error1', 'a_error2');
-    else if(has('k')) line = ana(0.3, 'a_k1', 'a_k2', 'a_k3', A.res === 'whiff' ? 'a_whiff1' : 'a_k3');
-    else if(has('ball')) line = ana(0.35, 'a_walk1', 'a_walk2', 'a_ball2');
-    else if(has('out') && A.res === 'inplay') line = ana(0.18, 'a_out1', 'a_out2', 'a_out3', A.bb && A.bb.type === 'gb' ? 'a_gb1' : 'a_fly1');
-    else if((has('batF') || has('foul')) && G.strikes === 2) line = ana(0.12, 'a_foul1', 'a_foul2');
-    else if(has('ballc') && G.balls === 3 && G.strikes === 2) line = ana(0.5, 'a_full1', 'a_full2');
-    else if(has('ballc') && G.balls >= 3) line = ana(0.25, 'a_ball1');
+    // (가끔 기준) 타석이 끝나는 결과는 대부분, 공 하나하나에도 서너 공에 한 번쯤 한마디
+    if(has('hr')) line = ana(0.95, 'a_hr1', 'a_hr2', 'a_hr3', 'a_wow');
+    else if(caught && (caught.dive || caught.far)) line = ana(0.95, 'a_def1', 'a_def2', 'a_def3', 'a_wow');
+    else if(has('b2') || has('b3')) line = ana(0.85, 'a_hit1', 'a_hit2', 'a_hit3', 'a_run1');
+    else if(has('hit')) line = ana(0.7, 'a_hit1', 'a_hit2', 'a_hit3', 'a_yes3');
+    else if(ps && (ps.kind === 'dp' || ps.kind === 'ldp')) line = ana(0.9, 'a_dp1', 'a_dp2');
+    else if(ps && ps.kind === 'err') line = ana(0.9, 'a_error1', 'a_error2');
+    else if(has('k')) line = ana(0.65, 'a_k1', 'a_k2', 'a_k3', A.res === 'whiff' ? 'a_whiff1' : 'a_pitch_good');
+    else if(has('ball')) line = ana(0.7, 'a_walk1', 'a_walk2', 'a_ball2', 'a_ball1');
+    else if(has('out') && A.res === 'inplay') line = ana(0.55, 'a_out1', 'a_out2', 'a_out3', A.bb && A.bb.type === 'gb' ? 'a_gb1' : 'a_fly1', 'a_dp2');
+    else if((has('batF') || has('foul')) && G.strikes === 2) line = ana(0.4, 'a_foul1', 'a_foul2');
+    else if(has('ballc') && G.balls === 3 && G.strikes === 2) line = ana(0.8, 'a_full1', 'a_full2');
+    else if(has('ballc') && G.balls >= 2) line = ana(0.35, 'a_ball1', 'a_ball2');
+    else if(has('ballc')) line = ana(0.2, 'a_ball1', 'a_ball2', 'a_watch');
+    else if(has('strike') || fx.some(n => /^whiff/.test(n))) line = ana(0.25, 'a_pitch_good', 'a_k3', fx.some(n => /^whiff/.test(n)) ? 'a_whiff1' : 'a_k2', 'a_yes3');
+    else if(has('batF') || has('foul')) line = ana(0.15, 'a_foul2', 'a_watch');
+    // 투수가 많이 던졌으면 가끔 체력 이야기
+    if(!line && curPitcher(G).n >= 80) line = ana(0.12, 'a_tired1', 'a_tired2');
     // 점수 흐름: 역전·동점이 먼저
     if(has('score')){
       if(diff(prev) < 0 && diff(sc) > 0) line = ana(0.9, 'a_comeback1') || line;
@@ -207,7 +213,7 @@ function castResult(res, opt = {}){
     after.push(ana(1, 'a_bye', 'a_end1'), CAST.idx && CAST.idx.c_thanks ? 'c_thanks' : null);
   }
   else {
-    if(hasAll('change')) after.push('change', `inn_${Math.min(12, G.inning)}${G.top ? 't' : 'b'}`, teamClip(batTeam(G)), 'j_attack',
+    if(hasAll('change')) after.push(ana(0.4, 'a_inning1', 'a_inning2'), 'change', `inn_${Math.min(12, G.inning)}${G.top ? 't' : 'b'}`, teamClip(batTeam(G)), 'j_attack',
       'j_score', teamClip(G.teams[0]), numClip(runsOf(G.teams[0])), 'j_vs', numClip(runsOf(G.teams[1])), teamClip(G.teams[1]));
     if(hasAll('pchange')) after.push('r_pitcher_change', ana(0.5, 'a_change1'));
     if((hasAll('batter') && !hasAll('start')) || hasAll('change')){
@@ -219,7 +225,9 @@ function castResult(res, opt = {}){
         if(G.bases.every(x => x != null)) after.push(ana(0.4, 'a_loaded1', 'a_pinch1'));
         else if(Math.random() < 0.3 * anaRate() && CAST.idx && CAST.idx.c_scoring) after.push('c_scoring', pick1('a_chance1', 'a_chance2', 'a_yes1', 'a_yes3'));
       }
-      else if(G.inning >= 7 && Math.abs(runsOf(G.teams[0]) - runsOf(G.teams[1])) <= 1) after.push(ana(0.12, 'a_close1', 'a_late1'));
+      else if(G.inning >= 7 && Math.abs(runsOf(G.teams[0]) - runsOf(G.teams[1])) <= 1) after.push(ana(0.4, 'a_close1', 'a_late1'));
+      else if(G.outs === 2) after.push(ana(0.25, 'a_twoout1', 'a_careful'));
+      else if(G.bases[0] != null) after.push(ana(0.25, 'a_steal1', 'a_careful'));
     }
   }
   }
