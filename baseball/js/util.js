@@ -24,4 +24,5 @@ const saveSet = () => ls.set('bb_set', SET);
 function applySet(){
   const r = document.documentElement;
   r.dataset.fs = SET.fs; r.dataset.theme = SET.theme;
+  r.classList.toggle('lowvis', !!SET.lowvis);   // 저시력 크게 보기: 단추·글자를 크게
 }

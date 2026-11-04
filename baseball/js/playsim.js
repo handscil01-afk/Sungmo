@@ -9,7 +9,7 @@
 const ANIM_SCALE = 1;   // 그림은 실제 시간 그대로
 const BASE_XY = [[19.4, 19.4], [0, 38.8], [-19.4, 19.4], [0, 0]];   // 1루 · 2루 · 3루 · 홈
 const MOUND = [0, 18.4];
-const FIELD_POS = { P:[0, 18.4], C:[0, -1.5], '1B':[20, 26], '2B':[11, 41], SS:[-11, 41], '3B':[-21, 26], LF:[-29, 82], CF:[0, 94], RF:[29, 82] };
+const FIELD_POS = { P:[0, 18.4], C:[0, -1.5], '1B':[20, 26], '2B':[11.5, 44], SS:[-12.5, 44], '3B':[-21, 26], LF:[-29, 82], CF:[0, 94], RF:[29, 82] };
 const dist2 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const lerp2 = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
 const POS_INF = ['P', '1B', '2B', 'SS', '3B'], POS_OF = ['LF', 'CF', 'RF'];
@@ -65,15 +65,17 @@ function simPlay0(G, bb, opt = {}){
   // 번트: 투수·포수·1루수·3루수가 달려 나와 잡음. 번트가 예상되면(주자 있고 2아웃 전, 전진 수비) 1·3루수가 미리 앞으로
   if(bb.bunt){
     const expect = (bases.some(x => x != null) && G.outs < 2) || fieldTeam(G).align.inf === 0;
-    F.C.react += 0.45;   // 포수는 앉은 자세에서 일어나 마스크를 벗고 나옴
-    ['1B', '3B'].forEach(pos => { if(expect){ F[pos].at = [F[pos].at[0] * 0.92, F[pos].at[1] - 6]; F[pos].react -= 0.12; } });
+    F.C.react += 0.45; F.P.react += 0.12;   // 투수는 던진 동작을 마치고 나옴   // 포수는 앉은 자세에서 일어나 마스크를 벗고 나옴
+    ['1B', '3B'].forEach(pos => { if(expect){ F[pos].at = [F[pos].at[0] * 0.82, 15.5]; F[pos].react -= 0.12; } /* 번트에 대비해 홈 쪽으로 바짝 */ });
   }
   const gbPool = bb.bunt ? ['P', 'C', '1B', '3B', '2B'] : POS_INF, gbMode = bb.bunt ? 'run' : 'gb';
+  if(!bb.bunt) F.P.react += 0.1;   // 투수는 던진 뒤 몸이 기울어 있어 땅볼 반응이 늦음
   if(bb.type === 'gb'){
     const wallR = fenceAng(G, bb.ang) - 2;   // 굴러가다 담장에서 멈춤
     const tStop = bb.v / bb.dec, ballAt = t => { const tt = Math.min(t, tStop); return polar(bb.ang, Math.min(wallR, bb.v * tt - bb.dec * tt * tt / 2)); };
     let best = null;
-    for(let t = 0.15; t <= tStop + 0.01; t += 0.04){
+    // 공이 멈춘 뒤에도(느린 땅볼·번트) 가까운 내야수·투수·포수가 달려가 주움: 멈춘 뒤 4초까지 찾음
+    for(let t = 0.15; t <= tStop + 4; t += 0.04){
       const p = ballAt(t); if(Math.hypot(...p) > 47) break;
       for(const pos of gbPool){ const f = F[pos]; if(reachT(f, p, gbMode) <= t){ if(!best || t < best.t) best = { pos, t, p, slack: t - reachT(f, p, gbMode) }; } }
       if(best) break;
