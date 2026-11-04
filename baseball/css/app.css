@@ -341,7 +341,7 @@ html.gfxui .opt{ min-height:50px; padding:6px 8px 6px 8px; gap:8px; border-radiu
 html.gfxui .opt.noico{ padding-left:18px; }
 html.gfxui .opt .num{ top:-5px; left:-5px; width:1.2rem; height:1.2rem; font-size:0.66rem; border-width:1.5px; }
 html.gfxui .opt b{ font-size:0.88rem; line-height:1.25; }
-html.gfxui .opt small{ position:absolute !important; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+html.gfxui .opt small{ display:block; font-size:0.68rem; line-height:1.3; color:#8fa0c8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; -webkit-line-clamp:unset; }
 html.gfxui .gico{ width:32px; height:32px; border-radius:9px; }
 html.gfxui .gico svg{ width:19px; height:19px; }
 html.gfxui .gico.tm{ font-size:0.95rem; }
@@ -378,3 +378,15 @@ html.gfxui:not(.gfxinput) #cmd::placeholder{ color:#6b789f; }
 }
 /* 뜸 들이는 중: 맨 끝 줄(결과)은 숨겨지므로, 지금 공의 앞부분(투구 설명)을 보여 줌 */
 html.gfxgame.hold #say p.cur{ display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; overflow:hidden; font-size:0.9rem; font-weight:600; line-height:1.4; color:#fff; margin:0; }
+/* 설정을 한 화면에: 설명은 빼고(누르면 바뀐 값을 말해 줌) 두 칸, 값 알약은 이름 아래 */
+html.gfxui .opts.setlist{ grid-template-columns:repeat(2, minmax(0, 1fr)); gap:6px; }
+html.gfxui .opts.setlist .opt{ min-height:44px; padding:5px 7px; gap:7px; }
+html.gfxui .opts.setlist .opt small{ display:none; }
+html.gfxui .opts.setlist .opt.set .tx{ grid-template-columns:minmax(0, 1fr); row-gap:2px; }
+html.gfxui .opts.setlist .opt.set .val{ justify-self:start; max-width:100%; font-size:0.66rem; padding:1px 8px; }
+html.gfxui .opts.setlist .opt b{ font-size:0.8rem; }
+html.gfxui .opts.setlist .gico{ width:28px; height:28px; border-radius:8px; }
+html.gfxui .opts.setlist .gico svg{ width:17px; height:17px; }
+@media (min-width: 560px){ html.gfxui .opts.setlist{ grid-template-columns:repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 900px){ html.gfxui .opts.setlist{ grid-template-columns:repeat(4, minmax(0, 1fr)); } }
+html.gfxui .opts.setlist .opt b{ font-size:0.76rem; line-height:1.2; }

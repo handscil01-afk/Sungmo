@@ -36,6 +36,7 @@ function castPreload(){
 // 조각들을 at초 뒤부터 이어서 틂 (앞 중계가 아직 나오는 중이면 끝난 뒤에). 끝나는 시각을 돌려줌
 function castPlay(ids, at = 0){
   const c = audio(); if(!c || !castOn()) return 0;
+  if(c.state !== 'running' && c.state !== 'closed') c.resume().catch(() => {});   // 멈춰 있으면(음성 대화·다른 앱 소리 뒤) 다시 켬
   let t = Math.max(c.currentTime + at, CAST.until);
   ids.filter(Boolean).forEach(id => {
     const name = castFile(id); if(!name) return;
@@ -65,7 +66,6 @@ const teamClip = (T, long) => `team_${T.key}${long ? '' : '_s'}`;
 function castResult(res, opt = {}){
   if(!castOn() || !res || typeof G === 'undefined' || !G) return null;
   castLoadIndex();
-  castStop();
   // 여러 공을 한꺼번에 진행한 결과(맡기기·자동)면 마지막 공의 효과만 보고 판정을 말함 (앞 공의 파울·득점을 섞지 않게)
   const fxAll = res.fx || [], lastP = fxAll.lastIndexOf('pitch'), fx = lastP > 0 ? fxAll.slice(lastP) : fxAll;
   const text = (res.lines || []).map(l => l.s || l).join(' '), has = n => fx.includes(n), hasAll = n => fxAll.includes(n), A = G.anim;
@@ -174,6 +174,9 @@ function castResult(res, opt = {}){
   }
   // 시각 순서대로 이어서 틂 (앞 조각이 안 끝났으면 끝난 뒤에). 안내(after)는 언제나 맨 끝: 도루·득점 중계가 공수 교대 안내 뒤로 밀리지 않게
   plan.sort((a, b) => a[0] - b[0]);
+  // 새로 말할 것이 없으면(온라인에서 차례만 바뀐 상태 따위) 하던 중계를 끊지 않음
+  if(!plan.length && !after.length) return null;
+  castStop();
   if(after.length) plan.push([plan.length ? plan[plan.length - 1][0] : resAt, after.flat(3).filter(Boolean)]);
   let end = 0;
   plan.forEach(([t, ids]) => { end = castPlay(ids, t); });

@@ -44,10 +44,13 @@ const SFX = { ctx:null };
 function audio(){
   if(SFX.ctx) return SFX.ctx;
   try{ const C = window.AudioContext || window.webkitAudioContext; if(C) SFX.ctx = new C(); }catch(e){}
+  // 휴대폰에서 음성 대화(마이크)를 켜거나 다른 앱 소리가 끼어들면 소리 장치가 멈출(interrupted·suspended) 수 있음 → 다시 켬
+  if(SFX.ctx) SFX.ctx.onstatechange = () => { const c = SFX.ctx; if(c.state !== 'running' && c.state !== 'closed' && !document.hidden) c.resume().catch(() => {}); };
   return SFX.ctx;
 }
 document.addEventListener('pointerdown', () => { const c = audio(); if(c && c.state === 'suspended') c.resume().catch(() => {}); }, true);
 document.addEventListener('keydown', () => { const c = audio(); if(c && c.state === 'suspended') c.resume().catch(() => {}); }, true);
+document.addEventListener('visibilitychange', () => { const c = SFX.ctx; if(c && !document.hidden && c.state !== 'running' && c.state !== 'closed') c.resume().catch(() => {}); });
 function noise(c, t0, dur, type, freq, gain, q = 1){
   const n = Math.max(1, Math.floor(c.sampleRate * dur)), buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
   for(let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
