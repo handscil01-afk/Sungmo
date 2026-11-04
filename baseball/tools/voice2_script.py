@@ -174,3 +174,13 @@ for code, who, tone, lines in B:
 with open(os.path.join(V, 'script2.txt'), 'w') as f:
     for n, (code, i, t) in enumerate(rows, 1): f.write(f'{n:03d}\t{code}\t{i}\t{t}\n')
 print(len(B), 'bundles', len(rows), 'lines', [len(l) for _, _, _, l in B])
+
+# AI Studio(Gemini TTS)용: Style 칸에 넣을 말투와, 본문 칸에 넣을 문장만 (안내문 없이)
+os.makedirs(os.path.join(V, 'prompts2_studio'), exist_ok=True)
+STYLE = { 'C': '한국어 스포츠 중계 캐스터. ', 'A': '한국어 야구 해설위원, 차분한 40대 남성. ' }
+for code, who, tone, lines in B:
+    with open(os.path.join(V, 'prompts2_studio', f'{code}.txt'), 'w') as f:
+        f.write(f'[{code}] Speaker: {"캐스터 (1차 녹음과 같은 목소리)" if who == "C" else "해설 (캐스터와 다른 목소리, A 묶음은 모두 같은 목소리)"}\n')
+        f.write(f'Style 칸: {STYLE[who]}{tone}. 문장마다 2초 쉬고 다음 문장을 읽음.\n')
+        f.write('본문 칸 (아래를 그대로 붙여 넣기):\n\n')
+        for _, t in lines: f.write(t + '\n\n')
