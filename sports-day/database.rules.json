@@ -132,6 +132,102 @@
           }
         }
       }
+    },
+    "goldenbell1": {
+      "secret": {
+        ".read": false,
+        "staffPw": {
+          ".write": "auth != null && root.child('goldenbell1/masters/' + auth.uid).exists()",
+          ".validate": "newData.isString() && newData.val().length >= 4 && newData.val().length <= 30"
+        }
+      },
+      "masters": {
+        ".read": "auth != null && root.child('goldenbell1/masters/' + auth.uid).exists()",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && (root.child('goldenbell1/masters/' + auth.uid).exists() || (auth.uid === $uid && newData.val() === root.child('goldenbell1/secret/masterPw').val()))"
+        }
+      },
+      "staffs": {
+        ".read": "auth != null && root.child('goldenbell1/masters/' + auth.uid).exists()",
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && (root.child('goldenbell1/masters/' + auth.uid).exists() || (auth.uid === $uid && (!newData.exists() || (root.child('goldenbell1/secret/staffPw').exists() && newData.child('pw').val() === root.child('goldenbell1/secret/staffPw').val()))))",
+          ".validate": "!newData.exists() || (newData.child('name').isString() && newData.child('name').val().length <= 20)"
+        }
+      },
+      "live": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('goldenbell1/masters/' + auth.uid).exists()"
+      },
+      "questions": {
+        ".read": "auth != null && (root.child('goldenbell1/masters/' + auth.uid).exists() || root.child('goldenbell1/staffs/' + auth.uid).exists())",
+        ".write": "auth != null && root.child('goldenbell1/masters/' + auth.uid).exists()"
+      },
+      "seats": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('goldenbell1/masters/' + auth.uid).exists()"
+      },
+      "banner": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('goldenbell1/masters/' + auth.uid).exists()"
+      },
+      "bannerimg": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('goldenbell1/masters/' + auth.uid).exists()",
+        ".validate": "!newData.exists() || (newData.child('img').isString() && newData.child('img').val().length < 1000000)"
+      },
+      "favs": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('goldenbell1/masters/' + auth.uid).exists()"
+      },
+      "marks": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('goldenbell1/masters/' + auth.uid).exists()",
+        "$id": {
+          "q": {
+            ".write": "auth != null && (root.child('goldenbell1/masters/' + auth.uid).exists() || root.child('goldenbell1/staffs/' + auth.uid).exists())",
+            ".validate": "newData.isString() && newData.val().length < 60"
+          },
+          "p": {
+            ".write": "auth != null && (root.child('goldenbell1/masters/' + auth.uid).exists() || root.child('goldenbell1/staffs/' + auth.uid).exists())",
+            ".validate": "newData.isString() && newData.val().length < 60"
+          },
+          "by": {
+            "$u": {
+              ".write": "auth != null && (root.child('goldenbell1/masters/' + auth.uid).exists() || (root.child('goldenbell1/staffs/' + auth.uid).exists() && auth.uid === $u))",
+              ".validate": "!newData.exists() || (newData.child('n').isString() && newData.child('n').val().length <= 20 && newData.child('t').isNumber() && newData.child('r').isString())"
+            }
+          }
+        }
+      },
+      "devices": {
+        ".read": "auth != null",
+        "$uid": {
+          ".write": "auth != null && (auth.uid === $uid || root.child('goldenbell1/masters/' + auth.uid).exists())",
+          ".validate": "!newData.exists() || (newData.child('name').isString() && newData.child('name').val().length <= 20 && newData.child('role').isString())"
+        }
+      },
+      "msgs": {
+        ".read": "auth != null && (root.child('goldenbell1/masters/' + auth.uid).exists() || root.child('goldenbell1/staffs/' + auth.uid).exists())",
+        "$id": {
+          ".write": "auth != null && (root.child('goldenbell1/masters/' + auth.uid).exists() || (root.child('goldenbell1/staffs/' + auth.uid).exists() && !data.exists() && newData.child('uid').val() === auth.uid))",
+          ".validate": "!newData.exists() || (newData.child('text').isString() && newData.child('text').val().length <= 300 && newData.child('uid').val() === auth.uid)"
+        }
+      },
+      "radio": {
+        ".read": "auth != null && (root.child('goldenbell1/masters/' + auth.uid).exists() || root.child('goldenbell1/staffs/' + auth.uid).exists())",
+        "lock": {
+          ".write": "auth != null && (root.child('goldenbell1/masters/' + auth.uid).exists() || root.child('goldenbell1/staffs/' + auth.uid).exists()) && (!data.exists() || data.child('uid').val() === auth.uid || now - data.child('at').val() > 10000 || root.child('goldenbell1/masters/' + auth.uid).exists())",
+          ".validate": "!newData.exists() || (newData.child('uid').val() === auth.uid && newData.child('at').isNumber() && newData.child('tid').isString())"
+        },
+        "s": {
+          "$k": {
+            ".write": "auth != null && (root.child('goldenbell1/masters/' + auth.uid).exists() || root.child('goldenbell1/staffs/' + auth.uid).exists()) && ((root.child('goldenbell1/radio/lock/uid').val() === auth.uid && newData.child('t').val() === root.child('goldenbell1/radio/lock/tid').val() && newData.child('u').val() === auth.uid) || (!newData.exists() && (data.child('u').val() === auth.uid || root.child('goldenbell1/masters/' + auth.uid).exists())))",
+            ".validate": "!newData.exists() || (newData.child('d').isString() && newData.child('d').val().length < 20000)"
+          }
+        }
+      }
     }
   }
 }
