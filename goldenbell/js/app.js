@@ -69,8 +69,12 @@ function saveBanner(){ S.banner.rev = now(); saveSoon('banner', () => ({ ...S.ba
 
 /* ===================== 받아 오기 ===================== */
 const SUBS = { qs:null, host:[] };
+let RULES_MISSING = false, RULES_OLD = false;
 function subscribeBase(){
-  DB.on('live', applyLive);
+  // 규칙 버전 확인: rv2 는 2판 규칙에만 읽기가 열려 있음 (못 읽으면 예전 규칙이 게시돼 있음)
+  DB.on('rv2', () => { RULES_OLD = false; }, e => { if(isDenied(e)){ RULES_OLD = true; if(!$('#sheet').hidden && $('#mForm')) openSheet(rulesMissingHTML()); } });
+  // live 는 로그인한 모든 기기가 읽을 수 있어야 함: 못 읽으면 서버 규칙을 아직 게시하지 않은 것
+  DB.on('live', d => { RULES_MISSING = false; applyLive(d); }, e => { if(isDenied(e)){ RULES_MISSING = true; rulesNotice(); } });
   DB.on('seats', d => { if(d && (d.rev || 0) >= S.seats.rev){ S.seats = { rows:d.rows || 4, cols:d.cols || 5, people:asList(d.people).map(p => ({ id:String(p.id), name:String(p.name || '') })), map:clone(d.map || {}), adjust:clone(d.adjust || {}), rev:d.rev || 0 }; schedule(); } });
   DB.on('banner', d => { if(d && (d.rev || 0) >= S.banner.rev){ S.banner = { ...S.banner, ...d }; schedule(); } });
   DB.on('bannerimg', d => { if(!d){ if(!S.bimg.img) return; S.bimg = { img:'', rev:0 }; schedule(); return; } if((d.rev || 0) >= S.bimg.rev){ S.bimg = { img:d.img || '', rev:d.rev || 0 }; schedule(); } });
@@ -96,19 +100,57 @@ function onRoleChange(){
 }
 function pushPresence(){ if(DB) DB.presence({ name:(ROLE === 'host' ? '진행자' : ME.name || '이름 없음').slice(0, 20), role:ROLE || 'pick', zone:zoneText(), at:srvNow(), master:ME.master, staff:ME.staff }).catch(() => {}); }
 function onNetChange(){
+  if(RULES_MISSING && !DEMO) return rulesNotice();
   const ok = DB && DB.st.connected;
   $$('.pill.net').forEach(el => { el.className = 'pill net ' + (DEMO ? 'warn' : ok ? 'ok' : 'bad'); el.textContent = DEMO ? '연습 모드' : ok ? '연결됨' : '연결 끊김 · 다시 연결 중'; });
   if(typeof radioRender === 'function') radioRender();
 }
 
 /* ===================== 들어오기 (진행자·직원) ===================== */
+// 서버 규칙(database.rules.json)을 아직 Firebase에 게시하지 않았으면 무엇도 읽고 쓸 수 없음 → 비밀번호 대신 게시 방법을 보여 줌
+function rulesMissingHTML(){
+  return `<h3>${RULES_OLD && !RULES_MISSING ? '서버 규칙을 새 것으로 한 번 더 게시해 주세요' : '서버 준비가 아직 안 됐습니다'}</h3>
+    <p>${RULES_OLD && !RULES_MISSING ? '지금 게시된 골든벨 규칙은 예전 것이라, 앱에서 진행자 비밀번호를 처음 정할 수 없습니다. 아래처럼 새 규칙 파일을 다시 붙여 넣고 게시해 주세요.' : '골든벨용 서버 규칙을 Firebase에 한 번 게시해야 진행자 비밀번호를 정하고 쓸 수 있습니다. 가을운동회 때와 같은 곳입니다.'}</p>
+    <ol>
+      <li>PC에서 <b>console.firebase.google.com</b>에 들어가 <b>handscil-sports</b> 프로젝트를 엽니다.</li>
+      <li>왼쪽 <b>빌드 → Realtime Database → 규칙</b> 탭을 엽니다.</li>
+      <li>안의 내용을 모두 지우고, 깃허브 저장소의 <b>sports-day/database.rules.json</b> 내용을 그대로 붙여 넣은 뒤 <b>게시</b>를 누릅니다. (운동회·야구 규칙도 함께 들어 있어 그대로 유지됩니다)</li>
+      <li>이 화면을 새로 고침하면 진행자 비밀번호를 정하는 창이 나옵니다.</li>
+    </ol>
+    <p class="muted small">규칙 파일 주소: github.com/handscil01-afk/Sungmo/blob/main/sports-day/database.rules.json</p>
+    <div class="row"><button class="btn" data-act="reload">새로 고침</button><div class="sp"></div><button class="btn primary" data-close>닫기</button></div>`;
+}
 function loginMasterSheet(next){
+  if((RULES_MISSING || RULES_OLD) && !DEMO){ openSheet(rulesMissingHTML()); return; }
   openSheet(`<h3>진행자 비밀번호</h3><p class="muted small">진행자 도구와 프로젝터 화면은 진행자 비밀번호로 한 번 들어온 기기에서만 열립니다. 같은 브라우저의 다른 창은 다시 묻지 않습니다.</p>
-    <form id="mForm"><input type="password" id="mPw" autocomplete="current-password" placeholder="비밀번호" style="width:100%"><div class="row" style="margin-top:12px"><div class="sp"></div><button type="button" class="btn" data-close>취소</button><button class="btn primary">들어가기</button></div></form>`);
+    <form id="mForm"><input type="password" id="mPw" autocomplete="current-password" placeholder="비밀번호" style="width:100%"><div class="row" style="margin-top:12px"><div class="sp"></div><button type="button" class="btn" data-close>취소</button><button class="btn primary">들어가기</button></div></form>
+    ${DEMO ? '<p class="muted small">연습 모드 비밀번호는 0000입니다.</p>' : '<div class="first-run"><b>처음 쓰시나요?</b> 아직 진행자 비밀번호를 정한 적이 없으면 여기서 정하세요. 한 번 정하면 다른 사람은 새로 정할 수 없습니다.<div class="row" style="margin-top:8px"><button type="button" class="btn" data-first>진행자 비밀번호 처음 정하기</button></div></div>'}`, e => {
+    if(e.target.closest('[data-first]')) firstPwSheet(next);
+  });
   $('#mForm').addEventListener('submit', async e => {
     e.preventDefault(); const pw = $('#mPw').value;
+    if(!pw){ toast('비밀번호를 넣어 주세요'); return; }
     try{ await DB.set('masters/' + DB.uid, pw); ME.master = true; closeSheet(); toast('진행자로 들어왔습니다'); onRoleChange(); next && next(); }
-    catch(err){ toast(isDenied(err) ? '비밀번호가 맞지 않습니다.' : '서버에 연결하지 못했습니다.'); }
+    catch(err){ toast(isDenied(err) ? '비밀번호가 맞지 않습니다. 아직 정한 적이 없으면 아래 "처음 정하기"를 누르세요.' : '서버에 연결하지 못했습니다.'); }
+  });
+}
+function rulesNotice(){
+  $$('.pill.net').forEach(el => { el.className = 'pill net bad'; el.textContent = '서버 규칙 게시 필요'; });
+  if(!$('#sheet').hidden && $('#mForm')) openSheet(rulesMissingHTML());
+}
+function firstPwSheet(next){
+  openSheet(`<h3>진행자 비밀번호 정하기</h3><p class="muted small">진행자 도구와 프로젝터 화면을 열 때 쓰는 비밀번호입니다(4~30자). 진행을 맡을 직원끼리만 알고 계세요. 나중에 바꾸려면 Firebase 콘솔의 데이터 탭에서 goldenbell1 → secret → masterPw를 고칩니다.</p>
+    <form id="fForm"><label class="field"><span>새 비밀번호</span><input type="password" id="fPw1" autocomplete="new-password" maxlength="30"></label>
+    <label class="field" style="margin-top:8px"><span>한 번 더</span><input type="password" id="fPw2" autocomplete="new-password" maxlength="30"></label>
+    <div class="row" style="margin-top:12px"><div class="sp"></div><button type="button" class="btn" data-close>취소</button><button class="btn primary">정하고 들어가기</button></div></form>`);
+  $('#fForm').addEventListener('submit', async e => {
+    e.preventDefault(); const a = $('#fPw1').value, b = $('#fPw2').value;
+    if(a.length < 4){ toast('4자 이상으로 정해 주세요'); return; }
+    if(a !== b){ toast('두 번 넣은 비밀번호가 다릅니다'); return; }
+    try{ await DB.set('secret/masterPw', a); }
+    catch(err){ toast(isDenied(err) ? '진행자 비밀번호가 이미 정해져 있습니다. 정한 사람에게 물어봐 주세요.' : '서버에 연결하지 못했습니다.'); return; }
+    try{ await DB.set('masters/' + DB.uid, a); ME.master = true; closeSheet(); toast('진행자 비밀번호를 정하고 들어왔습니다'); onRoleChange(); next && next(); }
+    catch(err){ toast('비밀번호는 정했지만 들어가지 못했습니다. 새로 고침한 뒤 그 비밀번호로 들어가 주세요.'); }
   });
 }
 function loginStaffSheet(){
@@ -123,7 +165,7 @@ function loginStaffSheet(){
     if(!n){ toast('이름을 넣어 주세요'); return; }
     ME.name = n; ls.set('name', n);
     try{ await DB.set('staffs/' + DB.uid, { pw, name:n, at:srvNow() }); ME.staff = true; closeSheet(); toast('직원으로 들어왔습니다'); onRoleChange(); }
-    catch(err){ toast(isDenied(err) ? '직원 비밀번호가 맞지 않습니다. 진행자에게 확인해 주세요.' : '서버에 연결하지 못했습니다.'); pushPresence(); }
+    catch(err){ toast(RULES_MISSING && !DEMO ? '진행자가 아직 서버 준비(규칙 게시)를 하지 않았습니다. 진행자에게 알려 주세요.' : isDenied(err) ? '직원 비밀번호가 맞지 않거나 아직 정해지지 않았습니다. 진행자에게 확인해 주세요.' : '서버에 연결하지 못했습니다.'); pushPresence(); }
   });
 }
 function ensureAccess(r){
@@ -511,6 +553,7 @@ document.addEventListener('click', e => {
   if(e.detail > 0 && el.tagName === 'BUTTON' && (ROLE === 'host' || ROLE === 'screen')) el.blur();
   switch(a){
     case 'role': setRole(el.dataset.r); break;
+    case 'reload': location.reload(); break;
     case 'pick': setRole('pick'); break;
     case 'tab': setTab(el.dataset.t); break;
     case 'fsToggle': FS.toggle(); break;

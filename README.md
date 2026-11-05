@@ -303,5 +303,5 @@
 가을운동회 점수판의 `handscil-sports` 프로젝트를 그대로 씁니다(익명 로그인은 이미 켜져 있음).
 
 1. **Realtime Database → 규칙** 탭에 `sports-day/database.rules.json` 내용을 그대로 붙여 넣고 게시합니다. 골든벨 규칙(`goldenbell1` 부분)이 더해졌고, 운동회·야구 규칙은 바뀌지 않았습니다.
-2. **Realtime Database → 데이터** 탭에서 `goldenbell1` → `secret` → `masterPw`에 진행자 비밀번호(문자열)를 넣습니다.
+2. 앱에서 **진행자 도구**를 누르고 **진행자 비밀번호 처음 정하기**로 비밀번호를 정합니다(한 번 정하면 앱에서는 다시 정할 수 없고, 바꿀 때는 **Realtime Database → 데이터** 탭의 `goldenbell1` → `secret` → `masterPw`를 고칩니다). 규칙을 아직 게시하지 않았으면 앱이 게시 방법을 안내합니다.
 3. 진행자 도구로 들어와 **직원·기기** 탭에서 직원 비밀번호를 정합니다.

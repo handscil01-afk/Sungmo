@@ -139,6 +139,10 @@
         "staffPw": {
           ".write": "auth != null && root.child('goldenbell1/masters/' + auth.uid).exists()",
           ".validate": "newData.isString() && newData.val().length >= 4 && newData.val().length <= 30"
+        },
+        "masterPw": {
+          ".write": "auth != null && (!data.exists() || root.child('goldenbell1/masters/' + auth.uid).exists())",
+          ".validate": "newData.isString() && newData.val().length >= 4 && newData.val().length <= 30"
         }
       },
       "masters": {
@@ -227,6 +231,10 @@
             ".validate": "!newData.exists() || (newData.child('d').isString() && newData.child('d').val().length < 20000)"
           }
         }
+      },
+      "rv2": {
+        ".read": "auth != null",
+        ".write": false
       }
     }
   }

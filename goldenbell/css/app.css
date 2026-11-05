@@ -70,6 +70,8 @@ body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset
 .sheet-box ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
 .sheet-box p{margin:0}
 .scr-list{display:flex;flex-direction:column;gap:8px}
+.first-run{border-top:1px solid var(--line);padding-top:12px;margin-top:4px;font-size:13.5px;color:var(--muted)}
+.first-run b{color:var(--fg)}
 .btn.scr{justify-content:flex-start;min-height:48px;white-space:normal;text-align:left}
 .srow{white-space:normal;align-items:flex-start;flex-wrap:wrap}
 
