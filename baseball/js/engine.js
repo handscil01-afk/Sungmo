@@ -410,20 +410,6 @@ function advanceOnOut(G, opts = {}){
   scoreRuns(G, sc, opts.rbi !== false);
 }
 const fielder = (T, pos) => { const p = T.bat.find(x => x.pos === pos); return `${POS[pos]} ${p ? p.name : ''}`.trim(); };
-// 실책: 타자는 1루로, 주자는 한 베이스씩
-function onError(G, pos){
-  const F = fieldTeam(G), b = G.bases, sc = [];
-  F.E++;
-  // 실책 종류: 외야는 뜬공·타구를 놓침(포구 실책), 내야는 공을 놓치거나(포구 실책) 1루 송구가 빗나감(송구 실책)
-  const of = ['LF', 'CF', 'RF'].includes(pos), throwErr = !of && rnd(G) < 0.45;
-  const what = of ? pickOne(G, ['타구를 쫓아가다 공을 떨어뜨립니다', '글러브에 맞고 튕겨 나갑니다']) : throwErr ? pickOne(G, ['잡아서 1루로 던졌는데 송구가 높게 빗나갑니다', '급하게 던진 송구가 1루수 옆으로 빠집니다']) : pickOne(G, ['땅볼을 잡다가 공을 놓칩니다', '공이 글러브 밑으로 빠져나갑니다']);
-  emit(G, `아, ${fielder(F, pos)}, ${what}! ${throwErr ? '송구' : '포구'} 실책으로 타자는 1루에 나갑니다.`, 'r');
-  fx(G, 'safe');
-  if(b[2] != null) sc.push(b[2]);
-  G.bases = [batTeam(G).bi, b[0], b[1]];
-  scoreRuns(G, sc, false);
-}
-const errorChance = F => clamp(0.018 + (60 - F.def) / 2000, 0.004, 0.05);
 
 /* ---------- 도루 ---------- */
 function canSteal(G){ const b = G.bases; return (b[0] != null && b[1] == null) || (b[1] != null && b[2] == null); }
@@ -881,18 +867,6 @@ function buntResult(G, head, simple){
   if(G.anim) G.anim.res = 'inplay';
   playOrReview(G, bb, r, fi, head, { fi, d:0 });
 }
-// 플레이 전후 주자 위치를 비교해 "김하늘 2루로, 박민준은 3루에 그대로"처럼 알림 (홈인은 따로 알림)
-function runnerMoves(G, before){
-  const T = batTeam(G), out = [];
-  before.forEach((r, k) => {
-    if(r == null) return;
-    const to = G.bases.indexOf(r), nm = T.bat[r].name;
-    if(to > k) out.push(`${nm} ${to + 1}루로`);
-    else if(to === k) out.push(`${josa(nm, '은', '는')} ${k + 1}루에 그대로`);
-  });
-  return out.length ? `주자: ${out.join(', ')}.` : '';
-}
-
 /* ---------- 인플레이 타구 (정밀 모드) ---------- */
 function inPlay(G, o){
   const { x, y, q, ev, k, pt, d: dir } = o;
@@ -1035,48 +1009,6 @@ function applyPlay(G, r, head, info = {}){
   if(G.outs >= 3 && r.kind !== 'hit') scored.length = 0;
   scoreRuns(G, scored, !(r.kind === 'dp' || r.kind === 'err'));
 }
-function groundOut(G, head, pos, inf){
-  const T = batTeam(G), B = curBatter(G), b = G.bases, F = fieldTeam(G);
-  const who = fielder(F, pos);
-  // 히트 앤드 런: 주자가 미리 뛰어 병살을 피하고 한 베이스씩 감
-  if(G.hrun && b[0] != null){
-    B.st.ab++; addOut(G);
-    emit(G, `${head} 땅볼, ${ga(who)} 잡아 1루로. 아웃. 미리 뛴 주자는 다음 베이스까지 갑니다. ${G.outs}아웃.`, 'r'); fx(G, 'out');
-    if(G.outs < 3) advanceOnOut(G, { all:true });
-    return;
-  }
-  // 병살: 1루 주자가 있고 아웃이 2개 미만일 때
-  if(b[0] != null && G.outs < 2){
-    // 트리플 플레이: 무사 1·2루나 만루에서 아주 드물게 (3루수가 잡아 3루 → 2루 → 1루)
-    if(G.outs === 0 && b[1] != null && ['3B', 'SS'].includes(pos) && rnd(G) < 0.03){
-      B.st.ab++; addOut(G, 3);
-      emit(G, `${head} 땅볼, ${ga(who)} 잡아 3루 베이스를 밟고, 2루로, 다시 1루로! 트리플 플레이!!! 순식간에 세 명이 아웃됩니다! 3아웃.`, 'r'); fx(G, 'out');
-      return;
-    }
-    const pDP = clamp(0.32 + [-0.1, 0, 0.1][inf] - (B.spd - 50) / 200, 0.1, 0.75);
-    if(rnd(G) < pDP){
-      B.st.ab++; addOut(G, 2);
-      emit(G, `${head} 땅볼, ${ga(who)} 잡아 2루, 다시 1루로. 병살타! ${G.outs}아웃.`, 'r'); fx(G, 'out');
-      b[0] = null;
-      if(G.outs < 3){ const sc = []; if(b[2] != null){ sc.push(b[2]); b[2] = null; } if(b[1] != null){ b[2] = b[1]; b[1] = null; } scoreRuns(G, sc, false); }
-      return;
-    }
-    if(rnd(G) < 0.35){   // 앞 주자만 잡음 (야수 선택)
-      const R = T.bat[b[0]];
-      B.st.ab++; addOut(G);
-      emit(G, `${head} 땅볼, ${ga(who)} 잡아 2루로. 1루 주자 ${R.name} 아웃, 타자는 1루에 삽니다. ${G.outs}아웃.`, 'r'); fx(G, 'out');
-      const nb = [T.bi, null, null], sc = [];
-      if(b[1] != null){ if(b[2] != null && G.outs < 3) sc.push(b[2]); nb[2] = b[1]; }   // 2루 주자는 밀려서 3루로, 만루면 3루 주자 득점
-      else if(b[2] != null) nb[2] = b[2];
-      G.bases = nb; scoreRuns(G, sc, true);
-      return;
-    }
-  }
-  B.st.ab++; addOut(G);
-  emit(G, `${head} 땅볼, ${ga(who)} 잡아 1루로. 아웃. ${G.outs}아웃.`, 'r'); fx(G, 'out');
-  if(G.outs < 3) advanceOnOut(G, { hold3: b[2] != null && (inf === 0 ? rnd(G) < 0.85 : rnd(G) < 0.15) && !(b[0] != null && b[1] != null) });
-}
-
 /* ---------- 타석 한 번 (간단 모드) ----------
    D(수비): 'attack' 정면 승부 · 'nibble' 유인구 승부 · 'ibb' 고의 볼넷
    O(공격): 'power' 강하게 · 'normal' 보통 · 'contact' 맞히기 · 'bunt' 번트 · 'steal' 도루 */

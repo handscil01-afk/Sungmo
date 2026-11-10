@@ -1,0 +1,390 @@
+[
+ {
+  "label": "경기 시작",
+  "game": 1,
+  "step": 0,
+  "ret": {
+   "at": 0,
+   "end": 7.46
+  },
+  "clips": [
+   "0 c_hello-2",
+   "1.08 c_with-2",
+   "1.76 a_hello-2",
+   "2.64 team_whale",
+   "3.52 j_vs",
+   "4.3 team_swallow",
+   "5.98 playball"
+  ]
+ },
+ {
+  "label": "헛스윙",
+  "game": 1,
+  "step": 1,
+  "ret": {
+   "at": 1.23,
+   "end": 2.81
+  },
+  "clips": [
+   "0.2 p_throw1",
+   "1.23 r_whiff1"
+  ]
+ },
+ {
+  "label": "안타",
+  "game": 1,
+  "step": 2,
+  "ret": {
+   "at": 3.14,
+   "end": 9.42
+  },
+  "clips": [
+   "0.2 p_throw1",
+   "1.23 c_soft2",
+   "2.21 c_liner",
+   "3.14 r_sigh2",
+   "3.92 r_hit5",
+   "5.6 a_yes3",
+   "6.58 bat_2",
+   "7.16 run_1",
+   "8.24 a_careful"
+  ]
+ },
+ {
+  "label": "볼",
+  "game": 1,
+  "step": 4,
+  "ret": {
+   "at": 1.3,
+   "end": 2.98
+  },
+  "clips": [
+   "0.17 p_throw2",
+   "1.3 r_ball3"
+  ]
+ },
+ {
+  "label": "파울",
+  "game": 1,
+  "step": 6,
+  "ret": {
+   "at": 1.58,
+   "end": 2.26
+  },
+  "clips": [
+   "0 p_throw3",
+   "1.58 r_foul2"
+  ]
+ },
+ {
+  "label": "뜬공 아웃",
+  "game": 1,
+  "step": 7,
+  "ret": {
+   "at": 5.19,
+   "end": 10.89
+  },
+  "clips": [
+   "0.06 p_throw3",
+   "1.29 c_soft2",
+   "2.27 c_high2",
+   "2.85 c_right",
+   "3.83 c_far1",
+   "5.19 r_out_sad",
+   "5.77 a_out2",
+   "7.35 bat_5",
+   "8.23 run_full",
+   "9.51 out_1"
+  ]
+ },
+ {
+  "label": "땅볼 아웃",
+  "game": 1,
+  "step": 10,
+  "ret": {
+   "at": 5.69,
+   "end": 11.11
+  },
+  "clips": [
+   "0 p_throw4",
+   "1.28 c_soft1",
+   "2.16 c_ground2",
+   "3.84 c_right",
+   "5.69 r_groundout3",
+   "7.37 bat_6",
+   "8.35 run_full",
+   "9.63 out_2"
+  ]
+ },
+ {
+  "label": "스트라이크",
+  "game": 1,
+  "step": 13,
+  "ret": {
+   "at": 1.34,
+   "end": 2.42
+  },
+  "clips": [
+   "0.01 p_throw4",
+   "1.34 r_strike2"
+  ]
+ },
+ {
+  "label": "헛스윙 삼진",
+  "game": 1,
+  "step": 18,
+  "ret": {
+   "at": 1.3,
+   "end": 17.32
+  },
+  "clips": [
+   "0 p_throw5",
+   "1.38 r_k_swing",
+   "2.26 a_inning1",
+   "3.64 change",
+   "4.42 inn_1b",
+   "5.3 team_swallow_s",
+   "6.38 j_attack",
+   "7.46 j_score",
+   "8.94 team_whale_s",
+   "10.42 num_0",
+   "12.1 j_vs",
+   "12.88 num_0",
+   "14.56 team_swallow_s",
+   "15.64 bat_1"
+  ]
+ },
+ {
+  "label": "도루",
+  "game": 1,
+  "step": 22,
+  "ret": {
+   "at": 1.24,
+   "end": 6
+  },
+  "clips": [
+   "0 p_throw5",
+   "1.38 r_ball4",
+   "1.96 a_ball1",
+   "2.94 r_steal_go",
+   "4.62 r_steal_safe"
+  ]
+ },
+ {
+  "label": "공수 교대",
+  "game": 1,
+  "step": 29,
+  "ret": {
+   "at": 2.78,
+   "end": 18.54
+  },
+  "clips": [
+   "0 p_throw6",
+   "1.48 c_soft1",
+   "2.78 r_groundout2",
+   "4.36 change",
+   "5.14 inn_2t",
+   "6.72 team_whale_s",
+   "8.2 j_attack",
+   "9.28 j_score",
+   "10.76 team_whale_s",
+   "12.24 num_0",
+   "13.92 j_vs",
+   "14.7 num_0",
+   "16.38 team_swallow_s",
+   "17.46 bat_7"
+  ]
+ },
+ {
+  "label": "서서 삼진",
+  "game": 1,
+  "step": 52,
+  "ret": {
+   "at": 1.24,
+   "end": 8.36
+  },
+  "clips": [
+   "0 p_throw6",
+   "1.48 r_k_look",
+   "2.86 a_k1",
+   "3.44 bat_8",
+   "4.62 run_1",
+   "5.7 out_2",
+   "7.18 a_careful"
+  ]
+ },
+ {
+  "label": "2루타",
+  "game": 1,
+  "step": 114,
+  "ret": {
+   "at": 3.55,
+   "end": 11.76
+  },
+  "clips": [
+   "0.23 p_throw1",
+   "1.26 c_hit4",
+   "2.54 c_liner",
+   "3.55 r_double",
+   "4.53 a_hit3",
+   "8.92 r_safe3",
+   "9.8 bat_4",
+   "10.58 run_2"
+  ]
+ },
+ {
+  "label": "판독 신청",
+  "game": 1,
+  "step": 117,
+  "ret": {
+   "at": 3.36,
+   "end": 4.48
+  },
+  "clips": [
+   "0.21 p_throw1",
+   "1.24 c_hit2",
+   "2.32 r_review",
+   "3.2 a_watch"
+  ]
+ },
+ {
+  "label": "끝내기",
+  "game": 1,
+  "step": 122,
+  "ret": {
+   "at": 3.41,
+   "end": 22.58
+  },
+  "clips": [
+   "0.16 p_throw2",
+   "1.29 c_hit3",
+   "2.47 c_liner",
+   "3.41 r_double",
+   "4.39 a_hit2",
+   "8.92 r_score1",
+   "10.1 r_walkoff2",
+   "11.58 j_score",
+   "13.06 team_whale_s",
+   "14.54 num_0",
+   "16.22 j_vs",
+   "17 num_2",
+   "17.68 team_swallow_s",
+   "18.76 c_winner",
+   "19.44 team_swallow",
+   "21.12 a_end1",
+   "21.7 c_thanks"
+  ]
+ },
+ {
+  "label": "홈런",
+  "game": 2,
+  "step": 28,
+  "ret": {
+   "at": 5.29,
+   "end": 8.93
+  },
+  "clips": [
+   "0.06 p_throw3",
+   "1.29 c_hit5",
+   "2.67 c_high1",
+   "5.29 r_hr4",
+   "6.97 a_hr3",
+   "8.05 bat_5"
+  ]
+ },
+ {
+  "label": "투수 교체",
+  "game": 2,
+  "step": 59,
+  "ret": {
+   "at": 5.38,
+   "end": 21.1
+  },
+  "clips": [
+   "0.01 p_throw3",
+   "1.24 c_soft1",
+   "2.12 c_high1",
+   "3.8 c_far2",
+   "5.38 r_catch2",
+   "6.56 a_out2",
+   "8.14 change",
+   "8.92 inn_3b",
+   "10 team_turtle_s",
+   "11.38 j_attack",
+   "12.46 j_score",
+   "13.94 team_thunder_s",
+   "14.72 num_1",
+   "15.3 j_vs",
+   "16.08 num_0",
+   "17.76 team_turtle_s",
+   "19.14 r_pitcher_change",
+   "19.82 bat_9"
+  ]
+ },
+ {
+  "label": "볼넷·사구",
+  "game": 2,
+  "step": 125,
+  "ret": {
+   "at": 1.31,
+   "end": 8.79
+  },
+  "clips": [
+   "0 p_throw4",
+   "1.31 r_hbp",
+   "2.59 a_walk2",
+   "3.27 bat_1",
+   "4.95 run_12",
+   "6.23 c_scoring",
+   "7.11 a_chance1"
+  ]
+ },
+ {
+  "label": "병살",
+  "game": 3,
+  "step": 19,
+  "ret": {
+   "at": 5.52,
+   "end": 21.34
+  },
+  "clips": [
+   "0 p_throw4",
+   "1.28 c_soft2",
+   "2.26 c_ground1",
+   "3.84 c_left",
+   "5.52 r_dp2",
+   "6.4 a_dp1",
+   "7.88 a_inning1",
+   "9.26 change",
+   "10.04 inn_1b",
+   "10.92 team_meteor_s",
+   "11.5 j_attack",
+   "12.58 j_score",
+   "14.06 team_hawk_s",
+   "14.94 num_0",
+   "16.62 j_vs",
+   "17.4 num_0",
+   "19.08 team_meteor_s",
+   "19.66 bat_1"
+  ]
+ },
+ {
+  "label": "득점",
+  "game": 3,
+  "step": 37,
+  "ret": {
+   "at": 3.68,
+   "end": 10.38
+  },
+  "clips": [
+   "0 p_throw5",
+   "1.38 c_soft1",
+   "2.26 c_right",
+   "3.68 r_groundout2",
+   "5.26 r_score1",
+   "6.44 a_out3",
+   "8.12 bat_4",
+   "8.9 out_2"
+  ]
+ }
+]

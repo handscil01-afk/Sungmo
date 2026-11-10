@@ -65,6 +65,7 @@ async function netCreate(cfg){
   const F = await fbInit(), { R } = F;
   for(let i = 0; i < 12; i++){
     const code = String(1000 + Math.floor(Math.random() * 9000));
+    cfg = { ...cfg, ver: RULES_VER };
     const room = { host:{ uid:F.uid, name:SET.name, at:F.TS }, cfg };
     try{ await R.set(F.ref(code), room); }
     catch(e){ if(/PERMISSION/i.test(String(e.code || e.message))) { if(i < 11) continue; } throw e; }
@@ -74,11 +75,16 @@ async function netCreate(cfg){
   }
   throw new Error('방 코드를 만들지 못했습니다');
 }
+// 규칙 버전: 방(cfg.ver)을 만든 기기와 내 기기의 계산·화면 규칙이 같아야 함. ver가 없는 방은 이 칸을 넣기 전의 첫 버전(1)
+const verOf = x => (x && x.ver) || 1;
+const verMismatch = x => verOf(x) !== RULES_VER;
+const verText = x => { NET.verBad = true; return `두 기기의 버전이 다릅니다 (이 기기 ${RULES_VER}, 방 ${verOf(x)}). 새로 고침한 뒤 다시 들어와 주세요.`; };
 // 손님으로 들어가기. 이미 내가 손님인 방이면 그대로 다시 들어감
 async function netJoin(code){
   const F = await fbInit(), { R } = F;
   const [h, c, g] = await Promise.all(['host', 'cfg', 'guest'].map(k => R.get(F.ref(code + '/' + k)).then(s => s.val())));
   if(!h || !c) return '그런 방이 없습니다. 방 코드를 다시 확인해 주세요.';
+  if(verMismatch(c)) return verText(c);
   if(h.uid === F.uid) return '내가 만든 방입니다. 온라인 대전 화면의 방 다시 열기를 써 주세요.';
   if(g && g.uid !== F.uid) return '이미 두 사람이 들어가 있는 방입니다.';
   await R.set(F.ref(code + '/guest'), { uid:F.uid, name:SET.name, at:F.TS });
@@ -91,6 +97,7 @@ async function netReopen(code){
   const F = await fbInit(), { R } = F;
   const [h, c, g] = await Promise.all(['host', 'cfg', 'guest'].map(k => R.get(F.ref(code + '/' + k)).then(s => s.val())));
   if(!h || h.uid !== F.uid || !c) return '방이 이미 닫혔습니다.';
+  if(verMismatch(c)) return verText(c);
   const old = (await R.get(F.ref(code + '/state/n')).catch(() => null));   // 손님이 받은 상태 번호보다 크게 이어 감
   Object.assign(NET, { on:true, role:'host', code, cfg:c, side:c.hostSide, peer:g || null, stN:(old && old.val()) || 0, log:[], chats:[], sent:false, pend:{}, peerOn:!!g });
   netSave(); netListen();
@@ -158,7 +165,7 @@ function netPushState(res){
   const from = Math.min(NET.pushedN || 0, recent);
   const tail = G.log.filter(l => l.n > from).slice(-300);
   NET.pushedN = G.log.length ? G.log[G.log.length - 1].n : 0;
-  const st = { n: NET.stN, gid: G.at, g, tail: JSON.stringify(tail), fx: JSON.stringify(res ? res.fx : []), pend, at: F.TS };
+  const st = { n: NET.stN, ver: RULES_VER, gid: G.at, g, tail: JSON.stringify(tail), fx: JSON.stringify(res ? res.fx : []), pend, at: F.TS };
   R.set(F.ref(NET.code + '/state'), st).catch(e => netNotice(netErr(e)));
   ls.set('bb_netg', { code: NET.code, G, opts: GS.opts });
 }
@@ -177,7 +184,7 @@ function netSig(t, d){
   const F = FB, { R } = F;
   R.push(F.ref(NET.code + '/sig/' + peerRole()), d === undefined ? { t, at:F.TS } : { t, d: JSON.stringify(d), at:F.TS }).catch(() => {});
 }
-async function netSetCfg(cfg){ const F = FB; NET.cfg = cfg; await F.R.set(F.ref(NET.code + '/cfg'), cfg); }
+async function netSetCfg(cfg){ const F = FB; cfg = { ...cfg, ver: RULES_VER }; NET.cfg = cfg; await F.R.set(F.ref(NET.code + '/cfg'), cfg); }
 async function netKick(){ const F = FB; await F.R.remove(F.ref(NET.code + '/guest')).catch(() => {}); }
 
 /* ---------- 받기 ---------- */

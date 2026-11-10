@@ -7,7 +7,7 @@ let LSRC = 'league';
 const LSTORE = { league:{ key:'bb_league', L:null }, career:{ key:'bb_career', L:null } };
 function LG(){
   const S = LSTORE[LSRC];
-  if(!S.L){ S.L = ls.get(S.key, null); if(S.L && S.L.v === 1) leagueFix(S.L); }
+  if(!S.L){ S.L = ls.get(S.key, null); if(S.L && S.L.v === 1){ migrate('league', S.L); leagueFix(S.L); } }
   return S.L && S.L.v === 1 ? S.L : null;
 }
 function setLG(L){ LSTORE[LSRC].L = L; if(L) ls.set(LSTORE[LSRC].key, L); else ls.del(LSTORE[LSRC].key); }

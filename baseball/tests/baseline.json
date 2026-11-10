@@ -1,0 +1,275 @@
+{
+ "cellPA": 3000,
+ "table": {
+  "난이도1|주자 없음|강하게": {
+   "pa": 3000,
+   "avg": 0.284,
+   "xbhRate": 0.346,
+   "kRate": 0.341,
+   "bbRate": 0.044,
+   "hrRate": 0.043,
+   "runsPerPA": 0.043
+  },
+  "난이도1|주자 없음|보통": {
+   "pa": 3000,
+   "avg": 0.333,
+   "xbhRate": 0.209,
+   "kRate": 0.233,
+   "bbRate": 0.052,
+   "hrRate": 0.024,
+   "runsPerPA": 0.024
+  },
+  "난이도1|주자 없음|맞히기": {
+   "pa": 3000,
+   "avg": 0.366,
+   "xbhRate": 0.164,
+   "kRate": 0.15,
+   "bbRate": 0.069,
+   "hrRate": 0.012,
+   "runsPerPA": 0.012
+  },
+  "난이도1|1루|강하게": {
+   "pa": 3000,
+   "avg": 0.279,
+   "xbhRate": 0.347,
+   "kRate": 0.344,
+   "bbRate": 0.042,
+   "hrRate": 0.042,
+   "runsPerPA": 0.093
+  },
+  "난이도1|1루|보통": {
+   "pa": 3000,
+   "avg": 0.335,
+   "xbhRate": 0.307,
+   "kRate": 0.227,
+   "bbRate": 0.061,
+   "hrRate": 0.03,
+   "runsPerPA": 0.072
+  },
+  "난이도1|1루|맞히기": {
+   "pa": 3000,
+   "avg": 0.373,
+   "xbhRate": 0.204,
+   "kRate": 0.15,
+   "bbRate": 0.066,
+   "hrRate": 0.014,
+   "runsPerPA": 0.038
+  },
+  "난이도1|2루|강하게": {
+   "pa": 3000,
+   "avg": 0.252,
+   "xbhRate": 0.452,
+   "kRate": 0.388,
+   "bbRate": 0.04,
+   "hrRate": 0.041,
+   "runsPerPA": 0.219
+  },
+  "난이도1|2루|보통": {
+   "pa": 3000,
+   "avg": 0.327,
+   "xbhRate": 0.392,
+   "kRate": 0.262,
+   "bbRate": 0.056,
+   "hrRate": 0.028,
+   "runsPerPA": 0.239
+  },
+  "난이도1|2루|맞히기": {
+   "pa": 3000,
+   "avg": 0.367,
+   "xbhRate": 0.297,
+   "kRate": 0.138,
+   "bbRate": 0.067,
+   "hrRate": 0.015,
+   "runsPerPA": 0.227
+  },
+  "난이도1|3루|강하게": {
+   "pa": 3000,
+   "avg": 0.308,
+   "xbhRate": 0.346,
+   "kRate": 0.357,
+   "bbRate": 0.04,
+   "hrRate": 0.047,
+   "runsPerPA": 0.515
+  },
+  "난이도1|3루|보통": {
+   "pa": 3000,
+   "avg": 0.373,
+   "xbhRate": 0.224,
+   "kRate": 0.23,
+   "bbRate": 0.061,
+   "hrRate": 0.025,
+   "runsPerPA": 0.581
+  },
+  "난이도1|3루|맞히기": {
+   "pa": 3000,
+   "avg": 0.401,
+   "xbhRate": 0.166,
+   "kRate": 0.15,
+   "bbRate": 0.07,
+   "hrRate": 0.015,
+   "runsPerPA": 0.62
+  },
+  "난이도1|만루|강하게": {
+   "pa": 3000,
+   "avg": 0.303,
+   "xbhRate": 0.459,
+   "kRate": 0.37,
+   "bbRate": 0.039,
+   "hrRate": 0.05,
+   "runsPerPA": 0.807
+  },
+  "난이도1|만루|보통": {
+   "pa": 3000,
+   "avg": 0.377,
+   "xbhRate": 0.33,
+   "kRate": 0.227,
+   "bbRate": 0.061,
+   "hrRate": 0.028,
+   "runsPerPA": 0.892
+  },
+  "난이도1|만루|맞히기": {
+   "pa": 3000,
+   "avg": 0.39,
+   "xbhRate": 0.256,
+   "kRate": 0.151,
+   "bbRate": 0.062,
+   "hrRate": 0.012,
+   "runsPerPA": 0.899
+  },
+  "난이도0|주자 없음|강하게": {
+   "pa": 3000,
+   "avg": 0.215,
+   "xbhRate": 0.323,
+   "kRate": 0.396,
+   "bbRate": 0.042,
+   "hrRate": 0.04,
+   "runsPerPA": 0.04
+  },
+  "난이도0|주자 없음|보통": {
+   "pa": 3000,
+   "avg": 0.247,
+   "xbhRate": 0.2,
+   "kRate": 0.269,
+   "bbRate": 0.062,
+   "hrRate": 0.023,
+   "runsPerPA": 0.023
+  },
+  "난이도0|주자 없음|맞히기": {
+   "pa": 3000,
+   "avg": 0.296,
+   "xbhRate": 0.12,
+   "kRate": 0.168,
+   "bbRate": 0.073,
+   "hrRate": 0.01,
+   "runsPerPA": 0.01
+  },
+  "난이도0|1루|강하게": {
+   "pa": 3000,
+   "avg": 0.199,
+   "xbhRate": 0.277,
+   "kRate": 0.407,
+   "bbRate": 0.046,
+   "hrRate": 0.031,
+   "runsPerPA": 0.065
+  },
+  "난이도0|1루|보통": {
+   "pa": 3000,
+   "avg": 0.275,
+   "xbhRate": 0.179,
+   "kRate": 0.254,
+   "bbRate": 0.055,
+   "hrRate": 0.021,
+   "runsPerPA": 0.045
+  },
+  "난이도0|1루|맞히기": {
+   "pa": 3000,
+   "avg": 0.298,
+   "xbhRate": 0.117,
+   "kRate": 0.165,
+   "bbRate": 0.075,
+   "hrRate": 0.008,
+   "runsPerPA": 0.022
+  },
+  "난이도0|2루|강하게": {
+   "pa": 3000,
+   "avg": 0.206,
+   "xbhRate": 0.372,
+   "kRate": 0.397,
+   "bbRate": 0.037,
+   "hrRate": 0.03,
+   "runsPerPA": 0.157
+  },
+  "난이도0|2루|보통": {
+   "pa": 3000,
+   "avg": 0.262,
+   "xbhRate": 0.298,
+   "kRate": 0.249,
+   "bbRate": 0.052,
+   "hrRate": 0.024,
+   "runsPerPA": 0.169
+  },
+  "난이도0|2루|맞히기": {
+   "pa": 3000,
+   "avg": 0.277,
+   "xbhRate": 0.221,
+   "kRate": 0.176,
+   "bbRate": 0.062,
+   "hrRate": 0.011,
+   "runsPerPA": 0.138
+  },
+  "난이도0|3루|강하게": {
+   "pa": 3000,
+   "avg": 0.242,
+   "xbhRate": 0.265,
+   "kRate": 0.404,
+   "bbRate": 0.046,
+   "hrRate": 0.028,
+   "runsPerPA": 0.434
+  },
+  "난이도0|3루|보통": {
+   "pa": 3000,
+   "avg": 0.308,
+   "xbhRate": 0.18,
+   "kRate": 0.26,
+   "bbRate": 0.051,
+   "hrRate": 0.02,
+   "runsPerPA": 0.529
+  },
+  "난이도0|3루|맞히기": {
+   "pa": 3000,
+   "avg": 0.299,
+   "xbhRate": 0.158,
+   "kRate": 0.173,
+   "bbRate": 0.078,
+   "hrRate": 0.012,
+   "runsPerPA": 0.551
+  },
+  "난이도0|만루|강하게": {
+   "pa": 3000,
+   "avg": 0.247,
+   "xbhRate": 0.359,
+   "kRate": 0.397,
+   "bbRate": 0.038,
+   "hrRate": 0.034,
+   "runsPerPA": 0.648
+  },
+  "난이도0|만루|보통": {
+   "pa": 3000,
+   "avg": 0.296,
+   "xbhRate": 0.249,
+   "kRate": 0.262,
+   "bbRate": 0.052,
+   "hrRate": 0.024,
+   "runsPerPA": 0.718
+  },
+  "난이도0|만루|맞히기": {
+   "pa": 3000,
+   "avg": 0.327,
+   "xbhRate": 0.143,
+   "kRate": 0.163,
+   "bbRate": 0.067,
+   "hrRate": 0.009,
+   "runsPerPA": 0.726
+  }
+ }
+}

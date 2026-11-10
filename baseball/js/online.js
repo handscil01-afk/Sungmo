@@ -53,7 +53,9 @@ async function createRoomFlow(via){
 async function startJoin(code, via){
   go(() => ({ q:`방 ${spaced(code)}에 들어가는 중입니다…`, opts:[] }), via);
   try{
+    NET.verBad = false;
     const err = await netJoin(code);
+    if(err && NET.verBad){ UI.codeBuf = ''; go(() => versionScreen(err), 'click'); return; }
     if(err){ UI.codeBuf = ''; go(codeScreen, 'click', [err]); return; }
     G = null;
     go(lobbyScreen, 'click', [`${NET.peer.name}님의 방에 들어왔습니다.`]);
@@ -63,11 +65,13 @@ async function resumeOnline(via){
   const sv = ls.get('bb_net', null); if(!sv) return;
   go(() => ({ q:'방에 다시 연결하는 중입니다…', opts:[] }), via);
   try{
+    NET.verBad = false;
     const err = sv.role === 'host' ? await netReopen(sv.code) : await netJoin(sv.code);
+    if(err && NET.verBad){ go(() => versionScreen(err), 'click'); return; }   // 버전이 달라서 못 들어간 것이므로 방 기록은 지우지 않음
     if(err){ ls.del('bb_net'); go(onlineHome, 'click', [err]); return; }
     const g = ls.get('bb_netg', null);
     if(sv.role === 'host' && g && g.code === sv.code && g.G && !g.G.over){
-      G = g.G; G.out = []; G.fx = []; GS.opts = g.opts; GS.pend = { def:null, off:null }; GS.auto = null;
+      G = migrate('game', g.G); G.out = []; G.fx = []; GS.opts = g.opts; GS.pend = { def:null, off:null }; GS.auto = null;
       UI.logG = null;
       gameNext('click', { lines:[{ s:'방을 다시 열고 경기를 이어 합니다. ' + situation(G), k:'i' }], fx:[] });
       return;
@@ -75,6 +79,12 @@ async function resumeOnline(via){
     G = null;
     go(lobbyScreen, 'click', ['방에 다시 들어왔습니다.']);
   }catch(e){ go(onlineHome, 'click', [netErr(e)]); }
+}
+// 두 기기의 규칙 버전이 다를 때: 새로 고침(서비스 워커가 잡고 있는 옛 파일을 새로 받음)을 안내
+function versionScreen(msg){
+  return { q: msg, back: v => go(onlineHome, v),
+    opts:[{ n:1, t:'새로 고침', s:'앱을 다시 불러와 최신 버전으로 바꿉니다.', act: () => { try{ location.reload(); }catch(e){} } },
+      { n:2, t:'온라인 대전 화면으로', act: v => go(onlineHome, v) }] };
 }
 function cfgSummary(){
   const c = NET.cfg; if(!c) return [];
@@ -265,6 +275,7 @@ function onAct(v){
 // 손님: 방장이 보낸 경기 상태
 function onState(st){
   if(!NET.on || NET.role !== 'guest' || !st || !st.g) return;
+  if(verMismatch(st)){ const msg = `방장 기기의 버전이 다릅니다 (이 기기 ${RULES_VER}, 방장 ${verOf(st)}). 새로 고침한 뒤 다시 들어와 주세요.`; netLeave(); G = null; go(() => versionScreen(msg), 'auto'); return; }
   if(st.gid !== NET.gid){ NET.gid = st.gid; NET.log = []; NET.stN = 0; UI.logG = null; GS.auto = null; GS.guess = null; NET.key = ''; }
   if(st.n <= NET.stN) return;
   let g, tail = [], fxs = [];

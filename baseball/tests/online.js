@@ -40,6 +40,23 @@ const PORT = 8769, URL0 = `http://localhost:${PORT}/baseball/?emu=1`;
   console.log('방 코드', code);
   await shot(host, 'on-host-lobby');
 
+  // 규칙 버전이 다른 기기(util.js의 RULES_VER를 2로 바꿔 받음)는 들어갈 수 없고, 새로 고침 안내를 받아야 함
+  {
+    const vctx = await browser.newContext({ viewport:{ width:390, height:844 } });
+    await vctx.route('**/js/util.js', async r => { const res = await r.fetch(); await r.fulfill({ response: res, body: (await res.text()).replace('const RULES_VER = 1;', 'const RULES_VER = 2;') }); });
+    const vp = await vctx.newPage();
+    vp.on('pageerror', e => errors.push(`버전 다른 손님: ${e.message}`));
+    await vp.goto(`${URL0}&room=${code}`); await vp.waitForSelector('#q');
+    if((await q(vp)).includes('어떤 방식으로')) await vp.keyboard.press('2');
+    await waitQ(vp, /이름을/); await say(vp, '옛 기기');
+    await waitQ(vp, /버전이 다릅니다/);
+    const vopts = await vp.$$eval('#opts .opt b', els => els.map(e => e.textContent));
+    console.log('버전 다른 손님:', (await q(vp)).slice(0, 60), vopts.join(' / '));
+    if(!vopts.includes('새로 고침')) errors.push('버전이 다를 때 새로 고침 단추가 없음');
+    const gst = await vp.evaluate(async c => { const F = await fbInit(); return (await F.R.get(F.ref(c + '/guest'))).exists(); }, code);
+    if(gst) errors.push('버전이 다른 손님이 방에 들어가 버림');
+    await vctx.close();
+  }
   // 손님: 초대 링크로 열기 → 이름 → 들어가기
   const guest = await mk('손님', `${URL0}&room=${code}`);
   await waitQ(guest, /이름을/); await say(guest, '선생님');

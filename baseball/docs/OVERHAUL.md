@@ -249,6 +249,7 @@
 3. 쓰지 않는 옛 판정 함수 삭제(A2). 삭제 전후 `sim` 수치가 같아야 한다.
 4. 온라인 `ver` 넣기(A5), 저장 불러오기에 `migrate` 뼈대.
 - 끝 기준: 모든 시험 통과, 화면·소리 변화 없음.
+- **완료 (2026-11-10)**: 균형 표는 `sim.js` 끝에 있고 기준값은 `tests/baseline.json`(균형을 일부러 바꾸는 단계에서만 `node baseball/tests/sim.js 200 --save-baseline`으로 다시 저장). 중계 스냅샷은 `tests/caster.snap.json`(의도한 변화일 때만 `node baseball/tests/caster.js --update`). 삭제한 옛 함수: `groundOut`, `onError`, `runnerMoves`, `errorChance`. `onHit`·`advanceOnOut`은 간단 모드 판독(`first`)과 폴백 경로가 아직 쓰므로 남겨 둠(Phase 1에서 `simPlay` 경로로 옮긴 뒤 삭제). 온라인은 `RULES_VER`(util.js)를 `cfg.ver`·`state.ver`에 실어 다르면 들어가지 못하게 막고, 저장 불러오기는 `migrate(kind, obj)`(util.js)를 거침(지금은 단계 없음). `tests/online.js`에 버전 불일치 시험을 더함.
 
 ### Phase 1. 사건 목록 (A1)
 1. `engine`·`playsim`이 `events`를 만든다. `lines`·`fx`는 그대로 함께 낸다.

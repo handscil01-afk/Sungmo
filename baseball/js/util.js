@@ -8,6 +8,19 @@ const ls = {
   del(k){ try{ localStorage.removeItem(k); }catch(e){} },
 };
 
+/* 규칙 버전과 저장 불러오기 뼈대
+   RULES_VER: 경기 계산·화면 정의가 바뀌어 두 기기가 서로 맞지 않게 되는 때 올림. 온라인 방(cfg.ver)과 상태(ver)에 실어 보내고, 다르면 들어가지 못하게 막음.
+   migrate(kind, obj): 저장해 둔 설정·경기·리그를 불러올 때 거치는 자리. 새 칸은 더하기만 하고, 없는 칸의 기본값은 MIGRATIONS에 단계(to)로 적음.
+   지금은 단계가 없어서 아무것도 바꾸지 않음. 단계를 적용했을 때만 obj.mv(저장 형식 번호)를 남김. */
+const RULES_VER = 1;
+const MIGRATIONS = { set:[], game:[], league:[] };   // 예: game:[{ to:2, run: G => { G.inningLog ||= []; } }]
+function migrate(kind, obj){
+  if(!obj || typeof obj !== 'object') return obj;
+  let v = obj.mv || 1;
+  (MIGRATIONS[kind] || []).forEach(m => { if(m.to > v){ try{ m.run(obj); }catch(e){} v = m.to; obj.mv = v; } });
+  return obj;
+}
+
 // 사용자 설정 (이 기기에만 저장)
 // fs: 글자 크기 · theme: 화면 색 · voice: 읽어 주기(sr 화면 낭독기 · tts 기기 음성 · off) · dice: 판정 과정 보기
 // pad: 코스 키패드 배열(phone 1 2 3이 위 · pc 7 8 9가 위) · snd: 효과음 · vib: 진동 · quick: 명령 칸에서 숫자를 누르면 바로 고르기
@@ -18,7 +31,7 @@ const ls = {
 const SET_DEF = { fs:1, theme:'dark', voice:'sr', dice:false, pad:'phone', snd:true, vib:true, quick:true, watch:4, autoFS:true, installDismissed:false, rate:1, name:'', chatRead:true, vmode:'call', mgrAsk:'key', mgrPitch:false, revOdds:'num', sndKind:'rec', view:null, crowd:true, easy:1, cast:true,
   // 직접 고르기(정밀 모드)에서 사람이 고를 항목. 고르지 않는 항목은 컴퓨터가 정함
   picks:{ pt:true, loc:'full', edge:true, pow:true, bat:'full', guess:true } };
-const SET = { ...SET_DEF, ...ls.get('bb_set', {}) };
+const SET = { ...SET_DEF, ...migrate('set', ls.get('bb_set', {})) };
 if(SET.voice === 'cast'){ SET.voice = 'sr'; SET.cast = true; }
 const saveSet = () => ls.set('bb_set', SET);
 function applySet(){

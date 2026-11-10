@@ -1,9 +1,12 @@
-// 컴퓨터끼리 여러 경기를 돌려 수치와 규칙 위반을 확인함. 사용법: node baseball/tests/sim.js [경기 수]
+// 컴퓨터끼리 여러 경기를 돌려 수치와 규칙 위반을 확인함. 사용법: node baseball/tests/sim.js [경기 수] [--save-baseline]
+// 끝에 '상황별 균형 표'(주자 5가지 × 스윙 3가지 × 난이도 2가지)를 만들어 기준 범위와 baseline.json(저장해 둔 수치)에 견줌.
+// 균형을 일부러 바꾼 단계에서는 --save-baseline으로 새 수치를 저장함.
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const dir = path.join(__dirname, '..', 'js');
 ['data.js', 'engine.js', 'playsim.js', 'ai.js'].forEach(f => vm.runInThisContext(fs.readFileSync(path.join(dir, f), 'utf8'), { filename: f }));
 
-const N = +process.argv[2] || 300;
+const N = +process.argv.slice(2).find(a => /^\d+$/.test(a)) || 300;
+const SAVE = process.argv.includes('--save-baseline');
 function run(mode, unit, easy){
   const parks = {};
   const tot = { g:0, runs:0, pa:0, ab:0, h:0, hr:0, k:0, bb:0, sb:0, e:0, pitches:0, xbh:0, extra:0, draws:0, lines:0, walkoff:0 };
@@ -51,3 +54,69 @@ run('simple', 'pitch');
 run('manager');
 // 타격 난이도 보통(1)·쉬움(2)
 run('detail', null, 1); run('detail', null, 2); run('simple', 'pitch', 1); run('simple', null, 1);
+
+
+/* ---------- 상황별 균형 표 ----------
+   정밀 모드에서 1아웃에 주자 상황과 스윙(강하게·보통·맞히기)을 고정하고, 타석마다 같은 상황으로 되돌려 타석 수를 모음.
+   (투수 체력은 타석마다 되돌림. 휘두를지 말지는 컴퓨터 타자가, 휘두를 때의 세기만 고정) */
+const SITS = [['주자 없음', [null, null, null]], ['1루', [0, null, null]], ['2루', [null, 0, null]], ['3루', [null, null, 0]], ['만루', [0, 1, 2]]];
+const SWINGS = [['강하게', 'power'], ['보통', 'swing'], ['맞히기', 'contact']];
+const CELL_PA = N * 15;
+function cell(sit, swing, easy, ci){
+  const c = { pa:0, ab:0, h:0, xbh:0, hr:0, k:0, bb:0, runs:0, sit: sit[0], swing: swing[0], easy };
+  let G = null, left = 0;
+  while(c.pa < CELL_PA){
+    if(left-- <= 0 || G.over){
+      const keys = TEAMS.map(t => t.key), K = keys.length, n = ci * 1000 + (c.pa >> 5);
+      if(G){ G.teams.forEach(T => T.bat.concat(T.gone).forEach(B => { c.ab += B.st.ab; c.h += B.st.h; c.hr += B.st.hr; c.k += B.st.k; c.bb += B.st.bb; c.xbh += (B.st.b2 || 0) + (B.st.b3 || 0) + B.st.hr; })); }
+      const a = n % K, h = (a + 1 + (n >> 3) % (K - 1)) % K;
+      G = newGame({ mode:'detail', innings:99, teams:[keys[a], keys[h]], ctrl:['cpu', 'cpu'], easy, seed: 77000 + n }); flush(G); left = 32;
+    }
+    // 이번 타석의 상황으로 되돌림
+    G.outs = 1; G.bases = sit[1].map(x => x == null ? null : (batTeam(G).bi + 1 + x) % 9); G.balls = 0; G.strikes = 0;
+    G.teams.forEach(T => T.pit.forEach(P => { P.n = 0; P.load = 0; }));
+    const pa = G.pa, half = G.half, r0 = runsOf(G.teams[0]) + runsOf(G.teams[1]);
+    let guard = 0;
+    while(G.pa === pa && G.half === half && !G.over){
+      if(++guard > 60) throw new Error('타석이 끝나지 않음 ' + sit[0] + ' ' + swing[0]);
+      if(G.review){ resolveReview(G, false); continue; }
+      let o = aiOffChoice(G);
+      if(o.k === 'steal' || o.k === 'bunt' || o.k === 'hitrun') o = { k:'swing', g:null };
+      else if(o.k !== 'take') o = { ...o, k: swing[1] };
+      playStep(G, aiDefChoice(G), o);
+    }
+    c.pa++;
+    c.runs += runsOf(G.teams[0]) + runsOf(G.teams[1]) - r0;
+  }
+  G.teams.forEach(T => T.bat.concat(T.gone).forEach(B => { c.ab += B.st.ab; c.h += B.st.h; c.hr += B.st.hr; c.k += B.st.k; c.bb += B.st.bb; c.xbh += (B.st.b2 || 0) + (B.st.b3 || 0) + B.st.hr; }));
+  const r = v => Math.round(v * 1000) / 1000;
+  return { pa:c.pa, avg: r(c.h / c.ab), xbhRate: r(c.xbh / c.h), kRate: r(c.k / c.pa), bbRate: r(c.bb / c.pa), hrRate: r(c.hr / c.pa), runsPerPA: r(c.runs / c.pa) };
+}
+const table = {};
+let ci = 0;
+[1, 0].forEach(easy => SITS.forEach(sit => SWINGS.forEach(sw => { table[`난이도${easy}|${sit[0]}|${sw[0]}`] = cell(sit, sw, easy, ci++); })));
+console.log(`\n[상황별 균형 표] 칸마다 ${CELL_PA}타석 (정밀 모드, 1아웃)`);
+[1, 0].forEach(easy => {
+  console.log(`  난이도 ${easy === 1 ? '보통(1)' : '현실(0)'}        타율 / 장타 비율 / 삼진율 / 타석당 득점`);
+  SITS.forEach(sit => console.log('   ' + sit[0].padEnd(6) + SWINGS.map(sw => { const t = table[`난이도${easy}|${sit[0]}|${sw[0]}`]; return `${sw[0]} ${t.avg.toFixed(3)} ${(t.xbhRate * 100).toFixed(0)}% ${(t.kRate * 100).toFixed(0)}% ${t.runsPerPA.toFixed(2)}`; }).join(' · ')));
+});
+// 기준 범위: 지금 구조가 크게 어긋나지 않았는지 보는 넓은 범위 (균형을 맞추는 단계에서 좁혀 감)
+const errs = [];
+Object.entries(table).forEach(([k, t]) => {
+  if(!(t.avg >= 0.18 && t.avg <= 0.5)) errs.push(`${k} 타율 ${t.avg} 범위 밖(0.18~0.50)`);
+  if(!(t.xbhRate >= 0.08 && t.xbhRate <= 0.6)) errs.push(`${k} 장타 비율 ${t.xbhRate} 범위 밖(0.08~0.60)`);
+  if(!(t.kRate >= 0.03 && t.kRate <= 0.5)) errs.push(`${k} 삼진율 ${t.kRate} 범위 밖(0.03~0.50)`);
+  if(!(t.bbRate >= 0.02 && t.bbRate <= 0.25)) errs.push(`${k} 볼넷률 ${t.bbRate} 범위 밖(0.02~0.25)`);
+});
+const BASE = path.join(__dirname, 'baseline.json');
+const out = { cellPA: CELL_PA, table };
+if(SAVE){ fs.writeFileSync(BASE, JSON.stringify(out, null, 1) + '\n'); console.log('baseline.json 저장'); }
+else if(fs.existsSync(BASE)){
+  const old = JSON.parse(fs.readFileSync(BASE, 'utf8'));
+  if(old.cellPA !== CELL_PA) console.log(`baseline.json은 칸당 ${old.cellPA}타석 기준이라 같은 경기 수(${old.cellPA / 15})로 돌릴 때만 견줌`);
+  else Object.entries(old.table).forEach(([k, o]) => ['avg', 'xbhRate', 'kRate', 'bbRate', 'hrRate', 'runsPerPA'].forEach(f => {
+    if(Math.abs(table[k][f] - o[f]) > 0.0005) errs.push(`${k} ${f}: 저장한 값 ${o[f]} → 지금 ${table[k][f]}`);
+  }));
+} else console.log('baseline.json이 없음: --save-baseline으로 저장');
+if(errs.length){ console.log('균형 표 오류:\n  ' + errs.join('\n  ')); process.exit(1); }
+console.log('균형 표 통과' + (fs.existsSync(BASE) && !SAVE ? ' (baseline.json과 같음)' : ''));

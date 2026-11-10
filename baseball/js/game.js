@@ -24,7 +24,7 @@ const whoLabel = ti => twoP() ? `${G.who[ti] || G.teams[ti].short}, ` : '';
 const myTeam = () => isHuman(0) && !isHuman(1) ? 0 : isHuman(1) && !isHuman(0) ? 1 : -1;
 
 function saveGame(){ if(G && !NET.on) ls.set('bb_game', { G, opts: GS.opts, holder: GS.holder }); }
-function loadSaved(){ const s = ls.get('bb_game', null); return s && s.G && !s.G.over && s.G.v === 1 ? s : null; }
+function loadSaved(){ const s = ls.get('bb_game', null); if(s && s.G) migrate('game', s.G); return s && s.G && !s.G.over && s.G.v === 1 ? s : null; }
 
 function startGame(opts, via){
   G = newGame(opts);
