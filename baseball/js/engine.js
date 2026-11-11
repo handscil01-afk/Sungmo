@@ -211,7 +211,7 @@ const curPitcher = G => { const T = fieldTeam(G); return T.pit[T.pi]; };
 const runsOf = T => T.R.reduce((a, b) => a + (b || 0), 0);
 const fatigue = P => Math.max(0, (P.load - P.sta) / 25);
 const gradeOf = (P, t) => (P.pitches.find(x => x.t === t) || { g:40 }).g;
-const expVel = (P, t, w) => Math.round(P.vel * PITCH[t].spd + POWER[w].dv + P.cond * 0.8 - fatigue(P) * 4);
+const expVel = (P, t, w) => Math.round(P.vel * PITCH[t].spd + POWER[w || 5].dv + P.cond * 0.8 - fatigue(P) * 4);
 const halfName = G => `${G.inning}회${G.top ? '초' : '말'}`;
 function basesText(b){
   const on = [0, 1, 2].filter(i => b[i] != null);
@@ -410,7 +410,7 @@ function onHit(G, n, ev, simple){
   }
   const spd = i => simple ? 55 : T.bat[i].spd;
   if(n >= 4){ for(let k = 2; k >= 0; k--) if(b[k] != null){ sc.push(b[k]); b[k] = null; } sc.push(T.bi); scoreRuns(G, sc, true); return; }
-  const nb = [null, null, null], ofAdj = [-0.18, 0, 0.1][F.align.of] + EZ(G, [0, 0.12, 0.18]);
+  const nb = [null, null, null], ofAdj = [-0.18, 0, 0.1][F.align.of] + EZ(G, [0, 0.08, 0.16]);
   for(let k = 2; k >= 0; k--){
     const r = b[k]; if(r == null) continue;
     let to = k + n;
@@ -603,6 +603,21 @@ function applyReview(G, R, c){
 
 /* ---------- 코스 ---------- */
 // 겨냥한 곳: x(-몸쪽 ~ +바깥쪽), y(+높게 ~ -낮게). 스트라이크 존은 -1~1
+// 스윙 세기별 보정: 앵커 3(맞히기)·5(치기)·8(강하게)를 이어 계산하고 그 바깥(1~2, 9)은 이어서 늘림
+// eye 선구안 · bq 타격 정확도 · ev 타구 힘 · gb 땅볼 비율 · c2 2스트라이크 뒤 파울 벌점(맞히기 쪽만)
+const SW_ANCHOR = [[3, { eye:8, bq:4, ev:-0.07, gb:0.04, c2:0.06 }], [5, { eye:0, bq:0, ev:0, gb:0, c2:0 }], [8, { eye:-10, bq:-12, ev:0.07, gb:-0.07, c2:0 }]];
+function swingP(s){
+  const [a, b] = s <= 5 ? [SW_ANCHOR[0], SW_ANCHOR[1]] : [SW_ANCHOR[1], SW_ANCHOR[2]], t = (s - a[0]) / (b[0] - a[0]), o = {};
+  Object.keys(a[1]).forEach(k => { o[k] = a[1][k] + (b[1][k] - a[1][k]) * t; });
+  o.c2 = Math.max(0, o.c2);
+  return o;
+}
+// 노려 치기: 고른 칸(r행 c열, 0~2)과 실제 공 위치의 거리로 타격 정확도를 보정. 가운데 칸이거나 고르지 않으면 보정 없음. 선구안이 높으면 빗나갔을 때 벌점이 작음
+function aimAdj(a, x, y, eye){
+  if(!a || !Number.isInteger(a.r) || !Number.isInteger(a.c) || (a.r === 1 && a.c === 1)) return 0;
+  const d = Math.hypot(x - [-1, 0, 1][a.c] * 0.55, y - [1, 0, -1][a.r] * 0.55), f = clamp(1 - d / 0.9, -1, 1);
+  return f > 0 ? f * 7 : f * 10 * (1 - clamp(eye, 0, 100) / 150);
+}
 function aimXY(sel){
   const cx = [-1, 0, 1][sel.c], cy = [1, 0, -1][sel.r];
   const m = { in:0.55, edge:0.90, out:1.28 }[sel.e || 'in'];
@@ -621,7 +636,7 @@ function locText(x, y){
   return `${where} ${far ? '크게 ' : ''}빠지는`;
 }
 const selText = s => s.k === 'ibb' ? '고의 볼넷' :
-  `${PITCH[s.t].name}, ${ZONE_NAME[s.r][s.c]}${s.r === 1 && s.c === 1 ? '' : ', ' + EDGE[s.e || 'in'].name}, ${POWER[s.w || 2].name}`;
+  `${PITCH[s.t].name}, ${ZONE_NAME[s.r][s.c]}${s.r === 1 && s.c === 1 ? '' : ', ' + EDGE[s.e || 'in'].name}, ${POWER[s.w || 5].name}`;
 
 /* ---------- 해설 문장 ----------
    문장 앞부분(투구 동작·구종·구속·움직임)만 들어서는 결과를 알 수 없게 하고, 결과는 타격 방법에 따라 여러 문장 가운데 하나를 고름.
@@ -660,7 +675,7 @@ const SAY = {
 const pickSay = (G, arr) => arr[Math.floor(rnd(G) * arr.length)];
 
 /* ---------- 투구 한 개 (정밀 모드) ----------
-   P(수비): { k:'pitch', t:구종, r:행, c:열, e:'in'|'edge'|'out', w:1~3 } 또는 { k:'ibb' }
+   P(수비): { k:'pitch', t:구종, r:행, c:열, e:'in'|'edge'|'out', w:1~9 (5가 보통) } 또는 { k:'ibb' }
    B(공격): { k:'swing'|'power'|'contact'|'take'|'bunt'|'steal', g:null|'fast'|'break' } */
 function playPitch(G, Psel, Bsel){
   if(G.over) return flush(G);
@@ -671,12 +686,12 @@ function playPitch(G, Psel, Bsel){
     forceWalk(G); fx(G, 'ball'); endPA(G); return flush(G);
   }
   F.lastSel = { ...Psel };
-  G.pitchNo++; P.n++; P.load += POWER[Psel.w].cost; fx(G, 'pitch');
+  G.pitchNo++; P.n++; P.load += POWER[Psel.w || 5].cost; fx(G, 'pitch');
   const pt = PITCH[Psel.t], vel = expVel(P, Psel.t, Psel.w) + Math.round(gauss(G) * 0.8);
-  const pq = 0.45 * P.stf + 0.35 * gradeOf(P, Psel.t) + (pt.fast ? (vel - 147) * 0.7 : 4) + POWER[Psel.w].q + P.cond * 4 - fatigue(P) * 14;
+  const pq = 0.45 * P.stf + 0.35 * gradeOf(P, Psel.t) + (pt.fast ? (vel - 147) * 0.7 : 4) + POWER[Psel.w || 5].q + P.cond * 4 - fatigue(P) * 14;
   // 제구: 겨냥한 곳에서 얼마나 벗어나는지
   const aim = aimXY(Psel);
-  const sig = 0.25 * (1.45 - P.ctl / 100) * POWER[Psel.w].err * pt.err * (1 + fatigue(P) * 0.8) * (1 - P.cond * 0.06);
+  const sig = 0.25 * (1.45 - P.ctl / 100) * POWER[Psel.w || 5].err * pt.err * (1 + fatigue(P) * 0.8) * (1 - P.cond * 0.06);
   const x = aim.x + gauss(G) * sig, y = aim.y + gauss(G) * sig;
   const zd = Math.max(Math.abs(x), Math.abs(y)), inZone = zd <= 1;
   G.lastLoc = { x, y };
@@ -695,8 +710,11 @@ function playPitch(G, Psel, Bsel){
   }
   G.prev = { t: Psel.t, vel, fast: pt.fast };
   // 히트 앤드 런: 1루 주자가 미리 뛰고, 타자는 웬만하면 방망이를 내서 맞히기에 집중함
-  const hr = Bsel.k === 'hitrun' && G.bases[0] != null;
+  // 히트 앤드 런: 감독 모드의 작전(hitrun)이거나, 정밀 모드에서 스윙에 함께 건 표시(Bsel.hr). 둘 다 1루 주자가 있어야 함
+  const hr = G.bases[0] != null && (Bsel.k === 'hitrun' || (Bsel.hr && G.bases[1] == null && ['swing', 'power', 'contact'].includes(Bsel.k)));
   const k = Bsel.k === 'hitrun' ? 'contact' : Bsel.k, swingIntent = k === 'swing' || k === 'power' || k === 'contact';
+  // 스윙 세기 1(맞히기)~9(풀스윙): 3·5·8이 옛 맞히기·치기·강하게와 같은 값 (swingP). 정하지 않으면 k에 맞는 옛 값
+  const sw = swingIntent ? (Bsel.s != null ? clamp(Math.round(Bsel.s), 1, 9) : ({ contact:3, swing:5, power:8 })[k]) : 5, SP = swingP(sw);
   const breaking = !pt.fast;
   const end = () => { endPA(G); return flush(G); };
   const strikeCall = () => { const border = zd > 0.95 && zd < 1.05; if(!border) return inZone; return rnd(G) < clamp(0.5 - (zd - 1) * 8, 0.1, 0.9); };
@@ -737,7 +755,7 @@ function playPitch(G, Psel, Bsel){
   else if(swingIntent){
     if(inZone) swing = true;
     else {
-      const eye = B.eye + B.cond * 4 + (k === 'contact' ? 8 : k === 'power' ? -10 : 0);
+      const eye = B.eye + B.cond * 4 + SP.eye;
       const lure = pt.chase * ((y < 0 || x > 0) ? 1 : 0.5);
       swing = !check(G, '선구안', (eye / 100) * (0.6 + (zd - 1) * 2.0) - lure, '참음', '방망이가 나감');
     }
@@ -756,10 +774,12 @@ function playPitch(G, Psel, Bsel){
 
   /* 휘두름 */
   const guess = Bsel.g ? (Bsel.g === 'fast') === pt.fast ? 9 : -7 : 0;
-  const bq = soft(B.con, 0.7) + B.cond * 4 + ({ swing:0, power:-12, contact:10 })[k] + guess + timing;
+  const aimBonus = aimAdj(Bsel.aim, x, y, B.eye);
+  if(aimBonus) emit(G, `판정 노려 치기: 노린 칸과 공의 거리에 따른 보정 ${aimBonus > 0 ? '+' : ''}${Math.round(aimBonus * 10) / 10}.`, 'd');
+  const bq = soft(B.con, 0.7) + B.cond * 4 + SP.bq + guess + timing + aimBonus;
   const cen = clamp(1 - zd, 0, 1);
-  const pCon = 0.84 + EZ(G, [0, 0.04, 0.06]) + (bq - pq) / 110 - (inZone ? 0.12 * (1 - cen) : 0.14 + (zd - 1) * 1.0);
-  const kk = ({ power:'power', contact:'contact' })[k] || 'swing';
+  const pCon = 0.84 + EZ(G, [0, 0.02, 0.05]) + (bq - pq) / 110 - (inZone ? 0.12 * (1 - cen) : 0.14 + (zd - 1) * 1.0);
+  const kk = sw <= 4 ? 'contact' : sw >= 7 ? 'power' : 'swing';
   if(guess > 0) emit(G, '노리던 공이 들어옵니다.', 'd');
   if(timing < 0) emit(G, '느린 공에 타이밍을 빼앗깁니다.', 'd');
   if(!check(G, '맞히기', pCon, '맞힘', '헛스윙')){
@@ -785,30 +805,36 @@ function playPitch(G, Psel, Bsel){
     return flush(G);
   }
   // 맞힘: 파울인지 안으로 들어갔는지
-  const pFair = clamp(0.46 + (bq - pq) / 300 + (inZone ? 0.10 * cen : -0.12) - (k === 'contact' && G.strikes === 2 ? 0.06 : 0), 0.25, 0.75);
+  const pFair = clamp(0.46 + (bq - pq) / 300 + (inZone ? 0.10 * cen : -0.12) - (G.strikes === 2 ? SP.c2 : 0), 0.25, 0.75);
   if(rnd(G) >= pFair){
     fx(G, 'batF', 'foul'); G.anim.res = 'foul';
-    if(rnd(G) < 0.03 * parkOf(G).foul){
-      const pos = pickOne(G, ['C', '1B', '3B']);
-      emit(G, `${head} 높이 뜬 파울! ${ga(fielder(F, pos))} 끝까지 따라가 잡습니다. 파울 플라이 아웃.`, 'r');
-      B.st.ab++; addOut(G); fx(G, 'out'); return end();
+    // 파울 플라이: 떨어질 곳과 시간을 계산해 야수가 닿으면 아웃 (playsim.js foulFly)
+    let ff = null;
+    if(rnd(G) < FOUL_FLY_P * Math.sqrt(parkOf(G).foul || 1)){
+      ff = foulFly(G);
+      (G.evs ||= []).push({ k:'foulfly', pos: ff.pos, caught: ff.caught, hang: ff.hang });   // (이 함수 안에서 ev는 타구 힘이라 ev()를 못 씀)
+      if(ff.caught){
+        emit(G, `${head} 높이 뜬 파울! ${ga(fielder(F, ff.pos))} 끝까지 따라가 잡습니다. 파울 플라이 아웃.`, 'r');
+        B.st.ab++; addOut(G); fx(G, 'out'); return end();
+      }
     }
     if(G.strikes < 2) G.strikes++;
-    emit(G, `${head} ${pickSay(G, SAY.foul[kk])} ${countText(G)}.${tail}`, 'p');
+    if(ff) emit(G, `${head} 높이 뜬 파울! ${ga(fielder(F, ff.pos))} 따라가 보지만 닿지 않고 파울 지역에 떨어집니다. ${countText(G)}.${tail}`, 'p');
+    else emit(G, `${head} ${pickSay(G, SAY.foul[kk])} ${countText(G)}.${tail}`, 'p');
     return flush(G);
   }
   // 방향 노리기: 바깥쪽 공을 밀어치거나 몸쪽 공을 당겨치면 잘 맞고, 반대면 빗맞기 쉬움
   const dirFit = !Bsel.d ? 0 : (Bsel.d === 'oppo' ? x : -x) > 0.25 ? 0.08 : (Bsel.d === 'oppo' ? x : -x) < -0.25 ? -0.08 : 0;
   if(dirFit) emit(G, dirFit > 0 ? '노린 방향으로 칠 수 있는 공입니다.' : '노린 방향과 반대쪽 공입니다.', 'd');
-  const q = clamp(rnd(G) * 0.75 + 0.08 + dirFit + EZ(G, [0, 0.05, 0.07]) + (bq - pq) / 220 + (inZone ? 0.18 * cen : -0.12), 0, 1);
-  const ev = clamp(0.45 * q + 0.45 * soft(B.pow + B.cond * 4, 0.5) / 100 + ({ swing:0, power:0.07, contact:-0.07 })[k] + (pt.fast && vel >= 153 ? 0.02 : 0) + gauss(G) * 0.035, 0, 1.08);
+  const q = clamp(rnd(G) * 0.75 + 0.08 + dirFit + EZ(G, [0, 0.03, 0.06]) + (bq - pq) / 220 + (inZone ? 0.18 * cen : -0.12), 0, 1);
+  const ev = clamp(0.45 * q + 0.45 * soft(B.pow + B.cond * 4, 0.5) / 100 + SP.ev + (pt.fast && vel >= 153 ? 0.02 : 0) + gauss(G) * 0.035, 0, 1.08);
   emit(G, `판정 타구: 정확도 ${Math.round(q * 100)}, 힘 ${Math.round(ev * 100)}.`, 'd');
   fx(G, q > 0.75 ? 'batBig' : 'bat'); G.anim.res = 'inplay';
   G.hrun = hr;
   const hitWord = Psel.e !== 'in' && zd < 0.42 && q > 0.5 ? '가운데로 몰린 실투를 놓치지 않습니다!' : pickSay(G, SAY.hit[kk][q > 0.75 ? 'good' : 'bad']);
-  inPlay(G, { head: `${head} ${hitWord}`, x, y, q, ev, k, pt, d: Bsel.d });
+  inPlay(G, { head: `${head} ${hitWord}`, x, y, q, ev, k, SP, pt, d: Bsel.d });
   G.hrun = false;
-  if(G.review) return flush(G);
+  if(G.review || G.pendingThrow) return flush(G);
   return end();
 }
 
@@ -893,7 +919,7 @@ function buntResult(G, head, simple){
 }
 /* ---------- 인플레이 타구 (정밀 모드) ---------- */
 function inPlay(G, o){
-  const { x, y, q, ev, k, pt, d: dir } = o;
+  const { x, y, q, ev, k, SP, pt, d: dir } = o;
   const F = fieldTeam(G), T = batTeam(G), B = curBatter(G), P = curPitcher(G);
   const inf = F.align.inf, of = F.align.of, defMod = (60 - F.def) / 300, pk = parkOf(G);
   // 방향: 몸쪽 공은 당겨 치기 쉬움
@@ -901,7 +927,7 @@ function inPlay(G, o){
   if(dir) pull = clamp(pull + (dir === 'pull' ? 0.3 : -0.3), 0.08, 0.62);
   const side = wpick(G, [['pull', pull], ['cen', 0.33], ['oppo', 1 - pull - 0.33]]);
   const fi = side === 'cen' ? 1 : (side === 'pull') === (B.hand === 'R') ? 0 : 2;   // 0 왼쪽 · 1 가운데 · 2 오른쪽
-  const pGB = 0.42 - y * 0.10 + pt.gb - (B.pow - 50) / 500 - (k === 'power' ? 0.07 : 0) + (k === 'contact' ? 0.04 : 0);
+  const pGB = 0.42 - y * 0.10 + pt.gb - (B.pow - 50) / 500 + SP.gb;
   const pPU = 0.05 + (q < 0.25 ? 0.10 : 0), pLD = 0.16 + q * 0.12;
   const type = wpick(G, [['gb', pGB], ['pu', pPU], ['ld', pLD], ['fb', 1 - pGB - pPU - pLD]]);
   if(G.anim) G.anim.bb = { type, fi, d: type === 'gb' ? 30 + ev * 30 : type === 'pu' ? 25 : type === 'ld' ? 50 + ev * 40 : 0 };
@@ -928,8 +954,35 @@ function inPlay(G, o){
     if(d >= hrLine) opt.hr = true; else if(d >= fence) opt.wall = true;
   }
   if(type === 'fb'){ bb.d = opt.wall ? fence - 1 : d; bb.hang = 2.1 + bb.d / 46; }
-  const r = simPlay(G, bb, opt);
-  playOrReview(G, bb, r, fi, head, { d, raw, wind, fence, fi });
+  const rng0 = G.rng, r = simPlay(G, bb, opt), info = { d, raw, wind, fence, fi };
+  // 송구 선택: 사람이 수비하고 던질 곳이 둘 이상이면 잡은 순간에 멈추고 묻음. 같은 난수로 고른 곳을 다시 계산함(resolveThrow)
+  if(type === 'gb' && !opt.hr && r.throwOpts && r.throwOpts.length >= 2 && askThrow(G)){
+    G.rng = rng0;
+    const who = fielder(F, r.pos);
+    G.pendingThrow = { opts: r.throwOpts, pos: r.pos, who, auto: r.tgt, bb, opt, fi, info, hrun: !!G.hrun, fx: G.fx.splice(0), evs: (G.evs || []).splice(0), n: G.anim ? G.anim.n : 0 };
+    if(G.anim) G.anim.n--;   // 이 공의 그림·소리·중계는 고른 뒤에 한꺼번에 (그림이 먼저 끝까지 가 버리지 않게)
+    (G.evs ||= []).push({ k:'throwq', pos: r.pos, who, opts: r.throwOpts.map(o => o.base) });   // (이 함수 안에서 ev는 타구 힘이라 ev()를 못 씀)
+    emit(G, `${head} 땅볼 타구가 ${who}에게 갑니다! 잡았습니다. 어디로 던질까요?`, 'r');
+    return;
+  }
+  playOrReview(G, bb, r, fi, head, info);
+}
+// 사람이 수비하는 정밀 모드 경기에서, 설정이 켜져 있으면 송구할 곳을 물음 (컴퓨터·감독 모드·맡긴 쪽은 묻지 않고 컴퓨터가 고름)
+const askThrow = G => G.mode === 'detail' && G.ctrl[1 - batIdx(G)] === 'human' && (typeof SET === 'undefined' || SET.pickThrow !== false);
+function resolveThrow(G, base){
+  const p = G.pendingThrow; if(!p) return flush(G);
+  G.pendingThrow = null;
+  if(G.anim) G.anim.n = p.n;
+  G.fx.push(...p.fx); (G.evs ||= []).push(...p.evs);
+  const valid = p.opts.some(o => o.base === base);
+  G.hrun = p.hrun;
+  const r = simPlay(G, p.bb, valid ? { ...p.opt, throwTo: base } : p.opt);
+  G.hrun = false;
+  ev(G, { k:'throw', base: valid ? base : p.auto, chosen: valid, auto: !valid || base === p.auto });
+  if(valid) emit(G, `${josa(p.who, '은', '는')} ${BASE_TO[base]} 던지기로 합니다.`, 'c');
+  playOrReview(G, p.bb, r, p.fi, '', p.info);
+  if(!G.review) endPA(G);
+  return flush(G);
 }
 // 아슬아슬한 베이스 승부가 있으면 심판이 판정(아주 아슬아슬하면 가끔 틀림)하고 비디오 판독을 고를 수 있게 함. 그림은 심판의 판정대로
 function playOrReview(G, bb, r, fi, head, info){
@@ -963,7 +1016,7 @@ function setAnimPlay(G, bb, r, fi){
   const T = batTeam(G);
   const rm = r.runners.map(x => ({ from: x.from, to: x.to, t0: x.t0 || 0, t: x.t || 0, at: x.at, back: !!x.back }));
   const ps = { ev: r.ev, fm: r.fmove, call: r.call, result: r.result, runT: r.runT || 0, kind: r.kind, bat: r.bat, batTried: r.batTried || r.bat, batOut: r.batOut || null, rm, cover: r.cover || null, bunt: !!bb.bunt };
-  G.anim.bb = { type: bb.type, fi, d: bb.d || Math.round((bb.v || 20) * (bb.v || 20) / (2 * (bb.dec || 7))), hit: r.kind === 'hr' ? 4 : r.kind === 'hit' ? (r.batTried || r.bat) : 0,
+  G.anim.bb = { type: bb.type, fi, d: bb.d || Math.round((bb.v || 20) * (bb.v || 20) / (2 * (bb.dec || 7))), hit: r.kind === 'hr' ? 4 : r.kind === 'hit' ? (r.hitBases || r.batTried || r.bat) : 0,
     ps: JSON.parse(JSON.stringify(ps, (k, v) => typeof v === 'number' ? Math.round(v * 100) / 100 : v)) };
 }
 // 계산한 플레이를 경기에 반영하고 중계 문장을 만듦
@@ -990,8 +1043,10 @@ function describePlay(e){
     case 'err': return e.err === 'drop' ? `${josa(dirW, '으로', '로')} 뜬 공, ${who}, 잡는 듯했지만 공을 떨어뜨립니다! 포구 실책.` : e.err === 'throw' ? `땅볼, ${ga(who)} 잡아 1루로 던졌는데 송구가 빠집니다! 송구 실책으로 타자는 2루까지 갑니다.` : `${who}, 공을 놓칩니다! 포구 실책으로 타자는 1루에 나갑니다.`;
     default: {   // 안타
       const wallW = e.wall ? '담장을 맞고 나오는 ' : '';
-      const base = e.tried >= 3 ? `${wallW}타구가 ${dirW} 깊숙이 굴러갑니다. 3루까지! 3루타!` : e.tried === 2 ? `${wallW}타구가 ${dirW}를 가릅니다. 2루까지! 2루타!` : e.type === 'gb' ? `땅볼이 ${dirW === '가운데' ? '투수 옆을' : dirW === '왼쪽' ? '3루수와 유격수 사이를' : '1루수와 2루수 사이를'} 빠져나갑니다. 안타!` : `${ga(who)} 쫓아가지만 앞에 떨어집니다. 안타!`;
-      return base + (e.bat === 0 ? ` 타자 주자는 한 베이스 더 노리다 아웃! ${outW()}` : '') + (e.err ? ' 송구가 빠지는 사이 한 베이스 더 갑니다!' : '');
+      const hb = e.hb || e.tried;
+      const base = hb >= 3 ? `${wallW}타구가 ${dirW} 깊숙이 굴러갑니다. 3루까지! 3루타!` : hb === 2 ? `${wallW}타구가 ${dirW}를 가릅니다. 2루까지! 2루타!` : e.type === 'gb' ? `땅볼이 ${dirW === '가운데' ? '투수 옆을' : dirW === '왼쪽' ? '3루수와 유격수 사이를' : '1루수와 2루수 사이를'} 빠져나갑니다. 안타!` : `${ga(who)} 쫓아가지만 앞에 떨어집니다. 안타!`;
+      const extraN = !e.err && e.bat > hb ? e.bat : 0;
+      return base + (extraN ? ` 다른 베이스로 송구가 가는 사이 타자 주자는 ${extraN}루까지 갑니다.` : '') + (e.bat === 0 ? ` 타자 주자는 한 베이스 더 노리다 아웃! ${outW()}` : '') + (e.err ? ' 송구가 빠지는 사이 한 베이스 더 갑니다!' : '');
     }
   }
 }
@@ -1011,7 +1066,7 @@ function applyPlay(G, r, head, info = {}){
   if(r.bat >= 1 && r.bat <= 3){ let b = r.bat - 1; while(b < 3 && nb[b] != null) b++; if(b < 3) nb[b] = T.bi; else scored.push(T.bi); }
   if(r.bat === 4) scored.push(T.bi);
   // 기록
-  const hitN = r.kind === 'hr' ? 4 : r.kind === 'hit' ? (r.batTried || r.bat || 1) - (r.bat === 0 ? 1 : 0) : r.kind === 'ifh' ? 1 : 0;
+  const hitN = r.kind === 'hr' ? 4 : r.kind === 'hit' ? (r.hitBases || (r.batTried || r.bat || 1) - (r.bat === 0 ? 1 : 0)) : r.kind === 'ifh' ? 1 : 0;
   const sacBunt = r.bb && r.bb.bunt && r.kind === 'go' && r.runners.some(x => x.to > x.from);
   if(!(r.sac && r.outs === 1 && r.kind === 'fo') && !sacBunt) B.st.ab++;
   if(hitN > 0){
@@ -1024,7 +1079,7 @@ function applyPlay(G, r, head, info = {}){
   if(r.outs) addOut(G, r.outs);
   // 사건: 타구 하나의 결과를 구조로 남기고, 문장은 이 사건에서 만듦(describePlay). 중계·효과음·그림은 문장이 아니라 이 사건을 읽음
   const pe = { k:'play', kind:r.kind, pos:r.pos || null, who, dir:info.fi ?? 1, dirW, hitBases:hitN, outs:r.outs || 0, o:G.outs, bunt:!!(r.bb && r.bb.bunt), type: r.bb ? r.bb.type : null,
-    cover:r.cover || null, tgt:r.tgt, dive:!!r.dive, err: r.err ? (r.err.kind || 'misc') : null, tried:r.batTried || r.bat, bat:r.bat, wall:!!r.wall, sac:!!r.sac,
+    cover:r.cover || null, tgt:r.tgt, dive:!!r.dive, err: r.err ? (r.err.kind || 'misc') : null, tried:r.batTried || r.bat, hb:r.hitBases || 0, bat:r.bat, wall:!!r.wall, sac:!!r.sac,
     adv:r.runners.some(x => x.to > x.from), d:info.d, raw:info.raw, fence:info.fence, wind:info.wind, rm:scored.length };
   ev(G, pe);
   if(r.kind === 'dp' || r.kind === 'ldp') (G.hs || {}).dp++;
@@ -1086,8 +1141,8 @@ function playSimple(G, D, O, from){
 // 간단 모드의 주사위 결과(k)와 맞는 타구를 위치·속도 계산(playsim.js)으로 찾아 그 플레이로 보여 주고 기록함
 function simpleSim(G, k, head){
   if(!['S1', 'S2', 'S3', 'HR', 'GO', 'FO'].includes(k) || typeof simPlay !== 'function') return false;
-  const ok = r => ({ S1: (r.kind === 'hit' && (r.batTried || r.bat) === 1) || r.kind === 'ifh', S2: r.kind === 'hit' && (r.batTried || r.bat) === 2,
-    S3: r.kind === 'hit' && (r.batTried || r.bat) === 3, HR: r.kind === 'hr', GO: ['go', 'dp', 'fc'].includes(r.kind), FO: ['fo', 'pu', 'lo', 'ldp'].includes(r.kind) })[k];
+  const ok = r => ({ S1: (r.kind === 'hit' && (r.hitBases || r.batTried || r.bat) === 1) || r.kind === 'ifh', S2: r.kind === 'hit' && (r.hitBases || r.batTried || r.bat) === 2,
+    S3: r.kind === 'hit' && (r.hitBases || r.batTried || r.bat) === 3, HR: r.kind === 'hr', GO: ['go', 'dp', 'fc'].includes(r.kind), FO: ['fo', 'pu', 'lo', 'ldp'].includes(r.kind) })[k];
   for(let i = 0; i < 40; i++){
     const fi = rint(G, 0, 2), u = rnd(G), probe = battedBall(G, { type:'fb', fi, ev:0.5, q:0.5, d:60 }), fence = Math.round(fenceAng(G, probe.ang));
     let type, ev, q = 0.3 + rnd(G) * 0.6, d = 0;

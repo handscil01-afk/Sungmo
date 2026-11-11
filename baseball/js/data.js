@@ -15,11 +15,17 @@ const PITCH = {
 const PITCH_EXTRA = ['SL', 'CU', 'CH', 'FK', 'SI', 'CT'];
 
 // 투구 세기: 구속 차이(km/h) · 제구 오차 배율 · 구위 보정 · 체력 소모(투구 수로 셈)
-const POWER = {
-  1: { name:'전력 투구', dv:+2, err:1.22, q:+6, cost:1.6 },
-  2: { name:'보통',     dv:-2, err:1.00, q:0,  cost:1.0 },
-  3: { name:'힘 빼고',  dv:-7, err:0.80, q:-7, cost:0.7 },
-};
+// 구속(세기) 1(가장 느림)~9(최대 전력), 5가 보통. 3·5·8이 옛 3단계(힘 빼고·보통·전력 투구)와 같은 값이고, 그 사이·바깥은 이어서 계산함
+const POWER_ANCHOR = [[3, { dv:-7, err:0.8, q:-7, cost:0.7 }], [5, { dv:-2, err:1, q:0, cost:1 }], [8, { dv:2, err:1.22, q:6, cost:1.6 }]];
+const POWER_NAME = { 1:'가장 느리게', 2:'아주 가볍게', 3:'힘 빼고', 4:'조금 약하게', 5:'보통', 6:'조금 세게', 7:'힘 주고', 8:'전력 투구', 9:'최대 전력' };
+const POWER_OLD = { 1:8, 2:5, 3:3 };   // 옛 저장·화면의 1(전력)·2(보통)·3(힘 빼고)를 새 값으로
+const POWER = {};
+for(let w = 1; w <= 9; w++){
+  const [a, b] = w <= 5 ? [POWER_ANCHOR[0], POWER_ANCHOR[1]] : [POWER_ANCHOR[1], POWER_ANCHOR[2]], t = (w - a[0]) / (b[0] - a[0]);
+  const o = { name: POWER_NAME[w] };
+  Object.keys(a[1]).forEach(k => { o[k] = Math.round((a[1][k] + (b[1][k] - a[1][k]) * t) * 1000) / 1000; });
+  POWER[w] = o;
+}
 
 // 팀 스타일: 능력치 보정과 컴퓨터 작전 성향
 // bat·pit: 능력치 더하기 / def: 수비 / aggr: 적극성 / steal·bunt: 작전 빈도 배율 / nibble: 투수가 구석·유인구를 쓰는 정도

@@ -38,7 +38,7 @@ function aiPitch(G, order){
   if(r === 1 && c === 1 && e !== 'in') c = rnd(G) < 0.5 ? 0 : 2;
   // 세기
   const f = fatigue(P);
-  const w = s === 2 && rnd(G) < 0.35 ? 1 : f > 0.5 && rnd(G) < 0.3 ? 3 : wpick(G, [[2, 0.75], [1, 0.15], [3, 0.10]]);
+  const w = s === 2 && rnd(G) < 0.35 ? 8 : f > 0.5 && rnd(G) < 0.3 ? 3 : wpick(G, [[5, 0.75], [8, 0.15], [3, 0.10]]);   // 전력 8 · 보통 5 · 힘 빼고 3
   G.prevTypes = [t, ...(G.prevTypes || [])].slice(0, 2);
   return { k:'pitch', t, r, c, e, w };
 }

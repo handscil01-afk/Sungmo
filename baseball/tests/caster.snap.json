@@ -259,8 +259,8 @@
    "0.16 p_throw2",
    "1.29 c_hit3",
    "2.47 c_liner",
-   "3.41 r_double",
-   "4.39 a_hit2",
+   "3.41 r_sigh2",
+   "4.19 r_hit2",
    "8.92 r_score1",
    "10.1 r_walkoff2",
    "11.58 j_score",
@@ -322,69 +322,60 @@
   ]
  },
  {
-  "label": "볼넷·사구",
+  "label": "경기 끝",
   "game": 2,
-  "step": 125,
+  "step": 74,
   "ret": {
-   "at": 1.31,
-   "end": 8.79
+   "at": 4.85,
+   "end": 19.79
   },
   "clips": [
    "0 p_throw4",
-   "1.31 r_hbp",
-   "2.59 a_walk2",
-   "3.27 bat_1",
-   "4.95 run_12",
-   "6.23 c_scoring",
-   "7.11 a_chance1"
+   "1.28 c_hit3",
+   "2.46 c_ground1",
+   "4.85 r_groundout1",
+   "6.33 a_gb1",
+   "7.91 end",
+   "9.59 j_score",
+   "11.07 team_thunder_s",
+   "11.85 num_1",
+   "12.43 j_vs",
+   "13.21 num_0",
+   "14.89 team_turtle_s",
+   "16.27 c_winner",
+   "16.95 team_thunder",
+   "18.33 a_end1",
+   "18.91 c_thanks"
   ]
  },
  {
-  "label": "병살",
-  "game": 3,
-  "step": 19,
+  "label": "볼넷·사구",
+  "game": 4,
+  "step": 45,
   "ret": {
-   "at": 5.52,
-   "end": 21.34
+   "at": 1.28,
+   "end": 4.72
   },
   "clips": [
    "0 p_throw4",
-   "1.28 c_soft2",
-   "2.26 c_ground1",
-   "3.84 c_left",
-   "5.52 r_dp2",
-   "6.4 a_dp1",
-   "7.88 a_inning1",
-   "9.26 change",
-   "10.04 inn_1b",
-   "10.92 team_meteor_s",
-   "11.5 j_attack",
-   "12.58 j_score",
-   "14.06 team_hawk_s",
-   "14.94 num_0",
-   "16.62 j_vs",
-   "17.4 num_0",
-   "19.08 team_meteor_s",
-   "19.66 bat_1"
+   "1.28 r_hbp",
+   "2.56 bat_7",
+   "3.64 run_1"
   ]
  },
  {
   "label": "득점",
-  "game": 3,
-  "step": 37,
+  "game": 7,
+  "step": 25,
   "ret": {
-   "at": 3.68,
-   "end": 10.38
+   "at": 0,
+   "end": 4.92
   },
   "clips": [
-   "0 p_throw5",
-   "1.38 c_soft1",
-   "2.26 c_right",
-   "3.68 r_groundout2",
-   "5.26 r_score1",
-   "6.44 a_out3",
-   "8.12 bat_4",
-   "8.9 out_2"
+   "0 r_score2",
+   "1.28 bat_6",
+   "2.26 run_2",
+   "3.44 out_2"
   ]
  }
 ]

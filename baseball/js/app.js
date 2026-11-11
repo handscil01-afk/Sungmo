@@ -204,7 +204,7 @@ function pickName(){
 }
 // after: 고른 뒤 갈 곳 · back: 뒤로
 function picksScreen(after, back){
-  const use = (k, v) => { SET.picks = { ...PICK_SETS[k].p, dir: picks().dir }; saveSet(); after(v); };
+  const use = (k, v) => { SET.picks = { ...PICK_SETS[k].p, dir: picks().dir, pow9: picks().pow9, swing9: picks().swing9, aim: picks().aim }; saveSet(); after(v); };
   const sub = (title, keys) => v => go(() => ({ q:`${title}: 무엇을 직접 고를까요? 나머지는 컴퓨터가 정합니다.`, back: w => go(() => picksScreen(after, back), w),
     opts: keys.map((k, i) => ({ n: i + 1, t: PICK_SETS[k].name.replace(/^\d단계: /, ''), act: w => use(k, w) })) }), v);
   return { q:`정밀 모드 단계를 고르세요. 지금: ${pickName()}. 고르지 않는 것은 컴퓨터가 정합니다. (1단계는 간단 모드입니다)`, back: back || (v => after(v)), opts:[
@@ -227,7 +227,18 @@ function picksCustom(after, back){
     { n:5, t:`치는 방법: ${p.bat === 'full' ? '치기·강하게·맞히기·지켜보기' : '치기·지켜보기만'}`, act: ch(q => { q.bat = q.bat === 'full' ? 'simple' : 'full'; }, q => `치는 방법 ${q.bat === 'full' ? '네 가지' : '치기와 지켜보기만'}`) },
     { n:6, t:`노림수: ${p.guess ? '씀' : '쓰지 않음'}`, s:'직구 계열이나 변화구를 노립니다.', act: ch(q => { q.guess = !q.guess; }, q => `노림수 ${q.guess ? '씀' : '쓰지 않음'}`) },
     { n:7, t:`타자 방향 노리기: ${p.dir ? '씀' : '쓰지 않음'}`, s:'밀어치기·당겨치기', act: ch(q => { q.dir = !q.dir; }, q => `방향 노리기 ${q.dir ? '씀' : '쓰지 않음'}`) },
+    { n:8, t:'세밀하게 고르기 (구속·스윙 9단계, 노려 치기)', s:'기본은 모두 꺼져 있습니다. 켜면 직접 고르는 항목이 늘고, 고르지 않은 항목은 컴퓨터가 정합니다.', act: v => go(() => picksFine(after, back), v) },
     { n:9, t:'다 됐어요', act: v => after(v) },
+  ] };
+}
+function picksFine(after, back){
+  const p = picks(), ch = (fn, label) => () => { const q = picks(); fn(q); SET.picks = q; saveSet(); stay(label(q)); };
+  const on = b => b ? '켬' : '끔';
+  return { q:'세밀하게 고르기. 하나씩 켜고 끕니다. 다 됐으면 9번을 누르세요.', back: v => go(() => picksCustom(after, back), v), opts:[
+    { n:1, t:`구속 9단계: ${on(p.pow9)}`, s:'수비할 때 세기를 3단계 대신 1(가장 느림)~9(최대 전력)로 고릅니다. 세게 던질수록 빠르고 구위가 좋지만 제구가 흔들리고 힘이 듭니다.', act: ch(q => { q.pow9 = !q.pow9; }, q => `구속 9단계 ${on(q.pow9)}`) },
+    { n:2, t:`스윙 세기 9단계: ${on(p.swing9)}`, s:'공격할 때 강하게 치기·맞히기 대신 1(맞히기)~9(풀스윙) 가운데 고릅니다.', act: ch(q => { q.swing9 = !q.swing9; }, q => `스윙 세기 9단계 ${on(q.swing9)}`) },
+    { n:3, t:`노려 치기: ${on(p.aim)}`, s:'공격할 때 노림수 화면에서 공이 올 칸을 하나 고릅니다.', act: ch(q => { q.aim = !q.aim; }, q => `노려 치기 ${on(q.aim)}`) },
+    { n:9, t:'다 됐어요', act: v => go(() => picksCustom(after, back), v) },
   ] };
 }
 function settings3(backTo){
@@ -235,6 +246,8 @@ function settings3(backTo){
   return { q:'설정 더 보기 (마지막)', back: v => go(() => settings2(backTo), v), opts:[
     { n:1, t:'소리 시험', s:'읽어 주기, 효과음, 중계 음성, 진동을 시험합니다.', act: v => { playFx(['pitch', 'bat', 'hit']); if(castOn()) castSample(); speak('소리 시험입니다. 딱! 잘 맞은 타구, 안타!'); if(v === 'click' && SET.voice === 'sr') note(['소리 시험입니다. 딱! 잘 맞은 타구, 안타!'], v); } },
     { n:5, t:`타격 난이도: ${EASY_NAME[SET.easy ?? 1]}`, s:'쉬움일수록 잘 맞히고 안타·볼넷·진루가 많아집니다. 다음 경기부터 적용합니다. (리그의 다른 팀 경기는 늘 현실)', act: ch(() => { SET.easy = cycle([1, 2, 0], SET.easy ?? 1); }, () => `타격 난이도 ${EASY_NAME[SET.easy]}`) },
+    { n:7, t:`송구 고르기: ${SET.pickThrow === false ? '끔' : SET.throwSec ? `켬 (${SET.throwSec}초 안에)` : '켬 (시간 제한 없음)'}`, s:'정밀 모드에서 내가 수비할 때, 땅볼을 잡은 뒤 던질 베이스를 직접 고릅니다. 시간 안에 고르지 않으면 컴퓨터가 정합니다. 누를 때마다 6초, 10초, 시간 제한 없음, 끔 순서로 바뀝니다.',
+      act: ch(() => { const c = SET.pickThrow === false ? 'off' : SET.throwSec === 6 ? 's6' : SET.throwSec === 10 ? 's10' : SET.throwSec === 0 ? 's0' : 's6', nx = { s6:'s10', s10:'s0', s0:'off', off:'s6' }[c]; SET.pickThrow = nx !== 'off'; SET.throwSec = nx === 's6' ? 6 : nx === 's10' ? 10 : 0; }, () => `송구 고르기 ${SET.pickThrow === false ? '끔' : SET.throwSec ? SET.throwSec + '초' : '시간 제한 없음'}`) },
     { n:6, t:`관중 소리: ${onOff(SET.crowd)}`, s:'화면 보며 하기에서 경기 내내 야구장 관중 소리를 작게 깔아 줍니다. 효과음이 꺼져 있으면 나지 않습니다.',
       act: ch(() => { SET.crowd = !SET.crowd; crowdSync(); }, () => `관중 소리 ${onOff(SET.crowd)}`) },
     { n:7, t:`중계 볼카운트: ${({ always:'매번', idle:'오래 고를 때만', off:'읽지 않음' })[SET.castCount || 'idle']}`, s:'중계 음성이 공마다 볼카운트를 말할지 정합니다. "오래 고를 때만"이면 고르는 데 6초가 넘게 걸릴 때 볼카운트·아웃·주자를 한 번 말하고, 고르면 바로 멈춥니다.',

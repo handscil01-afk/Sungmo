@@ -99,9 +99,12 @@ const PORT = 8769, URL0 = `http://localhost:${PORT}/baseball/?emu=1`;
   await waitQ(guest, /어떻게|어떤 공|고르는 중|타순과/);
   await shot(host, 'on-host-game'); await shot(guest, 'on-guest-game');
   const skip = mode === 'manager' ? /더 보기|채팅|설정|나가기|닫기|상대 팀 보기/ : /더 보기|채팅|설정|나가기|닫기|작전|노림수|맡기기|수비 위치/;
-  let steps = 0;
+  let steps = 0, same = 0, lastSig = '';
+  const threw = { host:0, guest:0 };   // 송구 선택 화면이 방장·손님 쪽에 나온 횟수
   for(; steps < 3000; steps++){
     const [qh, qg] = [await q(host), await q(guest)];
+    if(/어디로 던질까요/.test(qh)) threw.host++; if(/어디로 던질까요/.test(qg)) threw.guest++;
+    const sig = qh + '|' + qg; if(sig === lastSig){ if(++same > 60){ steps = 3000; break; } } else { same = 0; lastSig = sig; }   // 화면이 오래 그대로면 멈춘 것: 빨리 끝냄
     if(/경기가 끝났습니다/.test(qh) && /경기가 끝났습니다/.test(qg)) break;
     let moved = false;
     for(const p of [host, guest]){
@@ -113,10 +116,11 @@ const PORT = 8769, URL0 = `http://localhost:${PORT}/baseball/?emu=1`;
     }
     if(!moved) await host.waitForTimeout(120);
   }
+  console.log('송구 선택 화면:', JSON.stringify(threw));
   const sb = await Promise.all([host, guest].map(p => p.evaluate(() => scoreboard(G).join(' '))));
   console.log(`경기 끝 (${steps}번). 방장: ${sb[0]}`);
   if(sb[0] !== sb[1]) errors.push('두 기기의 점수판이 다름: ' + sb.join(' / '));
-  if(steps >= 3000) errors.push('경기가 끝나지 않음');
+  if(steps >= 3000){ errors.push('경기가 끝나지 않음'); console.log('멈춘 화면 방장:', (await q(host)).slice(0, 120), '/ 손님:', (await q(guest)).slice(0, 120)); }
   await shot(host, 'on-host-end'); await shot(guest, 'on-guest-end');
 
   // 한 판 더 → 새 경기가 손님에게도 시작됨

@@ -216,6 +216,64 @@ const PORT = 8766;
     await page.keyboard.press('2'); await page.keyboard.press('1'); await page.keyboard.press('1');
     await ctx.close();
   }
+  // 송구 선택: 사람이 수비할 때 땅볼을 잡으면 던질 곳을 묻고, 고르면(또는 시간이 지나면) 이어서 진행해야 함
+  for(const [view, key] of [['그림', '1'], ['소리와 글', '2']]){
+    const ctx = await browser.newContext({ viewport:{ width:1024, height:768 } });
+    const page = await ctx.newPage();
+    page.on('pageerror', e => errors.push(`송구 선택(${view}): ${e.message}`));
+    page.on('console', m => { if(m.type() === 'error') errors.push(`송구 선택(${view}) console: ${m.text()}`); });
+    await page.goto(`http://localhost:${PORT}/baseball/`); await page.waitForSelector('#opts .opt');
+    await page.keyboard.press(key);
+    await page.evaluate(() => { startGame({ mode:'detail', unit:'pa', innings:3, teams:[TEAMS[0].key, TEAMS[1].key], ctrl:['human', 'cpu'], who:['', ''], diff:1, easy:1, seed:31005 }, 'click'); });
+    const toPending = () => page.evaluate(() => { let g = 0; while(!G.pendingThrow && !G.over && g++ < 3000){ if(G.review) resolveReview(G, false); else playStep(G, aiDefChoice(G), aiOffChoice(G)); } if(!G.pendingThrow) return false; gameNext('click', flush(G)); return true; });
+    if(!(await toPending())){ errors.push(`송구 선택(${view}): 3000걸음 안에 송구 선택이 나오지 않음`); await ctx.close(); continue; }
+    await page.waitForFunction(() => /어디로 던질까요/.test(document.querySelector('#q').textContent));
+    const os = await opts(page);
+    if(os.length < 3 || !os.some(o => /컴퓨터가 고르게/.test(o.t))) errors.push(`송구 선택(${view}): 선택지가 이상함 ${JSON.stringify(os)}`);
+    await noOverflow(page, `송구 선택(${view})`); await shot(page, `throw-${view}`);
+    await page.keyboard.press(os[0].n);
+    await page.waitForFunction(() => !G.pendingThrow);
+    if(/어디로 던질까요/.test(await q(page)) && await page.evaluate(() => !G.pendingThrow)) errors.push(`송구 선택(${view}): 고른 뒤에도 같은 화면`);
+    // 시간 제한: 1초 안에 고르지 않으면 컴퓨터가 정함
+    await page.evaluate(() => { SET.throwSec = 1; });
+    if(await toPending()){ await page.waitForFunction(() => !G.pendingThrow, null, { timeout: 4000 }).catch(() => errors.push(`송구 선택(${view}): 시간이 지나도 자동으로 진행되지 않음`)); }
+    console.log(`송구 선택(${view}): 선택지 ${os.map(o => o.t).join(' / ')}`);
+    await ctx.close();
+  }
+  // 세밀하게 고르기(구속·스윙 9단계, 노려 치기)와 히트 앤드 런: 해당 화면이 나오고, 끝까지 진행되어야 함
+  {
+    const ctx = await browser.newContext({ viewport:{ width:1024, height:768 } });
+    const page = await ctx.newPage();
+    page.on('pageerror', e => errors.push(`세밀하게 고르기: ${e.message}`));
+    page.on('console', m => { if(m.type() === 'error') errors.push(`세밀하게 고르기 console: ${m.text()}`); });
+    await page.goto(`http://localhost:${PORT}/baseball/`); await page.waitForSelector('#opts .opt');
+    await page.keyboard.press('1');
+    await page.evaluate(() => { SET.picks = { ...picks(), pow9:true, swing9:true, aim:true }; SET.throwSec = 0;
+      startGame({ mode:'detail', unit:'pa', innings:2, teams:[TEAMS[2].key, TEAMS[5].key], ctrl:['human', 'cpu'], who:['', ''], diff:1, easy:1, seed:777 }, 'click'); });
+    const seen = {};
+    for(let i = 0; i < 3000; i++){
+      const qq = await q(page);
+      if(qq.includes('경기가 끝났습니다')) break;
+      const os = await opts(page), nOpt = os.filter(o => o.n !== '0').length;   // 0번은 '지금 상황 확인'
+      if(/얼마나 세게 던질까요/.test(qq)) seen.pow = nOpt;
+      if(/스윙을 얼마나 세게/.test(qq)) seen.swing = nOpt;
+      if(/어느 칸으로 올 공/.test(qq)) seen.aim = nOpt;
+      if(os.some(o => /^히트 앤드 런/.test(o.t))) seen.hitrun = (seen.hitrun || 0) + 1;
+      let pool = os.filter(o => !/더 보기|설정|그만하기|처음 화면|자동 재생|경기 기록|지금 상황/.test(o.t));
+      // 새 화면을 자주 거치도록 우선 고름
+      const pref = pool.filter(o => /스윙 세기 고르기|노림수|히트 앤드 런/.test(o.t));
+      if(pref.length && Math.random() < 0.6) pool = pref;
+      if(qq.includes('명단입니다') || !pool.length){ await page.keyboard.press('.'); continue; }
+      await page.keyboard.press(pool[Math.floor(Math.random() * pool.length)].n);
+    }
+    if(!(await q(page)).includes('경기가 끝났습니다')) errors.push('세밀하게 고르기: 경기가 끝나지 않음');
+    if(seen.pow !== 9) errors.push(`세밀하게 고르기: 구속 9단계 선택지가 ${seen.pow}개`);
+    if(seen.swing !== 9) errors.push(`세밀하게 고르기: 스윙 9단계 선택지가 ${seen.swing}개`);
+    if(seen.aim !== 9) errors.push(`세밀하게 고르기: 노려 치기 칸이 ${seen.aim}개`);
+    if(!seen.hitrun) errors.push('세밀하게 고르기: 히트 앤드 런 선택지가 한 번도 나오지 않음');
+    console.log('세밀하게 고르기:', JSON.stringify(seen));
+    await ctx.close();
+  }
   await browser.close(); srv.kill();
   if(errors.length){ console.log('오류:\n' + [...new Set(errors)].join('\n')); process.exit(1); }
   console.log('오류 없음');

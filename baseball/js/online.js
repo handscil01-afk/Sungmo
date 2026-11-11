@@ -142,6 +142,10 @@ function netNext(via, res, lines){
   }
   NET.key = key;
   if(G.over){ GS.auto = null; go(endScreen, via, lines); return; }
+  if(G.pendingThrow){   // 던질 곳은 수비하는 팀의 기기에서 고름
+    if(1 - batIdx(G) === NET.side && !NET.sent){ go(throwScreen, via, lines); return; }
+    go(waitScreen, via, lines); return;
+  }
   if(G.review){
     const sd = G.review.side;
     if(sd === NET.side && reviewLeft(G, sd) > 0 && !NET.sent){ go(reviewScreen, via, lines); return; }
@@ -168,7 +172,7 @@ function netNext(via, res, lines){
 }
 function waitScreen(){
   const who = NET.peer ? NET.peer.name + '님' : '상대';
-  return { board:true, q: G.review ? `${who}이 비디오 판독 신청 여부를 고르는 중입니다.` : GS.auto ? '맡겨 둔 동안 컴퓨터가 고르고 있습니다.' : `${who}이 고르는 중입니다. 결과가 나오면 읽어 드립니다.`,
+  return { board:true, q: G.pendingThrow ? `${who}이 던질 곳을 고르는 중입니다.` : G.review ? `${who}이 비디오 판독 신청 여부를 고르는 중입니다.` : GS.auto ? '맡겨 둔 동안 컴퓨터가 고르고 있습니다.' : `${who}이 고르는 중입니다. 결과가 나오면 읽어 드립니다.`,
     note: NET.peerOn ? [] : [`${who}의 연결이 끊겼습니다. 다시 들어오기를 기다립니다.`],
     opts:[
       { n:1, t:'채팅과 음성 대화', s: voiceLabel(), act: v => go(talkScreen, v) },
@@ -212,14 +216,18 @@ function onGuest(v){
 }
 // 방장: 손님의 선택·작전 확인
 const VALID_PITCH = c => c && (c.k === 'ibb' || (c.k === 'pitch' && PITCH[c.t] && curPitcher(G).pitches.some(x => x.t === c.t)
-  && [0, 1, 2].includes(c.r) && [0, 1, 2].includes(c.c) && ['in', 'edge', 'out'].includes(c.e) && [1, 2, 3].includes(c.w)));
-const VALID_BAT = c => c && ['swing', 'power', 'contact', 'take', 'bunt', 'steal'].includes(c.k) && [null, 'fast', 'break'].includes(c.g ?? null) && (c.k !== 'steal' || stealCands(G).includes(c.from));
+  && [0, 1, 2].includes(c.r) && [0, 1, 2].includes(c.c) && ['in', 'edge', 'out'].includes(c.e) && Number.isInteger(c.w) && c.w >= 1 && c.w <= 9));
+const VALID_BAT = c => c && ['swing', 'power', 'contact', 'take', 'bunt', 'steal'].includes(c.k) && (c.s == null || (Number.isInteger(c.s) && c.s >= 1 && c.s <= 9)) && (c.aim == null || (Number.isInteger(c.aim.r) && Number.isInteger(c.aim.c) && c.aim.r >= 0 && c.aim.r <= 2 && c.aim.c >= 0 && c.aim.c <= 2)) && [null, 'fast', 'break'].includes(c.g ?? null) && (c.k !== 'steal' || stealCands(G).includes(c.from));
 function onAct(v){
   if(NET.role !== 'host' || !G || G.over) return;
   let a; try{ a = JSON.parse(v.c); }catch(e){ return; }
   const side = 1 - NET.side, def = 1 - batIdx(G), role = side === def ? 'def' : 'off';
   if(G.review){   // 판독이 걸려 있으면 그 판독 여부만 받음
     if(a.k === 'review' && G.review.side === side){ const r = resolveReview(G, !!a.yes); gameNext('auto', r); }
+    return;
+  }
+  if(G.pendingThrow){   // 송구 선택: 수비하는 쪽만, 후보에 있는 베이스만 (그 밖의 값은 컴퓨터가 고른 곳으로)
+    if(a.k === 'throw' && side === 1 - batIdx(G)){ const r = resolveThrow(G, Number.isInteger(a.base) ? a.base : null); gameNext('auto', r); }
     return;
   }
   if(a.k === 'choice'){
@@ -231,7 +239,7 @@ function onAct(v){
       if(c.k === 'hitrun' && !canSteal(G)) return;
       c = c.k === 'steal' ? { k:'steal', from:c.from } : { k:c.k };
     }
-    else if(G.mode === 'detail'){ if(role === 'def' ? !VALID_PITCH(c) : !VALID_BAT(c)) return; c = role === 'def' ? (c.k === 'ibb' ? { k:'ibb' } : { k:'pitch', t:c.t, r:c.r, c:c.c, e:c.e, w:c.w }) : { k:c.k, g:c.g ?? null, d: ['pull', 'oppo'].includes(c.d) ? c.d : null, from:c.from }; }
+    else if(G.mode === 'detail'){ if(role === 'def' ? !VALID_PITCH(c) : !VALID_BAT(c)) return; c = role === 'def' ? (c.k === 'ibb' ? { k:'ibb' } : { k:'pitch', t:c.t, r:c.r, c:c.c, e:c.e, w:c.w }) : { k:c.k, g:c.g ?? null, d: ['pull', 'oppo'].includes(c.d) ? c.d : null, from:c.from, s: c.s ?? null, aim: c.aim ? { r:c.aim.r, c:c.aim.c } : null, hr: !!c.hr && ['swing', 'power', 'contact'].includes(c.k) && G.bases[0] != null && G.bases[1] == null && canSteal(G) }; }
     else if(!(role === 'def' ? ['attack', 'nibble', 'ibb'] : ['power', 'normal', 'contact', 'bunt', ...(G.unit === 'pitch' ? ['take'] : [])]).includes(c)) return;
     GS.pend[role] = c;
     if(!tryResolve('auto')) netPushState(null);

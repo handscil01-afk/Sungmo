@@ -1,4 +1,4 @@
-const CACHE = 'baseball-v64';
+const CACHE = 'baseball-v65';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png',
   './css/app.css', './img/index.json', ...['bg-pitch', 'bg-field', 'pitcher', 'batter', 'catcher', 'fielder', 'banners', 'banners2', 'umpire', 'umpire-s', 'runner', 'tv', 'fielder2', 'runner-s', 'fielder-set', 'run-g', 'run-b', 'slide', 'run-f', 'run-k', 'cr-cage', 'cr-gym', 'cr-bullpen', 'cr-track', 'cr-room', 'cr-shop', 'cr-fansign', 'cr-rehab', 'cr-train', 'cr-life', 'cr-people', 'cr-props', 'icons', 'icons2'].map(n => './img/' + n + '.png'),
   './js/util.js', './js/data.js', './js/engine.js', './js/playsim.js', './js/timeline.js', './js/ai.js', './js/league.js', './js/speech.js', './js/caster.js', './js/shell.js', './js/ui.js', './js/gfx.js', './js/net.js', './js/voice.js', './js/game.js', './js/manager.js', './js/league-ui.js', './js/career.js', './js/career-life.js', './js/online.js', './js/app.js',
