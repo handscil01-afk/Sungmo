@@ -24,12 +24,14 @@ function fieldersOf(G){
     let [x, y] = FIELD_POS[pos];
     if(POS_INF.includes(pos) && pos !== 'P'){ y += [-4, 0, 3.5][inf]; }
     if(POS_OF.includes(pos)){ const k = [-11, 0, 8][of]; const r = Math.hypot(x, y); x *= (r + k) / r; y *= (r + k) / r; }
-    out[pos] = { pos, at:[x, y], v: 6.6 + (spd - 50) / 50 * 0.9 - [0, 0.55, 0.9][e], react: 0.38 - (def - 50) / 320, arm: 29 + (def - 50) / 9, def, name: pl.name || '' };
+    const tr = pos === 'P' ? [] : traitsOf(pl);   // 강한 어깨는 송구 +4m/s, 넓은 수비 범위는 달리기 +0.45m/s
+    out[pos] = { pos, at:[x, y], v: 6.6 + (spd - 50) / 50 * 0.9 - [0, 0.55, 0.9][e] + (tr.includes('range') ? 0.45 : 0), react: 0.38 - (def - 50) / 320, arm: 29 + (def - 50) / 9 + (tr.includes('arm') ? 4 : 0), def, name: pl.name || '' };
   });
   return out;
 }
 // 공까지 가는 시간: 땅볼은 옆으로 몸을 날리는 범위라 느리게, 뜬공은 외야수가 전력으로 달림
 const reachT = (f, p, mode) => f.react + dist2(f.at, p) / (mode === 'gb' ? f.v * 0.83 : mode === 'air' && POS_OF.includes(f.pos) ? f.v + 1.7 : f.v);
+const runQ = p => traitsOf(p).includes('quick') ? 0.3 : 0;   // 빠른 발: 주루 +0.3m/s
 const runV = spd => 7.2 + ((spd ?? 50) - 50) / 50 * 1.0;          // 타석에서 1루까지
 const runV2 = spd => 7.7 + ((spd ?? 50) - 50) / 50 * 1.0;         // 가속이 붙은 베이스 사이 (리드·2차 리드 포함)
 
@@ -56,10 +58,10 @@ function simPlay0(G, bb, opt = {}){
   const ev = [], fmove = {}, call = [];
   const mv = (pos, path) => { fmove[pos] = path; };
   const res = { bb, ev, fmove, call, outs:0, bat:0, runners:[], err:null, pos:null };
-  const vB = runV(Bt.spd) + [0, 0.05, 0.35][G.easy || 0], tB1 = 0.62 + 27.4 / vB - (Bt.hand === 'L' ? 0.08 : 0) - (bb.bunt ? 0.25 : 0);   // 번트는 대면서 바로 뛰어 나감
+  const vB = runV(Bt.spd) + runQ(Bt) + [0, 0.05, 0.35][G.easy || 0], tB1 = 0.62 + 27.4 / vB - (Bt.hand === 'L' ? 0.08 : 0) - (bb.bunt ? 0.25 : 0);   // 번트는 대면서 바로 뛰어 나감
   const hr = G.hrun ? 1.0 : 0;
   // 주자들: 베이스별 출발 (리드 3미터, 히트 앤드 런이면 먼저 뜀)
-  const runners = [0, 1, 2].filter(i => bases[i] != null).map(i => ({ i, id: bases[i], v: runV2(T.bat[bases[i]].spd) + [0, 0.05, 0.35][G.easy || 0], lead: 0.1 - (i === 0 ? hr : 0) }));
+  const runners = [0, 1, 2].filter(i => bases[i] != null).map(i => ({ i, id: bases[i], v: runV2(T.bat[bases[i]].spd) + runQ(T.bat[bases[i]]) + [0, 0.05, 0.35][G.easy || 0], lead: 0.1 - (i === 0 ? hr : 0) }));
 
   // ---------- 땅볼 ----------
   // 번트: 투수·포수·1루수·3루수가 달려 나와 잡음. 번트가 예상되면(주자 있고 2아웃 전, 전진 수비) 1·3루수가 미리 앞으로
@@ -143,7 +145,7 @@ function simPlay0(G, bb, opt = {}){
     call.push({ t: catcher.t, out:true, catch:true });
     res.outs = 1; res.bat = 0; res.kind = bb.type === 'pu' ? 'pu' : bb.type === 'ld' ? 'lo' : 'fo'; res.dive = dive;
     res.result = catcher.t;
-    tagUps(G, F, res, runners, catcher, bb);
+    tagUps(G, F, res, runners, catcher, bb, opt);
     return res;
   }
   // 떨어짐(또는 다이빙했지만 놓침): 굴러간 뒤 주움
@@ -232,7 +234,7 @@ function simPlay(G, bb, opt = {}){
   const T = batTeam(G);
   res.runners.forEach(x => {
     const id = G.bases[x.from]; if(id == null) return;
-    const v = runV2(T.bat[id].spd) + [0, 0.05, 0.35][G.easy || 0];
+    const v = runV2(T.bat[id].spd) + runQ(T.bat[id]) + [0, 0.05, 0.35][G.easy || 0];
     if(x.to == null){ x.t = x.tOut; if(x.t0 == null) x.t0 = Math.max(0, x.tOut - (x.back ? 0.6 : (x.at - x.from) * 27.4 / v)); }
     else if(x.to > x.from){ if(!x.t) x.t = (x.to - x.from) * 27.4 / v; if(x.t0 == null) x.t0 = Math.max(0, x.t - (x.to - x.from) * 27.4 / v); }
     else { x.t0 = 0; x.t = 0; }
@@ -353,7 +355,7 @@ function hitPlay(G, F, res, pick, minBase, runners, vB, tB1, opt = {}){
   const throwT = base => { const dd = dist2(Pp, BASE_XY[base]); return tp + 0.55 + dd / f.arm * (dd > 55 ? 1.22 : 1); };
   // 주자별 베이스 도착 시각 (b는 0=1루 … 3=홈)
   const all = [...runners.map(r => ({ ...r })).sort((a, b) => b.i - a.i), { i:-1, bat:true, v: vB, lead:0 }];
-  const vB2 = runV2(curBatter(G).spd) + [0, 0.05, 0.35][G.easy || 0];
+  const vB2 = runV2(curBatter(G).spd) + runQ(curBatter(G)) + [0, 0.05, 0.35][G.easy || 0];
   // 뜬공·직선타가 떨어진 안타: 2아웃 전이면 주자는 잡힐지 몰라 중간쯤(약 11미터)에서 기다렸다가 떨어지는 순간 뜀
   const wait = pick.air != null && G.outs < 2;
   const arr = (r, b) => r.bat ? (b === 0 ? tB1 : tB1 + b * 27.4 / vB2) : Math.max(r.lead + (b - r.i) * 27.4 / r.v - 4 / r.v, wait ? pick.air + 0.2 + ((b - r.i) * 27.4 - 11) / r.v : 0);
@@ -410,8 +412,8 @@ function errorAdvance(res, runners, tB1, tEnd){
   return res;
 }
 // 뜬공 아웃 뒤 태그업 (3루 주자 홈, 깊으면 2루 주자 3루). 히트 앤드 런 직선타면 돌아가지 못해 아웃
-function tagUps(G, F, res, runners, c, bb){
-  const f = F[c.pos];
+function tagUps(G, F, res, runners, c, bb, opt = {}){
+  const f = F[c.pos], cands = [];   // 송구 선택 후보: 태그업해서 더 가려는 주자가 향하는 베이스 (opt.throwTo 하나에만 던지고, -1이면 던지지 않음)
   runners.slice().sort((a, b) => b.i - a.i).forEach(r => {
     let to = r.i;
     if(bb.type === 'ld' && G.hrun && r.i === 0 && G.outs + res.outs < 3){
@@ -422,6 +424,12 @@ function tagUps(G, F, res, runners, c, bb){
       const nb = r.i + 1, mine = c.t + 0.15 + 27.4 / (r.v + 0.3), dd = dist2(c.p, BASE_XY[nb]), thr = c.t + 0.6 + dd / f.arm * (dd > 55 ? 1.22 : 1);
       if(thr - mine + gauss(G) * 0.3 > 0.1){
         to = nb;
+        cands.push({ base: nb, who: r.i, eta: thr, rEta: mine, m: mine - thr });
+        if(opt.throwTo != null && opt.throwTo !== nb){   // 이 베이스로는 던지지 않음: 주자는 그대로 안전하게 감
+          res.call.push({ t: mine, base: nb, out:false }); res.result = Math.max(res.result, mine); r.tagT = mine;
+          if(nb === 3) res.sac = true;
+          res.runners.push({ from: r.i, to, t: r.tagT || 0, t0: to > r.i ? c.t + 0.15 : 0, tag:true }); return;
+        }
         res.ev.push({ k:'ball', t0: c.t + 0.45, t1: thr, from: c.p, to: BASE_XY[nb], h: 3 });
         if(thr < mine){ res.outs++; res.runners.push({ from: r.i, to:null, at: nb, tOut: thr, t0: c.t + 0.15 }); res.call.push({ t: thr, base: nb, out:true }); res.result = Math.max(res.result, thr); return; }
         res.call.push({ t: mine, base: nb, out:false }); res.result = Math.max(res.result, mine); r.tagT = mine;
@@ -431,6 +439,7 @@ function tagUps(G, F, res, runners, c, bb){
     }
     res.runners.push({ from: r.i, to, t: r.tagT || 0, t0: to > r.i ? c.t + 0.15 : 0, tag:true });
   });
+  if(cands.length >= 2 && opt.throwTo == null) res.throwOpts = [...cands.map(c => ({ base: c.base, who: c.who, eta: Math.round(c.eta * 100) / 100, rEta: Math.round(c.rEta * 100) / 100, m: Math.round(c.m * 100) / 100, force:false, dp:false })), { base:-1, who:-1, eta:0, rEta:0, m:0.5, force:false, dp:false }];
 }
 
 /* ---------- 도루·견제 (리드 거리와 시간) ----------
@@ -444,7 +453,7 @@ function stealSim(G, from, o = {}){
   const T = batTeam(G), F = fieldTeam(G), P = curPitcher(G), R = T.bat[G.bases[from]];
   const spd = o.simple ? 55 : R.spd, C = F.bat.find(x => x.pos === 'C') || { def:50 }, cdef = o.simple ? 50 : C.def;
   const lead = runnerLead(G, from, spd) - (o.dbl ? 0.3 : 0);
-  const v = runV2(spd) - 0.5 + [0, 0.02, 0.25][G.easy || 0];
+  const v = runV2(spd) - 0.5 + (o.simple ? 0 : runQ(R)) + [0, 0.02, 0.25][G.easy || 0];
   const jump = 0.26 + gauss(G) * 0.1 - (o.breaking ? 0.04 : 0);
   const tR = jump + (27.4 - lead) / v;
   const vel = o.vel || 145, loc = o.loc || { x:0, y:0 };

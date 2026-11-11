@@ -45,6 +45,7 @@ function careerNew(){
     for(const k in m) p[k] = clamp(p[k] + m[k], 25, 90);
   }
   p.name = NEWC.name; p.age = 20; p.rookie = true; p.cond = 0;
+  if(!NEWC.pit) p.trait = { glove:['range'], speed:['quick'], power:['arm'], contact:[] }[NEWC.type] || [];   // 유형에 맞는 포지션 특기
   ensureGrowth(L, p);
   L.mv = 2;   // 새 저장 형식 (성장 유형·피로·계약·장비 상태가 처음부터 있음)
   L.career = { v:CAREER_V, id:p.id, p, where:'minor', pit:NEWC.pit, type:NEWC.type, pts:{}, fame:0, trained:-1, minor:{}, ach:[], hurt:0, slump:0, money:300, salary:3000, equip:{}, goods:{ drink:1 }, owned:[], fatigue:0, gs:{}, applied:{}, contract:{ years:1, salary:3000, bonus:0, until:L.season, team:L.my } };
@@ -98,6 +99,7 @@ function careerStatus(L){
   const c = C(L), p = myP(L), T = L.teams[L.my], out = [];
   const where = c.hurt > 0 ? `부상 중, ${c.hurt}일 뒤 돌아옴` : c.where === 'minor' ? '퓨처스리그(2군)' : isPit(p) ? `1군 ${p.role}` : `1군 주전 ${T.bat.indexOf(p) + 1}번 타자`;
   out.push(`${p.name}, ${p.age}세, ${teamInfo(L.my).name} ${isPit(p) ? '투수' : POS[p.pos]}. ${where}. 인기 ${c.fame}.`);
+  if(!isPit(p)) out.push(`특기: ${traitText(p)}.`);
   out.push(isPit(p) ? `능력치: 구속 ${p.vel}, 제구 ${p.ctl}, 구위 ${p.stf}, 체력 ${p.sta}. 컨디션 ${COND[p.cond]}.` : `능력치: 컨택 ${p.con}, 파워 ${p.pow}, 선구안 ${p.eye}, 스피드 ${p.spd}, 수비 ${p.def}. 컨디션 ${COND[p.cond]}.`);
   const s = p.ss || {}, m = c.minor || {};
   if(c.where !== 'minor') out.push(isPit(p) ? `이번 시즌 1군: ${pitLine(p).replace(/^[^:]+: /, '')}` : `이번 시즌 1군: ${batLine(p).replace(/^[^:]+: /, '')}`);
@@ -263,7 +265,7 @@ function interview(L, p, what){
 // 날이 지날 때: 슬럼프·부상, 1군 승격
 function careerAfterDay(L){
   const c = C(L), p = myP(L), out = [];
-  addFatigue(c, -4);   // 하루 쉬면 조금 풀림
+  addFatigue(c, -4 - 2 * (c.home || 0));   // 하루 쉬면 조금 풀림 (좋은 집일수록 더)
   if(c.hurt > 0){ c.hurt--; if(!c.hurt){ heal(p, c); out.push('부상에서 돌아왔습니다!'); } }
   else if(rnd(L) < injuryChance(c)){ const m = injure(L, p, c); out.push(`아, 경기 중에 몸을 다쳤습니다. ${m}`); crLog(L, `${p.name}, 부상으로 ${c.hurt}일 쉼.`); }
   else if(rnd(L) < 0.02){ p.cond = -2; out.push('요즘 슬럼프입니다. 몸이 무겁습니다. 훈련하거나 푹 쉬어 보세요.'); }

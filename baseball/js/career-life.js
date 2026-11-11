@@ -197,6 +197,7 @@ function visitScreen(msg){
     { n:2, t:'내 가방', s:`장비: ${equipText(L)}`, act: v => go(bagScreen, v) },
     { n:3, t:'팬 사인회', s: lock || '인기와 용돈이 오릅니다. 가끔 피곤해집니다.', act: v => done ? stay(lock) : fanMeet(v) },
     { n:4, t:'특별 코치 레슨 (300만 원)', s: lock || '유명 코치에게 하루 집중 지도를 받아 성장 점수가 크게 오릅니다.', act: v => done ? stay(lock) : go(coachScreen, v) },
+    { n:9, t:`집 구하기 (지금 ${HOMES[c.home || 0][0]})`, s:'큰돈을 들여 더 좋은 집으로 옮기면 날마다 피로가 더 풀립니다.', act: v => go(homeScreen2, v) },
     { n:7, t: c.coach === L.season ? '개인 코치 계약 끝내기' : `개인 코치 고용 (시즌 동안 연봉의 25%, 약 ${won(Math.round(c.salary * 0.25))})`, s: c.coach === L.season ? '더 이상 비용을 내지 않습니다.' : '이번 시즌 동안 훈련 성장 효과가 1.25배가 됩니다. 비용은 날마다 나눠 나갑니다.', act: () => { if(c.coach === L.season){ delete c.coach; saveLeague(); stay('개인 코치 계약을 끝냈습니다.'); } else { c.coach = L.season; saveLeague(); stay('개인 코치를 고용했습니다. 이번 시즌 훈련 효과가 1.25배가 됩니다.'); } } },
     { n:8, t:`기부하기 (연봉의 10%, ${won(Math.round(c.salary * 0.1))})`, s: c.donated === L.season ? '이번 시즌에는 이미 했습니다.' : '인기가 4 오릅니다. 시즌에 한 번.', act: () => { const cost = Math.round(c.salary * 0.1); if(c.donated === L.season){ stay('이번 시즌에는 이미 기부했습니다.'); return; } if(c.money < cost){ stay('돈이 모자랍니다.'); return; } c.money -= cost; c.donated = L.season; c.fame += 4; saveLeague(); stay(`기부했습니다. 인기 4 올라 ${c.fame}.`); } },
     { n:6, t:'휴가 (150만 원)', s: lock || '하루를 통째로 쉽니다. 피로가 크게 풀리고 컨디션이 좋아집니다.', act: v => done ? stay(lock) : vacation(v) },
@@ -208,6 +209,15 @@ function vacation(via){
   if(c.money < 150){ stay('돈이 모자랍니다.'); return; }
   c.money -= 150; c.visited = dayKey(L); addFatigue(c, -50); p.cond = Math.min(2, p.cond + 1);
   saveLeague(); go(() => sceneScreen('rest', '휴가'), via, [`하루 푹 쉬고 왔습니다. 피로 ${fatigueWord(c)}, 컨디션 ${COND[p.cond]}.`]);
+}
+// 집: 좋은 집에서 살수록 날마다 피로가 더 풀림. 큰돈이 드는 지출처
+const HOMES = [['숙소', 0], ['작은 아파트', 2000], ['넓은 아파트', 6000], ['단독 주택', 15000]];
+function homeScreen2(){
+  const L = CR(), c = life(L), cur = c.home || 0;
+  return { q:`집을 정합니다. 지금 ${HOMES[cur][0]}. 가진 돈 ${won(c.money)}. 좋은 집일수록 날마다 피로가 더 풀립니다.`, back: v => go(visitScreen, v), opts: HOMES.map(([name, cost], i) => ({ n: i + 1, t: `${name}${i === cur ? ' (지금)' : ''}${cost ? ` ${won(cost)}` : ''}`, s: `날마다 피로 ${4 + i * 2} 회복.${i < cur ? ' 지금보다 낮은 집으로 옮기면 돈은 돌려받지 못합니다.' : ''}`, act: () => {
+    if(i === cur){ stay('이미 살고 있는 집입니다.'); return; }
+    if(i > cur && c.money < cost){ stay('돈이 모자랍니다.'); return; }
+    if(i > cur) c.money -= cost; c.home = i; saveLeague(); stay(`${name}(으)로 옮겼습니다. 가진 돈 ${won(c.money)}.`); } })) };
 }
 function fanMeet(via){
   const L = CR(), c = life(L), p = myP(L);

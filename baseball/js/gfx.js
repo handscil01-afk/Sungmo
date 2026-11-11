@@ -396,6 +396,14 @@ function drawPlayReplay(G, A){
   GX.cam = { x: GX.cam.x + (want.x - GX.cam.x) * 0.12, y: GX.cam.y + (want.y - GX.cam.y) * 0.12 };
   ctx.save(); ctx.translate(-Math.round(GX.cam.x), -Math.round(GX.cam.y));
   bgField(G);
+  // 타구 자취: 홈에서 공이 떨어지는(또는 잡히는) 곳까지 점선을 남기고, 도착하면 X 표시를 끝까지 둠 (방향과 거리를 한눈에)
+  if(balls[0] && balls[0].from && balls[0].to){
+    const b0 = balls[0], k0 = clamp((ts - b0.t0) / Math.max(0.01, b0.t1 - b0.t0), 0, 1), a0 = mw(b0.from), z0 = mw(lerp2(b0.from, b0.to, k0));
+    ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(Math.round(a0.x), Math.round(a0.y)); ctx.lineTo(Math.round(z0.x), Math.round(z0.y)); ctx.stroke(); ctx.setLineDash([]);
+    if(k0 >= 1){ const e = mw(b0.to); ctx.strokeStyle = '#ffeb3b'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(e.x - 4, e.y - 4); ctx.lineTo(e.x + 4, e.y + 4); ctx.moveTo(e.x + 4, e.y - 4); ctx.lineTo(e.x - 4, e.y + 4); ctx.stroke(); }
+    ctx.restore();
+  }
   const people = [];
   // 수비수: 기록된 길(반응 → 전력 질주 → 기다림). 움직이는 쪽을 바라봄
   const Fs = fieldersOf(G), holds = (ps.ev || []).filter(e => e.k === 'catch' || e.k === 'field' || e.k === 'pickup');

@@ -972,13 +972,15 @@ function inPlay(G, o){
   if(type === 'fb'){ bb.d = opt.wall ? fence - 1 : d; bb.hang = 2.1 + bb.d / 46; }
   const rng0 = G.rng, r = simPlay(G, bb, opt), info = { d, raw, wind, fence, fi };
   // 송구 선택: 사람이 수비하고 던질 곳이 둘 이상이면 잡은 순간에 멈추고 묻음. 같은 난수로 고른 곳을 다시 계산함(resolveThrow)
-  if((type === 'gb' || r.kind === 'hit') && !opt.hr && r.throwOpts && r.throwOpts.length >= 2 && askThrow(G)){
+  if(!opt.hr && r.throwOpts && r.throwOpts.length >= 2 && askThrow(G)){
     G.rng = rng0;
     const who = fielder(F, r.pos);
-    G.pendingThrow = { kind: r.kind === 'hit' ? 'hit' : 'gb', opts: r.throwOpts, pos: r.pos, who, auto: r.tgt ?? -1, bb, opt, fi, info, hrun: !!G.hrun, fx: G.fx.splice(0), evs: (G.evs || []).splice(0), n: G.anim ? G.anim.n : 0 };
+    // auto: 컴퓨터가 고르는 곳. 태그업(뜬공)은 주자마다 따로 판단해서 하나로 정해지지 않으므로 null (고르지 않으면 지금까지처럼 컴퓨터가 알아서)
+    const pk = r.kind === 'hit' ? 'hit' : r.kind === 'fo' || r.kind === 'lo' ? 'tag' : 'gb';
+    G.pendingThrow = { kind: pk, opts: r.throwOpts, pos: r.pos, who, auto: pk === 'tag' ? null : (r.tgt ?? -1), bb, opt, fi, info, hrun: !!G.hrun, fx: G.fx.splice(0), evs: (G.evs || []).splice(0), n: G.anim ? G.anim.n : 0 };
     if(G.anim) G.anim.n--;   // 이 공의 그림·소리·중계는 고른 뒤에 한꺼번에 (그림이 먼저 끝까지 가 버리지 않게)
     (G.evs ||= []).push({ k:'throwq', pos: r.pos, who, opts: r.throwOpts.map(o => o.base) });   // (이 함수 안에서 ev는 타구 힘이라 ev()를 못 씀)
-    emit(G, r.kind === 'hit' ? `${head} ${ga(who)} 공을 잡았습니다! 주자들이 더 가려고 합니다. 어디로 던질까요?` : `${head} 땅볼 타구가 ${who}에게 갑니다! 잡았습니다. 어디로 던질까요?`, 'r');
+    emit(G, pk === 'tag' ? `${head} ${ga(who)} 공을 잡았습니다! 주자들이 태그업해서 더 가려고 합니다. 어디로 던질까요?` : r.kind === 'hit' ? `${head} ${ga(who)} 공을 잡았습니다! 주자들이 더 가려고 합니다. 어디로 던질까요?` : `${head} 땅볼 타구가 ${who}에게 갑니다! 잡았습니다. 어디로 던질까요?`, 'r');
     return;
   }
   playOrReview(G, bb, r, fi, head, info);

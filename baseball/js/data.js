@@ -115,3 +115,19 @@ const EDGE = {
   edge: { name:'구석에 걸치게', sub:'치기 어렵지만 제구가 흔들리면 볼이 됩니다.' },
   out:  { name:'존 밖으로 빼기', sub:'유인구. 볼이 되기 쉽지만 헛스윙을 노립니다.' },
 };
+
+/* 포지션 특기(trait): 선수마다 0~2개. 야수의 강한 어깨(송구 속도), 넓은 수비 범위(달리는 속도), 누구나 빠른 발(주루).
+   저장된 선수에게 없으면 이름·번호로 정해서(난수를 쓰지 않아 경기 결과의 흐름은 그대로) 한 번 적어 둠. 육성 선수는 유형에 맞춰 처음부터 가짐 */
+const TRAIT_NAME = { arm:'강한 어깨', range:'넓은 수비 범위', quick:'빠른 발' };
+const TRAIT_ARM_POS = ['C', '3B', 'SS', 'LF', 'CF', 'RF'], TRAIT_RANGE_POS = ['2B', 'SS', '3B', 'LF', 'CF', 'RF'];
+function traitsOf(p){
+  if(!p || p.vel) return [];
+  if(p.trait) return p.trait;
+  let h = 7; for(const ch of `${p.id}|${p.name}|${p.pos}`) h = (h * 31 + ch.charCodeAt(0)) % 100003;
+  const t = [];
+  if(TRAIT_ARM_POS.includes(p.pos) && h % 100 < 14) t.push('arm');
+  if(TRAIT_RANGE_POS.includes(p.pos) && (h >> 3) % 100 < 14) t.push('range');
+  if(t.length < 2 && (h >> 6) % 100 < ((p.spd || 50) >= 60 ? 20 : 8)) t.push('quick');
+  return p.trait = t;
+}
+const traitText = p => traitsOf(p).map(k => TRAIT_NAME[k]).join(', ') || '없음';

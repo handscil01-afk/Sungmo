@@ -54,7 +54,7 @@ function aiBat(G, order){
   if(canSteal(G) && b < 3 && s < 2){
     const r = bs[1] != null && bs[2] == null ? bs[1] : bs[0];
     const R = T.bat[r];
-    if(R && R.spd >= 66 && rnd(G) < 0.09 * S.steal * (R.spd - 58) / 20) return { k:'steal', g:null };
+    if(R && R.spd >= 66 && rnd(G) < 0.06 * S.steal * (R.spd - 58) / 20) return { k:'steal', g:null };
   }
   // 희생 번트: 무사, 1·2루 주자, 3루 빔, 힘이 약한 타자, 접전
   if(s < 2 && G.outs === 0 && (bs[0] != null || bs[1] != null) && bs[2] == null && B.pow < 55 && closeGame(G) && rnd(G) < 0.10 * S.bunt) return { k:'bunt', g:null };
