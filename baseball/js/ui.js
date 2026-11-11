@@ -103,7 +103,7 @@ function render(){
     bs.hidden = false;
     const keep = SET.view === 'gfx' && typeof gfxRender === 'function' && bs.querySelector('.gfxwrap');
     bs.innerHTML = boardHTML();
-    if(SET.view === 'gfx' && typeof gfxRender === 'function'){ if(keep) bs.prepend(keep); gfxRender(G, UI.lastFx || [], UI.lastLines || []); UI.lastFx = []; UI.lastLines = []; }
+    if(SET.view === 'gfx' && typeof gfxRender === 'function'){ if(keep) bs.prepend(keep); gfxRender(G, UI.lastFx || [], UI.lastLines || [], UI.lastEv || []); UI.lastFx = []; UI.lastLines = []; UI.lastEv = []; }
   }
   else if(S.scene && SET.view === 'gfx' && typeof gfxScene === 'function'){ bs.hidden = false; gfxScene(bs, S.scene); }
   else { bs.hidden = true; bs.innerHTML = ''; if(typeof GX !== 'undefined') GX.scene = null; }

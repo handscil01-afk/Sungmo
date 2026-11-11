@@ -590,23 +590,23 @@ function drawCard(A){
 }
 
 /* ---------- 움직임 ---------- */
-// 결과 글씨: 이번에 생긴 효과음 사건과 중계 문장으로 정함
-function bannerOf(fx, text){
-  const has = n => fx.includes(n);
-  if(G && G.over) return [G.walkoff ? '끝내기!' : '게임 셋!', PAL.ink, has('hr')];
-  if(has('hr')) return ['홈런!', PAL.red, true];
-  if(/트리플 플레이/.test(text)) return ['트리플 플레이!', PAL.red];
-  if(/실책/.test(text)) return ['실책!', PAL.red];
-  if(/병살/.test(text)) return ['병살!', '#3cbcfc'];
-  if(has('b3')) return ['3루타!', PAL.ink]; if(has('b2')) return ['2루타!', PAL.ink]; if(has('hit')) return ['안타!', PAL.ink];
-  if(has('k')) return ['삼진!', '#3cbcfc']; if(has('ball')) return ['볼넷', '#58d854']; if(has('out')) return ['아웃!', '#3cbcfc'];
-  if(fx.some(n => /^whiff/.test(n))) return ['헛스윙!', '#f8b800']; if(has('foul')) return ['파울', PAL.white];
-  if(has('strike')) return ['스트라이크!', '#f8b800']; if(has('ballc')) return ['볼', '#58d854']; if(has('safe')) return ['세이프!', PAL.ink];
+// 결과 글씨: 이번 결과의 사건 목록(engine.js의 ev)으로 정함. 문장을 읽지 않음
+function bannerOf(evs){
+  const pa = r => evs.some(e => e.k === 'pa' && e.r === r), call = c => evs.some(e => e.k === 'call' && e.c === c), pl = evs.find(e => e.k === 'play');
+  if(G && G.over) return [G.walkoff ? '끝내기!' : '게임 셋!', PAL.ink, pa('hr')];
+  if(pa('hr')) return ['홈런!', PAL.red, true];
+  if(pl && pl.kind === 'err') return ['실책!', PAL.red];
+  if(pl && pl.kind === 'dp') return ['병살!', '#3cbcfc'];
+  if(pa('b3')) return ['3루타!', PAL.ink]; if(pa('b2')) return ['2루타!', PAL.ink]; if(pa('b1')) return ['안타!', PAL.ink];
+  if(pa('k')) return ['삼진!', '#3cbcfc']; if(pa('bb')) return ['볼넷', '#58d854']; if(pa('out')) return ['아웃!', '#3cbcfc'];
+  if(call('whiff')) return ['헛스윙!', '#f8b800']; if(call('foul')) return ['파울', PAL.white];
+  if(call('strike')) return ['스트라이크!', '#f8b800']; if(call('ball')) return ['볼', '#58d854']; if(pa('safe')) return ['세이프!', PAL.ink];
   return null;
 }
 // 새 투구·새 플레이가 있으면 차례대로 보여 줌 (투구 → 도루·견제·판독)
-function gfxStart(G, fx, lines, pre, skip){
-  const now = performance.now(), text = (lines || []).map(l => l.s || l).join(' ');
+function gfxStart(G, fx, lines, pre, skip, evs){
+  const now = performance.now();
+  evs = evs || [];
   // skip: 육성 모드에서 내 차례 뒤 다음 내 차례까지 건너뜀. 내 공(skip.snap.anim)만 보여 주고, 건너뛴 장면 대신 '건너뜀' 카드
   const A0 = skip ? skip.snap.anim : G.anim, P0 = skip ? skip.snap.play : G.play;
   const newPitch = !!(A0 && A0.n !== GX.lastAnimN);
@@ -618,8 +618,8 @@ function gfxStart(G, fx, lines, pre, skip){
     document.documentElement.classList.add('gfxhold');   // 결과 글은 공을 잡거나 떨어질 때 보여 줌
     if(G.over) document.documentElement.classList.add('gfxholdall');   // 마지막 공: 잡히기 전에는 '경기가 끝났습니다'와 선택지도 숨김
     // 도루·견제의 세이프·아웃은 뒤의 베이스 장면에서 보여 줌
-    const pfx = newPlay && A0.res !== 'inplay' ? fx.filter(n => n !== 'safe' && n !== 'out') : fx;
-    let bn = bannerOf(pfx, text);
+    const pfx = newPlay && A0.res !== 'inplay' ? evs.filter(e => !(e.k === 'pa' && (e.r === 'safe' || e.r === 'out'))) : evs;
+    let bn = bannerOf(pfx);
     if(A0.res === 'hbp') bn = ['몸에 맞는 공', '#58d854'];
     list.push({ kind:'pitch', ...A0, tl: playTL(A0, pfx), view: skip ? skip.snap : null, ph:'windup', t0:0, banner: bn && bn[0], bannerColor: bn && bn[1], hr: bn && bn[2], jit: (Math.random() - 0.5) * 0.3 });
   }
@@ -633,8 +633,8 @@ function gfxStart(G, fx, lines, pre, skip){
   if(skip){ list.push({ kind:'card', mode:'skip', from: skip.from }); }
   // 공수 교대·경기 끝: 이닝별 점수판 카드를 이어서 보여 줌
   else if(G.over && GX.overShown !== G.at){ GX.overShown = G.at; list.push({ kind:'card', mode:'end' }); }
-  else if((fx || []).includes('change')) list.push({ kind:'card', mode:'change' });
-  if(!list.length){ const bn = bannerOf(fx || [], text); if(bn) list.push({ kind:'banner', ph:'result', t0:1, banner: bn[0], bannerColor: bn[1], hr: bn[2] }); }
+  else if(evs.some(e => e.k === 'inning')) list.push({ kind:'card', mode:'change' });
+  if(!list.length){ const bn = bannerOf(evs); if(bn) list.push({ kind:'banner', ph:'result', t0:1, banner: bn[0], bannerColor: bn[1], hr: bn[2] }); }
   if(!list.length) return;
   list.forEach(a => { a.start = now; if(a.kind !== 'card') a.pre = pre; });
   GX.anim = list.shift(); GX.queue = list;
@@ -713,7 +713,7 @@ function gfxSize(){
   if(!GX.raf) GX.raf = requestAnimationFrame(gfxTick);
 }
 // render()가 부름: 화면 모드일 때 상황판 자리에 그림판을 두고, 새 투구·플레이가 있으면 움직임을 시작
-function gfxRender(G, fx, lines){
+function gfxRender(G, fx, lines, evs){
   GX.scene = null;
   const bs = $('#boardSec');
   let wrap = bs.querySelector('.gfxwrap');
@@ -731,7 +731,7 @@ function gfxRender(G, fx, lines){
   if(key !== GX.key){
     const fresh = GX.key && GX.key.split(':')[0] === String(G.at);
     GX.key = key;
-    if(fresh) gfxStart(G, fx || [], lines, GX.lastSnap, UI.lastSkip);
+    if(fresh) gfxStart(G, fx || [], lines, GX.lastSnap, UI.lastSkip, evs);
     else { GX.lastAnimN = G.anim ? G.anim.n : null; GX.lastPlayN = G.play ? G.play.n : null; GX.anim = null; GX.queue = []; }
   }
   GX.lastSnap = snapOf(G);   // 다음 움직임에서 '던지기 전 상태'로 씀

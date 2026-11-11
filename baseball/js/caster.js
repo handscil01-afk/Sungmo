@@ -54,7 +54,7 @@ function castPlay(ids, at = 0){
 // 지난 중계가 아직 남아 있으면 끊고 지금 장면부터 (빠르게 진행해도 중계가 밀리지 않게)
 function castDur(id){ const b = CAST.buf[id]; return b ? b.duration + 0.08 : 0.7; }
 // 중계하지 않은 결과(건너뛰기·중계 끔)도 '이미 본 것'으로 적어 둠: 나중에 옛 견제·판독을 말하지 않게
-function castSeen(){ if(typeof G === 'undefined' || !G) return; if(G.play) CAST.playN = G.play.n; if(G.anim) CAST.animN = G.anim.n; }
+function castSeen(){}   // 예전에는 본 공·플레이 번호를 적어 뒀지만, 이제 결과마다 사건 목록이 따로 오므로 할 일이 없음 (호출하는 곳은 그대로 둠)
 function castStop(){ CAST.src.splice(0).forEach(s => { try{ s.stop(); }catch(e){} }); CAST.until = 0; }
 // 녹음이 있는 조각만 골라서 (아직 녹음하지 않은 새 말은 건너뜀)
 const pick1 = (...ids) => { const have = CAST.idx ? ids.filter(id => CAST.idx[id]) : ids, L = have.length ? have : ids; return L[Math.floor(Math.random() * L.length)]; };
@@ -72,9 +72,17 @@ const teamClip = (T, long) => `team_${T.key}${long ? '' : '_s'}`;
 function castResult(res, opt = {}){
   if(!castOn() || !res || typeof G === 'undefined' || !G) return null;
   castLoadIndex();
-  // 여러 공을 한꺼번에 진행한 결과(맡기기·자동)면 마지막 공의 효과만 보고 판정을 말함 (앞 공의 파울·득점을 섞지 않게)
-  const fxAll = res.fx || [], lastP = fxAll.lastIndexOf('pitch'), fx = lastP > 0 ? fxAll.slice(lastP) : fxAll;
-  const text = (res.lines || []).map(l => l.s || l).join(' '), has = n => fx.includes(n), hasAll = n => fxAll.includes(n), A = G.anim;
+  // 결과는 글이 아니라 사건 목록(res.events, engine.js의 ev)에서 읽음.
+  // 여러 공을 한꺼번에 진행한 결과(맡기기·자동)면 마지막 공의 사건만 보고 판정을 말함 (앞 공의 파울·득점을 섞지 않게)
+  const evAll = res.events || [], lastP = evAll.map(e => e.k).lastIndexOf('pitch'), evs = lastP > 0 ? evAll.slice(lastP) : evAll;
+  const isE = (list, k, f, v) => list.some(e => e.k === k && (f == null || e[f] === v));
+  const pa = r => isE(evs, 'pa', 'r', r), call = c => isE(evs, 'call', 'c', c);
+  // 예전 효과 이름(fx)과 같은 이름으로 물어볼 수 있게 한 묶음 (이름은 그대로, 읽는 곳은 사건)
+  const has = n => ({ pitch: () => isE(evs, 'pitch'), hit: () => pa('b1'), b2: () => pa('b2'), b3: () => pa('b3'), hr: () => pa('hr'), out: () => pa('out'), safe: () => pa('safe'),
+    k: () => pa('k'), ball: () => pa('bb'), ballc: () => call('ball'), strike: () => call('strike'), foul: () => call('foul'), score: () => isE(evs, 'score'),
+    batBig: () => evs.some(e => e.k === 'contact' && e.big), batF: () => evs.some(e => e.k === 'contact' && e.foul), batter: () => isE(evs, 'batter'), change: () => isE(evs, 'inning') })[n]();
+  const hasAll = n => ({ start: () => evAll.some(e => e.k === 'game' && e.e === 'start'), change: () => isE(evAll, 'inning'), pchange: () => isE(evAll, 'pchange'), batter: () => isE(evAll, 'batter') })[n](), A = G.anim;
+  const whiffed = call('whiff'), pl = evs.find(e => e.k === 'play');
   const plan = [];   // [시각(초), [조각…]] 시각 순서대로
   const at = (t, ...ids) => { ids = ids.flat(3).filter(Boolean); if(ids.length) plan.push([t, ids]); };
   // 경기 시작: 캐스터·해설 소개 (녹음이 있으면), 두 팀, 플레이볼
@@ -84,9 +92,8 @@ function castResult(res, opt = {}){
     at(0, ...hello, teamClip(G.teams[0], true), 'j_vs', teamClip(G.teams[1], true), ...preview, 'playball');
     CAST.score = [0, 0];
   }
-  const fresh = A && A.n !== CAST.animN; if(A) CAST.animN = A.n;
-  const contact = fx.some(n => /^bat/.test(n)), pitched = fresh && (has('pitch') || contact);
-  const tl = pitched ? playTL(A, fx) : null;
+  const contact = evs.some(e => e.k === 'contact' && !e.bunt), pitched = !!A && (has('pitch') || contact);
+  const tl = pitched ? playTL(A, evs) : null;
   let resAt = 0;
   if(pitched){
     // 던질 때: 구종 이름이나 "던졌습니다!" (공을 놓는 순간 끝나게)
@@ -96,7 +103,7 @@ function castResult(res, opt = {}){
     if(A.res === 'inplay' && A.bb){
       const bb = A.bb, fence = (G.park && G.park.fence && G.park.fence[bb.fi]) || 110, ev = (ps && ps.ev) || [];
       const dive = ev.find(e => e.k === 'dive'), caught = ev.find(e => e.k === 'catch');
-      const fly = [ps && ps.bunt ? 'r_bunt' : fx.includes('batBig') ? pick1('c_hit1', 'c_hit2', 'c_hit4', 'c_hit5') : pick1('c_hit3', 'c_soft1', 'c_soft2')];
+      const fly = [ps && ps.bunt ? 'r_bunt' : has('batBig') ? pick1('c_hit1', 'c_hit2', 'c_hit4', 'c_hit5') : pick1('c_hit3', 'c_soft1', 'c_soft2')];
       if(!(ps && ps.bunt)){
         fly.push(bb.type === 'gb' ? pick1('c_ground1', 'c_ground2') : bb.type === 'ld' ? 'c_liner' : pick1('c_high1', 'c_high2'));
         fly.push(['c_left', 'c_center', 'c_right'][bb.fi ?? 1]);
@@ -116,10 +123,10 @@ function castResult(res, opt = {}){
       let used = 0;
       fly.forEach((id, i) => { const d = castDur(id); if(i === 0 || used + d <= room){ fit.push(id); used += d; } });
       at(tl.contact, fit);
-      const post = [];
-      const pk = ps ? ps.kind : (/병살/.test(text) ? 'dp' : /실책/.test(text) ? 'err' : '');
+      const post = [], dpFallback = !pl && isE(evs, 'play', 'kind', 'dp');
+      const pk = pl ? pl.kind : ps ? ps.kind : (dpFallback ? 'dp' : '');
       if(pk === 'dp' || pk === 'ldp') post.push(pick1('r_dp', 'r_dp2'));
-      else if(pk === 'err') post.push(/송구/.test(text) ? 'r_error2' : 'r_error1');
+      else if(pk === 'err') post.push(pl && pl.err === 'throw' ? 'r_error2' : 'r_error1');
       else if(has('hr')){ const on = ps ? (ps.rm || []).filter(m => m.to === 3).length : 0;
         post.push(G.walkoff && CAST.idx && CAST.idx.r_walkoff_hr ? 'r_walkoff_hr' : on >= 3 ? 'r_hr_grand' : pick1('r_hr1', 'r_hr2', 'r_hr3', 'r_hr4', 'r_hr5', 'r_hr6'));
         if(on === 1 || on === 2) post.push(CAST.idx && CAST.idx[on === 1 ? 'r_hr_two' : 'r_hr_three'] ? (on === 1 ? 'r_hr_two' : 'r_hr_three') : null); }
@@ -145,7 +152,7 @@ function castResult(res, opt = {}){
       const call = [];
       if(has('batF') || has('foul')){ resAt = tl.contact + 0.35; call.push(has('out') ? 'r_catch1' : pick1('r_foul1', 'r_foul2', 'r_foul3', 'r_foul4', 'r_foul5')); }
       else if(has('k')) call.push(A.res === 'whiff' ? pick1('r_k_swing', 'r_k_swing2') : 'r_k_look');
-      else if(fx.some(n => /^whiff/.test(n))) call.push(pick1('r_whiff1', 'r_whiff2', 'r_whiff3', 'r_whiff4'));
+      else if(whiffed) call.push(pick1('r_whiff1', 'r_whiff2', 'r_whiff3', 'r_whiff4'));
       else if(A.res === 'hbp') call.push('r_hbp');
       else if(has('ball')) call.push(pick1('r_walk', 'r_walk2'));
       else if(has('strike')) call.push(pick1('r_strike1', 'r_strike2', 'r_strike3', 'r_strike4'));
@@ -156,12 +163,11 @@ function castResult(res, opt = {}){
     }
   }
   // 도루·견제·판독 (공이 미트에 들어간 뒤)
-  // 이번 결과에서 새로 일어난 플레이만: 이 공에서 일어났으면 공이 미트에 들어간 뒤, 이 공 전(견제)이나 공 없이(판독 결과)면 맨 앞
-  const P = G.play;
-  const freshPlay = P && P.n !== CAST.playN && (A ? (P.an === A.n || (fresh && P.an === A.n - 1) || !fresh) : true);
-  if(P) CAST.playN = P.n;
-  if(freshPlay){
-    const t = tl && P.an === A.n ? tl.contact + 0.2 : 0;
+  // 이번 결과의 사건에 들어 있는 플레이만: 이 공을 던진 뒤에 일어났으면 공이 미트에 들어간 뒤, 던지기 전(견제)이나 공 없이(판독 결과)면 맨 앞
+  const kinds = evAll.map(e => e.k), pIdx = Math.max(kinds.lastIndexOf('steal'), kinds.lastIndexOf('pick'), kinds.lastIndexOf('review'), kinds.lastIndexOf('reviewEnd'), kinds.lastIndexOf('wp'));
+  const P = pIdx >= 0 ? evAll[pIdx] : null;
+  if(P){
+    const t = tl && pIdx > kinds.lastIndexOf('pitch') ? tl.contact + 0.2 : 0;
     if(P.k === 'steal') at(t, 'r_steal_go', P.safe ? pick1('r_steal_safe', 'r_steal_safe2') : 'r_steal_out', P.safe ? ana(0.4, 'a_run1', 'a_run2') : null);
     else if(P.k === 'pick') at(t, 'r_pickoff', P.safe ? 'r_safe1' : 'r_steal_out');
     else if(P.k === 'review') at(t, 'r_review', ana(0.5, 'a_review1', 'a_watch'));
@@ -178,8 +184,8 @@ function castResult(res, opt = {}){
     else if(caught && (caught.dive || caught.far)) line = ana(0.95, 'a_def1', 'a_def2', 'a_def3', 'a_wow');
     else if(has('b2') || has('b3')) line = ana(0.85, 'a_hit1', 'a_hit2', 'a_hit3', 'a_run1');
     else if(has('hit')) line = ana(0.7, 'a_hit1', 'a_hit2', 'a_hit3', 'a_yes3');
-    else if(ps && (ps.kind === 'dp' || ps.kind === 'ldp')) line = ana(0.9, 'a_dp1', 'a_dp2');
-    else if(ps && ps.kind === 'err') line = ana(0.9, 'a_error1', 'a_error2');
+    else if(pl && (pl.kind === 'dp' || pl.kind === 'ldp')) line = ana(0.9, 'a_dp1', 'a_dp2');
+    else if(pl && pl.kind === 'err') line = ana(0.9, 'a_error1', 'a_error2');
     else if(has('k')) line = ana(0.65, 'a_k1', 'a_k2', 'a_k3', A.res === 'whiff' ? 'a_whiff1' : 'a_pitch_good');
     else if(has('ball')) line = ana(0.7, 'a_walk1', 'a_walk2', 'a_ball2', 'a_ball1');
     else if(has('out') && A.res === 'inplay') line = ana(0.55, 'a_out1', 'a_out2', 'a_out3', A.bb && A.bb.type === 'gb' ? 'a_gb1' : 'a_fly1', 'a_dp2');
@@ -187,7 +193,7 @@ function castResult(res, opt = {}){
     else if(has('ballc') && G.balls === 3 && G.strikes === 2) line = ana(0.8, 'a_full1', 'a_full2');
     else if(has('ballc') && G.balls >= 2) line = ana(0.35, 'a_ball1', 'a_ball2');
     else if(has('ballc')) line = ana(0.2, 'a_ball1', 'a_ball2', 'a_watch');
-    else if(has('strike') || fx.some(n => /^whiff/.test(n))) line = ana(0.25, 'a_pitch_good', 'a_k3', fx.some(n => /^whiff/.test(n)) ? 'a_whiff1' : 'a_k2', 'a_yes3');
+    else if(has('strike') || whiffed) line = ana(0.25, 'a_pitch_good', 'a_k3', whiffed ? 'a_whiff1' : 'a_k2', 'a_yes3');
     else if(has('batF') || has('foul')) line = ana(0.15, 'a_foul2', 'a_watch');
     // 투수가 많이 던졌으면 가끔 체력 이야기
     if(!line && curPitcher(G).n >= 80) line = ana(0.12, 'a_tired1', 'a_tired2');

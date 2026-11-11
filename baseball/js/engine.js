@@ -53,9 +53,21 @@ function emit(G, s, k = 'p'){
   if(G.log.length > 1500) G.log.splice(0, G.log.length - 1500);
   G.out.push(e);
 }
-function fx(G, ...names){ G.fx.push(...names); }
-// 이번 선택으로 생긴 문장과 효과음을 꺼냄
-function flush(G){ const r = { lines: G.out, fx: G.fx }; G.out = []; G.fx = []; return r; }
+/* 사건 목록: 결과를 글(emit)·효과 이름(fx)과 별도로, 읽는 쪽이 글을 해석하지 않아도 되게 구조로 남김.
+   종류(k): game(e: start·end) pitch call(c: strike·ball·whiff·foul) contact(big·foul·bunt) pa(r: k·bb·hbp·b1·b2·b3·hr·out·safe)
+            play(타구 하나의 결과: kind·pos·who·hitBases·err …) score(n·walkoff) inning pchange sub batter review reviewEnd steal pick wp
+   fx 이름은 호환을 위해 그대로 두고, 같은 이름이 나올 때 대응하는 사건도 함께 쌓음. 데이터가 더 필요한 곳은 ev()로 직접 넣음. */
+const FX_EV = { pitch:{ k:'pitch' }, strike:{ k:'call', c:'strike' }, ballc:{ k:'call', c:'ball' },
+  foul:{ k:'call', c:'foul' }, k:{ k:'pa', r:'k' }, ball:{ k:'pa', r:'bb' }, batter:{ k:'batter' }, pchange:{ k:'pchange' }, sub:{ k:'sub' },
+  bat:{ k:'contact', big:false }, batBig:{ k:'contact', big:true }, batF:{ k:'contact', foul:true }, bunt:{ k:'contact', bunt:true },
+  hit:{ k:'pa', r:'b1' }, b2:{ k:'pa', r:'b2' }, b3:{ k:'pa', r:'b3' }, hr:{ k:'pa', r:'hr' }, out:{ k:'pa', r:'out' }, safe:{ k:'pa', r:'safe' } };
+function ev(G, o){ (G.evs ||= []).push(o); }
+function fx(G, ...names){
+  G.fx.push(...names);
+  names.forEach(n => { const e = FX_EV[n] || (/^whiff-/.test(n) ? { k:'call', c:'whiff', kind:n[6] } : null); if(e) ev(G, { ...e }); });
+}
+// 이번 선택으로 생긴 문장·효과음·사건을 꺼냄
+function flush(G){ const r = { lines: G.out, fx: G.fx, events: G.evs || [] }; G.out = []; G.fx = []; G.evs = []; return r; }
 
 /* ---------- 선수 만들기 ---------- */
 function newName(G){
@@ -183,7 +195,8 @@ function beginGame(G){
     G.teams.forEach(T => { const P = T.pit[T.pi]; emit(G, `${T.short} 선발 투수 ${P.name}${P.cond >= 1 ? ', 몸이 가벼워 보입니다' : P.cond <= -1 ? ', 몸이 조금 무거워 보입니다' : ''}.`, 'n'); });
   }
   emit(G, `1회초, ${A.short}의 공격입니다.`, 'i');
-  fx(G, 'start');
+  fx(G, 'start'); ev(G, { k:'game', e:'start' });
+  G.inningLog = []; halfBegin(G);
   startPA(G);
 }
 const parkOf = G => G.park || parkInfo('star');
@@ -271,11 +284,20 @@ function endPA(G, keep){
   if(G.outs >= 3){ endHalf(G); return; }
   startPA(G);
 }
+// 이닝 기록(inningLog): 초·말마다 득점·안타·볼넷·실책·삼진·병살·잔루를 쌓아, 이닝 끝 중계가 맥락(삼자범퇴인지, 실점했는지)을 보고 말하게 함
+const teamKs = T => T.pit.reduce((s, p) => s + p.st.k, 0);
+function halfBegin(G){ const T = batTeam(G), F = fieldTeam(G); G.hs = { H:T.H, BB:T.BB, E:F.E, K:teamKs(F), dp:0 }; }
+function halfEnd(G){
+  const T = batTeam(G), F = fieldTeam(G), hs = G.hs || { H:0, BB:0, E:0, K:0, dp:0 };
+  const e = { inning:G.inning, top:G.top, runs:T.R[G.inning - 1] || 0, hits:T.H - hs.H, walks:T.BB - hs.BB, errors:F.E - hs.E, ks:teamKs(F) - hs.K, dp:hs.dp, lob:G.bases.filter(x => x != null).length };
+  (G.inningLog ||= []).push(e); ev(G, { k:'inning', ...e }); if(G.hs) G.hs.done = true;
+  return e;
+}
 function endHalf(G){
   const T = batTeam(G);
   if(T.R[G.inning - 1] == null) T.R[G.inning - 1] = 0;
   emit(G, `3아웃. ${halfName(G)} 끝. ${scoreText(G)}.`, 'i');
-  fx(G, 'change');
+  halfEnd(G); fx(G, 'change');
   const a = runsOf(G.teams[0]), h = runsOf(G.teams[1]);
   if(G.top){
     if(G.inning >= G.innings && h > a){ gameOver(G); return; }
@@ -286,7 +308,7 @@ function endHalf(G){
     G.top = true; G.inning++;
     if(G.inning > G.innings) emit(G, '동점이라 연장전에 들어갑니다.', 'i');
   }
-  G.outs = 0; G.bases = [null, null, null]; G.half++;
+  G.outs = 0; G.bases = [null, null, null]; G.half++; halfBegin(G);
   const pk = parkOf(G);
   if(detailed(G) && !pk.dome && rnd(G) < pk.change){
     const before = windText(G);
@@ -300,6 +322,7 @@ function endHalf(G){
 }
 function gameOver(G){
   G.over = true;
+  if(G.hs && !G.hs.done) halfEnd(G);   // 끝내기처럼 3아웃 없이 끝난 마지막 초·말도 이닝 기록에 넣음
   const [A, H] = G.teams, a = runsOf(A), h = runsOf(H);
   if(!G.top && H.R[G.inning - 1] == null) H.R[G.inning - 1] = 0;
   G.winner = a > h ? 0 : h > a ? 1 : -1;
@@ -317,7 +340,7 @@ function gameOver(G){
     if(used.length === 1) feat(G, perfect ? 'perfect' : 'nohit', `대기록! ${T.short} ${used[0].name}, ${perfect ? '퍼펙트게임' : '노히트 노런'}을 달성했습니다!`, used[0], T);
     else feat(G, 'teamnohit', `대기록! ${T.short} 투수진이 이어 던져 ${perfect ? '팀 퍼펙트게임' : '팀 노히트 노런'}을 합작했습니다!`, null, T);
   });
-  fx(G, 'end');
+  fx(G, 'end'); ev(G, { k:'game', e:'end', walkoff:!!G.walkoff, winner:G.winner });
 }
 
 // 승리·패전·세이브·홀드 투수 (간단히 한 KBO 규칙)
@@ -353,6 +376,7 @@ function scoreRuns(G, list, rbi){
   emit(G, `${names} 홈인! ${list.length > 1 ? list.length + '점' : '1점'}. ${scoreText(G)}.`, 'r');
   fx(G, 'score');
   if(!G.top && G.inning >= G.innings && runsOf(G.teams[1]) > runsOf(G.teams[0])) G.walkoff = true;
+  ev(G, { k:'score', n:list.length, rbi:!!rbi, walkoff:!!G.walkoff });
   // 앞서는 팀이 바뀌면 승리·패전 투수 후보를 기록 (그때 마운드에 있던 두 팀 투수)
   const lead = runsOf(G.teams[0]) - runsOf(G.teams[1]), leader = lead > 0 ? 0 : lead < 0 ? 1 : -1;
   if(leader !== G.leader){
@@ -525,7 +549,7 @@ const flipCall = c => ({ out:'safe', safe:'out', hr:'2b', '2b':'hr' })[c];
 const callWord = c => ({ out:'아웃', safe:'세이프', hr:'홈런', '2b':'2루타' })[c];
 const reviewLeft = (G, side) => G.teams[side].rev ?? 2;
 // 화면 모드 그림용 플레이 기록 (도루·견제·비디오 판독). n이 늘어날 때마다 그림이 그 장면을 보여 줌
-function markPlay(G, o){ G.playN = (G.playN || 0) + 1; G.play = { n: G.playN, an: G.anim ? G.anim.n : 0, ...o }; }   // an: 그때의 공 번호 (중계가 언제 말할지 정함)
+function markPlay(G, o){ G.playN = (G.playN || 0) + 1; G.play = { n: G.playN, an: G.anim ? G.anim.n : 0, ...o }; ev(G, { ...o }); }   // an: 그때의 공 번호 (중계가 언제 말할지 정함)
 function openReview(G, R){ G.review = R; emit(G, R.say, 'r'); fx(G, 'review'); markPlay(G, { k:'review', rk: R.kind, call: R.call, base: R.data && (R.data.base ?? R.data.from) }); }
 function resolveReview(G, challenge){
   const R = G.review; if(!R) return flush(G);
@@ -944,6 +968,33 @@ function setAnimPlay(G, bb, r, fi){
 }
 // 계산한 플레이를 경기에 반영하고 중계 문장을 만듦
 const BASE_TO = ['1루로', '2루로', '3루로', '홈으로'];
+// 타구 결과 사건(play)을 문장으로. 글·중계·소리가 같은 사건에서 나오게 하려고 applyPlay의 문장 만들기를 옮겨 온 것
+function describePlay(e){
+  const who = e.who, dirW = e.dirW, outW = () => `${e.o}아웃.`;
+  switch(e.kind){
+    case 'go': if(e.bunt) return `번트, ${ga(who)} 잡아 1루로. 타자 아웃.${e.adv && e.o < 3 ? ' 희생 번트 성공!' : ''} ${outW()}`;
+      return e.pos === '1B' && e.cover !== 'P' ? `땅볼, ${ga(who)} 잡아 직접 1루 베이스를 밟습니다. 아웃. ${outW()}` : e.cover === 'P' ? `땅볼, ${ga(who)} 잡아 베이스 커버를 들어온 투수에게 토스! 아웃. ${outW()}` : `땅볼, ${ga(who)} 잡아 1루로 송구. 아웃. ${outW()}`;
+    case 'ifh': return e.bunt ? `번트가 절묘하게 굴러갑니다. ${ga(who)} 잡아 1루로 던지지만 세이프! 번트 안타.` : `땅볼, ${ga(who)} 잡아 1루로 던지지만 타자가 먼저 들어갑니다. 세이프! 내야 안타.`;
+    case 'dp': return `${e.bunt ? '번트' : '땅볼'}, ${ga(who)} 잡아 ${BASE_TO[e.tgt]}, 다시 1루로. 병살! ${outW()}`;
+    case 'fc': return e.outs ? `${e.bunt ? '번트' : '땅볼'}, ${ga(who)} 잡아 ${BASE_TO[e.tgt]} 던집니다. 앞 주자를 잡고, 타자는 1루에 삽니다. ${outW()}`
+      : `${e.bunt ? '번트' : '땅볼'}, ${ga(who)} 잡아 ${BASE_TO[e.tgt]} 던졌지만 세이프! 야수 선택으로 모두 삽니다.`;
+    case 'pu': return e.bunt ? `번트가 떠 버립니다. ${ga(who)} 잡아 아웃. ${outW()}` : `높이 떴습니다. 내야 뜬공, ${ga(who)} 잡습니다. ${outW()}`;
+    case 'lo': return e.dive ? `날카로운 직선 타구! ${who}, 몸을 날려 잡아냅니다! ${outW()}` : `잘 맞은 직선 타구, 그러나 ${who} 정면. 직선타 아웃. ${outW()}`;
+    case 'ldp': return `직선 타구, ${ga(who)} 잡고 1루로! 1루 주자가 돌아가지 못해 더블 플레이! ${outW()}`;
+    case 'fo': return e.dive ? `${josa(dirW, '으로', '로')} 높이 뜬 타구, ${who}, 몸을 날려 잡아냅니다! 호수비! ${outW()}` : e.d >= e.fence - 12 ? `${dirW} 깊숙한 타구, ${ga(who)} 뒤로, 뒤로… 담장 앞에서 잡아냅니다! ${outW()}` : `${josa(dirW, '으로', '로')} 뜬 공, ${ga(who)} 잡습니다. ${outW()}`;
+    case 'hr': {
+      const fl = dirW, dd = e.d;
+      return e.raw < e.fence && e.wind > 0 ? `높이 뜬 타구, ${josa(fl, '으로', '로')} 날아갑니다. 바람을 타고, 타고… 담장을 간신히 넘어갑니다! 홈런! 비거리 ${dd}미터.`
+        : dd >= e.fence + 20 ? `큰 타구! ${fl} 담장을 훌쩍 넘어가는 대형 홈런! 비거리 ${dd}미터.` : dd < e.fence + 4 ? `${fl} 깊숙한 타구, 뒤로, 뒤로… 담장을 살짝 넘어갑니다! 홈런! 비거리 ${dd}미터.` : `큰 타구! ${fl} 담장을 넘어갑니다. 홈런! 비거리 ${dd}미터.`;
+    }
+    case 'err': return e.err === 'drop' ? `${josa(dirW, '으로', '로')} 뜬 공, ${who}, 잡는 듯했지만 공을 떨어뜨립니다! 포구 실책.` : e.err === 'throw' ? `땅볼, ${ga(who)} 잡아 1루로 던졌는데 송구가 빠집니다! 송구 실책으로 타자는 2루까지 갑니다.` : `${who}, 공을 놓칩니다! 포구 실책으로 타자는 1루에 나갑니다.`;
+    default: {   // 안타
+      const wallW = e.wall ? '담장을 맞고 나오는 ' : '';
+      const base = e.tried >= 3 ? `${wallW}타구가 ${dirW} 깊숙이 굴러갑니다. 3루까지! 3루타!` : e.tried === 2 ? `${wallW}타구가 ${dirW}를 가릅니다. 2루까지! 2루타!` : e.type === 'gb' ? `땅볼이 ${dirW === '가운데' ? '투수 옆을' : dirW === '왼쪽' ? '3루수와 유격수 사이를' : '1루수와 2루수 사이를'} 빠져나갑니다. 안타!` : `${ga(who)} 쫓아가지만 앞에 떨어집니다. 안타!`;
+      return base + (e.bat === 0 ? ` 타자 주자는 한 베이스 더 노리다 아웃! ${outW()}` : '') + (e.err ? ' 송구가 빠지는 사이 한 베이스 더 갑니다!' : '');
+    }
+  }
+}
 function applyPlay(G, r, head, info = {}){
   const F = fieldTeam(G), T = batTeam(G), B = curBatter(G), P = curPitcher(G);
   const who = r.pos ? fielder(F, r.pos) : '', dirW = ['왼쪽', '가운데', '오른쪽'][info.fi ?? 1];
@@ -971,34 +1022,13 @@ function applyPlay(G, r, head, info = {}){
   }
   if(r.err) F.E++;
   if(r.outs) addOut(G, r.outs);
-  // 문장
-  const outW = () => `${G.outs}아웃.`;
-  let text;
-  switch(r.kind){
-    case 'go': if(r.bb.bunt){ text = `번트, ${ga(who)} 잡아 1루로. 타자 아웃.${r.runners.some(x => x.to > x.from) && G.outs < 3 ? ' 희생 번트 성공!' : ''} ${outW()}`; break; }
-      text = r.pos === '1B' && r.cover !== 'P' ? `땅볼, ${ga(who)} 잡아 직접 1루 베이스를 밟습니다. 아웃. ${outW()}` : r.cover === 'P' ? `땅볼, ${ga(who)} 잡아 베이스 커버를 들어온 투수에게 토스! 아웃. ${outW()}` : `땅볼, ${ga(who)} 잡아 1루로 송구. 아웃. ${outW()}`; break;
-    case 'ifh': text = r.bb.bunt ? `번트가 절묘하게 굴러갑니다. ${ga(who)} 잡아 1루로 던지지만 세이프! 번트 안타.` : `땅볼, ${ga(who)} 잡아 1루로 던지지만 타자가 먼저 들어갑니다. 세이프! 내야 안타.`; break;
-    case 'dp': text = `${r.bb.bunt ? '번트' : '땅볼'}, ${ga(who)} 잡아 ${BASE_TO[r.tgt]}, 다시 1루로. 병살! ${outW()}`; break;
-    case 'fc': text = r.outs ? `${r.bb.bunt ? '번트' : '땅볼'}, ${ga(who)} 잡아 ${BASE_TO[r.tgt]} 던집니다. 앞 주자를 잡고, 타자는 1루에 삽니다. ${outW()}`
-      : `${r.bb.bunt ? '번트' : '땅볼'}, ${ga(who)} 잡아 ${BASE_TO[r.tgt]} 던졌지만 세이프! 야수 선택으로 모두 삽니다.`; break;
-    case 'pu': if(r.bb.bunt){ text = `번트가 떠 버립니다. ${ga(who)} 잡아 아웃. ${outW()}`; break; }
-      text = `높이 떴습니다. 내야 뜬공, ${ga(who)} 잡습니다. ${outW()}`; break;
-    case 'lo': text = r.dive ? `날카로운 직선 타구! ${who}, 몸을 날려 잡아냅니다! ${outW()}` : `잘 맞은 직선 타구, 그러나 ${who} 정면. 직선타 아웃. ${outW()}`; break;
-    case 'ldp': text = `직선 타구, ${ga(who)} 잡고 1루로! 1루 주자가 돌아가지 못해 더블 플레이! ${outW()}`; break;
-    case 'fo': text = r.dive ? `${josa(dirW, '으로', '로')} 높이 뜬 타구, ${who}, 몸을 날려 잡아냅니다! 호수비! ${outW()}` : info.d >= info.fence - 12 ? `${dirW} 깊숙한 타구, ${ga(who)} 뒤로, 뒤로… 담장 앞에서 잡아냅니다! ${outW()}` : `${josa(dirW, '으로', '로')} 뜬 공, ${ga(who)} 잡습니다. ${outW()}`; break;
-    case 'hr': {
-      const fl = dirW, dd = info.d;
-      text = info.raw < info.fence && info.wind > 0 ? `높이 뜬 타구, ${josa(fl, '으로', '로')} 날아갑니다. 바람을 타고, 타고… 담장을 간신히 넘어갑니다! 홈런! 비거리 ${dd}미터.`
-        : dd >= info.fence + 20 ? `큰 타구! ${fl} 담장을 훌쩍 넘어가는 대형 홈런! 비거리 ${dd}미터.` : dd < info.fence + 4 ? `${fl} 깊숙한 타구, 뒤로, 뒤로… 담장을 살짝 넘어갑니다! 홈런! 비거리 ${dd}미터.` : `큰 타구! ${fl} 담장을 넘어갑니다. 홈런! 비거리 ${dd}미터.`;
-      break;
-    }
-    case 'err': text = r.err.kind === 'drop' ? `${josa(dirW, '으로', '로')} 뜬 공, ${who}, 잡는 듯했지만 공을 떨어뜨립니다! 포구 실책.` : r.err.kind === 'throw' ? `땅볼, ${ga(who)} 잡아 1루로 던졌는데 송구가 빠집니다! 송구 실책으로 타자는 2루까지 갑니다.` : `${who}, 공을 놓칩니다! 포구 실책으로 타자는 1루에 나갑니다.`; break;
-    default: {   // 안타
-      const tried = r.batTried || r.bat, wallW = r.wall ? '담장을 맞고 나오는 ' : '';
-      const base = tried >= 3 ? `${wallW}타구가 ${dirW} 깊숙이 굴러갑니다. 3루까지! 3루타!` : tried === 2 ? `${wallW}타구가 ${dirW}를 가릅니다. 2루까지! 2루타!` : r.bb && r.bb.type === 'gb' ? `땅볼이 ${dirW === '가운데' ? '투수 옆을' : dirW === '왼쪽' ? '3루수와 유격수 사이를' : '1루수와 2루수 사이를'} 빠져나갑니다. 안타!` : `${ga(who)} 쫓아가지만 앞에 떨어집니다. 안타!`;
-      text = base + (r.bat === 0 ? ` 타자 주자는 한 베이스 더 노리다 아웃! ${outW()}` : '') + (r.err ? ' 송구가 빠지는 사이 한 베이스 더 갑니다!' : '');
-    }
-  }
+  // 사건: 타구 하나의 결과를 구조로 남기고, 문장은 이 사건에서 만듦(describePlay). 중계·효과음·그림은 문장이 아니라 이 사건을 읽음
+  const pe = { k:'play', kind:r.kind, pos:r.pos || null, who, dir:info.fi ?? 1, dirW, hitBases:hitN, outs:r.outs || 0, o:G.outs, bunt:!!(r.bb && r.bb.bunt), type: r.bb ? r.bb.type : null,
+    cover:r.cover || null, tgt:r.tgt, dive:!!r.dive, err: r.err ? (r.err.kind || 'misc') : null, tried:r.batTried || r.bat, bat:r.bat, wall:!!r.wall, sac:!!r.sac,
+    adv:r.runners.some(x => x.to > x.from), d:info.d, raw:info.raw, fence:info.fence, wind:info.wind, rm:scored.length };
+  ev(G, pe);
+  if(r.kind === 'dp' || r.kind === 'ldp') (G.hs || {}).dp++;
+  const text = describePlay(pe);
   emit(G, [head, text].filter(Boolean).join(' '), 'r');
   extra.forEach(t => emit(G, t, 'r'));
   if(hitN === 4) fx(G, 'hr'); else if(hitN === 3) fx(G, 'b3'); else if(hitN === 2) fx(G, 'b2'); else if(hitN === 1) fx(G, 'hit');
@@ -1233,7 +1263,7 @@ const ORDER_OFF = { normal:'타자에게 맡기기', aggr:'적극적으로 쳐�
 function playManager(G, D, O){
   if(G.over) return flush(G);
   if(D.k === 'ibb') return playPitch(G, { k:'ibb' }, { k:'take' });
-  const acc = { lines:[], fx:[] }, pa = G.pa, half = G.half;
+  const acc = { lines:[], fx:[], events:[] }, pa = G.pa, half = G.half;
   let first = true, guard = 0;
   while(!G.over && !G.review && G.pa === pa && G.half === half && guard++ < 40){
     const P = aiPitch(G, D.k);
@@ -1243,7 +1273,7 @@ function playManager(G, D, O){
     if(O.k === 'bunt' && G.strikes < 2) B = { k:'bunt', g:null };
     first = false;
     const r = playPitch(G, P, B);
-    acc.lines.push(...r.lines); acc.fx.push(...r.fx);
+    acc.lines.push(...r.lines); acc.fx.push(...r.fx); acc.events.push(...r.events);
   }
   return acc;
 }

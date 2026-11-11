@@ -7,6 +7,7 @@ const dir = path.join(__dirname, '..', 'js');
 
 const N = +process.argv.slice(2).find(a => /^\d+$/.test(a)) || 300;
 const SAVE = process.argv.includes('--save-baseline');
+const crypto = require('crypto'), TXT = crypto.createHash('sha1');   // 모든 경기 문장의 해시: 글이 한 글자라도 달라지면 baseline.json과 달라짐
 function run(mode, unit, easy){
   const parks = {};
   const tot = { g:0, runs:0, pa:0, ab:0, h:0, hr:0, k:0, bb:0, sb:0, e:0, pitches:0, xbh:0, extra:0, draws:0, lines:0, walkoff:0 };
@@ -14,11 +15,12 @@ function run(mode, unit, easy){
     const keys = TEAMS.map(t => t.key), K = keys.length, a = n % K, h = (a + 1 + (n >> 4) % (K - 1)) % K;
     const G = newGame({ mode, innings:9, teams:[keys[a], keys[h]], ctrl:['cpu', 'cpu'], unit, easy, seed: 1000 + n });
     flush(G);
-    let guard = 0;
+    let guard = 0, evRuns = 0, evHalves = 0;
     while(!G.over){
       if(++guard > 5000) throw new Error('끝나지 않는 경기 ' + n);
-      if(G.review) resolveReview(G, aiChallenge(G));
-      else playStep(G, aiDefChoice(G), aiOffChoice(G));
+      const res = G.review ? resolveReview(G, aiChallenge(G)) : playStep(G, aiDefChoice(G), aiOffChoice(G));
+      // 사건 목록 확인: 모든 사건에 종류가 있고, 득점 사건·이닝 기록이 실제 점수와 맞아야 함
+      (res.events || []).forEach(e => { if(!e || !e.k) throw new Error('종류 없는 사건 ' + JSON.stringify(e)); if(e.k === 'score') evRuns += e.n; if(e.k === 'inning') evHalves++; });
       // 규칙 확인
       const on = G.bases.filter(x => x != null);
       if(new Set(on).size !== on.length) throw new Error('같은 주자가 두 베이스에: ' + JSON.stringify(G.bases) + ' 경기 ' + n);
@@ -26,6 +28,13 @@ function run(mode, unit, easy){
       if(G.outs > 3 || G.balls > 3 || G.strikes > 2) { if(!G.over) throw new Error('카운트 이상 ' + JSON.stringify([G.outs, G.balls, G.strikes])); }
       G.log.forEach(l => { if(/undefined|NaN|null/.test(l.s)) throw new Error('문장 이상: ' + l.s); });
     }
+    G.log.forEach(l => TXT.update(l.k + l.s + '\n'));
+    const totRuns = G.teams.reduce((n, T) => n + runsOf(T), 0), logRuns = (G.inningLog || []).reduce((n, h) => n + h.runs, 0);
+    if(evRuns !== totRuns) throw new Error(`득점 사건 ${evRuns}점 ≠ 실제 ${totRuns}점 (경기 ${n})`);
+    if(logRuns !== totRuns) throw new Error(`이닝 기록 득점 ${logRuns}점 ≠ 실제 ${totRuns}점 (경기 ${n})`);
+    if(evHalves !== G.inningLog.length) throw new Error(`이닝 사건 ${evHalves}개 ≠ 이닝 기록 ${G.inningLog.length}개 (경기 ${n})`);
+    const logHits = G.inningLog.reduce((x, h) => x + h.hits, 0), teamHits = G.teams.reduce((x, T) => x + T.H, 0);
+    if(logHits !== teamHits) throw new Error(`이닝 기록 안타 ${logHits}개 ≠ 팀 안타 ${teamHits}개 (경기 ${n})`);
     tot.g++;
     const pk = parks[G.park.key] ||= { g:0, runs:0, hr:0 };
     pk.g++; G.teams.forEach(T => { pk.runs += runsOf(T); pk.hr += T.bat.concat(T.gone).reduce((s, b) => s + b.st.hr, 0); });
@@ -109,10 +118,12 @@ Object.entries(table).forEach(([k, t]) => {
   if(!(t.bbRate >= 0.02 && t.bbRate <= 0.25)) errs.push(`${k} 볼넷률 ${t.bbRate} 범위 밖(0.02~0.25)`);
 });
 const BASE = path.join(__dirname, 'baseline.json');
-const out = { cellPA: CELL_PA, table };
+const textHash = TXT.digest('hex');
+const out = { cellPA: CELL_PA, textHash, table };
 if(SAVE){ fs.writeFileSync(BASE, JSON.stringify(out, null, 1) + '\n'); console.log('baseline.json 저장'); }
 else if(fs.existsSync(BASE)){
   const old = JSON.parse(fs.readFileSync(BASE, 'utf8'));
+  if(old.textHash && old.cellPA === CELL_PA && old.textHash !== textHash) errs.push(`경기 문장 해시 ${old.textHash.slice(0, 8)} → ${textHash.slice(0, 8)}: 어딘가 글이 달라짐`);
   if(old.cellPA !== CELL_PA) console.log(`baseline.json은 칸당 ${old.cellPA}타석 기준이라 같은 경기 수(${old.cellPA / 15})로 돌릴 때만 견줌`);
   else Object.entries(old.table).forEach(([k, o]) => ['avg', 'xbhRate', 'kRate', 'bbRate', 'hrRate', 'runsPerPA'].forEach(f => {
     if(Math.abs(table[k][f] - o[f]) > 0.0005) errs.push(`${k} ${f}: 저장한 값 ${o[f]} → 지금 ${table[k][f]}`);

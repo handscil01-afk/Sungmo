@@ -111,7 +111,7 @@ function prScreen(slot){
    사람이 맡은 팀이라도 중요한 순간이 아니면 "맡기기"로 정하고 바로 진행함. 물어야 할 순간이 오면 멈추고 그때까지의 결과를 돌려줌.
    온라인에서는 방장 기기가 양쪽 팀 모두에 같은 규칙(방장의 '묻는 때' 설정)을 씀 */
 function mgrAuto(res){
-  const acc = { lines: res ? [...res.lines] : [], fx: res ? [...res.fx] : [] };
+  const acc = { lines: res ? [...res.lines] : [], fx: res ? [...res.fx] : [], events: res && res.events ? [...res.events] : [] };
   const every = SET.mgrAsk === 'every';
   for(let guard = 0; guard < 300 && !G.over && !G.pre; guard++){
     const off = batIdx(G), def = 1 - off;
@@ -122,7 +122,7 @@ function mgrAuto(res){
       const sd = G.review.side;
       if(human(sd) && reviewLeft(G, sd) > 0) break;
       const r = resolveReview(G, human(sd) ? false : aiChallenge(G));
-      acc.lines.push(...r.lines); acc.fx.push(...r.fx); continue;
+      acc.lines.push(...r.lines); acc.fx.push(...r.fx); acc.events.push(...r.events); continue;
     }
     const ask = ti => human(ti) && (every || mgrImportant(G, ti));
     if(ask(def) || ask(off)){
@@ -134,7 +134,7 @@ function mgrAuto(res){
     const O = GS.pend.off || (human(off) ? { k:'normal' } : aiOrderOff(G));
     GS.pend = { def:null, off:null };
     const r = playManager(G, D, O);
-    acc.lines.push(...r.lines); acc.fx.push(...r.fx);
+    acc.lines.push(...r.lines); acc.fx.push(...r.fx); acc.events.push(...r.events);
   }
   return acc;
 }

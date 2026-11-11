@@ -38,7 +38,7 @@ function playTL(A, fx){
     if(bb.hit && bb.hit < 4 && bb.type !== 'gb') t.runner = t.result + 0.6;
   }
   else if(A.res === 'bunt'){ t.kind = 'bunt'; t.field = c + 0.9; t.result = c + 1.5; }
-  else if(A.res === 'foul' || fx.includes('batF')){ t.kind = 'foul'; t.result = c + 0.8; }
+  else if(A.res === 'foul' || fx.includes('batF') || fx.some(e => e && e.k === 'contact' && e.foul)){ t.kind = 'foul'; t.result = c + 0.8; }
   else t.kind = A.res || 'take';
   t.end = t.result + (t.kind === 'pitch' || t.kind === 'take' || t.kind === 'whiff' || t.kind === 'hbp' ? 1.0 : 1.5);
   return t;

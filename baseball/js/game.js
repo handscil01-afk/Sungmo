@@ -107,7 +107,7 @@ function gameNext(via, res){
   if(G.mode === 'manager' && !(NET.on && NET.role === 'guest')) res = mgrAuto(res);
   if(res){ const willSkip = !!(G.focus && !G.review && !needs(batIdx(G)) && !needs(1 - batIdx(G)));   // 육성: 이 결과 뒤 바로 다음 내 차례까지 건너뜀
     if(res.skip && typeof castSkip === 'function'){ const e = castSkip(); if(e){ UI.castLock = e * 1000; UI.castNow = true; } }
-    if(!res.skip){ UI.susp = suspenseMs(res.fx || []); if(typeof castResult === 'function' && castOn()){ const c = castResult(res, { noAfter: willSkip }); UI.castNow = true; if(c){ if(c.at && UI.susp){ UI.susp = Math.max(UI.susp, c.at * 1000); SFX.castAt = c.at; } UI.castLock = c.end * 1000; } } } if(typeof castSeen === 'function') castSeen(); playFx(res.fx); UI.lastFx = res.skip ? res.skip.fx : res.fx || []; UI.lastLines = res.lines || []; UI.lastSkip = res.skip || null; }
+    if(!res.skip){ UI.susp = suspenseMs(res.fx || []); if(typeof castResult === 'function' && castOn()){ const c = castResult(res, { noAfter: willSkip }); UI.castNow = true; if(c){ if(c.at && UI.susp){ UI.susp = Math.max(UI.susp, c.at * 1000); SFX.castAt = c.at; } UI.castLock = c.end * 1000; } } } if(typeof castSeen === 'function') castSeen(); playFx(res.fx); UI.lastFx = res.skip ? res.skip.fx : res.fx || []; UI.lastEv = res.skip ? res.skip.events || [] : res.events || []; UI.lastLines = res.lines || []; UI.lastSkip = res.skip || null; }
   const lines = visible(res ? res.lines : []);
   if(NET.on){ netNext(via, res, lines); return; }
   saveGame();
@@ -126,13 +126,13 @@ function gameNext(via, res){
     const mine = side === myTeam && ((runner && runner.id === G.focus) || (['first', 'hr'].includes(R.kind) && curBatter(G).id === G.focus) || (R.kind === 'pick' && curPitcher(G).id === G.focus));
     if(mine && reviewLeft(G, side) > 0){ go(appealScreen, via, lines); return; }
     const r = resolveReview(G, side === myTeam ? aiChallenge(G) : aiChallenge(G));
-    gameNext(via, { lines:[...(res ? res.lines : []), ...r.lines], fx: r.fx }); return;
+    gameNext(via, { lines:[...(res ? res.lines : []), ...r.lines], fx: r.fx, events: r.events }); return;
   }
   if(G.review){
     const side = G.review.side;
     if(!needs(side) || reviewLeft(G, side) <= 0){
       const r = resolveReview(G, needs(side) ? false : aiChallenge(G));
-      gameNext(via, { lines:[...(res ? res.lines : []), ...r.lines], fx: r.fx }); return;
+      gameNext(via, { lines:[...(res ? res.lines : []), ...r.lines], fx: r.fx, events: r.events }); return;
     }
     if(twoP() && GS.holder !== side){ go(() => handoffScreen(side), via, lines); return; }
     GS.holder = side; go(reviewScreen, via, lines); return;
@@ -143,14 +143,14 @@ function gameNext(via, res){
     const more = runSteps(() => autoDone());
     GS.auto = null;
     const keep = more.lines.filter(l => GS.autoScope === 'pa' ? l.k !== 'd' || SET.dice : 'ric'.includes(l.k));
-    gameNext(via, { lines: [...(res ? res.lines : []), ...keep], fx: more.fx });
+    gameNext(via, { lines: [...(res ? res.lines : []), ...keep], fx: more.fx, events: more.events });
     return;
   }
   // 선수 육성: 내 선수 차례가 올 때까지 빠르게 진행하고, 점수가 난 장면과 이닝 소식만 읽어 줌
   // 건너뛴 장면의 소리는 내지 않고, '내 차례까지 넘어갔다'는 알림과 지금 상황만 알려 줌 (그림 모드는 카드)
   if(G.focus && !needs(off) && !needs(def)){
     const snap = typeof snapOf === 'function' ? snapOf(G) : null, from = `${G.inning}회${G.top ? '초' : '말'} ${G.outs}아웃`;
-    const myFx = (res && res.skip ? res.skip.fx : res && res.fx) || [];
+    const myFx = (res && res.skip ? res.skip.fx : res && res.fx) || [], myEv = (res && res.skip ? res.skip.events : res && res.events) || [];
     const runs0 = G.teams.map(runsOf);
     const more = runSteps(() => needs(batIdx(G)) || needs(1 - batIdx(G)) || G.over);
     const scored = G.teams.map((T, i) => runsOf(T) - runs0[i]);
@@ -161,7 +161,7 @@ function gameNext(via, res){
       { s:`지금 ${situation(G)}`, k:'c' }];
     // 내 결과 뒤에 붙은 다음 타자 소개·수비 위치 변경 같은 글은 건너뛴 쪽이라 뺌
     const mineL = res ? res.lines : [], lastR = mineL.map(l => l.k).lastIndexOf('r');
-    gameNext(via, { lines:[...(lastR >= 0 ? mineL.slice(0, lastR + 1) : mineL), ...sum], fx: [], skip: snap ? { snap, fx: myFx, from } : null }); return;
+    gameNext(via, { lines:[...(lastR >= 0 ? mineL.slice(0, lastR + 1) : mineL), ...sum], fx: [], skip: snap ? { snap, fx: myFx, events: myEv, from } : null }); return;
   }
   if(!needs(off) && !needs(def)){ go(watchScreen, via, lines); return; }
   const turn = (needs(def) && !GS.pend.def) ? def : off;
@@ -183,8 +183,8 @@ function stepAI(){
   return playStep(G, aiDefChoice(G), aiOffChoice(G));
 }
 function runSteps(stop){
-  const acc = { lines:[], fx:[] }; let guard = 0;
-  while(!G.over && !stop() && guard++ < 4000){ const r = G.review ? resolveReview(G, aiChallenge(G)) : stepAI(); acc.lines.push(...r.lines); acc.fx.push(...r.fx); }
+  const acc = { lines:[], fx:[], events:[] }; let guard = 0;
+  while(!G.over && !stop() && guard++ < 4000){ const r = G.review ? resolveReview(G, aiChallenge(G)) : stepAI(); acc.lines.push(...r.lines); acc.fx.push(...r.fx); acc.events.push(...r.events); }
   return acc;
 }
 // side: 'def' | 'off'
@@ -215,7 +215,7 @@ function tryResolve(via){
   const O = GS.pend.off || aiOffChoice(G);
   GS.pend = { def:null, off:null };
   const res = playStep(G, D, O);
-  if(pre){ res.lines = [...pre.lines, ...res.lines]; res.fx = [...pre.fx, ...res.fx]; }
+  if(pre){ res.lines = [...pre.lines, ...res.lines]; res.fx = [...pre.fx, ...res.fx]; res.events = [...pre.events, ...res.events]; }
   gameNext(via, res);
   return true;
 }
@@ -244,7 +244,7 @@ function appealScreen(){
     const yes = aiChallenge(G) || (appeal && Math.random() < 0.65);
     const pre = appeal ? [{ s: yes ? '강하게 어필했습니다! 감독이 나와서 비디오 판독을 신청합니다.' : '강하게 어필했지만 감독은 판독을 신청하지 않습니다.', k:'c' }] : [{ s:'판정을 받아들입니다.', k:'c' }];
     const r = resolveReview(G, appeal ? yes : aiChallenge(G));
-    gameNext(v, { lines:[...pre, ...r.lines], fx: r.fx });
+    gameNext(v, { lines:[...pre, ...r.lines], fx: r.fx, events: r.events });
   };
   return { board:true, q:`아슬아슬한 판정! 원심은 ${callWord(R.call)}입니다. 어떻게 할까요?`, opts:[
     { n:1, t:'강하게 어필하기', s:'세이프라고(또는 아웃이라고) 강하게 주장합니다. 감독이 판독을 신청할 가능성이 커집니다.', act: v => go2(true, v) },
@@ -562,13 +562,13 @@ function openMenu(via){
 /* ---------- 관전 (컴퓨터끼리) ---------- */
 function watchScreen(){
   const unit = G.mode === 'detail' || G.unit === 'pitch' ? '공' : '타석';
-  const step = stop => v => { const r = runSteps(stop); gameNext(v, { lines: r.lines.filter(l => !GS.short || 'ric'.includes(l.k)), fx: r.fx }); };
+  const step = stop => v => { const r = runSteps(stop); gameNext(v, { lines: r.lines.filter(l => !GS.short || 'ric'.includes(l.k)), fx: r.fx, events: r.events }); };
   const pa = G.pa, half = G.half;
   return { board:true, q:`관전 중. ${halfName(G)}. 무엇을 볼까요?`, opts:[
     { n:1, t:`다음 ${unit}`, act: v => { GS.short = false; let k = 0; step(() => k++ >= 1)(v); } },
     { n:2, t:'이번 타석 끝까지', act: v => { GS.short = false; step(() => G.pa !== pa)(v); } },
     { n:3, t:'이번 이닝 끝까지', s:'타석 결과만 읽어 줍니다.', act: v => { GS.short = true; step(() => G.half !== half)(v); } },
-    { n:4, t:'경기 끝까지', s:'점수가 난 장면과 결과만 읽어 줍니다.', act: v => { GS.short = true; const r = runSteps(() => false); gameNext(v, { lines: r.lines.filter(l => 'i'.includes(l.k) || /홈인|홈런/.test(l.s)), fx: r.fx.slice(-1) }); } },
+    { n:4, t:'경기 끝까지', s:'점수가 난 장면과 결과만 읽어 줍니다.', act: v => { GS.short = true; const r = runSteps(() => false); gameNext(v, { lines: r.lines.filter(l => 'i'.includes(l.k) || /홈인|홈런/.test(l.s)), fx: r.fx, events: r.events.slice(-1) }); } },
     { n:5, t: GS.play ? '자동 재생 멈추기' : `자동 재생 (${SET.watch}초마다 한 타석)`, act: v => GS.play ? stopAutoPlay(true) : startAutoPlay() },
     { n:9, t:'더 보기', act: v => go(moreScreen, v) },
   ] };
@@ -580,7 +580,7 @@ function startAutoPlay(){
     if(!GS.play || !G || G.over) { GS.play = 0; return; }
     const pa = G.pa;
     const r = runSteps(() => G.pa !== pa);
-    gameNext('auto', { lines: r.lines, fx: r.fx });
+    gameNext('auto', { lines: r.lines, fx: r.fx, events: r.events });
     if(G && !G.over && GS.play) GS.play = setTimeout(tick, Math.max(SET.watch * 1000, (UI.castEnd || 0) - performance.now() + 400));   // 중계가 끝난 뒤에
     else GS.play = 0;
   };

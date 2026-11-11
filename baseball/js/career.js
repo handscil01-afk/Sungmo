@@ -184,7 +184,7 @@ function careerPlay(via){
   GS.opts = null; GS.pend = { def:null, off:null }; GS.auto = null; GS.holder = -1; GS.sel = null; UI.logG = null;
   const r = flush(G);
   const pre = isPit(p) ? (G.teams[G.focusTeam].pit[0].id === c.id ? '오늘은 내가 선발 투수입니다.' : '불펜에서 대기합니다. 감독이 부르면 마운드에 오릅니다.') : `${G.teams[G.focusTeam].bat.findIndex(b => b.id === c.id) + 1}번 타자로 나갑니다.`;
-  gameNext(via, { lines:[{ s:`${G.career.label} 1군 경기. ${pre}`, k:'i' }, ...r.lines], fx: r.fx });
+  gameNext(via, { lines:[{ s:`${G.career.label} 1군 경기. ${pre}`, k:'i' }, ...r.lines], fx: r.fx, events: r.events });
 }
 // 경기 뒤: 내 기록으로 성장 점수, 업적, 인터뷰, 리그 하루 진행
 function careerAfterGame(G){
@@ -311,7 +311,7 @@ function careerMinorPlay(via){
   GS.opts = null; GS.pend = { def:null, off:null }; GS.auto = null; GS.holder = -1; GS.sel = null; UI.logG = null;
   const r = flush(G);
   const pre = isPit(p) ? (G.teams[0].pit[0].id === c.id ? '오늘은 내가 선발 투수입니다.' : '불펜에서 대기합니다. 감독이 부르면 마운드에 오릅니다.') : `${G.teams[0].bat.findIndex(b => b.id === c.id) + 1}번 타자로 나갑니다.`;
-  gameNext(via, { lines:[{ s:`${G.career.label}. ${pre}`, k:'i' }, ...r.lines], fx: r.fx });
+  gameNext(via, { lines:[{ s:`${G.career.label}. ${pre}`, k:'i' }, ...r.lines], fx: r.fx, events: r.events });
 }
 function careerMinorDay(via, listen){
   const L = CR(), c = C(L), p = myP(L), out = [];

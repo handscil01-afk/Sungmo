@@ -145,7 +145,7 @@ function netNext(via, res, lines){
   if(G.review){
     const sd = G.review.side;
     if(sd === NET.side && reviewLeft(G, sd) > 0 && !NET.sent){ go(reviewScreen, via, lines); return; }
-    if(NET.role === 'host' && reviewLeft(G, sd) <= 0){ const r = resolveReview(G, false); gameNext(via, { lines:[...(res ? res.lines : []), ...r.lines], fx: r.fx }); return; }
+    if(NET.role === 'host' && reviewLeft(G, sd) <= 0){ const r = resolveReview(G, false); gameNext(via, { lines:[...(res ? res.lines : []), ...r.lines], fx: r.fx, events: r.events }); return; }
     go(waitScreen, via, lines); return;
   }
   if(G.pre){
@@ -278,8 +278,8 @@ function onState(st){
   if(verMismatch(st)){ const msg = `방장 기기의 버전이 다릅니다 (이 기기 ${RULES_VER}, 방장 ${verOf(st)}). 새로 고침한 뒤 다시 들어와 주세요.`; netLeave(); G = null; go(() => versionScreen(msg), 'auto'); return; }
   if(st.gid !== NET.gid){ NET.gid = st.gid; NET.log = []; NET.stN = 0; UI.logG = null; GS.auto = null; GS.guess = null; NET.key = ''; }
   if(st.n <= NET.stN) return;
-  let g, tail = [], fxs = [];
-  try{ g = JSON.parse(st.g); tail = JSON.parse(st.tail || '[]'); fxs = JSON.parse(st.fx || '[]'); }catch(e){ return; }
+  let g, tail = [], fxs = [], evs = [];
+  try{ g = JSON.parse(st.g); tail = JSON.parse(st.tail || '[]'); fxs = JSON.parse(st.fx || '[]'); evs = JSON.parse(st.ev || '[]'); }catch(e){ return; }
   NET.stN = st.n; NET.sent = false; NET.pend = st.pend || {};
   const lastN = NET.log.length ? NET.log[NET.log.length - 1].n : 0;
   const fresh = tail.filter(l => l.n > lastN);
@@ -287,7 +287,7 @@ function onState(st){
   g.log = NET.log; g.out = []; g.fx = []; g.names = [];
   g.rng = (Math.random() * 4294967296) >>> 0;   // 이 기기의 '맡기기'용 (실제 결과는 방장 기기가 계산)
   G = g;
-  gameNext('auto', { lines: fresh, fx: fxs });
+  gameNext('auto', { lines: fresh, fx: fxs, events: evs });
 }
 function onRoomClosed(){ if(!NET.on) return; netLeave(); G = null; go(homeScreen, 'auto', ['방장이 방을 닫았습니다.']); }
 function onKicked(){ if(!NET.on) return; netLeave(); G = null; go(homeScreen, 'auto', ['방에서 나오게 되었습니다.']); }

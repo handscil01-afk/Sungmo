@@ -153,7 +153,7 @@ function netPushState(res){
   if(!NET.on || NET.role !== 'host' || !G) return;
   if(NET.gidPushed !== G.at){ NET.gidPushed = G.at; NET.pushedN = 0; }
   const F = FB, { R } = F;
-  const c = JSON.parse(JSON.stringify(G, (k, v) => (k === 'log' || k === 'rng' || k === 'out' || k === 'fx' || k === 'names' || k === 'prevTypes') ? undefined : v));
+  const c = JSON.parse(JSON.stringify(G, (k, v) => (k === 'log' || k === 'rng' || k === 'out' || k === 'fx' || k === 'evs' || k === 'names' || k === 'prevTypes') ? undefined : v));
   c.teams[NET.side].lastSel = null;   // 방장이 겨냥했던 곳은 보내지 않음
   const g = JSON.stringify(c);
   const pend = {};
@@ -165,7 +165,7 @@ function netPushState(res){
   const from = Math.min(NET.pushedN || 0, recent);
   const tail = G.log.filter(l => l.n > from).slice(-300);
   NET.pushedN = G.log.length ? G.log[G.log.length - 1].n : 0;
-  const st = { n: NET.stN, ver: RULES_VER, gid: G.at, g, tail: JSON.stringify(tail), fx: JSON.stringify(res ? res.fx : []), pend, at: F.TS };
+  const st = { n: NET.stN, ver: RULES_VER, gid: G.at, g, tail: JSON.stringify(tail), fx: JSON.stringify(res ? res.fx : []), ev: JSON.stringify(res && res.events ? res.events : []), pend, at: F.TS };
   R.set(F.ref(NET.code + '/state'), st).catch(e => netNotice(netErr(e)));
   ls.set('bb_netg', { code: NET.code, G, opts: GS.opts });
 }
