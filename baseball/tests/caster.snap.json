@@ -82,7 +82,7 @@
   "step": 7,
   "ret": {
    "at": 5.19,
-   "end": 10.89
+   "end": 11.77
   },
   "clips": [
    "0.06 p_throw3",
@@ -94,7 +94,8 @@
    "5.77 a_out2",
    "7.35 bat_5",
    "8.23 run_full",
-   "9.51 out_1"
+   "9.51 out_1",
+   "10.89 a_pinch1"
   ]
  },
  {
@@ -103,7 +104,7 @@
   "step": 10,
   "ret": {
    "at": 5.69,
-   "end": 11.11
+   "end": 12.29
   },
   "clips": [
    "0 p_throw4",
@@ -113,7 +114,8 @@
    "5.69 r_groundout3",
    "7.37 bat_6",
    "8.35 run_full",
-   "9.63 out_2"
+   "9.63 out_2",
+   "11.11 a_loaded1"
   ]
  },
  {
@@ -135,23 +137,23 @@
   "step": 18,
   "ret": {
    "at": 1.3,
-   "end": 17.32
+   "end": 17.42
   },
   "clips": [
    "0 p_throw5",
    "1.38 r_k_swing",
-   "2.26 a_inning1",
-   "3.64 change",
-   "4.42 inn_1b",
-   "5.3 team_swallow_s",
-   "6.38 j_attack",
-   "7.46 j_score",
-   "8.94 team_whale_s",
-   "10.42 num_0",
-   "12.1 j_vs",
-   "12.88 num_0",
-   "14.56 team_swallow_s",
-   "15.64 bat_1"
+   "2.26 a_inning2",
+   "3.74 change",
+   "4.52 inn_1b",
+   "5.4 team_swallow_s",
+   "6.48 j_attack",
+   "7.56 j_score",
+   "9.04 team_whale_s",
+   "10.52 num_0",
+   "12.2 j_vs",
+   "12.98 num_0",
+   "14.66 team_swallow_s",
+   "15.74 bat_1"
   ]
  },
  {
@@ -281,15 +283,16 @@
   "step": 28,
   "ret": {
    "at": 5.29,
-   "end": 8.93
+   "end": 10.01
   },
   "clips": [
    "0.06 p_throw3",
    "1.29 c_hit5",
    "2.67 c_high1",
    "5.29 r_hr4",
-   "6.97 a_hr3",
-   "8.05 bat_5"
+   "6.97 r_wow3",
+   "8.45 a_wow",
+   "9.13 bat_5"
   ]
  },
  {
@@ -298,7 +301,7 @@
   "step": 59,
   "ret": {
    "at": 5.38,
-   "end": 21.1
+   "end": 21.98
   },
   "clips": [
    "0.01 p_throw3",
@@ -318,7 +321,8 @@
    "16.08 num_0",
    "17.76 team_turtle_s",
    "19.14 r_pitcher_change",
-   "19.82 bat_9"
+   "19.82 a_change1",
+   "20.7 bat_9"
   ]
  },
  {

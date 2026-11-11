@@ -91,8 +91,39 @@ function record(sc, i){
 }
 const snap = scenes.map(record);
 
+// ---- 이닝 끝 해설이 이닝 상황과 맞는지 (새 녹음 아이디까지 있는 것처럼 꾸며서) ----
+const NEWIDS = ['a_inn_big', 'a_inn_run1', 'a_inn_runs', 'a_inn_k', 'a_inn_dp', 'a_inn_lob', 'a_inn_escape'];
+const innErrs = [], seenCat = {};
+{
+  const real = CAST.idx; CAST.idx = { ...real }; NEWIDS.forEach(id => { CAST.idx[id] = 1; CAST.buf[id] = { duration: dur(id), id }; });
+  globalThis.SET.analyst = 'often';
+  for(let gs = 100; gs < 130; gs++){
+    const G = newGame({ mode:'detail', innings:4, teams:[TEAMS[gs % 10].key, TEAMS[(gs + 4) % 10].key], ctrl:['cpu', 'cpu'], seed: 900 + gs });
+    globalThis.G = G; CAST.until = 0; CAST.last = {}; CAST.score = null;
+    let res = flush(G), guard = 0;
+    while(!G.over && guard++ < 3000){
+      res = G.review ? resolveReview(G, aiChallenge(G)) : playStep(G, aiDefChoice(G), aiOffChoice(G));
+      const half = (res.events || []).filter(e => e.k === 'inning').pop(); if(!half || G.over) continue;
+      played.length = 0; seedRandom(gs * 7 + guard); castResult(res);
+      const ids = played.map(p => p[1].replace(/-\d+$/, '')), quiet = half.hits + half.walks + half.errors === 0;
+      const has = id => ids.includes(id), tag = `${gs}번 경기 ${half.inning}${half.top ? '초' : '말'}(득점 ${half.runs} 안타 ${half.hits} 볼넷 ${half.walks} 실책 ${half.errors} 병살 ${half.dp} 잔루 ${half.lob} 삼진 ${half.ks})`;
+      if(has('a_inning1')){ seenCat.clean = 1; if(half.runs || !quiet) innErrs.push(`${tag}: 삼자범퇴가 아닌데 "깔끔하게"`); }
+      if(has('a_inning2') || has('a_inn_dp') || has('a_inn_lob') || has('a_inn_escape')){ seenCat.escape = 1; if(half.runs || quiet) innErrs.push(`${tag}: 실점했거나 출루가 없는데 "실점 없이 막음" 계열`); }
+      if(has('a_inn_big')){ seenCat.big = 1; if(half.runs < 3) innErrs.push(`${tag}: 대량 실점 해설이 맞지 않음`); }
+      if(has('a_inn_run1')){ seenCat.run1 = 1; if(half.runs !== 1) innErrs.push(`${tag}: 1실점 해설이 맞지 않음`); }
+      if(has('a_inn_runs')){ if(half.runs !== 2) innErrs.push(`${tag}: 2실점 해설이 맞지 않음`); }
+      if(has('a_inn_k') && !(quiet && half.ks >= 3)) innErrs.push(`${tag}: 삼진 해설이 맞지 않음`);
+      if(has('a_inn_dp') && !half.dp) innErrs.push(`${tag}: 병살 해설인데 병살이 없음`);
+      if(has('a_inn_lob') && half.lob < 3) innErrs.push(`${tag}: 잔루 해설인데 잔루가 적음`);
+    }
+  }
+  CAST.idx = real; globalThis.SET.analyst = 'some';
+  ['clean', 'escape', 'run1'].forEach(k => { if(!seenCat[k]) innErrs.push(`이닝 끝 해설 시험: ${k} 경우가 한 번도 나오지 않음`); });
+}
+console.log(`이닝 끝 맥락 시험: ${Object.keys(seenCat).join(', ')} 확인, 어긋남 ${innErrs.length}건`);
+
 // ---- 점검: 스냅샷과 별개로 늘 지켜야 하는 것 ----
-const errs = [];
+const errs = [...innErrs];
 if(snap.length !== 20) errs.push(`장면이 ${snap.length}개 (20개여야 함)`);
 snap.forEach(s => {
   let prevEnd = -1;

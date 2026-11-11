@@ -107,7 +107,7 @@ function gameNext(via, res){
   if(G.mode === 'manager' && !(NET.on && NET.role === 'guest')) res = mgrAuto(res);
   if(res){ const willSkip = !!(G.focus && !G.review && !needs(batIdx(G)) && !needs(1 - batIdx(G)));   // 육성: 이 결과 뒤 바로 다음 내 차례까지 건너뜀
     if(res.skip && typeof castSkip === 'function'){ const e = castSkip(); if(e){ UI.castLock = e * 1000; UI.castNow = true; } }
-    if(!res.skip){ UI.susp = suspenseMs(res.fx || []); if(typeof castResult === 'function' && castOn()){ const c = castResult(res, { noAfter: willSkip }); UI.castNow = true; if(c){ if(c.at && UI.susp){ UI.susp = Math.max(UI.susp, c.at * 1000); SFX.castAt = c.at; } UI.castLock = c.end * 1000; } } } if(typeof castSeen === 'function') castSeen(); playFx(res.fx); UI.lastFx = res.skip ? res.skip.fx : res.fx || []; UI.lastEv = res.skip ? res.skip.events || [] : res.events || []; UI.lastLines = res.lines || []; UI.lastSkip = res.skip || null; }
+    if(!res.skip){ UI.susp = suspenseMs(res.fx || []); if(typeof castResult === 'function' && castOn()){ const c = castResult(res, { noAfter: willSkip }); UI.castNow = true; if(c){ if(c.at && UI.susp){ UI.susp = Math.max(UI.susp, c.at * 1000); SFX.castAt = c.at; } SFX.hitAt = c.hit != null ? c.hit : null; UI.castLock = c.end * 1000; } } } if(typeof castSeen === 'function') castSeen(); SFX.ev = res.events || []; playFx(res.fx); UI.lastFx = res.skip ? res.skip.fx : res.fx || []; UI.lastEv = res.skip ? res.skip.events || [] : res.events || []; UI.lastLines = res.lines || []; UI.lastSkip = res.skip || null; }
   const lines = visible(res ? res.lines : []);
   if(NET.on){ netNext(via, res, lines); return; }
   saveGame();

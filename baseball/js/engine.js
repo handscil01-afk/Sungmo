@@ -389,7 +389,8 @@ function scoreRuns(G, list, rbi){
   emit(G, `${names} 홈인! ${list.length > 1 ? list.length + '점' : '1점'}. ${scoreText(G)}.`, 'r');
   fx(G, 'score');
   if(!G.top && G.inning >= G.innings && runsOf(G.teams[1]) > runsOf(G.teams[0])) G.walkoff = true;
-  ev(G, { k:'score', n:list.length, rbi:!!rbi, walkoff:!!G.walkoff });
+  // lc: 이 득점으로 앞서는 팀이 바뀜(역전·처음 앞섬), tie: 동점이 됨 (함성의 크기와 해설이 씀)
+  { const ld = runsOf(G.teams[0]) - runsOf(G.teams[1]), nl = ld > 0 ? 0 : ld < 0 ? 1 : -1; ev(G, { k:'score', n:list.length, rbi:!!rbi, walkoff:!!G.walkoff, lc: nl >= 0 && nl !== G.leader, tie: nl < 0 }); }
   // 앞서는 팀이 바뀌면 승리·패전 투수 후보를 기록 (그때 마운드에 있던 두 팀 투수)
   const lead = runsOf(G.teams[0]) - runsOf(G.teams[1]), leader = lead > 0 ? 0 : lead < 0 ? 1 : -1;
   if(leader !== G.leader){

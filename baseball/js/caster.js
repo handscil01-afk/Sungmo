@@ -3,7 +3,7 @@
    읽어 주기가 '중계 음성'이면 경기 결과는 화면 낭독기 대신 캐스터 목소리로 중계함.
    voice/index.json의 variants에 같은 문장의 녹음이 여러 개면(이름-2) 번갈아 골라 매번 조금씩 다르게 들림.
    공을 친 결과는 뜸 들이는 중계 시간표에 맞춰: '쳤습니다! 높이 뜹니다! 오른쪽으로!' → (타구가 떨어질 때) '잡았습니다! 아웃!' */
-const CAST = { idx:null, buf:{}, loading:{}, until:0, last:{}, src:[] };
+const CAST = { idx:null, styles:{}, buf:{}, loading:{}, until:0, last:{}, src:[] };
 // 중계 음성: 설정의 '중계 음성'이 켜져 있고 효과음이 켜져 있을 때 (두 모드 모두 기본 켬)
 // 결과 전달이 '글만'이면 캐스터 목소리로 결과를 말하지 않음
 function castOn(){ return SET.cast !== false && SET.snd !== false && SET.deliver !== 'text'; }
@@ -13,16 +13,19 @@ function castSample(){ castLoadIndex().then(() => {
   Promise.all(ids.map(castLoad)).then(() => { castStop(); castPlay(ids, 0.1); }); }); }
 function castLoadIndex(){
   if(CAST.idx || CAST.idxP) return CAST.idxP;
-  CAST.idxP = fetch(new URL('voice/index.json', document.baseURI).href).then(r => r.json()).then(j => { CAST.idx = j.variants || {}; }).catch(() => { CAST.idx = {}; });
+  CAST.idxP = fetch(new URL('voice/index.json', document.baseURI).href).then(r => r.json()).then(j => { CAST.idx = j.variants || {}; CAST.styles = j.styles || {}; }).catch(() => { CAST.idx = {}; });
   return CAST.idxP;
 }
 function castFile(id){
   const n = CAST.idx && CAST.idx[id]; if(!n) return null;
   // 지난번과 다른 녹음을 고름
-  let k = 1 + Math.floor(Math.random() * n);
-  if(n > 1 && CAST.last[id] === k) k = k % n + 1;
+  // 해설 스타일(SET.castStyle): voice/index.json의 styles에 그 스타일의 같은 아이디 녹음이 있으면 voice/<스타일>/ 쪽을 씀. 없는 줄은 기본(차분) 녹음
+  const sty = SET.castStyle && SET.castStyle !== 'calm' && CAST.styles && CAST.styles[SET.castStyle] && CAST.styles[SET.castStyle][id] ? SET.castStyle : null;
+  const cnt = sty ? CAST.styles[sty][id] : n;
+  let k = 1 + Math.floor(Math.random() * cnt);
+  if(cnt > 1 && CAST.last[id] === k) k = k % cnt + 1;
   CAST.last[id] = k;
-  return k === 1 ? id : `${id}-${k}`;
+  return (sty ? sty + '/' : '') + (k === 1 ? id : `${id}-${k}`);
 }
 function castLoad(name){
   const c = audio(); if(!c || CAST.buf[name] || CAST.loading[name]) return CAST.loading[name];
@@ -33,7 +36,11 @@ function castLoad(name){
 }
 // 처음 누를 때 모든 조각을 미리 불러 둠 (약 2.7MB)
 function castPreload(){
-  castLoadIndex().then(() => Object.entries(CAST.idx || {}).forEach(([id, n]) => { for(let k = 1; k <= n; k++) castLoad(k === 1 ? id : `${id}-${k}`); }));
+  castLoadIndex().then(() => {
+    Object.entries(CAST.idx || {}).forEach(([id, n]) => { for(let k = 1; k <= n; k++) castLoad(k === 1 ? id : `${id}-${k}`); });
+    const sty = SET.castStyle && CAST.styles[SET.castStyle];   // 고른 스타일의 녹음도 미리
+    if(sty) Object.entries(sty).forEach(([id, n]) => { for(let k = 1; k <= n; k++) castLoad(`${SET.castStyle}/${k === 1 ? id : `${id}-${k}`}`); });
+  });
 }
 ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { if(castOn()) castPreload(); }, { capture:true, once:true }));
 // 조각들을 at초 뒤부터 이어서 틂 (앞 중계가 아직 나오는 중이면 끝난 뒤에). 끝나는 시각을 돌려줌
@@ -66,6 +73,18 @@ const numClip = n => n >= 0 && n <= 20 ? `num_${n}` : null;   // 녹음: 영~이
 const runClip = b => { const k = [0, 1, 2].filter(i => b[i] != null).map(i => i + 1).join(''); return ({ '':'run_none', 1:'run_1', 2:'run_2', 3:'run_3', 12:'run_12', 13:'run_13', 23:'run_23', 123:'run_full' })[k]; };
 const teamClip = (T, long) => `team_${T.key}${long ? '' : '_s'}`;
 
+// 이닝 끝 해설: inningLog의 한 줄(e)에서 상황을 가려 말함. 실점한 이닝에는 '깔끔하게'를 말하지 않음.
+// 새 녹음이 아직 없으면(a_inn_*) 맞는 옛 녹음(a_inning1 깔끔하게, a_inning2 실점 없이)만 쓰고, 둘 다 안 맞으면 말하지 않음
+function inningTalk(e){
+  if(!e) return null;
+  const quiet = e.hits + e.walks + e.errors === 0;
+  if(e.runs >= 3) return ana(0.7, 'a_inn_big');
+  if(e.runs > 0) return ana(0.5, e.runs === 1 ? 'a_inn_run1' : 'a_inn_runs');
+  if(quiet) return ana(0.4, e.ks >= 3 ? 'a_inn_k' : 'a_inning1', 'a_inning1');
+  if(e.dp > 0) return ana(0.6, 'a_inn_dp', 'a_inning2');
+  if(e.lob >= 3) return ana(0.6, 'a_inn_lob', 'a_inning2');
+  return ana(0.4, 'a_inn_escape', 'a_inning2');
+}
 /* 경기 결과 하나(res)를 중계로: gameNext가 부름.
    공 하나의 시간표(timeline.js)대로: 투구 동작 중 "던졌습니다" → 공이 미트에 들어가는 순간 "스트라이크!/볼." → 볼카운트
    / 친 공은 맞는 순간부터 "쳤습니다! 높이 뜹니다!" → 잡히거나 떨어지는 순간 결과 → 득점 → 새 타자·주자·아웃 안내.
@@ -95,7 +114,7 @@ function castResult(res, opt = {}){
   }
   const contact = evs.some(e => e.k === 'contact' && !e.bunt), pitched = !!A && (has('pitch') || contact);
   const tl = pitched ? playTL(A, evs) : null;
-  let resAt = 0;
+  let resAt = 0, hitAt = null;   // hitAt: 안타가 정해지는(함성이 터질) 시각
   if(pitched){
     // 던질 때: 구종 이름이나 "던졌습니다!" (공을 놓는 순간 끝나게)
     const thr = G.mode !== 'simple' && A.t && Math.random() < 0.45 ? `pt_${A.t}` : pick1('p_throw1', 'p_throw2', 'p_throw3', 'p_throw4', 'p_throw5', 'p_throw6');
@@ -115,6 +134,7 @@ function castResult(res, opt = {}){
       // 안타는 공이 떨어지는(내야를 빠져나가는) 순간에 "안타!", 그 뒤 베이스 승부(홈 송구 등)는 일어나는 순간마다
       const isHit = !!ps && (has('hit') || has('b2') || has('b3'));
       let hitT = null;
+      hitAt = null;
       if(isHit){
         const land = ev.find(e => e.k === 'land'), first = ev.find(e => e.k === 'ball'), pick = ev.find(e => e.k === 'pickup');
         hitT = land ? land.t : bb.type === 'gb' && first ? Math.min(first.t1, 1.3) : pick ? pick.t - 0.3 : null;
@@ -126,22 +146,27 @@ function castResult(res, opt = {}){
       at(tl.contact, fit);
       const post = [], dpFallback = !pl && isE(evs, 'play', 'kind', 'dp');
       const pk = pl ? pl.kind : ps ? ps.kind : (dpFallback ? 'dp' : '');
-      if(pk === 'dp' || pk === 'ldp') post.push(pick1('r_dp', 'r_dp2'));
+      if(pl && pl.outs >= 3) post.push('r_tp');   // 삼중살
+      else if(pk === 'dp' || pk === 'ldp') post.push(pick1('r_dp', 'r_dp2'));
       else if(pk === 'err') post.push(pl && pl.err === 'throw' ? 'r_error2' : 'r_error1');
       else if(has('hr')){ const on = ps ? (ps.rm || []).filter(m => m.to === 3).length : 0;
         post.push(G.walkoff && CAST.idx && CAST.idx.r_walkoff_hr ? 'r_walkoff_hr' : on >= 3 ? 'r_hr_grand' : pick1('r_hr1', 'r_hr2', 'r_hr3', 'r_hr4', 'r_hr5', 'r_hr6'));
-        if(on === 1 || on === 2) post.push(CAST.idx && CAST.idx[on === 1 ? 'r_hr_two' : 'r_hr_three'] ? (on === 1 ? 'r_hr_two' : 'r_hr_three') : null); }
+        if(on === 1 || on === 2) post.push(CAST.idx && CAST.idx[on === 1 ? 'r_hr_two' : 'r_hr_three'] ? (on === 1 ? 'r_hr_two' : 'r_hr_three') : null);
+        if(on >= 3 || G.walkoff || isE(evs, 'score', 'lc', true)) post.push(pick1('r_wow1', 'r_wow2', 'r_wow3')); }
       else if(has('b3')) post.push(pick1('r_triple', 'r_triple2'));
       else if(has('b2')) post.push(pick1('r_double', 'r_double2'));
       else if(has('hit')) post.push(dive && !caught ? 'r_sigh2' : null, pick1('r_hit1', 'r_hit2', 'r_hit3', 'r_hit4', 'r_hit5', 'r_hit6'));
       else if(has('out')){
+        // 누가 잡았는지(녹음 pos_<포지션>_c)와 어디로 던지는지(thr_<베이스>): 녹음이 있을 때만 말함
+        if(pl && pl.pos && CAST.idx && CAST.idx[`pos_${pl.pos}_c`]) post.push(`pos_${pl.pos}_c`);
+        if(pl && pl.kind === 'go' && pl.tgt != null && CAST.idx && CAST.idx[`thr_${pl.tgt}`]) post.push(`thr_${pl.tgt}`);
         if(bb.type === 'gb') post.push(pick1('r_groundout1', 'r_groundout2', 'r_groundout3'));
         else if(caught && (caught.dive || caught.far)) post.push(pick1('r_supercatch1', 'r_supercatch2', 'r_supercatch3'));
         else post.push(Math.random() < 0.25 ? 'r_out_sad' : pick1('r_catch1', 'r_catch2', 'r_catch3', 'r_catch4'));
       }
       else if(has('safe')) post.push(pick1('r_safe1', 'r_safe2', 'r_safe3'));
       if(isHit && hitT != null){
-        resAt = tl.contact + hitT; at(resAt, post);
+        resAt = tl.contact + hitT; hitAt = resAt; at(resAt, post);
         // 그 뒤 베이스 승부: 홈에서 세이프면 득점, 아웃이면 "아웃! 잡아냅니다", 그 밖의 세이프는 "세이프!"
         (ps.call || []).filter(c => c.base != null && !c.catch && c.t > hitT + 0.2 && !(c.base === 0 && !c.out)).sort((a, b) => a.t - b.t)
           .forEach(c => at(tl.contact + c.t, c.out ? 'r_steal_out' : c.base === 3 ? pick1('r_score1', 'r_score2', 'r_score3', 'r_score4') : pick1('r_safe1', 'r_safe3')));
@@ -159,6 +184,9 @@ function castResult(res, opt = {}){
       else if(has('strike')) call.push(pick1('r_strike1', 'r_strike2', 'r_strike3', 'r_strike4'));
       else if(has('ballc')) call.push(pick1('r_ball1', 'r_ball2', 'r_ball3', 'r_ball4', 'r_ball5'));
       const endPA = has('batter') || has('change') || G.over || has('k') || has('ball');
+      // 몰린 카운트: 투 스트라이크(타자)·쓰리 볼(투수)이 되는 공에서 가끔 한마디
+      if(!endPA && has('strike') && G.strikes === 2 && Math.random() < 0.35) call.push('c_twostrike');
+      if(!endPA && has('ballc') && G.balls === 3 && Math.random() < 0.35) call.push('c_threeball');
       if(!endPA && (G.balls || G.strikes) && SET.castCount === 'always') call.push(G.balls === 3 && G.strikes === 2 ? 'full' : [`cnt_b${G.balls}`, `cnt_s${G.strikes}`]);
       at(resAt, call);
     }
@@ -182,11 +210,11 @@ function castResult(res, opt = {}){
     let line = null;
     // (가끔 기준) 타석이 끝나는 결과는 대부분, 공 하나하나에도 서너 공에 한 번쯤 한마디
     if(has('hr')) line = ana(0.95, 'a_hr1', 'a_hr2', 'a_hr3', 'a_wow');
-    else if(caught && (caught.dive || caught.far)) line = ana(0.95, 'a_def1', 'a_def2', 'a_def3', 'a_wow');
+    else if(caught && (caught.dive || caught.far)) line = ana(0.95, 'a_def1', 'a_def2', 'a_def3', 'a_wow', 'a_oh');
     else if(has('b2') || has('b3')) line = ana(0.85, 'a_hit1', 'a_hit2', 'a_hit3', 'a_run1');
-    else if(has('hit')) line = ana(0.7, 'a_hit1', 'a_hit2', 'a_hit3', 'a_yes3');
+    else if(has('hit')) line = ana(0.7, 'a_hit1', 'a_hit2', 'a_hit3', 'a_yes2', 'a_yes3', 'a_yes4');
     else if(pl && (pl.kind === 'dp' || pl.kind === 'ldp')) line = ana(0.9, 'a_dp1', 'a_dp2');
-    else if(pl && pl.kind === 'err') line = ana(0.9, 'a_error1', 'a_error2');
+    else if(pl && pl.kind === 'err') line = ana(0.9, 'a_error1', 'a_error2', 'a_ah');
     else if(has('k')) line = ana(0.65, 'a_k1', 'a_k2', 'a_k3', A.res === 'whiff' ? 'a_whiff1' : 'a_pitch_good');
     else if(has('ball')) line = ana(0.7, 'a_walk1', 'a_walk2', 'a_ball2', 'a_ball1');
     else if(has('out') && A.res === 'inplay') line = ana(0.55, 'a_out1', 'a_out2', 'a_out3', A.bb && A.bb.type === 'gb' ? 'a_gb1' : 'a_fly1', 'a_dp2');
@@ -200,7 +228,7 @@ function castResult(res, opt = {}){
     if(!line && curPitcher(G).n >= 80) line = ana(0.12, 'a_tired1', 'a_tired2');
     // 점수 흐름: 역전·동점이 먼저
     if(has('score')){
-      if(diff(prev) < 0 && diff(sc) > 0) line = ana(0.9, 'a_comeback1') || line;
+      if(diff(prev) < 0 && diff(sc) > 0) line = ana(0.9, 'a_comeback1', 'a_flow1') || line;
       else if(diff(sc) === 0 && diff(prev) < 0) line = ana(0.8, 'a_tie1') || line;
       else if(!line) line = ana(0.4, 'a_score1', 'a_score2', 'a_score3');
     }
@@ -220,8 +248,19 @@ function castResult(res, opt = {}){
     after.push(ana(1, 'a_bye', 'a_end1'), CAST.idx && CAST.idx.c_thanks ? 'c_thanks' : null);
   }
   else {
-    if(hasAll('change')) after.push(ana(0.4, 'a_inning1', 'a_inning2'), 'change', `inn_${Math.min(12, G.inning)}${G.top ? 't' : 'b'}`, teamClip(batTeam(G)), 'j_attack',
-      'j_score', teamClip(G.teams[0]), numClip(runsOf(G.teams[0])), 'j_vs', numClip(runsOf(G.teams[1])), teamClip(G.teams[1]));
+    if(hasAll('change')){
+      // 이닝이 어떻게 끝났는지(inningLog)를 보고 말함: 삼자범퇴·위기 넘김·실점·병살·잔루 만루·삼진
+      const half = evAll.filter(e => e.k === 'inning').pop(), tied = runsOf(G.teams[0]) === runsOf(G.teams[1]), lead = runsOf(G.teams[0]) > runsOf(G.teams[1]) ? 0 : 1, gap = Math.abs(runsOf(G.teams[0]) - runsOf(G.teams[1]));
+      after.push(inningTalk(half), 'change', `inn_${Math.min(12, G.inning)}${G.top ? 't' : 'b'}`, teamClip(batTeam(G)), 'j_attack',
+        'j_score', teamClip(G.teams[0]), numClip(runsOf(G.teams[0])), 'j_vs', numClip(runsOf(G.teams[1])), teamClip(G.teams[1]));
+      // 지금 누가 앞서는지, 후반·마지막 이닝, 점수 차에 따른 한마디 (녹음이 없는 줄은 건너뜀)
+      if(tied) after.push(Math.random() < 0.6 ? 'j_tie' : null, G.inning >= 5 ? ana(0.3, 'c_even') : null);
+      else if(Math.random() < 0.5) after.push(teamClip(G.teams[lead]), 'j_lead');
+      if(G.top && G.inning === G.innings - 2 && G.innings >= 5) after.push('c_late');
+      if(G.top && G.inning >= G.innings) after.push('c_last');
+      if(gap >= 5 && G.inning >= 4) after.push(ana(0.5, 'a_big1'));
+      else if(gap >= 1 && gap <= 3 && G.inning >= G.innings - 2 && Math.random() < 0.3) after.push(ana(0.6, 'a_behind1'));
+    }
     if(hasAll('pchange')) after.push('r_pitcher_change', ana(0.5, 'a_change1'));
     if((hasAll('batter') && !hasAll('start')) || hasAll('change')){
       after.push(`bat_${batTeam(G).bi + 1}`);
@@ -229,7 +268,9 @@ function castResult(res, opt = {}){
       if(G.outs) after.push(`out_${G.outs}`);
       // 득점권이면 캐스터가 짚고 해설이 받음, 만루·후반 접전은 해설 한마디
       if(G.bases[1] != null || G.bases[2] != null){
-        if(G.bases.every(x => x != null)) after.push(ana(0.4, 'a_loaded1', 'a_pinch1'));
+        if(G.bases.every(x => x != null)) after.push(Math.random() < 0.5 ? 'c_loaded' : null, ana(0.4, 'a_loaded1', 'a_pinch1'));
+        else if(G.outs < 2 && G.bases[1] != null && G.bases[2] != null && Math.random() < 0.4) after.push('c_pinch');
+        else if(G.inning >= 7 && Math.abs(runsOf(G.teams[0]) - runsOf(G.teams[1])) <= 1 && Math.random() < 0.3) after.push('c_crucial');
         else if(Math.random() < 0.3 * anaRate() && CAST.idx && CAST.idx.c_scoring) after.push('c_scoring', pick1('a_chance1', 'a_chance2', 'a_yes1', 'a_yes3'));
       }
       else if(G.inning >= 7 && Math.abs(runsOf(G.teams[0]) - runsOf(G.teams[1])) <= 1) after.push(ana(0.4, 'a_close1', 'a_late1'));
@@ -246,7 +287,7 @@ function castResult(res, opt = {}){
   if(after.length) plan.push([plan.length ? plan[plan.length - 1][0] : resAt, after.flat(3).filter(Boolean)]);
   let end = 0;
   plan.forEach(([t, ids]) => { end = castPlay(ids, t); });
-  return { at: resAt, end };
+  return { at: resAt, end, hit: hitAt };
 }
 
 // 지금 상황 조각: 이닝 · 점수 · 아웃 · 주자 · 타자 (볼카운트 포함 여부는 count)
@@ -273,7 +314,7 @@ function castIdleArm(){
   CAST.idleT = setTimeout(() => {
     if(!G || G.over || key !== `${G.at}:${G.pitchNo}:${G.balls}:${G.strikes}:${G.outs}` || CAST.idleKey === key) return;
     CAST.idleKey = key;
-    const ids = [];
+    const ids = [G.bases.some(x => x != null) ? 'p_set3' : pick1('p_set1', 'p_set2')];   // 오래 고르는 동안 투구 전 뜸
     if(G.balls || G.strikes) ids.push(G.balls === 3 && G.strikes === 2 ? 'full' : [`cnt_b${G.balls}`, `cnt_s${G.strikes}`]);
     ids.push(`out_${G.outs}`, runClip(G.bases));
     castPlay(ids.flat(), 0);

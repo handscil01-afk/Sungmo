@@ -77,6 +77,8 @@ function tone(c, t0, dur, freq, gain, type = 'sine', to){
   o.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0 + dur + 0.02);
 }
 const SOUNDS = {
+  // 포수 미트에 공이 꽂히는 소리(합성): 짧은 저음 '퍽' + 가죽 잡음. 녹음을 받으면 이 자리를 바꿈
+  glove: (c, t) => { tone(c, t, 0.11, 110, 0.4, 'sine', 55); noise(c, t, 0.07, 'lowpass', 700, 0.5); noise(c, t + 0.005, 0.03, 'highpass', 3200, 0.14); },
   mitt:  (c, t) => { noise(c, t, 0.09, 'lowpass', 900, 0.5); tone(c, t, 0.08, 140, 0.25, 'sine', 70); },
   whiff: (c, t) => { noise(c, t, 0.25, 'bandpass', 1800, 0.18, 0.7); },
   foul:  (c, t) => { noise(c, t, 0.05, 'highpass', 2500, 0.35); },
@@ -123,6 +125,16 @@ const REC = { pitch:['pitch'], strike:['strike'], ballc:['ball'], foul:['foul'],
   // 헛스윙은 타격 방법마다(강하게·보통·맞히기), 타격음은 잘 맞은 정도마다 다른 소리 (여럿이면 그때그때 하나)
   'whiff-p':['whiff-p', 'whiff-p2'], 'whiff-s':['whiff-n', 'whiff-n2'], 'whiff-c':['whiff-c', 'whiff-c2'],
   bat:['bat1', 'bat2', 'bat3'], batF:['bat1', 'bat2', 'bat3'], batBig:['bat-big'] };
+/* 효과음 대응표: 사건마다 어떤 소리를 언제 내는지를 한곳에 적음 (시각은 공 하나의 시간표 timeline.js의 이름)
+   release 공을 놓음 · contact 공이 포수 미트나 방망이에 닿음 · hit 안타가 정해짐(공이 떨어지거나 내야를 빠져나감) · result 모든 플레이가 끝남
+   crowd: 함성의 종류와 크기. 안타 < 장타 < 홈런 ≤ 역전·끝내기. 원정팀 득점은 작게 */
+const SFX_MAP = {
+  pitch: { rec:'pitch', at:'release', lead:-0.15, vol:0.6 },
+  glove: { synth:'glove', at:'contact', when: A => A.res === 'take' || A.res === 'whiff' },   // 스트라이크·볼·헛스윙 모두 미트에 꽂히는 순간
+  swing: { rec:'contact', at:'contact', vol:0.95 },
+  crowd: { at:'hit', hit:{ peak:0.75, hold:1.6 }, xbh:{ peak:0.85, hold:2.2 }, big:{ peak:1.0, hold:3.5 }, away:0.6 },
+};
+const sfxTime = (tl, hitAt, key) => key === 'hit' ? (hitAt != null ? hitAt : tl.result) : tl[key];
 const REC_CONTACT = ['batBig', 'bat', 'batF', 'whiff-p', 'whiff-s', 'whiff-c'];
 const REC_MAIN = ['hr', 'b3', 'b2', 'hit', 'k', 'out', 'strike', 'ballc', 'foul', 'pchange', 'sub', 'start'];
 const RECBUF = {}, RECLOAD = {}, RECNOW = [];
@@ -166,12 +178,19 @@ function playRec(c, uniq){
   const tl = anim ? playTL(anim, uniq) : null, gx = !!tl;
   if(gx){
     const inplay = anim.res === 'inplay' && /^bat(Big)?$/.test(contact || ''), foul = contact === 'batF';
-    recPlay(c, 'pitch', tl.release - 0.15, 0.6);
-    if(contact) recPlay(c, recPick(contact), tl.contact, 0.95);
+    recPlay(c, 'pitch', sfxTime(tl, null, SFX_MAP.pitch.at) + SFX_MAP.pitch.lead, SFX_MAP.pitch.vol);
+    if(contact) recPlay(c, recPick(contact), tl.contact, SFX_MAP.swing.vol);
+    if(SFX_MAP.glove.when(anim)){ try{ SOUNDS.glove(c, c.currentTime + tl.contact); }catch(e){} }   // 미트 소리(합성)
     t = tl.result;
     if(SFX.castAt){ t = Math.max(t, SFX.castAt); SFX.castAt = 0; }   // 중계 음성이 결과를 말하는 순간에 맞춤
     const won = ['hr', 'b3', 'b2', 'hit'].find(n => uniq.includes(n));
-    if(inplay || foul) crowdSwell(c, tl.contact + 0.05, t, won ? (won === 'hr' ? 'big' : 'hit') : 'fade');
+    // 함성은 플레이가 다 끝나는 때가 아니라 안타가 정해지는 때(중계가 "안타!"를 말하는 때)에 터짐
+    const hm = typeof hitMoment === 'function' ? hitMoment(anim) : null, hitAt = SFX.hitAt != null ? SFX.hitAt : hm != null ? tl.contact + hm : null; SFX.hitAt = null;
+    const evs = SFX.ev || [], clutch = evs.some(e => e.k === 'score' && (e.walkoff || e.lc));
+    const kind = !won ? 'fade' : won === 'hr' || clutch ? 'big' : won === 'hit' ? 'hit' : 'xbh';
+    const top = typeof G !== 'undefined' && G ? (evs.some(e => e.k === 'inning') ? !G.top : G.top) : false;   // 이 공을 칠 때가 초인지 (3아웃으로 넘어갔으면 이미 뒤집힘)
+    const low = top ? SFX_MAP.crowd.away : 1;   // 원정팀(초) 안타·득점이면 함성을 작게
+    if(inplay || foul) crowdSwell(c, tl.contact + 0.05, won && hitAt != null ? Math.max(tl.contact + 0.2, Math.min(t, hitAt)) : t, kind, kind === 'fade' ? 1 : low);
   } else {
     if(pitch){ recPlay(c, 'pitch', t, 0.6); t += 0.35; }
     if(contact){ recPlay(c, recPick(contact), t, 0.9); t += contact === 'batBig' ? 0.45 : 0.3; }
@@ -189,22 +208,22 @@ function playRec(c, uniq){
   return true;
 }
 // 관중 함성 (녹음): 안타·득점은 cheer1의 한 부분을 짧게, 홈런은 cheer2를 길게. 중계가 들리게 조금 작게
-function cheer(c, at, big){
+function cheer(c, at, big, sc = 1){
   const name = big ? 'cheer2' : 'cheer1', buf = RECBUF[name]; if(!buf){ recLoad(name); return; }
   const s = c.createBufferSource(), g = c.createGain(); s.buffer = buf; s.connect(g); g.connect(c.destination);
-  const t = c.currentTime + at, dur = big ? 7 : 3.8, off = big ? 0 : Math.random() * Math.max(0, buf.duration - dur - 0.5), v = big ? 0.7 : 0.45;
+  const t = c.currentTime + at, dur = big ? 7 : 3.8, off = big ? 0 : Math.random() * Math.max(0, buf.duration - dur - 0.5), v = (big ? 0.7 : 0.45) * sc;
   g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(v, t + 0.25); g.gain.setValueAtTime(v, t + dur - 1.2); g.gain.linearRampToValueAtTime(0, t + dur);
   s.start(t, off); s.stop(t + dur + 0.05); RECNOW.push({ s, g });
 }
 // 타구가 날아가는 동안 관중이 술렁이며 커지고, 결과에 따라 길게 환호(hit·big)하거나 금세 사그라듦(fade)
-function crowdSwell(c, t0, t1, kind){
+function crowdSwell(c, t0, t1, kind, sc = 1){
   const buf = RECBUF.crowd; if(!buf){ recLoad('crowd'); return; }
   const s = c.createBufferSource(), g = c.createGain(), now = c.currentTime;
   s.buffer = buf; s.connect(g); g.connect(c.destination);
-  const a = now + t0, b = now + t1, peak = kind === 'big' ? 1.0 : 0.75;
-  g.gain.setValueAtTime(0.05, a); g.gain.linearRampToValueAtTime(0.45, b);
+  const cfg = SFX_MAP.crowd[kind] || SFX_MAP.crowd.hit, a = now + t0, b = now + t1, peak = cfg.peak * sc;
+  g.gain.setValueAtTime(0.05, a); g.gain.linearRampToValueAtTime(0.45 * sc, b);
   if(kind === 'fade'){ g.gain.linearRampToValueAtTime(0.5, b + 0.15); g.gain.linearRampToValueAtTime(0, b + 0.9); s.start(a, Math.random() * 40); s.stop(b + 1); }
-  else { cheer(c, t1 + 0.05, kind === 'big'); const hold = kind === 'big' ? 3.5 : 1.6; g.gain.linearRampToValueAtTime(peak, b + 0.3); g.gain.setValueAtTime(peak, b + hold); g.gain.linearRampToValueAtTime(0, b + hold + 1.5); s.start(a, Math.random() * 40); s.stop(b + hold + 1.6); }
+  else { cheer(c, t1 + 0.05, kind === 'big', sc); const hold = cfg.hold; g.gain.linearRampToValueAtTime(peak, b + 0.3); g.gain.setValueAtTime(peak, b + hold); g.gain.linearRampToValueAtTime(0, b + hold + 1.5); s.start(a, Math.random() * 40); s.stop(b + hold + 1.6); }
   RECNOW.push({ s, g });
 }
 // 함성은 처음 누를 때 미리 불러 둠 (첫 홈런에도 바로 나오게)

@@ -6,6 +6,12 @@
    field   땅볼을 야수가 잡음(그다음 1루로 던짐) · result 결과가 정해지는 순간(뜬공을 잡음, 송구가 1루에 도착, 공이 떨어짐, 담장을 넘음)
    runner  타자가 1루에 닿는 순간(아웃이면 송구보다 늦게, 내야 안타면 먼저) */
 const TL_BASE = { release:0.8, contact:1.27 };   // 투구 동작 0.8초, 공이 날아가는 시간은 구속으로
+// 공이 떨어지거나 내야를 빠져나가는 순간(안타를 말하고 함성이 터지는 때): 친 순간 뒤 몇 초. 안타가 아니면 null
+function hitMoment(A){
+  const bb = A && A.bb, ps = bb && bb.ps; if(!ps) return null;
+  const ev = ps.ev || [], land = ev.find(e => e.k === 'land'), first = ev.find(e => e.k === 'ball'), pick = ev.find(e => e.k === 'pickup');
+  return land ? land.t : bb.type === 'gb' && first ? Math.min(first.t1, 1.3) : pick ? pick.t - 0.3 : null;
+}
 function playTL(A, fx){
   if(!A) return null;
   fx = fx || [];

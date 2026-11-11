@@ -280,6 +280,10 @@ const PORT = 8766;
     await page.evaluate(() => { SET.picks = { ...picks(), pow9:true, swing9:true, aim:true }; SET.throwSec = 0;
       startGame({ mode:'detail', unit:'pa', innings:3, teams:[TEAMS[2].key, TEAMS[5].key], ctrl:['human', 'cpu'], who:['', ''], diff:1, easy:1, seed:777 }, 'click'); });
     const seen = {};
+    // 히트 앤드 런은 1루 주자만 있을 때 나옴: 처음 공격 화면에서 주자를 만들어 놓고 확인 (무작위로는 안 나올 수 있어서)
+    await page.evaluate(() => { G.bases = [(batTeam(G).bi + 1) % 9, null, null]; rerender(); });
+    if((await opts(page)).some(o => /^히트 앤드 런/.test(o.t))) seen.hitrun = 1;
+    await page.evaluate(() => { G.bases = [null, null, null]; rerender(); });
     for(let i = 0; i < 3000; i++){
       const qq = await q(page);
       if(qq.includes('경기가 끝났습니다')) break;
@@ -365,6 +369,49 @@ const PORT = 8766;
     await show("go(trainScreen, 'click')"); await page.keyboard.press('1');
     const fat2 = await page.evaluate(() => CR().career.fatigue); if(!(fat2 >= 10)) errors.push('육성: 훈련을 했는데 피로가 안 쌓임 ' + fat2);
     console.log('육성 화면 선택지 수:', JSON.stringify(dumps));
+    await ctx.close();
+  }
+  // 효과음 타이밍: 함성은 안타가 정해지는 때(플레이가 다 끝나기 전)에 터지고 크기가 사건에 맞으며, 미트 소리는 스트라이크·볼·헛스윙마다 공이 닿을 때 남
+  {
+    const ctx = await browser.newContext({ viewport:{ width:1024, height:768 } });
+    const page = await ctx.newPage();
+    page.on('pageerror', e => errors.push(`효과음 시험: ${e.message}`));
+    await page.goto(`http://localhost:${PORT}/baseball/`); await page.waitForSelector('#opts .opt');
+    await page.keyboard.press('1');
+    const r = await page.evaluate(() => {
+      const fake = { currentTime:0, state:'running' }; audio = () => fake; SET.snd = true; SET.sndKind = 'rec'; SET.cast = false;
+      const rec = { swell:[], glove:0, pitches:0 }; crowdSwell = (c, t0, t1, kind, sc) => rec.swell.push({ t0, t1, kind, sc }); SOUNDS.glove = () => { rec.glove++; };
+      G = newGame({ mode:'detail', innings:3, teams:[TEAMS[0].key, TEAMS[1].key], ctrl:['cpu', 'cpu'], easy:1, seed:41 }); flush(G);
+      const out = [], kinds = {}; let guard = 0;
+      while(!G.over && guard++ < 2500){
+        const res = G.review ? resolveReview(G, false) : playStep(G, aiDefChoice(G), aiOffChoice(G));
+        const pitched = res.events.some(e => e.k === 'pitch'), n0 = rec.swell.length, g0 = rec.glove, top0 = res.events.some(e => e.k === 'inning') ? !G.top : G.top;
+        SFX.ev = res.events; SFX.hitAt = null; playFx(res.fx);
+        if(!pitched) continue; rec.pitches++;
+        const A = G.anim, tl = playTL(A, res.fx), hm = hitMoment(A), pa = k => res.events.find(e => e.k === 'pa' && e.r === k);
+        if(rec.swell.length > n0 && hm != null && (pa('hr') || pa('b1') || pa('b2') || pa('b3'))){
+          const w = rec.swell[rec.swell.length - 1], want = Math.max(tl.contact + 0.2, Math.min(tl.result, tl.contact + hm));
+          const kind = pa('hr') ? 'hr' : pa('b2') || pa('b3') ? 'xbh' : pa('b1') ? 'hit' : '';
+          if(Math.abs(w.t1 - want) > 1e-6) out.push(`함성 시각 ${w.t1} ≠ 안타 시각 ${want}`);
+          if(w.t1 > tl.result + 1e-6) out.push('함성이 플레이가 끝난 뒤에 터짐');
+          if(w.t1 < tl.result - 0.05) kinds.early = (kinds.early || 0) + 1;
+          if(kind === 'hr' && w.kind !== 'big') out.push('홈런인데 큰 함성이 아님');
+          if(kind === 'xbh' && !['xbh', 'big'].includes(w.kind)) out.push('장타인데 장타 함성이 아님 ' + w.kind);
+          if(kind === 'hit' && !['hit', 'big'].includes(w.kind)) out.push('안타인데 안타 함성이 아님 ' + w.kind);
+          kinds[w.kind] = (kinds[w.kind] || 0) + 1;
+          if(top0 && w.sc >= 1) out.push('원정 팀 안타인데 함성이 작아지지 않음');
+          if(!top0 && w.sc < 1) out.push('홈 팀 안타인데 함성이 작음');
+        }
+        const taken = A.res === 'take' || A.res === 'whiff';
+        if(taken && rec.glove === g0) out.push('스트라이크·볼·헛스윙인데 미트 소리가 없음');
+        if(!taken && rec.glove > g0) out.push('치거나 파울인데 미트 소리가 남');
+      }
+      return { out: [...new Set(out)], kinds, pitches: rec.pitches, glove: rec.glove };
+    });
+    if(r.out.length) errors.push('효과음 시험: ' + r.out.join(' / '));
+    if(!r.kinds.early) errors.push('효과음 시험: 함성이 플레이 끝보다 일찍 터진 경우가 한 번도 없음(안타 시각을 못 씀)');
+    if(!r.kinds.hit || !r.kinds.xbh) errors.push('효과음 시험: 안타·장타 함성이 모두 나오지 않음 ' + JSON.stringify(r.kinds));
+    console.log('효과음 시험:', JSON.stringify(r));
     await ctx.close();
   }
   await browser.close(); srv.kill();
