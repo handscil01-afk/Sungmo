@@ -278,7 +278,7 @@ const PORT = 8766;
     await page.goto(`http://localhost:${PORT}/baseball/`); await page.waitForSelector('#opts .opt');
     await page.keyboard.press('1');
     await page.evaluate(() => { SET.picks = { ...picks(), pow9:true, swing9:true, aim:true }; SET.throwSec = 0;
-      startGame({ mode:'detail', unit:'pa', innings:2, teams:[TEAMS[2].key, TEAMS[5].key], ctrl:['human', 'cpu'], who:['', ''], diff:1, easy:1, seed:777 }, 'click'); });
+      startGame({ mode:'detail', unit:'pa', innings:3, teams:[TEAMS[2].key, TEAMS[5].key], ctrl:['human', 'cpu'], who:['', ''], diff:1, easy:1, seed:777 }, 'click'); });
     const seen = {};
     for(let i = 0; i < 3000; i++){
       const qq = await q(page);
@@ -330,6 +330,41 @@ const PORT = 8766;
     if(!sound.sayHidden || !sound.logHidden) errors.push('결과 전달 소리만: 결과 글이 숨겨지지 않음 ' + JSON.stringify(sound));
     if(text.castOn || text.sayHidden) errors.push('결과 전달 글만: 중계 음성이 켜져 있거나 글이 숨겨짐 ' + JSON.stringify(text));
     console.log('결과 전달:', JSON.stringify({ both, sound, text }));
+    await ctx.close();
+  }
+  // 육성: 계약·FA·장비 수리·강화·휴가·훈련 화면이 열리고 고를 수 있어야 함
+  {
+    const ctx = await browser.newContext({ viewport:{ width:390, height:844 } });
+    const page = await ctx.newPage();
+    page.on('pageerror', e => errors.push(`육성 화면: ${e.message}`));
+    page.on('console', m => { if(m.type() === 'error') errors.push(`육성 화면 console: ${m.text()}`); });
+    await page.goto(`http://localhost:${PORT}/baseball/`); await page.waitForSelector('#opts .opt');
+    await page.keyboard.press('2');
+    await page.evaluate(() => {
+      Object.assign(NEWC, { name:'시험', pit:false, pos:'SS', type:'power', team:'star' }); NEW.len = 18; NEW.mode = 'simple';
+      LSRC = 'career'; const L = careerNew(); L.mv = 2; setLG(L);
+      const c = L.career, p = c.p; p.seasons = 4; c.money = 5000;   // 1군 4시즌째, 돈 넉넉
+      ITEMS.filter(x => fits(x, p)).slice(0, 2).forEach(it => { c.owned.push(it.id); equip(L, it); });
+      c.offer = contractOffer(L, L.my); saveLeague(); go(careerHome, 'click');
+    });
+    const wanted = [['계약을 정할 시간', 3], ['FA 시장', 2], ['장비 수리·강화', 4], ['어디에 갈까요', 6], ['어떤 훈련을 할까요', 5]];
+    const show = async fn => { await page.evaluate(f => { window.__susp = true; eval(f); }, fn); await page.waitForTimeout(120); };
+    await show("go(careerHome, 'click')");
+    if(!/계약을 정할 시간/.test(await q(page))) errors.push('육성: 계약 제시 화면이 첫 화면에 나오지 않음: ' + (await q(page)).slice(0, 30));
+    const dumps = {};
+    for(const [name, fn] of [['계약', "go(contractScreen, 'click')"], ['FA', "(() => { const L = CR(), c = life(L); c.fa = faOffers(L); go(faScreen, 'click'); })()"], ['장비', "go(gearScreen, 'click')"], ['어디', "go(visitScreen, 'click')"], ['훈련', "go(trainScreen, 'click')"]]){
+      await show(fn); dumps[name] = (await opts(page)).filter(o => o.n !== '0').length; await noOverflow(page, `육성 ${name}`);
+    }
+    // 계약 받아들이기 → 첫 화면으로
+    await show("go(contractScreen, 'click')"); await page.keyboard.press('1');
+    await page.waitForFunction(() => !CR().career.offer);
+    if(/계약을 정할 시간/.test(await q(page))) errors.push('육성: 계약한 뒤에도 계약 화면');
+    // 휴가·훈련 실제 실행
+    await show("go(visitScreen, 'click')"); await page.keyboard.press('6');
+    const fat = await page.evaluate(() => CR().career.fatigue); if(!(fat <= 0)) errors.push('육성: 휴가를 갔는데 피로가 안 풀림 ' + fat);
+    await show("go(trainScreen, 'click')"); await page.keyboard.press('1');
+    const fat2 = await page.evaluate(() => CR().career.fatigue); if(!(fat2 >= 10)) errors.push('육성: 훈련을 했는데 피로가 안 쌓임 ' + fat2);
+    console.log('육성 화면 선택지 수:', JSON.stringify(dumps));
     await ctx.close();
   }
   await browser.close(); srv.kill();

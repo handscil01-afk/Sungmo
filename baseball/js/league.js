@@ -307,11 +307,33 @@ function seasonRecords(L){
 }
 const sumStats = (a, b) => { const o = { ...(a || {}) }; for(const k in (b || {})) o[k] = (o[k] || 0) + b[k]; return o; };
 // 나이에 따라 성장·하락: 젊으면 오르고, 서른을 넘기면 조금씩 떨어짐 (발은 일찍 떨어짐)
+/* 성장 유형과 잠재력: 선수마다 능력별 상한(pot)과 성장 곡선(조숙·보통·대기만성)이 있어, 어디까지 클지와 언제 크는지가 다름.
+   처음 필요할 때 만들어 두므로(옛 저장 포함) 저장 형식은 칸만 더해짐 */
+const CURVES = { early:{ name:'조숙형', shift:2 }, normal:{ name:'보통', shift:0 }, late:{ name:'대기만성형', shift:-2 } };
+const potKeys = p => p.vel ? ['vel', 'ctl', 'stf', 'sta'] : ['con', 'pow', 'eye', 'spd', 'def'];
+const potCap = k => k === 'vel' ? 162 : k === 'sta' ? 120 : 99;
+function ensureGrowth(L, p){
+  if(p.pot) return p;
+  const u = rnd(L); p.curve ||= u < 0.2 ? 'early' : u < 0.8 ? 'normal' : 'late';
+  const a = p.age || 25, room = a <= 22 ? 14 : a <= 25 ? 9 : a <= 29 ? 4 : 1;
+  p.pot = {};
+  // 잠재력은 능력별 상한(60~99, 구속은 140~162): 어린 선수일수록 높은 곳까지 갈 수 있고, 나이 든 선수는 지금 값 가까이
+  potKeys(p).forEach(k => {
+    const young = a <= 25, target = k === 'vel' ? 140 + rnd(L) * 20 : 62 + rnd(L) * 30, near = p[k] + room * (0.4 + rnd(L) * 1.2) * (k === 'vel' ? 0.3 : 1);
+    p.pot[k] = clamp(Math.round(young ? Math.max(near, target) : near), p[k], potCap(k));
+  });
+  return p;
+}
+// 나이에 곡선을 더한 '성장 나이' (조숙형은 일찍 꺾이고 대기만성형은 늦게까지 큼)
+const growAge = p => (p.age || 25) + CURVES[p.curve || 'normal'].shift;
 function develop(L, p){
-  const a = p.age, base = a <= 23 ? 3 : a <= 26 ? 1.5 : a <= 30 ? 0 : a <= 33 ? -1.5 : -3;
-  const ch = (k, extra = 0) => { p[k] = clamp(Math.round(p[k] + base + extra + gauss(L) * 2.5), 20, 99); };
+  ensureGrowth(L, p);
+  const a = p.age, ga = a <= 30 ? growAge(p) : a, base = ga <= 23 ? 3 : ga <= 26 ? 1.5 : ga <= 30 ? 0 : ga <= 33 ? -1.5 : -3;
+  // 늘어나는 해에는 잠재력(pot)을 넘지 못하고, 줄어드는 해에는 상한과 상관없이 줄어듦
+  const lim = (k, v) => base > 0 ? Math.min(v, Math.max(p[k], p.pot[k] || 99)) : v;
+  const ch = (k, extra = 0) => { p[k] = lim(k, clamp(Math.round(p[k] + base + extra + gauss(L) * 2.5), 20, 99)); };
   if(p.vel){
-    ch('ctl'); ch('stf'); p.vel = clamp(Math.round(p.vel + base / 2 + gauss(L) * 0.8), 128, 162);
+    ch('ctl'); ch('stf'); p.vel = lim('vel', clamp(Math.round(p.vel + base / 2 + gauss(L) * 0.8), 128, 162));
     (p.pitches || []).forEach(x => { x.g = clamp(Math.round(x.g + base + gauss(L) * 2), 20, 99); });
   } else { ch('con'); ch('pow'); ch('eye'); ch('def'); ch('spd', a >= 28 ? -1.5 : 0); }
 }

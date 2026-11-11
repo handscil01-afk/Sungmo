@@ -45,7 +45,9 @@ function careerNew(){
     for(const k in m) p[k] = clamp(p[k] + m[k], 25, 90);
   }
   p.name = NEWC.name; p.age = 20; p.rookie = true; p.cond = 0;
-  L.career = { id:p.id, p, where:'minor', pit:NEWC.pit, type:NEWC.type, pts:{}, fame:0, trained:-1, minor:{}, ach:[], hurt:0, slump:0, money:300, salary:3000, equip:{}, goods:{ drink:1 }, owned:[] };
+  ensureGrowth(L, p);
+  L.mv = 2;   // 새 저장 형식 (성장 유형·피로·계약·장비 상태가 처음부터 있음)
+  L.career = { v:CAREER_V, id:p.id, p, where:'minor', pit:NEWC.pit, type:NEWC.type, pts:{}, fame:0, trained:-1, minor:{}, ach:[], hurt:0, slump:0, money:300, salary:3000, equip:{}, goods:{ drink:1 }, owned:[], fatigue:0, gs:{}, applied:{}, contract:{ years:1, salary:3000, bonus:0, until:L.season, team:L.my } };
   crLog(L, `${p.name}, ${teamInfo(NEWC.team).name}에 입단했습니다! 퓨처스리그(2군)에서 시작합니다.`);
   return L;
 }
@@ -100,7 +102,7 @@ function careerStatus(L){
   const s = p.ss || {}, m = c.minor || {};
   if(c.where !== 'minor') out.push(isPit(p) ? `이번 시즌 1군: ${pitLine(p).replace(/^[^:]+: /, '')}` : `이번 시즌 1군: ${batLine(p).replace(/^[^:]+: /, '')}`);
   if(m.g) out.push(isPit(p) ? `퓨처스리그: ${m.g}경기 ${m.w || 0}승, ${ipText(m.out || 0)}, 평균자책점 ${m.out ? (m.r * 27 / m.out).toFixed(2) : '-'}.` : `퓨처스리그: ${m.g}경기 타율 ${avgText(m.ab ? m.h / m.ab : 0)}, 홈런 ${m.hr || 0}.`);
-  life(L); out.push(`연봉 ${won(c.salary)}, 가진 돈 ${won(c.money)}. 장비: ${equipText(L)}.`);
+  life(L); out.push(`연봉 ${won(c.salary)}${c.contract ? ` (계약 ${Math.max(0, c.contract.until - L.season + 1)}시즌 남음)` : ''}, 가진 돈 ${won(c.money)}. 피로 ${fatigueWord(c)}. 장비: ${equipText(L)}.`);
   if(L.phase === 'season') out.push(`${L.season}시즌 ${L.day + 1}일째. 팀은 ${myRank(L).rank}위, ${T.w}승 ${T.l}패.`);
   else if(L.phase === 'post') out.push(seriesText(L));
   else out.push(...awardLines(L));
@@ -113,7 +115,7 @@ function careerHome(){
     note:['내 선수 한 명을 만들어 신인으로 입단합니다. 2군에서 훈련하며 실력을 키워 1군 주전이 되고, 타이틀과 우승, 명예의 전당을 노립니다.', '1군 경기에서는 내 선수의 타석(투수라면 내 선수가 던지는 동안)만 직접 하고, 나머지는 빠르게 진행합니다.'],
     opts:[{ n:1, t:'새 선수 만들기', act: v => go(careerNameScreen, v) }] };
   const c = C(L), p = myP(L), done = L.phase === 'done', g = myGameToday(L);
-  if(!c.retired){ life(L); if(c.event) return eventScreen(); }
+  if(!c.retired){ life(L); if(c.offer) return contractScreen(); if(c.event) return eventScreen(); }
   if(c.retired) return { q:'은퇴한 선수입니다. 새 선수를 만들까요?', back: v => go(homeScreen, v), note: c.final || [], opts:[
     { n:1, t:'새 선수 만들기', act: v => go(careerNameScreen, v) }, { n:7, t:'업적과 경력', act: v => go(careerLogScreen, v) }, { n:8, t:'기록실과 명예의 전당', act: v => go(archiveScreen, v) }] };
   const saved = (() => { const s = loadSaved(); return s && s.G.career && s.G.career.day === L.day && s.G.career.phase === L.phase && s.G.career.season === L.season ? s : null; })();
@@ -141,33 +143,43 @@ function careerHome(){
 /* ---------- 훈련 ---------- */
 function trainScreen(){
   const L = CR(), p = myP(L), list = isPit(p) ? PIT_TRAIN : BAT_TRAIN, c = C(L);
-  const opts = list.map(([k, t, nm], i) => ({ n: i + 1, t, s:`${nm} ${p[k]}, 성장 점수 ${Math.round(c.pts[k] || 0)}/10`, act: v => doTrain(k, nm, v) }));
-  opts.push({ n:9, t:'푹 쉬기', s:'컨디션이 좋아집니다.', act: v => doTrain(null, null, v) });
-  return { q:'어떤 훈련을 할까요?', back: v => go(careerHome, v), opts };
+  ensureGrowth(L, p);
+  const opts = list.map(([k, t, nm], i) => ({ n: i + 1, t, s:`${nm} ${p[k]}, 성장 점수 ${Math.round(c.pts[k] || 0)}/10${(p.pot[k] ?? 99) - p[k] <= 0 ? ', 한계에 닿음' : (p.pot[k] ?? 99) - p[k] < 5 ? ', 한계에 가까워 느림' : ''}`, act: v => doTrain(k, nm, v) }));
+  opts.push({ n:9, t:'푹 쉬기', s:'컨디션이 좋아지고 피로가 풀립니다.', act: v => doTrain(null, null, v) });
+  return { q:`어떤 훈련을 할까요? 피로 ${fatigueWord(c)}${(c.fatigue || 0) > 70 ? '. 쉬지 않으면 효과가 크게 줄고 다치기 쉽습니다' : ''}.`, back: v => go(careerHome, v), opts };
 }
 function grow(L, k, amt){
   const c = C(L), p = myP(L), out = [];
-  c.pts[k] = (c.pts[k] || 0) + amt * growMul(p.age);
+  ensureGrowth(L, p);
+  // 성장 = 기본 × 나이(성장 유형 반영) × 잠재력까지 남은 거리 × 피로. 한계에 가까울수록 느려지고, 한계에 닿으면 더 오르지 않음
+  const room = clamp(((p.pot[k] ?? 99) - p[k]) / 12, 0, 1);
+  c.pts[k] = (c.pts[k] || 0) + amt * growMul(growAge(p)) * room * fatigueMul(c);
   while(c.pts[k] >= 10){
     c.pts[k] -= 10;
-    const max = k === 'vel' ? 162 : k === 'sta' ? 120 : 99;
+    const max = Math.min(potCap(k), p.pot[k] ?? 99);
     if(p[k] < max){ p[k]++; out.push(`${({ con:'컨택', pow:'파워', eye:'선구안', spd:'스피드', def:'수비', vel:'구속', ctl:'제구', stf:'구위', sta:'체력' })[k]}이 ${p[k]}로 올랐습니다!`); if(k === 'stf') (p.pitches || []).forEach(x => { x.g = Math.min(99, x.g + 1); }); }
+    else { c.pts[k] = 0; out.push(`${ABIL_NAME[k]}은 이 선수의 한계(${max})에 닿았습니다.`); break; }
   }
   return out;
 }
-function doTrain(k, nm, via){
-  const L = CR(), c = C(L), p = myP(L);
+// 훈련 하루 (화면 없이 계산만: 자동 시험도 이것을 씀). 돌려주는 값: 말할 글
+function trainDay(L, k, nm){
+  const c = C(L), p = myP(L);
   c.trained = `${L.season}-${L.phase}-${L.day}`;
-  let say;
-  if(!k){ p.cond = Math.min(2, p.cond + 1); say = [`푹 쉬었습니다. 컨디션 ${COND[p.cond]}.`]; }
-  else {
-    // 대성공(15%): 두 배, 보약을 먹었으면 또 두 배. 컨디션이 좋으면 조금 더
-    const great = rnd(L) < 0.15, tonic = !!c.tonic; c.tonic = false;
-    const amt = (4 + rnd(L) * 3) * (great ? 2 : 1) * (tonic ? 2 : 1) * (1 + (p.cond || 0) * 0.08);
-    const up = grow(L, k, amt);
-    if(rnd(L) < 0.2){ p.cond = Math.max(-2, p.cond - 1); up.push('훈련이 힘들어 몸이 조금 무겁습니다.'); }
-    say = [`${great ? '대성공! ' : ''}${nm} 훈련을 했습니다.${tonic ? ' 보약 덕분에 효과가 두 배!' : ''} 성장 점수 ${Math.round(c.pts[k])}/10.`, ...up];
-  }
+  if(!k){ p.cond = Math.min(2, p.cond + 1); addFatigue(c, -30); return [`푹 쉬었습니다. 컨디션 ${COND[p.cond]}, 피로 ${fatigueWord(c)}.`]; }
+  // 대성공(15%): 두 배, 보약을 먹었으면 또 두 배. 컨디션이 좋으면 조금 더
+  const great = rnd(L) < 0.15, tonic = !!c.tonic; c.tonic = false;
+  const amt = (4 + rnd(L) * 3) * (great ? 2 : 1) * (tonic ? 2 : 1) * (1 + (p.cond || 0) * 0.08);
+  const tired = (c.fatigue || 0) > 70;
+  const up = grow(L, k, amt);
+  addFatigue(c, 14);
+  if(rnd(L) < 0.2){ p.cond = Math.max(-2, p.cond - 1); up.push('훈련이 힘들어 몸이 조금 무겁습니다.'); }
+  if(tired) up.push('너무 피곤해서 훈련 효과가 크게 줄었습니다. 푹 쉬세요.');
+  else if((c.fatigue || 0) > 70) up.push('피로가 많이 쌓였습니다. 더 하면 부상 위험이 커집니다.');
+  return [`${great ? '대성공! ' : ''}${nm} 훈련을 했습니다.${tonic ? ' 보약 덕분에 효과가 두 배!' : ''} 성장 점수 ${Math.round(c.pts[k] || 0)}/10, 피로 ${fatigueWord(c)}.`, ...up];
+}
+function doTrain(k, nm, via){
+  const L = CR(), say = trainDay(L, k, nm);
   saveLeague(); go(() => sceneScreen(k || 'rest', k ? `${nm} 훈련` : '푹 쉬기'), via, say);
 }
 
@@ -236,6 +248,7 @@ function careerGrowFromGame(L, G, minor){
     if(!minor && (dec.w === c.id || dec.s === c.id) && s.r === 0) out.push(...interview(L, p, dec.w === c.id ? '무실점 승리' : '세이브'));
   }
   out.push(...gameBonus(L, ln, G, minor));
+  addFatigue(c, minor ? 3 : 5); out.push(...wearGear(L, minor ? 1 : 2));
   if(minor){ const mm = c.minor; mm.g = (mm.g || 0) + 1; ['ab', 'h', 'hr', 'out', 'r'].forEach(k => { mm[k] = (mm[k] || 0) + (s[k] || 0); }); if((G.decision || {}).w === c.id) mm.w = (mm.w || 0) + 1; }
   return out;
 }
@@ -250,8 +263,9 @@ function interview(L, p, what){
 // 날이 지날 때: 슬럼프·부상, 1군 승격
 function careerAfterDay(L){
   const c = C(L), p = myP(L), out = [];
-  if(c.hurt > 0){ c.hurt--; if(!c.hurt) out.push('부상에서 돌아왔습니다!'); }
-  else if(rnd(L) < 0.006){ c.hurt = 3 + Math.floor(rnd(L) * 8); out.push(`아, 경기 중에 몸을 다쳤습니다. ${c.hurt}일 동안 쉬어야 합니다.`); crLog(L, `${p.name}, 부상으로 ${c.hurt}일 쉼.`); }
+  addFatigue(c, -4);   // 하루 쉬면 조금 풀림
+  if(c.hurt > 0){ c.hurt--; if(!c.hurt){ heal(p, c); out.push('부상에서 돌아왔습니다!'); } }
+  else if(rnd(L) < injuryChance(c)){ const m = injure(L, p, c); out.push(`아, 경기 중에 몸을 다쳤습니다. ${m}`); crLog(L, `${p.name}, 부상으로 ${c.hurt}일 쉼.`); }
   else if(rnd(L) < 0.02){ p.cond = -2; out.push('요즘 슬럼프입니다. 몸이 무겁습니다. 훈련하거나 푹 쉬어 보세요.'); }
   if(c.where === 'minor' && L.phase === 'season') out.push(...promote(L));
   out.push(...payDay(L));
@@ -350,15 +364,21 @@ function careerSimDay(via, listen){
   out.push(...careerAfterDay(L));
   saveLeague(); go(careerHome, via, out);
 }
-function careerNextSeason(via){
-  const L = CR(), c = C(L);
+// 새 시즌 준비 (화면 없이 계산만). 돌려주는 값: { out 말할 글, retire 은퇴 사유 또는 null }
+function nextSeasonCore(L){
+  const c = C(L);
   if(c.where === 'minor'){ const p = c.p; p.cs = sumStats(p.cs, p.ss); p.ss = {}; p.seasons = (p.seasons || 0) + 1; p.age++; p.rookie = false; develop(L, p); }
   leagueNextSeason(L);
-  c.minor = {};
+  c.minor = {}; c.fatigue = 0;
   const p = myP(L), out = leagueNews(L);
-  out.unshift(`${L.season}시즌이 시작됩니다. ${p.name}, ${p.age}세가 되었습니다.`, ...negotiate(L));
-  if(p.age >= 40){ saveLeague(); careerRetire(via, '마흔 살이 되어 은퇴합니다.'); return; }
-  saveLeague(); go(careerHome, via, out);
+  out.unshift(`${L.season}시즌이 시작됩니다. ${p.name}, ${p.age}세가 되었습니다. 잠재력: ${CURVES[p.curve || 'normal'].name}.`, ...negotiate(L));
+  if(c.gs) refreshGear(L);   // 나이에 따라 능력치가 바뀐 뒤 장비 효과를 다시 계산
+  return { out, retire: p.age >= 40 ? '마흔 살이 되어 은퇴합니다.' : null };
+}
+function careerNextSeason(via){
+  const L = CR(), r = nextSeasonCore(L);
+  if(r.retire){ saveLeague(); careerRetire(via, r.retire); return; }
+  saveLeague(); go(careerHome, via, r.out);
 }
 function careerRetire(via, why){
   const L = CR(), c = C(L), p = myP(L);

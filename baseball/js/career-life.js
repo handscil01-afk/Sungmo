@@ -42,23 +42,21 @@ const won = n => n >= 10000 ? `${Math.floor(n / 10000)}억${n % 10000 ? ` ${n % 
 function life(L){
   const c = C(L);
   if(c.money == null){ c.money = 200; c.equip = {}; c.goods = {}; c.salary = c.where === 'minor' ? 3000 : salaryOf(L); }
-  c.equip ||= {}; c.goods ||= {}; c.owned ||= [];
+  c.equip ||= {}; c.goods ||= {}; c.owned ||= []; c.gs ||= {}; c.applied ||= {};
   return c;
 }
-function salaryOf(L){
+function salaryOf(L, raw){
   const c = C(L), p = myP(L), r = isPit(p) ? ratingPit(p) : ratingBat(p);
-  if(c.where === 'minor') return 3000;
+  if(c.where === 'minor' && !raw) return 3000;
   return Math.round((4000 + Math.max(0, r - 45) * 400 + (c.fame || 0) * 30) / 100) * 100;
 }
-// 장비 효과를 능력치에 더하거나(sign 1) 뺌(-1)
-function applyItem(p, it, sign){
-  const keys = it.fx.all ? statKeys(p).map(k => [k, it.fx.all]) : Object.entries(it.fx);
-  keys.forEach(([k, v]) => { if(p[k] == null) return; const max = k === 'vel' ? 165 : k === 'sta' ? 125 : 99; p[k] = clamp(p[k] + v * sign, 1, max); });
-}
+// 장비 효과는 career-grow.js의 refreshGear가 계산해 능력치에 반영함 (등급·성격·내구도·강화)
 function equipText(L){
   const c = life(L), list = Object.entries(c.equip).map(([s, id]) => itemOf(id)).filter(Boolean);
-  return list.length ? list.map(x => x.name).join(', ') : '없음';
+  return list.length ? list.map(x => `${x.name}(${gearTag(c, x)})`).join(', ') : '없음';
 }
+// 등급·내구도·강화를 한 줄로
+const gearTag = (c, it) => { const st = gearState(c, it.id); return `${GRADE_NAME[gearGrade(it)]}, 내구 ${st.dur}%${st.lv ? `, +${st.lv}` : ''}`; };
 
 /* ---------- 돈 ---------- */
 // 하루가 지날 때: 연봉을 경기 수만큼 나눠 받음
@@ -80,11 +78,34 @@ function gameBonus(L, ln, G, minor){
   c.money += b;
   return [`활약 보너스 ${won(b)}을 받았습니다. 가진 돈 ${won(c.money)}.`];
 }
-// 새 시즌: 연봉 협상
+// 새 시즌: 계약이 남았으면 그대로, 끝났으면 구단이 새 계약을 제시함(첫 화면에서 받기·올려 부르기·FA 선언을 고름). 2군은 늘 같은 조건으로 자동 계약
 function negotiate(L){
-  const c = life(L), old = c.salary, nw = salaryOf(L);
-  c.salary = Math.max(c.where === 'minor' ? 3000 : 3500, nw);
-  return [`연봉 협상: ${won(old)}에서 ${won(c.salary)}으로 ${c.salary > old ? '올랐습니다!' : c.salary < old ? '깎였습니다.' : '그대로입니다.'}`];
+  const c = life(L), old = c.salary;
+  if(c.where === 'minor'){ c.salary = 3000; c.contract = { years:1, salary:3000, bonus:0, until:L.season, team:L.my }; return []; }
+  if(c.contract && c.contract.until >= L.season){ c.salary = c.contract.salary; return [`계약이 ${c.contract.until - L.season + 1}시즌 남았습니다. 연봉 ${won(c.salary)}.`]; }
+  c.offer = contractOffer(L, L.my);
+  return [`계약이 끝났습니다. 구단이 새 계약을 제시했습니다. (지금 연봉 ${won(old)})`];
+}
+function offerText(o, L){ return `${teamInfo(o.team).name}: 연봉 ${won(o.salary)}, ${o.years}년${o.bonus ? `, 계약금 ${won(o.bonus)}` : ''}. 구단 예산 ${o.budget}${o.starter != null ? `, 주전 가능성 ${o.starter >= 3 ? '높음' : o.starter >= -3 ? '보통' : '낮음'}` : ''}.`; }
+function contractScreen(){
+  const L = CR(), c = life(L), p = myP(L), o = c.offer, can = faEligible(L, p);
+  const take = v => { signContract(L, o); saveLeague(); go(careerHome, v, [`계약했습니다. 연봉 ${won(c.salary)}, ${c.contract.years}년.${o.bonus ? ` 계약금 ${won(o.bonus)}을 받았습니다.` : ''}`]); };
+  return { q:'계약을 정할 시간입니다. 어떻게 할까요?', note:[offerText(o, L), can ? 'FA 자격이 있습니다.' : 'FA 자격은 1군에서 3시즌을 뛴 뒤 생깁니다.'], opts:[
+    { n:1, t:'제시를 받아들이기', act: take },
+    { n:2, t:'올려 불러 보기', hide: !!o.pushed, s:'성공하면 연봉이 오르지만, 실패하면 제시가 낮아지고 다시 올려 부를 수 없습니다.', act: v => {
+        const pr = clamp(0.35 + (c.fame || 0) / 200 + ((isPit(p) ? ratingPit(p) : ratingBat(p)) - 55) / 200, 0.15, 0.75), ok = rnd(L) < pr;
+        o.pushed = true; o.salary = clamp(Math.round(o.salary * (ok ? 1.12 : 0.93) / 100) * 100, 3500, salaryCap(o.budget) * (ok ? 1.05 : 1));
+        saveLeague(); go(contractScreen, v, [ok ? `구단이 한발 물러났습니다! 연봉 ${won(o.salary)}으로 올랐습니다.` : `구단이 기분이 상했습니다. 제시가 ${won(o.salary)}으로 낮아졌습니다.`]); } },
+    { n:3, t:'FA를 선언하기', hide: !can, s:'다른 구단들의 제시를 들어 보고 고릅니다. 원래 팀에 남을 수도 있습니다.', act: v => { c.fa = faOffers(L); saveLeague(); go(faScreen, v); } },
+  ] };
+}
+function faScreen(){
+  const L = CR(), c = life(L), list = c.fa || [];
+  const sign = (o, v) => { delete c.fa; signContract(L, o); saveLeague(); go(careerHome, v, [`${teamInfo(o.team).name}${o.team === L.my ? '에 남기로' : '로 이적하기로'} 했습니다. 연봉 ${won(c.salary)}, ${c.contract.years}년.`]); };
+  return { q:'FA 시장입니다. 어느 구단과 계약할까요?', back: v => go(contractScreen, v), opts:[
+    ...list.map((o, i) => ({ n: i + 1, t: teamInfo(o.team).name, s: offerText(o, L).replace(/^[^:]+: /, '') + ` 순위 ${o.rank}위.`, act: v => sign(o, v) })),
+    { n:9, t:`원래 팀(${teamInfo(L.my).name}) 제시 받기`, s: offerText(c.offer, L), act: v => { delete c.fa; signContract(L, c.offer); saveLeague(); go(careerHome, v, [`원래 팀과 계약했습니다. 연봉 ${won(c.salary)}.`]); } },
+  ] };
 }
 
 /* ---------- 용품점 ---------- */
@@ -93,7 +114,7 @@ function shopScreen(msg){
   const list = ITEMS.filter(it => fits(it, p));
   const pageItems = list.slice(0, 6);
   return { q:`스포츠 용품점입니다. 가진 돈 ${won(c.money)}. 무엇을 살까요?`, say: msg, scene:{ kind:'shop', title:'스포츠 용품점', color: teamInfo(L.my).color }, back: v => go(visitScreen, v), opts:[
-    ...pageItems.map((it, i) => ({ n: i + 1, icon:['icons', ITEMS.indexOf(it)], t:`${it.name} ${won(it.price)}${c.owned.includes(it.id) ? ' (가지고 있음)' : ''}`, s:`${SLOT_NAME[it.slot]} · ${fxText(it, p)}`, act: v => buyItem(it, v) })),
+    ...pageItems.map((it, i) => ({ n: i + 1, icon:['icons', ITEMS.indexOf(it)], t:`${it.name} ${won(it.price)}${c.owned.includes(it.id) ? ' (가지고 있음)' : ''}`, s:`${GRADE_NAME[gearGrade(it)]} ${SLOT_NAME[it.slot]} · ${fxText(it, p)}${(GEAR_COST[it.id] ? ', ' + Object.entries(GEAR_COST[it.id]).map(([k, v]) => `${ABIL_NAME[k]} ${v}`).join(', ') : '')}`, act: v => buyItem(it, v) })),
     { n:7, t:'장비 더 보기', hide: list.length <= 6, s:`${list.slice(6).map(x => x.name).join(', ')}`, act: v => go(() => shopMore(), v) },
     { n:8, t:'소모품 (음료·테이핑·보약)', act: v => go(goodsShop, v) },
     { n:9, t:'내 가방 (장착·사용)', act: v => go(bagScreen, v) },
@@ -101,7 +122,7 @@ function shopScreen(msg){
 }
 function shopMore(){
   const L = CR(), c = life(L), p = myP(L), list = ITEMS.filter(it => fits(it, p)).slice(6);
-  return { q:`장비 더 보기. 가진 돈 ${won(c.money)}.`, back: v => go(shopScreen, v), opts: list.slice(0, 8).map((it, i) => ({ n: i + 1, icon:['icons', ITEMS.indexOf(it)], t:`${it.name} ${won(it.price)}${c.owned.includes(it.id) ? ' (가지고 있음)' : ''}`, s:`${SLOT_NAME[it.slot]} · ${fxText(it, p)}`, act: v => buyItem(it, v) })) };
+  return { q:`장비 더 보기. 가진 돈 ${won(c.money)}.`, back: v => go(shopScreen, v), opts: list.slice(0, 8).map((it, i) => ({ n: i + 1, icon:['icons', ITEMS.indexOf(it)], t:`${it.name} ${won(it.price)}${c.owned.includes(it.id) ? ' (가지고 있음)' : ''}`, s:`${GRADE_NAME[gearGrade(it)]} ${SLOT_NAME[it.slot]} · ${fxText(it, p)}${(GEAR_COST[it.id] ? ', ' + Object.entries(GEAR_COST[it.id]).map(([k, v]) => `${ABIL_NAME[k]} ${v}`).join(', ') : '')}`, act: v => buyItem(it, v) })) };
 }
 function buyItem(it, via){
   const L = CR(), c = life(L), p = myP(L);
@@ -115,14 +136,13 @@ function buyItem(it, via){
 }
 function equip(L, it){
   const c = life(L), p = myP(L), old = itemOf(c.equip[it.slot]);
-  if(old) applyItem(p, old, -1);
-  applyItem(p, it, 1); c.equip[it.slot] = it.id;
-  return [`${SLOT_NAME[it.slot]}: ${it.name} 장착. ${fxText(it, p)}.${old ? ` (${old.name}은 가방으로)` : ''}`];
+  c.equip[it.slot] = it.id; refreshGear(L);
+  return [`${SLOT_NAME[it.slot]}: ${it.name} 장착. ${fxText(it, p)}. (${gearTag(c, it)})${old ? ` ${old.name}은 가방으로.` : ''}`];
 }
 function unequip(L, slot){
-  const c = life(L), p = myP(L), it = itemOf(c.equip[slot]);
+  const c = life(L), it = itemOf(c.equip[slot]);
   if(!it) return [];
-  applyItem(p, it, -1); delete c.equip[slot];
+  delete c.equip[slot]; refreshGear(L);
   return [`${it.name}을 벗었습니다.`];
 }
 function goodsShop(){
@@ -141,14 +161,26 @@ function bagScreen(msg){
       act: v => { const say = on ? unequip(L, it.slot) : equip(L, it); saveLeague(); go(bagScreen, v, say); } });
   });
   opts.push({ n:8, t:'소모품 쓰기', s: GOODS.map(g => `${g.name} ${c.goods[g.id] || 0}개`).join(', '), act: v => go(useGoods, v) });
+  opts.push({ n:9, t:'장비 수리·강화', s:'닳은 장비를 고치고 +1~+3까지 강화합니다.', act: v => go(gearScreen, v) });
   return { q:`내 가방입니다. 장비: ${equipText(L)}.`, say: msg || (owned.length ? null : ['아직 산 장비가 없습니다. 용품점에서 사세요.']), back: v => go(careerHome, v), opts };
+}
+// 장비 수리·강화: 끼고 있거나 가진 장비 하나를 골라 고치거나 강화함
+function gearScreen(msg){
+  const L = CR(), c = life(L), owned = c.owned.map(itemOf).filter(Boolean).slice(0, 4);
+  const opts = [];
+  owned.forEach((it, i) => {
+    const st = gearState(c, it.id), rc = repairCost(it), ec = enhanceCost(it, st);
+    opts.push({ n: i * 2 + 1, t:`${it.name} 수리 (${won(rc)})`, s:`${gearTag(c, it)}`, act: () => { if(st.dur >= 100){ stay('이미 새것 같습니다.'); return; } if(c.money < rc){ stay('돈이 모자랍니다.'); return; } c.money -= rc; st.dur = 100; refreshGear(L); saveLeague(); stay(`${it.name}을 수리했습니다. 가진 돈 ${won(c.money)}.`); } });
+    opts.push({ n: i * 2 + 2, t:`${it.name} 강화 +${(st.lv || 0) + 1} (${won(ec)})`, hide: (st.lv || 0) >= 3, s:'실패 없이 주된 능력이 1 더 오릅니다. 장비로 오르는 능력의 합에는 상한이 있습니다.', act: () => { if(c.money < ec){ stay('돈이 모자랍니다.'); return; } c.money -= ec; st.lv = (st.lv || 0) + 1; refreshGear(L); saveLeague(); stay(`${it.name}을 +${st.lv}으로 강화했습니다. 가진 돈 ${won(c.money)}.`); } });
+  });
+  return { q:`장비 수리·강화. 가진 돈 ${won(c.money)}. 장비로 오르는 능력은 모두 합쳐 ${GEAR_CAP}까지입니다.`, say: msg || (owned.length ? null : ['아직 산 장비가 없습니다.']), back: v => go(bagScreen, v), opts };
 }
 function useGoods(){
   const L = CR(), c = life(L), p = myP(L);
   const use = (id, fn) => () => { if(!(c.goods[id] > 0)){ stay('가진 것이 없습니다.'); return; } const msg = fn(); if(!msg) return; c.goods[id]--; saveLeague(); stay(msg); };
   return { q:'무엇을 쓸까요?', back: v => go(bagScreen, v), opts:[
     { n:1, t:`에너지 음료 (${c.goods.drink || 0}개)`, s: GOODS[0].desc, act: use('drink', () => { if(p.cond >= 2){ stay('이미 컨디션이 아주 좋습니다.'); return null; } p.cond++; return `에너지 음료를 마셨습니다. 컨디션 ${COND[p.cond]}.`; }) },
-    { n:2, t:`테이핑과 찜질 세트 (${c.goods.tape || 0}개)`, s: GOODS[1].desc, act: use('tape', () => { if(!(c.hurt > 0)){ stay('지금은 다친 곳이 없습니다.'); return null; } c.hurt = Math.max(0, c.hurt - 2); return c.hurt ? `치료했습니다. ${c.hurt}일 뒤 돌아옵니다.` : '치료했습니다. 다 나았습니다!'; }) },
+    { n:2, t:`테이핑과 찜질 세트 (${c.goods.tape || 0}개)`, s: GOODS[1].desc, act: use('tape', () => { if(!(c.hurt > 0)){ stay('지금은 다친 곳이 없습니다.'); return null; } c.hurt = Math.max(0, c.hurt - 2); if(!c.hurt) heal(p, c); return c.hurt ? `치료했습니다. ${c.hurt}일 뒤 돌아옵니다.` : '치료했습니다. 다 나았습니다!'; }) },
     { n:3, t:`보약 (${c.goods.tonic || 0}개)`, s: GOODS[2].desc, act: use('tonic', () => { if(c.tonic){ stay('이미 보약을 먹었습니다. 다음 훈련에 효과가 납니다.'); return null; } c.tonic = true; return '보약을 먹었습니다. 다음 훈련의 성장 효과가 두 배가 됩니다.'; }) },
   ] };
 }
@@ -163,8 +195,15 @@ function visitScreen(msg){
     { n:2, t:'내 가방', s:`장비: ${equipText(L)}`, act: v => go(bagScreen, v) },
     { n:3, t:'팬 사인회', s: lock || '인기와 용돈이 오릅니다. 가끔 피곤해집니다.', act: v => done ? stay(lock) : fanMeet(v) },
     { n:4, t:'특별 코치 레슨 (300만 원)', s: lock || '유명 코치에게 하루 집중 지도를 받아 성장 점수가 크게 오릅니다.', act: v => done ? stay(lock) : go(coachScreen, v) },
+    { n:6, t:'휴가 (150만 원)', s: lock || '하루를 통째로 쉽니다. 피로가 크게 풀리고 컨디션이 좋아집니다.', act: v => done ? stay(lock) : vacation(v) },
     { n:5, t: c.hurt > 0 ? '재활 센터 (100만 원)' : '마사지 숍 (50만 원)', s: lock || (c.hurt > 0 ? '부상이 2일 빨리 낫습니다.' : '컨디션이 한 단계 좋아집니다.'), act: v => done ? stay(lock) : clinic(v) },
   ] };
+}
+function vacation(via){
+  const L = CR(), c = life(L), p = myP(L);
+  if(c.money < 150){ stay('돈이 모자랍니다.'); return; }
+  c.money -= 150; c.visited = dayKey(L); addFatigue(c, -50); p.cond = Math.min(2, p.cond + 1);
+  saveLeague(); go(() => sceneScreen('rest', '휴가'), via, [`하루 푹 쉬고 왔습니다. 피로 ${fatigueWord(c)}, 컨디션 ${COND[p.cond]}.`]);
 }
 function fanMeet(via){
   const L = CR(), c = life(L), p = myP(L);
@@ -189,7 +228,7 @@ function clinic(via){
   if(c.money < cost){ stay('돈이 모자랍니다.'); return; }
   c.money -= cost; c.visited = dayKey(L);
   let say;
-  if(c.hurt > 0){ c.hurt = Math.max(0, c.hurt - 2); say = [c.hurt ? `재활 치료를 받았습니다. ${c.hurt}일 뒤 돌아옵니다.` : '재활 치료로 다 나았습니다!']; }
+  if(c.hurt > 0){ c.hurt = Math.max(0, c.hurt - 2); if(!c.hurt) heal(p, c); say = [c.hurt ? `재활 치료를 받았습니다. ${c.hurt}일 뒤 돌아옵니다.` : '재활 치료로 다 나았습니다!']; }
   else { p.cond = Math.min(2, p.cond + 1); say = [`마사지를 받았습니다. 컨디션 ${COND[p.cond]}.`]; }
   saveLeague(); go(() => sceneScreen(cost === 100 ? 'clinic' : 'massage', cost === 100 ? '재활 센터' : '마사지 숍'), via, say);
 }
