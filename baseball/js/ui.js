@@ -109,7 +109,8 @@ function render(){
   else { bs.hidden = true; bs.innerHTML = ''; if(typeof GX !== 'undefined') GX.scene = null; }
   $('#say').innerHTML = (S.say || []).map(l => `<p class="${l.k ? 'k-' + l.k : ''}${l.after ? ' after' : ''}${l.tail ? ' cur' : ''}">${esc(l.s || l)}${l.tail ? `<span class="tail"> ${esc(l.tail)}</span>` : ''}</p>`).join('');
   // 시청각장애인 모드에서 중계 음성이 켜져 있으면 경기 중 결과 글은 소리로만 (화면 낭독기가 같은 내용을 또 읽지 않게): 지금 내 차례의 질문과 선택지만
-  const castOnly = SET.view !== 'gfx' && !!S.board && typeof G !== 'undefined' && G && !G.over && typeof castOn === 'function' && castOn();
+  // 결과 전달: 소리와 글(기본) · 소리만 · 글만. '소리만'일 때만 결과 글과 기록을 숨김. 기본에서는 글이 화면과 점자 단말기에 남고, 낭독기는 중계와 겹치지 않게 질문부터 읽음
+  const castOnly = SET.view !== 'gfx' && !!S.board && typeof G !== 'undefined' && G && !G.over && typeof castOn === 'function' && castOn() && SET.deliver === 'sound';
   $('#say').hidden = !(S.say || []).length || castOnly;
   if($('#logSec')) $('#logSec').dataset.castOnly = castOnly ? '1' : '';
   // 메모: 화면이 정한 글, 없으면 방금 note()로 띄운 글 (전체화면 전환 같은 다시 그리기에도 남음)
@@ -223,15 +224,34 @@ const KEY_HELP = [
   '숫자 1부터 9: 선택지 고르기.',
   '0: 지금 상황 듣기. 경기 화면마다 있는 "지금 상황 확인" 단추와 같습니다. 점수, 아웃, 볼카운트, 주자 위치와 이름, 타자와 투수를 알려 줍니다.',
   '점(.) 또는 백스페이스: 뒤로.',
+  '선택지가 10개를 넘는 화면: 숫자를 연달아 눌러 두 자리 번호를 고릅니다. 예를 들어 1, 0은 10번입니다. 한 자리만 누르고 잠깐 기다리면 그 번호를 고릅니다.',
+  '설정 화면: 9번은 다음 탭입니다. 왼쪽·오른쪽 화살표로도 탭을 옮깁니다.',
   '더하기(+): 점수판 듣기.',
   '빼기(-): 지금 타자와 투수 정보 듣기.',
   '곱하기(*): 이 키 안내.',
   '나누기(/): 최근 기록 듣기.',
   '명령 칸에는 숫자나 낱말(상황, 점수, 선수, 기록, 도움, 뒤로, 또는 선택지 이름)을 적고 입력합니다.',
 ];
+// 두 자리 입력: 선택지가 10개를 넘는 화면에서는 숫자를 연달아(약 0.8초 안에) 누르면 두 자리 번호가 됨 (1, 0 → 10). 한 자리만 누르고 기다리면 그 번호를 고름
+function pendingDigits(){ return (UI.S.opts || []).filter(o => !o.hide && Number(o.n) >= 10); }
+function digitKey(k, via){
+  const big = pendingDigits();
+  // 자동 시험(Playwright)은 빠르게 연달아 누르므로, window.__digits를 켠 때만 두 자리 입력을 기다림
+  if(!big.length || UI.S.input || (navigator.webdriver && !window.__digits)) return choose(k, via);
+  if(UI.digit){
+    const first = UI.digit; clearTimeout(UI.digitT); UI.digit = '';
+    const two = first + k;
+    if(big.some(o => String(o.n) === two)) return choose(two, via);
+    choose(first, via); return digitKey(k, via);   // 두 자리 번호가 아니면 첫 숫자는 따로 고르고 이번 숫자를 새로 받음
+  }
+  if(!big.some(o => String(o.n).startsWith(k))) return choose(k, via);
+  UI.digit = k; speak(`${k}.`);
+  UI.digitT = setTimeout(() => { const f = UI.digit; UI.digit = ''; if(f) choose(f, via); }, 800);
+}
 function keyCmd(k, via){
   if(UI.S.input && /^[0-9]$/.test(k)) return UI.S.onDigit(k, via);   // 방 코드처럼 숫자를 입력하는 화면
-  if(/^[1-9]$/.test(k)) return choose(k, via);
+  if(/^[1-9]$/.test(k)) return digitKey(k, via);
+  if(k === '0' && UI.digit){ return digitKey('0', via); }
   if(k === '.') return back(via);
   if(k === '0') return note(typeof gameStatus === 'function' && G && UI.S.board ? gameStatus() : [`${UI.S.q || ''}`, optionsText() + '.'], via);
   if(k === '*') return note(KEY_HELP, via);
@@ -245,6 +265,7 @@ const WORDS = { '상황':'0', '점수':'+', '점수판':'+', '선수':'-', '정�
 function textCmd(v){
   v = v.trim(); if(!v) return;
   if(/^[0-9.+\-*/]$/.test(v)) return keyCmd(v, 'key');
+  if(/^[0-9]{2}$/.test(v) && (UI.S.opts || []).some(o => !o.hide && String(o.n) === v)) return choose(v, 'key');   // 두 자리 번호를 한꺼번에 적은 경우
   if(UI.S.onText) return UI.S.onText(v, 'key');   // 이름·방 코드·채팅처럼 글을 받는 화면
   if(WORDS[v]) return keyCmd(WORDS[v], 'key');
   const ops = (UI.S.opts || []).filter(o => !o.hide);
@@ -265,6 +286,8 @@ document.addEventListener('click', e => {
     return;
   }
   if(e.target.closest && e.target.closest('#backBtn')){ back('click'); return; }
+  const tb = e.target.closest && e.target.closest('[data-tab]');
+  if(tb && UI.S && UI.S.onTab){ UI.S.onTab(Number(tb.dataset.tab), 'click'); return; }
   if(e.target.closest && e.target.closest('#menuBtn')){ stopAutoPlay(); if(typeof openMenu === 'function') openMenu('click'); }
 });
 function keyName(e){
@@ -283,6 +306,8 @@ document.addEventListener('keydown', e => {
   if(dlgOpen() || e.ctrlKey || e.metaKey || e.altKey) return;
   const t = e.target, tag = t && t.tagName;
   if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  // 좌우 화살표: 탭이 있는 화면(설정)에서만 앞뒤 탭으로 (다른 화면에서는 화면 낭독기가 쓰도록 건드리지 않음)
+  if((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && UI.S && UI.S.onTab){ e.preventDefault(); UI.S.onTab(e.key === 'ArrowRight' ? 1 : -1, 'key', true); return; }
   const k = keyName(e);
   if(!k) return;
   e.preventDefault();

@@ -127,7 +127,7 @@ function netStartGame(via){
   const c = NET.cfg, teams = [], who = [];
   teams[c.hostSide] = c.hostTeam; teams[1 - c.hostSide] = c.guestTeam;
   who[c.hostSide] = SET.name || '방장'; who[1 - c.hostSide] = NET.peer ? NET.peer.name : '손님';
-  const opts = { mode:c.mode, unit:c.unit, innings:c.innings, teams, ctrl:['human', 'human'], who, diff:1, easy: SET.easy ?? 1, seed:(Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0 };
+  const opts = { mode:c.mode, unit:c.unit, innings:c.innings, teams, ctrl:['human', 'human'], who, diff:1, easy: SET.easy ?? 1, rev: SET.rev ?? 2, seed:(Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0 };
   startGame(opts, via);
 }
 

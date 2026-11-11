@@ -5,7 +5,8 @@
    공을 친 결과는 뜸 들이는 중계 시간표에 맞춰: '쳤습니다! 높이 뜹니다! 오른쪽으로!' → (타구가 떨어질 때) '잡았습니다! 아웃!' */
 const CAST = { idx:null, buf:{}, loading:{}, until:0, last:{}, src:[] };
 // 중계 음성: 설정의 '중계 음성'이 켜져 있고 효과음이 켜져 있을 때 (두 모드 모두 기본 켬)
-function castOn(){ return SET.cast !== false && SET.snd !== false; }
+// 결과 전달이 '글만'이면 캐스터 목소리로 결과를 말하지 않음
+function castOn(){ return SET.cast !== false && SET.snd !== false && SET.deliver !== 'text'; }
 // 설정을 켤 때 들려 주는 예시
 function castSample(){ castLoadIndex().then(() => {
   const ids = CAST.idx && CAST.idx.c_hello ? ['c_hello', anaRate() && CAST.idx.a_hello ? 'a_hello' : null, 'playball'].filter(Boolean) : ['intro', 'playball'];

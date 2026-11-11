@@ -208,12 +208,41 @@ const PORT = 8766;
       await page.keyboard.press('.');
       await page.keyboard.press('9'); await page.keyboard.press('.'); await page.keyboard.press('.');
     }
-    // 설정 화면: 글자 크기·화면 색 바꾸기
-    await page.keyboard.press('4');
-    await page.keyboard.press('8');
-    for(const k of ['1', '2', '2', '1', '1', '1']) await page.keyboard.press(k);
+    // 설정 화면(탭): 처음 화면의 설정 → 탭을 9번·화살표로 돌며 항목 바꾸기
+    for(let i = 0; i < 4 && !(await opts(page)).some(o => /설정과 게임 방법/.test(o.t)); i++) await page.keyboard.press('.');   // 처음 화면까지
+    if(await page.evaluate(() => dlgOpen())) await page.click('#dlg [data-dlg="0"]');   // 앞에서 연 설치 안내 창을 닫음
+    { const home = (await opts(page)).find(o => /^처음 화면으로/.test(o.t)); if(home) await page.keyboard.press(home.n); }   // 경기가 끝난 화면이면 처음 화면으로
+    if(await page.evaluate(() => dlgOpen())) await page.click('#dlg [data-dlg="0"]');
+    const setOpt = (await opts(page)).find(o => /설정과 게임 방법/.test(o.t)) || (await opts(page)).find(o => /^설정/.test(o.t));
+    if(!setOpt){ errors.push(`${name}: 처음 화면에서 설정을 찾지 못함: ${(await q(page)).slice(0, 40)} / ${(await opts(page)).map(o => o.t).join(', ')}`); await ctx.close(); continue; }
+    await page.keyboard.press(setOpt.n);
+    if(!(await q(page)).includes('설정, 게임 탭')) errors.push(`${name}: 설정 첫 탭이 게임이 아님: ${(await q(page)).slice(0, 40)}`);
+    const tabsSeen = [];
+    for(let i = 0; i < 6; i++){ tabsSeen.push(((await q(page)).match(/설정, (\S+) 탭/) || [])[1]); await shot(page, `${name}-settings-${i}`); await noOverflow(page, `${name} 설정 ${i}`); await page.keyboard.press('9'); }
+    if(tabsSeen.join() !== '게임,규칙,조작·접근성,화면,소리,저장') errors.push(`${name}: 설정 탭 순서가 이상함 ${tabsSeen.join()}`);
+    if(!(await q(page)).includes('설정, 게임 탭')) errors.push(`${name}: 탭을 한 바퀴 돌아도 처음으로 오지 않음`);
+    await page.evaluate(() => document.activeElement && document.activeElement.blur());   // 명령 칸에 초점이 있으면 화살표는 글자 칸이 씀
+    await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight');   // 조작·접근성
+    if(!(await q(page)).includes('조작·접근성 탭')) errors.push(`${name}: 화살표로 탭이 옮겨지지 않음`);
+    await page.keyboard.press('ArrowLeft');
+    if(!(await q(page)).includes('규칙 탭')) errors.push(`${name}: 왼쪽 화살표가 동작하지 않음`);
+    await page.keyboard.press('ArrowRight');
+    // 화면 보며 하기에서는 이름과 값이 따로 그려지므로 단추 전체 글을 읽음
+    const deliver = async () => { const n = (await opts(page)).find(o => /경기 결과 전달/.test(o.t)).n; return page.$eval(`#opts .opt[data-n="${n}"]`, e => e.innerText.replace(/\s+/g, ' ')); };
+    if(!(await deliver()).includes('소리와 글')) errors.push(`${name}: 결과 전달 기본값이 소리와 글이 아님: ${await deliver()}`);
+    const dn = (await opts(page)).find(o => /경기 결과 전달/.test(o.t)).n;
+    await page.keyboard.press(dn); if(!(await deliver()).includes('소리만')) errors.push(`${name}: 결과 전달이 소리만으로 바뀌지 않음`);
+    await page.keyboard.press(dn); if(!(await deliver()).includes('글만')) errors.push(`${name}: 결과 전달이 글만으로 바뀌지 않음`);
+    await page.keyboard.press(dn);
+    // 진동 뜻 익히기
+    const vn = (await opts(page)).find(o => /진동 뜻 익히기/.test(o.t)).n;
+    await page.keyboard.press(vn);
+    if(!(await q(page)).includes('진동 뜻 익히기') || (await opts(page)).length < 8) errors.push(`${name}: 진동 뜻 화면이 이상함`);
+    await page.keyboard.press('.');
+    // 화면 탭: 글자 크기·화면 색 바꾸기
+    await page.keyboard.press('9'); await page.keyboard.press('1'); await page.keyboard.press('2');
     await shot(page, `${name}-settings`); await noOverflow(page, name + ' 설정');
-    await page.keyboard.press('2'); await page.keyboard.press('1'); await page.keyboard.press('1');
+    await page.keyboard.press('.'); await page.keyboard.press('.');
     await ctx.close();
   }
   // 송구 선택: 사람이 수비할 때 땅볼을 잡으면 던질 곳을 묻고, 고르면(또는 시간이 지나면) 이어서 진행해야 함
@@ -272,6 +301,35 @@ const PORT = 8766;
     if(seen.aim !== 9) errors.push(`세밀하게 고르기: 노려 치기 칸이 ${seen.aim}개`);
     if(!seen.hitrun) errors.push('세밀하게 고르기: 히트 앤드 런 선택지가 한 번도 나오지 않음');
     console.log('세밀하게 고르기:', JSON.stringify(seen));
+    await ctx.close();
+  }
+  // 두 자리 입력(선택지 10개 넘는 화면)과 경기 결과 전달 방식
+  {
+    const ctx = await browser.newContext({ viewport:{ width:390, height:844 } });
+    const page = await ctx.newPage();
+    page.on('pageerror', e => errors.push(`접근성: ${e.message}`));
+    await page.goto(`http://localhost:${PORT}/baseball/`); await page.waitForSelector('#opts .opt');
+    await page.keyboard.press('2');
+    await page.evaluate(() => { window.__digits = true; window.__picked = []; go(() => ({ q:'열두 개 시험', opts: Array.from({ length: 12 }, (_, i) => ({ n: i + 1, t:`항목 ${i + 1}`, act: () => { window.__picked.push(i + 1); } })) }), 'init'); });
+    const picked = () => page.evaluate(() => window.__picked.join());
+    await page.keyboard.press('1'); await page.keyboard.press('2'); if(await picked() !== '12') errors.push('두 자리 입력: 1, 2가 12번이 되지 않음 ' + await picked());
+    await page.keyboard.press('1'); await page.keyboard.press('0'); if(await picked() !== '12,10') errors.push('두 자리 입력: 1, 0이 10번이 되지 않음 ' + await picked());
+    await page.keyboard.press('5'); if(await picked() !== '12,10,5') errors.push('두 자리 입력: 5가 바로 골라지지 않음 ' + await picked());
+    await page.keyboard.press('1'); await page.waitForTimeout(1100); if(await picked() !== '12,10,5,1') errors.push('두 자리 입력: 1만 누르고 기다리면 1번이 골라져야 함 ' + await picked());
+    await page.fill('#cmd', '11'); await page.press('#cmd', 'Enter'); if((await picked()).split(',').pop() !== '11') errors.push('명령 칸에 11을 적어도 11번이 골라지지 않음 ' + await picked());
+    // 결과 전달: 소리와 글(기본)은 결과 글이 남고, 소리만은 숨김, 글만은 중계 음성을 쓰지 않음
+    const state = async mode => {
+      await page.evaluate(m => { SET.deliver = m; SET.cast = true; SET.snd = true; SET.voice = 'sr'; startGame({ mode:'simple', unit:'pa', innings:1, teams:[TEAMS[0].key, TEAMS[1].key], ctrl:['human', 'cpu'], who:['', ''], diff:1, easy:1, seed:5 }, 'click'); }, mode);
+      await page.waitForSelector('#opts .opt');
+      const os = await opts(page); const o = os.find(x => !/더 보기|설정|그만|맡기기|지금 상황/.test(x.t)); await page.keyboard.press(o.n);
+      await page.waitForTimeout(300);
+      return page.evaluate(() => ({ sayHidden: $('#say').hidden, sayLen: $('#say').innerText.length, logHidden: $('#logSec').hidden, castOn: castOn() }));
+    };
+    const both = await state('both'), sound = await state('sound'), text = await state('text');
+    if(both.sayHidden || both.logHidden) errors.push('결과 전달 소리와 글: 결과 글이 숨겨짐 ' + JSON.stringify(both));
+    if(!sound.sayHidden || !sound.logHidden) errors.push('결과 전달 소리만: 결과 글이 숨겨지지 않음 ' + JSON.stringify(sound));
+    if(text.castOn || text.sayHidden) errors.push('결과 전달 글만: 중계 음성이 켜져 있거나 글이 숨겨짐 ' + JSON.stringify(text));
+    console.log('결과 전달:', JSON.stringify({ both, sound, text }));
     await ctx.close();
   }
   await browser.close(); srv.kill();

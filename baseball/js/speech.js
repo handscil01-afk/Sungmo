@@ -96,9 +96,21 @@ const SOUNDS = {
   chat:  (c, t) => { tone(c, t, 0.08, 988, 0.14); tone(c, t + 0.1, 0.12, 1319, 0.14); },
   end:   (c, t) => { [392, 523, 659, 784].forEach((f, i) => tone(c, t + i * 0.18, 0.3, f, 0.18, 'triangle')); },
 };
-const VIB = { review:[60, 60, 60, 60, 200], chat:[40, 60, 40], hit:[80], xbh:[80, 60, 80], b2:[80, 60, 80], b3:[80, 60, 80, 60, 80], hr:[100, 60, 100, 60, 400], score:[60, 40, 60], k:[250], out:[120], ball:[30], end:[300, 100, 300], safe:[40, 40, 40] };
+// 진동 문법: 짧게(약 50ms)와 길게(약 200ms)의 조합으로 뜻을 구분함. 설정의 '진동 뜻 익히기'에서 하나씩 느껴 볼 수 있음
+const VIB_INFO = [
+  ['strike', '스트라이크', '짧게 한 번', [40]],
+  ['ballc', '볼', '길게 한 번', [220]],
+  ['hit', '안타', '짧게 두 번', [50, 60, 50]],
+  ['b2', '장타(2루타·3루타)', '짧게 세 번', [50, 60, 50, 60, 50]],
+  ['hr', '홈런', '길게, 짧게, 길게', [250, 80, 50, 80, 250]],
+  ['out', '아웃', '길게 두 번', [200, 100, 200]],
+  ['k', '삼진', '길게 세 번', [200, 100, 200, 100, 200]],
+  ['score', '득점', '짧게 세 번 뒤 길게 한 번', [50, 60, 50, 60, 50, 100, 250]],
+];
+const VIB = { review:[60, 60, 60, 60, 200], chat:[40, 60, 40], end:[300, 100, 300], safe:[40, 40, 40], ball:[220, 80, 40], xbh:[50, 60, 50, 60, 50], b3:[50, 60, 50, 60, 50] };
+VIB_INFO.forEach(([k,, , p]) => { VIB[k] = p; });
 // 한 번의 선택으로 여러 효과가 나오면 가장 중요한 것 하나(간단한 소리는 순서대로 최대 3개)
-const FX_RANK = ['chat', 'roger', 'end', 'review', 'hr', 'score', 'b3', 'b2', 'xbh', 'hit', 'k', 'out', 'safe', 'ball', 'change', 'bunt', 'bat', 'foul', 'whiff', 'mitt'];
+const FX_RANK = ['chat', 'roger', 'end', 'review', 'hr', 'score', 'b3', 'b2', 'xbh', 'hit', 'k', 'out', 'safe', 'ball', 'change', 'bunt', 'bat', 'foul', 'whiff', 'mitt', 'strike', 'ballc'];
 // 간단한 소리로 바꿀 때: 새 사건 이름을 예전 소리에 맞춤
 const SYN = { strike:'mitt', ballc:'mitt', b2:'xbh', b3:'xbh', pchange:'change', sub:'change', 'whiff-p':'whiff', 'whiff-s':'whiff', 'whiff-c':'whiff', batBig:'bat', batF:'bat' };
 
@@ -226,7 +238,8 @@ function playFx(list){
     }
   }
   if(SET.vib && navigator.vibrate){
-    const top = FX_RANK.find(n => uniq.includes(n) && VIB[n]);
+    const vn = uniq.map(n => /^whiff-/.test(n) ? 'strike' : n);   // 헛스윙도 스트라이크
+    const top = FX_RANK.find(n => vn.includes(n) && VIB[n]);
     if(top) try{ navigator.vibrate(VIB[top]); }catch(e){}
   }
 }

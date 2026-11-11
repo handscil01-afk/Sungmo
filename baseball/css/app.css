@@ -407,3 +407,8 @@ html:not(.lowvis):not(.gfxgame):not(.gfxui) #cmd{ min-height:42px; padding:6px 1
 .opts.grid{ grid-auto-rows:minmax(3rem, auto); }
 .opts.grid .opt:not(.z){ min-height:40px; flex-direction:row; justify-content:center; }
 .opts.grid .opt:not(.z) small{ display:none; }
+
+/* 설정 탭 */
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
+.tabs .tab{font:inherit;border:2px solid currentColor;background:transparent;color:inherit;border-radius:999px;padding:6px 14px;min-height:44px;cursor:pointer;opacity:.75}
+.tabs .tab.on{opacity:1;font-weight:700;text-decoration:underline;text-underline-offset:4px}

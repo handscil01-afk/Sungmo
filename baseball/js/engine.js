@@ -170,6 +170,7 @@ function newGame(o){
   // 리그 경기는 리그의 선수 명단(rosters)을 그대로 씀
   G.teams = [0, 1].map(i => o.rosters ? rosterTeam(G, o.rosters[i]) : makeTeam(G, o.teams[i], G.ctrl[i] === 'cpu' && G.ctrl[1 - i] !== 'cpu' ? cpuBias : 0));
   G.leader = -1;
+  if(o.rev != null) G.teams.forEach(T => { T.rev = o.rev; });   // 비디오 판독 기회 (설정)
   // 홈 팀 구장: 담장·잔디·바람이 결과를 바꿈
   G.park = parkInfo(o.teams[1]);
   const pk = G.park;

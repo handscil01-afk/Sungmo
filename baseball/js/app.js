@@ -96,7 +96,7 @@ function newOpts(){
   let ctrl = ['cpu', 'cpu'], who = ['', ''];
   if(NEW.kind === '1p') ctrl = meFirst ? ['human', 'cpu'] : ['cpu', 'human'];
   if(NEW.kind === '2p'){ ctrl = ['human', 'human']; who = meFirst ? ['첫째 사람', '둘째 사람'] : ['둘째 사람', '첫째 사람']; }
-  return { mode: NEW.mode, unit: NEW.unit, innings: NEW.innings, teams, ctrl, who, diff: NEW.diff, easy: SET.easy ?? 1, seed: (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0 };
+  return { mode: NEW.mode, unit: NEW.unit, innings: NEW.innings, teams, ctrl, who, diff: NEW.diff, easy: SET.easy ?? 1, rev: SET.rev ?? 2, seed: (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0 };
 }
 function readyScreen(){
   const o = newOpts();
@@ -138,51 +138,86 @@ function viewScreen(after){
     { n:2, t: VIEWS.a11y, s:'보이스오버·톡백, 점자 단말기, 숫자판 키보드로 합니다. 모든 상황을 말과 글로 알려 줍니다.', act: v => { setView('a11y'); after(v); } },
   ] };
 }
-// 화면 보며 하기: 설정 세 쪽을 한 화면에 (번호는 이어서)
-function settingsScreen(backTo){
-  const S = settingsPage(backTo);
-  if(SET.view !== 'gfx') return S;
-  const more = o => o.t === '더 보기';
-  const all = [...S.opts, ...settings2(backTo).opts, ...settings3(backTo).opts].filter(o => !more(o) && !o.hide);
-  const seen = new Set(), opts = all.filter(o => !seen.has(o.t) && seen.add(o.t)).map((o, i) => ({ ...o, n: i + 1 }));
-  return { ...S, q:'설정', opts };
-}
-function settingsPage(backTo){
+/* 설정: 탭 여섯 개를 한 화면 틀로. 번호 1~8은 그 탭의 항목, 9번은 다음 탭. 좌우 화살표·탭 단추로도 탭을 옮김.
+   탭: 게임 · 규칙 · 조작·접근성 · 화면 · 소리 · 저장. 설정 값 이름(SET.*)은 그대로 */
+const SET_TABS = ['게임', '규칙', '조작·접근성', '화면', '소리', '저장'];
+const DELIVER = { both:'소리와 글', sound:'소리만', text:'글만' };
+let SET_TAB = 0;
+function settingsScreen(backTo, tab){
+  if(tab != null) SET_TAB = tab;
+  const T = SET_TAB, n = SET_TABS.length;
   const ch = (fn, label) => () => { fn(); saveSet(); stay(label()); };
-  return { q:'설정입니다. 고를 때마다 값이 바뀝니다.', back: v => backTo(v), opts:[
-    { n:1, t:`화면 방식: ${VIEWS[SET.view] || VIEWS.a11y}`, s:'고르면 화면 방식 고르기로 갑니다. 읽어 주기와 관중 소리도 그 방식에 맞게 바뀝니다.', act: v => go(() => viewScreen(w => go(() => settingsScreen(backTo), w)), v) },
-    { n:2, t:`글자 크기: ${FS_NAMES[SET.fs]}`, act: ch(() => { SET.fs = (SET.fs + 1) % FS_NAMES.length; }, () => `글자 크기 ${FS_NAMES[SET.fs]}`) },
-    { n:3, t:`화면 색: ${THEMES[SET.theme]}`, act: ch(() => { SET.theme = cycle(Object.keys(THEMES), SET.theme); }, () => `화면 색 ${THEMES[SET.theme]}`) },
-    { n:4, t:`읽어 주기: ${VOICES[SET.voice]}`, s:'화면 낭독기를 쓰지 않는다면 기기 음성으로 바꾸세요. 화면 낭독기와 기기 음성을 함께 켜면 두 번 읽습니다.',
-      act: ch(() => { SET.voice = cycle(Object.keys(VOICES), SET.voice); }, () => `읽어 주기 ${VOICES[SET.voice]}`) },
-    { n:5, t:`판정 과정 보기: ${onOff(SET.dice)}`, s:'주사위와 확률을 기록에 함께 보여 줍니다. 테이블 게임처럼 판정을 확인할 수 있습니다.',
-      act: ch(() => { SET.dice = !SET.dice; }, () => `판정 과정 보기 ${onOff(SET.dice)}`) },
-    { n:6, t:`코스 번호 배열: ${SET.pad === 'pc' ? '컴퓨터 숫자판식 (7 8 9가 위)' : '전화기식 (1 2 3이 위)'}`, s:'코스를 고를 때 숫자와 스트라이크 존 칸을 맞추는 방법입니다. 쓰는 키보드의 숫자 배열에 맞추세요.',
-      act: ch(() => { SET.pad = SET.pad === 'pc' ? 'phone' : 'pc'; }, () => `코스 번호 ${SET.pad === 'pc' ? '7 8 9가 높은 공' : '1 2 3이 높은 공'}`) },
-    { n:7, t:`효과음: ${sndName()}`, s:'야구장 소리(피칭, 타격, 스트라이크, 안타, 홈런, 공수교대 등) · 간단한 소리 · 끄기 순서로 바뀝니다.',
-      act: ch(() => { if(!SET.snd){ SET.snd = true; SET.sndKind = 'rec'; } else if(SET.sndKind !== 'synth') SET.sndKind = 'synth'; else SET.snd = false; crowdSync(); }, () => `효과음 ${sndName()}`) },
-    { n:8, t:'더 보기', s:'진동, 관중 소리, 명령 칸, 자동 재생, 음성 빠르기, 전체화면, 설치, 시험, 저장 지우기', act: v => go(() => settings2(backTo), v) },
-    { n:9, t:'게임 방법과 키 안내', act: v => go(() => helpScreen(() => go(() => settingsScreen(backTo), 'click')), v) },
-  ] };
+  const here = () => go(() => settingsScreen(backTo), 'click');
+  const goTab = (idx, v) => go(() => settingsScreen(backTo, idx), v);
+  const tabs = [
+    // 게임
+    [
+      { t:`화면 방식: ${VIEWS[SET.view] || VIEWS.a11y}`, s:'고르면 화면 방식 고르기로 갑니다. 읽어 주기와 관중 소리도 그 방식에 맞게 바뀝니다.', act: v => go(() => viewScreen(w => go(() => settingsScreen(backTo), w)), v) },
+      { t:`타격 난이도: ${EASY_NAME[SET.easy ?? 1]}`, s:'쉬움일수록 잘 맞히고 안타·볼넷·진루가 많아집니다. 다음 경기부터 적용합니다. (리그의 다른 팀 경기는 늘 현실)', act: ch(() => { SET.easy = cycle([1, 2, 0], SET.easy ?? 1); }, () => `타격 난이도 ${EASY_NAME[SET.easy]}`) },
+      { t:`정밀 모드에서 직접 고를 것: ${pickName()}`, s:'구종만 · 구종과 코스 · 전부 · 내 맘대로', act: v => go(() => picksScreen(w => go(() => settingsScreen(backTo), w)), v) },
+      { t:`세밀하게 고르기: 구속 ${onOff(picks().pow9)} · 스윙 ${onOff(picks().swing9)} · 노려 치기 ${onOff(picks().aim)}`, s:'구속 9단계, 스윙 세기 9단계, 노려 치기를 켜고 끕니다.', act: v => go(() => picksFine(w => go(() => settingsScreen(backTo), w), null, true), v) },
+      { t:`송구 고르기: ${SET.pickThrow === false ? '끔' : '켬'}`, s:'정밀 모드에서 내가 수비할 때, 땅볼을 잡은 뒤 던질 베이스를 직접 고릅니다. 끄면 컴퓨터가 정합니다.', act: ch(() => { SET.pickThrow = SET.pickThrow === false; }, () => `송구 고르기 ${SET.pickThrow === false ? '끔' : '켬'}`) },
+      { t:`관전 자동 재생 간격: ${SET.watch}초`, act: ch(() => { SET.watch = cycle([2, 4, 6, 8, 12], SET.watch); }, () => `자동 재생 ${SET.watch}초`) },
+    ],
+    // 규칙
+    [
+      { t:`판정 과정 보기: ${onOff(SET.dice)}`, s:'주사위와 확률을 기록에 함께 보여 줍니다. 테이블 게임처럼 판정을 확인할 수 있습니다.', act: ch(() => { SET.dice = !SET.dice; }, () => `판정 과정 보기 ${onOff(SET.dice)}`) },
+      { t:`송구 선택 시간: ${SET.throwSec ? SET.throwSec + '초' : '제한 없음'}`, hide: SET.pickThrow === false, s:'시간 안에 고르지 않으면 컴퓨터가 정합니다. 6초, 10초, 제한 없음 순서로 바뀝니다.', act: ch(() => { SET.throwSec = SET.throwSec === 6 ? 10 : SET.throwSec === 10 ? 0 : 6; }, () => `송구 선택 시간 ${SET.throwSec ? SET.throwSec + '초' : '제한 없음'}`) },
+      { t:`비디오 판독 기회: 팀마다 ${SET.rev ?? 2}번`, s:'새로 시작하는 경기부터 적용합니다. 0번이면 판독이 없습니다. (리그와 육성은 늘 2번)', act: ch(() => { SET.rev = ((SET.rev ?? 2) + 1) % 4; }, () => `비디오 판독 기회 ${SET.rev}번`) },
+    ],
+    // 조작·접근성
+    [
+      { t:`읽어 주기: ${VOICES[SET.voice]}`, s:'화면 낭독기를 쓰지 않는다면 기기 음성으로 바꾸세요. 화면 낭독기와 기기 음성을 함께 켜면 두 번 읽습니다.', act: ch(() => { SET.voice = cycle(Object.keys(VOICES), SET.voice); }, () => `읽어 주기 ${VOICES[SET.voice]}`) },
+      { t:`경기 결과 전달: ${DELIVER[SET.deliver || 'both']}`, s:'소리와 글: 중계 음성으로 듣고, 결과 글도 화면과 점자 단말기에 남깁니다(낭독기는 중계와 겹치지 않게 질문부터 읽습니다). 소리만: 결과 글을 숨깁니다. 글만: 중계 음성으로 결과를 말하지 않고 낭독기가 글을 읽습니다.',
+        act: ch(() => { SET.deliver = cycle(['both', 'sound', 'text'], SET.deliver || 'both'); }, () => `경기 결과 전달 ${DELIVER[SET.deliver]}`) },
+      { t:`코스 번호 배열: ${SET.pad === 'pc' ? '컴퓨터 숫자판식 (7 8 9가 위)' : '전화기식 (1 2 3이 위)'}`, s:'코스를 고를 때 숫자와 스트라이크 존 칸을 맞추는 방법입니다. 쓰는 키보드의 숫자 배열에 맞추세요.', act: ch(() => { SET.pad = SET.pad === 'pc' ? 'phone' : 'pc'; }, () => `코스 번호 ${SET.pad === 'pc' ? '7 8 9가 높은 공' : '1 2 3이 높은 공'}`) },
+      { t:`숫자판 방향 배치: ${onOff(!!SET.padDir)}`, hide: SET.view === 'gfx', s:'켜면 코스·높이·붙이기를 숫자판 방향대로 놓습니다. 왼손 타자는 좌우가 뒤집힙니다.', act: ch(() => { SET.padDir = !SET.padDir; }, () => `숫자판 방향 배치 ${onOff(!!SET.padDir)}`) },
+      { t:`명령 칸 숫자 바로 고르기: ${onOff(SET.quick)}`, s:'켜면 명령 칸에 숫자 하나만 적어도 바로 고릅니다. 끄면 입력 키를 눌러야 고릅니다. 선택지가 열 개를 넘는 화면에서는 두 자리를 연달아 누르세요.', act: ch(() => { SET.quick = !SET.quick; }, () => `숫자 바로 고르기 ${onOff(SET.quick)}`) },
+      { t:`진동: ${onOff(SET.vib)}`, s:'안드로이드 휴대폰에서 스트라이크, 볼, 안타, 홈런, 아웃, 득점 등을 진동 모양으로 알립니다.', act: ch(() => { SET.vib = !SET.vib; }, () => `진동 ${onOff(SET.vib)}`) },
+      { t:'진동 뜻 익히기', s:'진동 모양을 하나씩 느껴 보고 뜻을 듣습니다.', act: v => go(() => vibScreen(w => go(() => settingsScreen(backTo), w)), v) },
+      { t:`저시력 크게 보기: ${onOff(!!SET.lowvis)}`, hide: SET.view === 'gfx', s:'켜면 단추와 글자를 크게 보여 줍니다. 끄면 한 화면에 더 많이 보이게 작게 보여 줍니다.', act: ch(() => { SET.lowvis = !SET.lowvis; applySet(); }, () => `저시력 크게 보기 ${onOff(!!SET.lowvis)}`) },
+    ],
+    // 화면
+    [
+      { t:`글자 크기: ${FS_NAMES[SET.fs]}`, act: ch(() => { SET.fs = (SET.fs + 1) % FS_NAMES.length; }, () => `글자 크기 ${FS_NAMES[SET.fs]}`) },
+      { t:`화면 색: ${THEMES[SET.theme]}`, act: ch(() => { SET.theme = cycle(Object.keys(THEMES), SET.theme); }, () => `화면 색 ${THEMES[SET.theme]}`) },
+      { t: FS.on() ? '전체화면 끄기' : '전체화면 켜기', hide: isStandalone(), s: FS.supported() ? '' : '이 기기에서는 홈 화면에 설치하면 넓게 쓸 수 있습니다.', act: () => FS.toggle() },
+      { t:`자동 전체화면: ${onOff(SET.autoFS)}`, hide: isStandalone(), s:'켜면 화면을 처음 누를 때 전체화면으로 바뀝니다.', act: ch(() => { SET.autoFS = !SET.autoFS; FS.userExit = false; }, () => `자동 전체화면 ${onOff(SET.autoFS)}`) },
+      { t:'홈 화면에 설치하기', hide: !canInstall(), act: () => doInstall() },
+    ],
+    // 소리
+    [
+      { t:`효과음: ${sndName()}`, s:'야구장 소리(피칭, 타격, 스트라이크, 안타, 홈런, 공수교대 등) · 간단한 소리 · 끄기 순서로 바뀝니다.', act: ch(() => { if(!SET.snd){ SET.snd = true; SET.sndKind = 'rec'; } else if(SET.sndKind !== 'synth') SET.sndKind = 'synth'; else SET.snd = false; crowdSync(); }, () => `효과음 ${sndName()}`) },
+      { t:`중계 음성: ${castName()}${SET.deliver === 'text' ? ' (결과 전달이 글만이라 쉬는 중)' : ''}`, s:'캐스터 목소리로 경기를 중계하고, 해설위원이 맞장구와 한마디를 합니다. 끔 → 캐스터만 → 해설 가끔 → 해설 자주 순서로 바뀝니다.',
+        act: ch(() => { const k = ['off', 'c', 'some', 'often'], i = (k.indexOf(castKey()) + 1) % k.length; SET.cast = k[i] !== 'off'; SET.analyst = k[i] === 'c' ? 'off' : k[i] === 'off' ? (SET.analyst || 'some') : k[i]; if(SET.cast){ SET.snd = true; castSample(); } }, () => `중계 음성 ${castName()}`) },
+      { t:`중계 볼카운트: ${({ always:'매번', idle:'오래 고를 때만', off:'읽지 않음' })[SET.castCount || 'idle']}`, s:'중계 음성이 공마다 볼카운트를 말할지 정합니다. "오래 고를 때만"이면 고르는 데 6초 넘게 걸릴 때 한 번 말합니다.',
+        act: ch(() => { SET.castCount = cycle(['idle', 'always', 'off'], SET.castCount || 'idle'); }, () => `중계 볼카운트 ${({ always:'매번', idle:'오래 고를 때만', off:'읽지 않음' })[SET.castCount]}`) },
+      { t:`관중 소리: ${onOff(SET.crowd)}`, s:'화면 보며 하기에서 경기 내내 야구장 관중 소리를 작게 깔아 줍니다. 효과음이 꺼져 있으면 나지 않습니다.', act: ch(() => { SET.crowd = !SET.crowd; crowdSync(); }, () => `관중 소리 ${onOff(SET.crowd)}`) },
+      { t:`기기 음성 빠르기: ${SET.rate}배`, s:'읽어 주기가 기기 음성일 때만 씁니다.', act: ch(() => { SET.rate = cycle([0.8, 1, 1.2, 1.5, 2], SET.rate); }, () => `음성 빠르기 ${SET.rate}배`) },
+      { t:'소리 시험', s:'읽어 주기, 효과음, 중계 음성, 진동을 시험합니다.', act: v => { playFx(['pitch', 'bat', 'hit']); if(castOn()) castSample(); speak('소리 시험입니다. 딱! 잘 맞은 타구, 안타!'); if(v === 'click' && SET.voice === 'sr') note(['소리 시험입니다. 딱! 잘 맞은 타구, 안타!'], v); } },
+    ],
+    // 저장
+    [
+      { t:'저장된 경기 지우기', hide: !loadSaved(), act: () => openDlg('저장된 경기 지우기', ['이어 하던 경기를 지울까요? 되돌릴 수 없습니다.'], [
+        { label:'지우기', act: () => { ls.del('bb_game'); stay('저장된 경기를 지웠습니다.'); } }, { label:'그만두기' }]) },
+      { t:`받은 채팅 읽어 주기: ${onOff(SET.chatRead)}`, s:'온라인 대전에서 상대가 보낸 채팅을 바로 읽어 줍니다. 채팅 목록은 늘 화면에 남습니다.', act: ch(() => { SET.chatRead = !SET.chatRead; }, () => `채팅 읽어 주기 ${onOff(SET.chatRead)}`) },
+      { t:'게임 방법과 키 안내', act: v => go(() => helpScreen(() => go(() => settingsScreen(backTo), 'click')), v) },
+    ],
+  ];
+  const opts = tabs[T].filter(o => !o.hide).map((o, i) => ({ ...o, n: i + 1 }));
+  opts.push({ n:9, t:`다음 탭: ${SET_TABS[(T + 1) % n]}`, s:'왼쪽·오른쪽 화살표로도 탭을 옮깁니다.', act: v => goTab((T + 1) % n, v) });
+  const strip = `<div class="tabs" role="tablist" aria-label="설정 탭">${SET_TABS.map((t, i) => `<button type="button" role="tab" class="tab${i === T ? ' on' : ''}" data-tab="${i}" aria-selected="${i === T}" tabindex="${i === T ? 0 : -1}">${esc(t)}</button>`).join('')}</div>`;
+  return { top: strip, q:`설정, ${SET_TABS[T]} 탭, ${T + 1}번째 탭 ${n}개 중. 고를 때마다 값이 바뀝니다. 9번은 다음 탭입니다.`, back: v => backTo(v), opts,
+    onTab: (x, via, rel) => goTab(rel ? (T + x + n) % n : x, via) };
+}
+// 진동 뜻 익히기: 번호를 누르면 그 진동을 울리고 뜻을 말해 줌
+function vibScreen(after){
+  const opts = VIB_INFO.map(([k, name, how, pat], i) => ({ n: i + 1, t:`${name}: ${how}`, s:'누르면 진동이 울립니다.',
+    act: () => { if(navigator.vibrate){ try{ navigator.vibrate(pat); }catch(e){} } speak(`${name}. ${how}.`); } }));
+  return { q:`진동 뜻 익히기. 번호를 누르면 진동이 울리고 뜻을 말해 줍니다.${navigator.vibrate ? '' : ' 이 기기는 진동을 지원하지 않아 설명만 합니다.'}`, opts, back: v => after(v) };
 }
 const castKey = () => SET.cast === false ? 'off' : (SET.analyst || 'some') === 'off' ? 'c' : SET.analyst || 'some';
 const castName = () => ({ off:'끔', c:'캐스터만', some:'캐스터 + 해설 가끔', often:'캐스터 + 해설 자주' })[castKey()];
-function settings2(backTo){
-  const ch = (fn, label) => () => { fn(); saveSet(); stay(label()); };
-  return { q:'설정 더 보기', back: v => go(() => settingsScreen(backTo), v), opts:[
-    { n:1, t:`진동: ${onOff(SET.vib)}`, s:'안드로이드 휴대폰에서 안타, 홈런, 삼진, 득점 때 진동합니다.', act: ch(() => { SET.vib = !SET.vib; }, () => `진동 ${onOff(SET.vib)}`) },
-    { n:2, t:`중계 음성: ${castName()}`, s:'캐스터 목소리로 경기를 중계하고, 해설위원이 맞장구와 한마디를 합니다. 끔 → 캐스터만 → 해설 가끔 → 해설 자주 순서로 바뀝니다. 켜면 경기 결과는 중계로 듣고, 화면 낭독기는 질문과 선택지만 읽습니다.',
-      act: ch(() => { const k = ['off', 'c', 'some', 'often'], i = (k.indexOf(castKey()) + 1) % k.length; SET.cast = k[i] !== 'off'; SET.analyst = k[i] === 'c' ? 'off' : k[i] === 'off' ? (SET.analyst || 'some') : k[i]; if(SET.cast){ SET.snd = true; castSample(); } }, () => `중계 음성 ${castName()}`) },
-    { n:3, t:`명령 칸 숫자 바로 고르기: ${onOff(SET.quick)}`, s:'켜면 명령 칸에 숫자 하나만 적어도 바로 고릅니다. 끄면 입력 키를 눌러야 고릅니다.',
-      act: ch(() => { SET.quick = !SET.quick; }, () => `숫자 바로 고르기 ${onOff(SET.quick)}`) },
-    { n:4, t:`관전 자동 재생 간격: ${SET.watch}초`, act: ch(() => { SET.watch = cycle([2, 4, 6, 8, 12], SET.watch); }, () => `자동 재생 ${SET.watch}초`) },
-    { n:5, t:`기기 음성 빠르기: ${SET.rate}배`, s:'읽어 주기가 기기 음성일 때만 씁니다.', act: ch(() => { SET.rate = cycle([0.8, 1, 1.2, 1.5, 2], SET.rate); }, () => `음성 빠르기 ${SET.rate}배`) },
-    { n:6, t: FS.on() ? '전체화면 끄기' : '전체화면 켜기', hide: isStandalone(), s: FS.supported() ? '' : '이 기기에서는 홈 화면에 설치하면 넓게 쓸 수 있습니다.', act: () => FS.toggle() },
-    { n:7, t:`자동 전체화면: ${onOff(SET.autoFS)}`, hide: isStandalone(), s:'켜면 화면을 처음 누를 때 전체화면으로 바뀝니다.', act: ch(() => { SET.autoFS = !SET.autoFS; FS.userExit = false; }, () => `자동 전체화면 ${onOff(SET.autoFS)}`) },
-    { n:8, t:'더 보기', s:'소리 시험, 채팅 읽어 주기, 저장된 경기 지우기', act: v => go(() => settings3(backTo), v) },
-    { n:9, t:'홈 화면에 설치하기', hide: !canInstall(), act: () => doInstall() },
-  ] };
-}
 /* ---------- 직접 고를 항목 ---------- */
 // 정밀 모드 단계: 1단계는 간단 모드. 2단계는 구종·코스·세기 가운데 하나, 3단계는 둘, 4단계는 전부를 고름
 const PICK_ONE = { pt:'구종', loc:'코스(9칸)', pow:'세기' };
@@ -231,39 +266,17 @@ function picksCustom(after, back){
     { n:9, t:'다 됐어요', act: v => after(v) },
   ] };
 }
-function picksFine(after, back){
+function picksFine(after, back, direct){
   const p = picks(), ch = (fn, label) => () => { const q = picks(); fn(q); SET.picks = q; saveSet(); stay(label(q)); };
   const on = b => b ? '켬' : '끔';
-  return { q:'세밀하게 고르기. 하나씩 켜고 끕니다. 다 됐으면 9번을 누르세요.', back: v => go(() => picksCustom(after, back), v), opts:[
+  const done = v => direct ? after(v) : go(() => picksCustom(after, back), v);   // 설정 탭에서 열면 바로 설정으로 돌아감
+  return { q:'세밀하게 고르기. 하나씩 켜고 끕니다. 다 됐으면 9번을 누르세요.', back: done, opts:[
     { n:1, t:`구속 9단계: ${on(p.pow9)}`, s:'수비할 때 세기를 3단계 대신 1(가장 느림)~9(최대 전력)로 고릅니다. 세게 던질수록 빠르고 구위가 좋지만 제구가 흔들리고 힘이 듭니다.', act: ch(q => { q.pow9 = !q.pow9; }, q => `구속 9단계 ${on(q.pow9)}`) },
     { n:2, t:`스윙 세기 9단계: ${on(p.swing9)}`, s:'공격할 때 강하게 치기·맞히기 대신 1(맞히기)~9(풀스윙) 가운데 고릅니다.', act: ch(q => { q.swing9 = !q.swing9; }, q => `스윙 세기 9단계 ${on(q.swing9)}`) },
     { n:3, t:`노려 치기: ${on(p.aim)}`, s:'공격할 때 노림수 화면에서 공이 올 칸을 하나 고릅니다.', act: ch(q => { q.aim = !q.aim; }, q => `노려 치기 ${on(q.aim)}`) },
-    { n:9, t:'다 됐어요', act: v => go(() => picksCustom(after, back), v) },
+    { n:9, t:'다 됐어요', act: done },
   ] };
 }
-function settings3(backTo){
-  const ch = (fn, label) => () => { fn(); saveSet(); stay(label()); };
-  return { q:'설정 더 보기 (마지막)', back: v => go(() => settings2(backTo), v), opts:[
-    { n:1, t:'소리 시험', s:'읽어 주기, 효과음, 중계 음성, 진동을 시험합니다.', act: v => { playFx(['pitch', 'bat', 'hit']); if(castOn()) castSample(); speak('소리 시험입니다. 딱! 잘 맞은 타구, 안타!'); if(v === 'click' && SET.voice === 'sr') note(['소리 시험입니다. 딱! 잘 맞은 타구, 안타!'], v); } },
-    { n:5, t:`타격 난이도: ${EASY_NAME[SET.easy ?? 1]}`, s:'쉬움일수록 잘 맞히고 안타·볼넷·진루가 많아집니다. 다음 경기부터 적용합니다. (리그의 다른 팀 경기는 늘 현실)', act: ch(() => { SET.easy = cycle([1, 2, 0], SET.easy ?? 1); }, () => `타격 난이도 ${EASY_NAME[SET.easy]}`) },
-    { n:7, t:`송구 고르기: ${SET.pickThrow === false ? '끔' : SET.throwSec ? `켬 (${SET.throwSec}초 안에)` : '켬 (시간 제한 없음)'}`, s:'정밀 모드에서 내가 수비할 때, 땅볼을 잡은 뒤 던질 베이스를 직접 고릅니다. 시간 안에 고르지 않으면 컴퓨터가 정합니다. 누를 때마다 6초, 10초, 시간 제한 없음, 끔 순서로 바뀝니다.',
-      act: ch(() => { const c = SET.pickThrow === false ? 'off' : SET.throwSec === 6 ? 's6' : SET.throwSec === 10 ? 's10' : SET.throwSec === 0 ? 's0' : 's6', nx = { s6:'s10', s10:'s0', s0:'off', off:'s6' }[c]; SET.pickThrow = nx !== 'off'; SET.throwSec = nx === 's6' ? 6 : nx === 's10' ? 10 : 0; }, () => `송구 고르기 ${SET.pickThrow === false ? '끔' : SET.throwSec ? SET.throwSec + '초' : '시간 제한 없음'}`) },
-    { n:6, t:`관중 소리: ${onOff(SET.crowd)}`, s:'화면 보며 하기에서 경기 내내 야구장 관중 소리를 작게 깔아 줍니다. 효과음이 꺼져 있으면 나지 않습니다.',
-      act: ch(() => { SET.crowd = !SET.crowd; crowdSync(); }, () => `관중 소리 ${onOff(SET.crowd)}`) },
-    { n:7, t:`중계 볼카운트: ${({ always:'매번', idle:'오래 고를 때만', off:'읽지 않음' })[SET.castCount || 'idle']}`, s:'중계 음성이 공마다 볼카운트를 말할지 정합니다. "오래 고를 때만"이면 고르는 데 6초가 넘게 걸릴 때 볼카운트·아웃·주자를 한 번 말하고, 고르면 바로 멈춥니다.',
-      act: ch(() => { SET.castCount = cycle(['idle', 'always', 'off'], SET.castCount || 'idle'); }, () => `중계 볼카운트 ${({ always:'매번', idle:'오래 고를 때만', off:'읽지 않음' })[SET.castCount]}`) },
-    { n:8, t:`숫자판 방향 배치: ${onOff(!!SET.padDir)}`, hide: SET.view === 'gfx', s:'켜면 코스·높이·붙이기를 숫자판 방향대로 놓습니다. 높게는 위 줄, 바깥으로 뺄수록 바깥 칸이고, 왼손 타자면 몸쪽이 오른쪽입니다. 숫자판 키보드로 할 때 편합니다.',
-      act: ch(() => { SET.padDir = !SET.padDir; }, () => `숫자판 방향 배치 ${onOff(!!SET.padDir)}`) },
-    { n:9, t:`저시력 크게 보기: ${onOff(!!SET.lowvis)}`, hide: SET.view === 'gfx', s:'켜면 단추와 글자를 크게 보여 줍니다. 끄면 한 화면에 더 많이 보이게 작게 보여 줍니다.',
-      act: ch(() => { SET.lowvis = !SET.lowvis; applySet(); }, () => `저시력 크게 보기 ${onOff(!!SET.lowvis)}`) },
-    { n:4, t:`정밀 모드에서 직접 고를 것: ${pickName()}`, s:'구종만 · 구종과 코스 · 전부 · 내 맘대로', act: v => go(() => picksScreen(w => go(() => settings3(backTo), w)), v) },
-    { n:2, t:`받은 채팅 읽어 주기: ${onOff(SET.chatRead)}`, s:'온라인 대전에서 상대가 보낸 채팅을 바로 읽어 줍니다. 채팅 목록은 늘 화면에 남습니다.',
-      act: ch(() => { SET.chatRead = !SET.chatRead; }, () => `채팅 읽어 주기 ${onOff(SET.chatRead)}`) },
-    { n:3, t:'저장된 경기 지우기', hide: !loadSaved(), act: () => openDlg('저장된 경기 지우기', ['이어 하던 경기를 지울까요? 되돌릴 수 없습니다.'], [
-      { label:'지우기', act: () => { ls.del('bb_game'); stay('저장된 경기를 지웠습니다.'); } }, { label:'그만두기' }]) },
-  ] };
-}
-
 /* ---------- 도움말 ---------- */
 const HELP = {
   '게임 방법': [
