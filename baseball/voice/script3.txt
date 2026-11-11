@@ -1,0 +1,210 @@
+001	N1	a_inn_k	삼진 세 개로 이닝을 끝냅니다!
+002	N1	a_inn_k-2	세 타자를 모두 삼진으로 잡았습니다. 대단한 이닝이었어요.
+003	N1	a_inn_dp	병살로 불을 끕니다.
+004	N1	a_inn_dp-2	병살타로 위기를 벗어나네요. 투수에게 큰 도움이 됩니다.
+005	N1	a_inn_escape	위기를 잘 넘깁니다.
+006	N1	a_inn_escape-2	주자가 나갔지만 실점 없이 막아 냅니다. 집중력이 좋았어요.
+007	N2	a_inn_lob	아쉽습니다, 주자를 세 명이나 남겼습니다.
+008	N2	a_inn_lob-2	득점권에서 한 방이 아쉬운 이닝이었습니다.
+009	N2	a_inn_run1	한 점을 내주고 이닝을 마칩니다.
+010	N2	a_inn_run1-2	한 점으로 막은 게 그나마 다행입니다.
+011	N2	a_inn_runs	두 점을 내주고 이닝을 마칩니다.
+012	N2	a_inn_runs-2	두 점이 나왔네요. 흐름이 조금 넘어갔습니다.
+013	N2	a_inn_big	크게 무너진 이닝이었습니다.
+014	N2	a_inn_big-2	대량 실점입니다. 투수 교체도 고민해야 할 상황이에요.
+015	P1	pos_P_c	투수가 잡았습니다.
+016	P1	pos_C_c	포수가 잡았습니다.
+017	P1	pos_1B_c	1루수가 잡았습니다.
+018	P1	pos_2B_c	2루수가 잡았습니다.
+019	P1	pos_3B_c	3루수가 잡았습니다.
+020	P1	pos_SS_c	유격수가 잡았습니다.
+021	P1	pos_LF_c	좌익수가 잡았습니다.
+022	P1	pos_CF_c	중견수가 잡았습니다.
+023	P1	pos_RF_c	우익수가 잡았습니다.
+024	P2	pos_P_to	투수 앞으로!
+025	P2	pos_C_to	포수 앞으로!
+026	P2	pos_1B_to	1루수 앞으로!
+027	P2	pos_2B_to	2루수 앞으로!
+028	P2	pos_3B_to	3루수 앞으로!
+029	P2	pos_SS_to	유격수 앞으로!
+030	P2	pos_LF_to	좌익수 앞으로!
+031	P2	pos_CF_to	중견수 앞으로!
+032	P2	pos_RF_to	우익수 앞으로!
+033	P3	pos_P_at	투수 쪽으로!
+034	P3	pos_C_at	포수 쪽으로!
+035	P3	pos_1B_at	1루수 쪽으로!
+036	P3	pos_2B_at	2루수 쪽으로!
+037	P3	pos_3B_at	3루수 쪽으로!
+038	P3	pos_SS_at	유격수 쪽으로!
+039	P3	pos_LF_at	좌익수 쪽으로!
+040	P3	pos_CF_at	중견수 쪽으로!
+041	P3	pos_RF_at	우익수 쪽으로!
+042	T1	thr_0	1루로 송구합니다!
+043	T1	thr_1	2루로 송구합니다!
+044	T1	thr_2	3루로 송구합니다!
+045	T1	thr_3	홈으로 송구합니다!
+046	T1	thr_none	던지지 않습니다.
+047	T1	thr_ask	송구 선택!
+048	R1	c_hitrun1	히트 앤드 런!
+049	R1	c_hitrun1-2	작전이 걸렸습니다! 히트 앤드 런!
+050	R1	c_hitrun2	주자 스타트!
+051	R1	c_hitrun2-2	1루 주자가 뜁니다!
+052	R2	a_hitrun1	작전이 나왔네요.
+053	R2	a_hitrun1-2	벤치에서 승부를 거네요.
+054	R2	a_hitrun2	맞히면 한 베이스 더 갈 수 있습니다.
+055	R2	a_hitrun2-2	헛스윙이면 주자가 위험해집니다.
+056	HA1	hype/a_ah	아…
+057	HA1	hype/a_ball1	제구가 조금 흔들리네요.
+058	HA1	hype/a_ball2	유인구를 잘 참았습니다.
+059	HA1	hype/a_behind1	아직 포기하긴 이릅니다. 야구는 모르는 거예요.
+060	HA1	hype/a_big1	점수 차가 많이 벌어졌습니다.
+061	HA1	hype/a_bye	오늘 정말 좋은 경기였습니다. 감사합니다.
+062	HA1	hype/a_careful	여기는 조심해야 합니다.
+063	HA1	hype/a_chance1	득점권입니다. 한 방이면 점수가 납니다.
+064	HA1	hype/a_chance2	여기서 점수를 내야 합니다.
+065	HA1	hype/a_change1	투수 교체, 좋은 선택으로 보입니다.
+066	HA1	hype/a_close1	접전입니다. 한 점 싸움이에요.
+067	HA1	hype/a_comeback1	역전입니다! 경기가 뒤집혔어요!
+068	HA1	hype/a_def1	수비 좋습니다!
+069	HA1	hype/a_def2	첫발 스타트가 아주 좋았어요.
+070	HA1	hype/a_def3	이건 정말 하이라이트감입니다!
+071	HA1	hype/a_dp1	병살은 정말 뼈아프죠.
+072	HA1	hype/a_dp2	수비가 침착했습니다.
+073	HA1	hype/a_end1	이겼습니다! 선수들 정말 잘했어요.
+074	HA1	hype/a_error1	실책은 흐름을 바꿀 수 있어요.
+075	HA1	hype/a_error2	이건 잡아 줬어야 하는 공이에요.
+076	HA2	hype/a_flow1	흐름이 넘어갔어요.
+077	HA2	hype/a_fly1	조금 떠 버렸어요.
+078	HA2	hype/a_foul1	끈질기게 커트하고 있습니다.
+079	HA2	hype/a_foul2	타자가 잘 버티고 있어요.
+080	HA2	hype/a_full1	풀카운트, 이제 투수와 타자 모두 물러설 수 없습니다.
+081	HA2	hype/a_full2	다음 공이 정말 중요합니다.
+082	HA2	hype/a_gb1	공 윗부분을 쳤네요. 땅볼입니다.
+083	HA2	hype/a_hello	네, 안녕하세요. 해설 강태산입니다.
+084	HA2	hype/a_hello-2	반갑습니다, 강태산입니다. 오늘 재미있는 경기 기대됩니다.
+085	HA2	hype/a_hit1	좋은 타격입니다!
+086	HA2	hype/a_hit2	노리고 있었네요!
+087	HA2	hype/a_hit3	공을 끝까지 잘 봤어요.
+088	HA2	hype/a_hr1	실투였어요, 놓치지 않았습니다!
+089	HA2	hype/a_hr2	완벽하게 받아쳤습니다!
+090	HA2	hype/a_hr3	힘이 정말 대단하네요!
+091	HA2	hype/a_inning1	깔끔하게 이닝을 마무리합니다.
+092	HA2	hype/a_inning2	실점 없이 막아 냅니다. 좋습니다.
+093	HA2	hype/a_k1	결정구가 좋았습니다.
+094	HA2	hype/a_k2	타이밍을 완전히 빼앗았어요.
+095	HA2	hype/a_k3	코너워크가 훌륭합니다.
+096	HA3	hype/a_late1	후반입니다. 이제 불펜 싸움이 시작되겠네요.
+097	HA3	hype/a_loaded1	만루, 투수가 정말 부담스러운 상황입니다.
+098	HA3	hype/a_oh	오!
+099	HA3	hype/a_out1	아, 아쉽네요. 잘 맞았는데요.
+100	HA3	hype/a_out2	정면으로 갔습니다. 운이 없었어요.
+101	HA3	hype/a_out3	너무 급했어요. 조금 더 기다렸어야 합니다.
+102	HA3	hype/a_pinch1	투수에게는 위기입니다. 침착해야 해요.
+103	HA3	hype/a_pitch_good	오늘 공 끝이 아주 좋습니다.
+104	HA3	hype/a_preview1	오늘은 투수들의 제구가 승부를 가를 것 같습니다.
+105	HA3	hype/a_preview2	초반 기선 제압이 중요한 경기입니다.
+106	HA3	hype/a_preview3	두 팀 모두 타격감이 좋아서, 점수가 많이 날 수도 있겠어요.
+107	HA3	hype/a_review1	느린 화면으로 보면 판정이 바뀔 수도 있겠습니다.
+108	HA3	hype/a_run1	발이 정말 빠르네요!
+109	HA3	hype/a_run2	주루 센스가 좋습니다.
+110	HA3	hype/a_score1	귀중한 점수입니다.
+111	HA3	hype/a_score2	분위기를 가져옵니다!
+112	HA3	hype/a_score3	이 점수는 크게 느껴집니다.
+113	HA3	hype/a_steal1	뛸 것 같은 분위기입니다.
+114	HA3	hype/a_tie1	다시 원점입니다. 동점이에요!
+115	HA3	hype/a_tired1	투수가 조금 지쳐 보입니다.
+116	HA4	hype/a_tired2	투구 수가 많아졌어요. 교체 시점을 봐야겠습니다.
+117	HA4	hype/a_twoout1	투 아웃이지만, 아직 모릅니다.
+118	HA4	hype/a_walk1	볼넷은 투수에게 아쉬운 부분입니다.
+119	HA4	hype/a_walk2	승부를 피한 느낌이에요.
+120	HA4	hype/a_watch	지켜보시죠.
+121	HA4	hype/a_whiff1	변화구에 방망이가 따라 나갔네요.
+122	HA4	hype/a_wow	와, 대단합니다!
+123	HA4	hype/a_yes1	네, 그렇습니다.
+124	HA4	hype/a_yes2	맞습니다.
+125	HA4	hype/a_yes3	그렇죠.
+126	HA4	hype/a_yes4	저도 같은 생각입니다.
+127	HR1	hype/r_ball1	볼.
+128	HR1	hype/r_ball2	빠졌습니다, 볼.
+129	HR1	hype/r_ball3	낮습니다, 볼.
+130	HR1	hype/r_ball4	높게 빠집니다, 볼.
+131	HR1	hype/r_ball5	바깥으로 빠졌습니다, 볼.
+132	HR1	hype/r_bunt	번트! 굴립니다!
+133	HR1	hype/r_catch1	잡았습니다! 아웃!
+134	HR1	hype/r_catch2	잡아냅니다!
+135	HR1	hype/r_catch3	침착하게 처리합니다.
+136	HR1	hype/r_catch4	평범한 뜬공, 잡았습니다.
+137	HR1	hype/r_double	펜스까지 굴러갑니다! 2루타!
+138	HR1	hype/r_double2	외야를 가릅니다, 2루타!
+139	HR1	hype/r_dp	병살! 더블 플레이!
+140	HR1	hype/r_dp2	두 개를 잡아냅니다, 병살!
+141	HR1	hype/r_error1	아! 공을 놓칩니다! 실책!
+142	HR1	hype/r_error2	송구가 빠집니다! 실책!
+143	HR1	hype/r_foul1	아~ 파울입니다.
+144	HR1	hype/r_foul2	옆으로 휘어 나갑니다, 파울.
+145	HR1	hype/r_foul3	아깝습니다, 파울!
+146	HR1	hype/r_foul4	뒤로 넘어가는 파울.
+147	HR2	hype/r_foul5	커트해 냅니다, 파울.
+148	HR2	hype/r_groundout1	1루에서 아웃!
+149	HR2	hype/r_groundout2	송구, 아웃입니다.
+150	HR2	hype/r_groundout3	깔끔하게 처리합니다, 아웃.
+151	HR2	hype/r_hbp	아, 몸에 맞았습니다!
+152	HR2	hype/r_hit1	떨어집니다! 안타!
+153	HR2	hype/r_hit2	빠졌습니다! 안타!
+154	HR2	hype/r_hit3	안타입니다!
+155	HR2	hype/r_hit4	안타! 출루합니다!
+156	HR2	hype/r_hit5	깨끗한 안타!
+157	HR2	hype/r_hit6	내야를 빠져나갑니다, 안타!
+158	HR2	hype/r_hr1	넘어갔습니다! 홈런!!!
+159	HR2	hype/r_hr2	담장을 넘깁니다! 홈런!!!
+160	HR2	hype/r_hr3	이건 끝났어요! 홈런!!!
+161	HR2	hype/r_hr4	큽니다! 넘어갑니다! 홈런!
+162	HR2	hype/r_hr5	쐈습니다! 담장 밖으로! 홈런!
+163	HR2	hype/r_hr6	그대로 관중석으로! 홈런!
+164	HR2	hype/r_hr_grand	만루 홈런!!! 그랜드 슬램!!!
+165	HR2	hype/r_hr_three	쓰리런 홈런!
+166	HR2	hype/r_hr_two	투런 홈런!
+167	HR3	hype/r_k_look	꼼짝 못 하고, 삼진!
+168	HR3	hype/r_k_swing	헛스윙 삼진!!
+169	HR3	hype/r_k_swing2	삼진! 돌려세웁니다!
+170	HR3	hype/r_out_sad	아~ 아깝게 잡히고 맙니다.
+171	HR3	hype/r_overturn	판정이 뒤집힙니다!
+172	HR3	hype/r_pickoff	견제!
+173	HR3	hype/r_pitcher_change	투수가 바뀝니다.
+174	HR3	hype/r_review	비디오 판독에 들어갑니다.
+175	HR3	hype/r_safe1	세이프!
+176	HR3	hype/r_safe2	살았습니다!
+177	HR3	hype/r_safe3	간발의 차, 세이프!
+178	HR3	hype/r_score1	홈인! 득점!
+179	HR3	hype/r_score2	주자 들어옵니다!
+180	HR3	hype/r_score3	홈을 밟습니다!
+181	HR3	hype/r_score4	한 점 추가합니다!
+182	HR3	hype/r_sigh1	아~ 아쉽습니다.
+183	HR3	hype/r_sigh2	아이고, 이걸 놓치네요.
+184	HR3	hype/r_stand	원심 그대로 갑니다.
+185	HR3	hype/r_steal_go	뛰었습니다! 도루!
+186	HR3	hype/r_steal_out	아웃! 잡아냅니다!
+187	HR4	hype/r_steal_safe	세이프! 도루 성공!
+188	HR4	hype/r_steal_safe2	여유 있게 세이프, 도루 성공!
+189	HR4	hype/r_strike1	스트라이크!
+190	HR4	hype/r_strike2	꽂혔습니다, 스트라이크!
+191	HR4	hype/r_strike3	들어갔습니다, 스트라이크!
+192	HR4	hype/r_strike4	존에 걸칩니다, 스트라이크.
+193	HR4	hype/r_supercatch1	슈퍼 캐치! 이걸 잡아냅니다!
+194	HR4	hype/r_supercatch2	믿을 수 없는 호수비!
+195	HR4	hype/r_supercatch3	담장 앞에서 걷어냅니다! 대단한 수비!
+196	HR4	hype/r_tp	트리플 플레이!!! 이게 무슨 일입니까!!!
+197	HR4	hype/r_triple	3루까지! 3루타!
+198	HR4	hype/r_triple2	3루까지 내달립니다, 3루타!
+199	HR4	hype/r_walk	볼넷, 걸어 나갑니다.
+200	HR4	hype/r_walk2	볼넷, 1루로 걸어 나갑니다.
+201	HR4	hype/r_walkoff	끝내기!!! 경기 끝납니다!!!
+202	HR4	hype/r_walkoff2	끝내기 안타! 경기 끝납니다!
+203	HR4	hype/r_walkoff_hr	끝내기 홈런!
+204	HR4	hype/r_whiff1	헛스윙!
+205	HR4	hype/r_whiff2	방망이가 허공을 가릅니다!
+206	HR4	hype/r_whiff3	헛방망이!
+207	HR5	hype/r_whiff4	속았습니다, 헛스윙!
+208	HR5	hype/r_wow1	와아! 대단합니다!
+209	HR5	hype/r_wow2	이야, 멋집니다!
+210	HR5	hype/r_wow3	관중들이 모두 일어섭니다!

@@ -129,7 +129,9 @@ function castResult(res, opt = {}){
   let resAt = 0, hitAt = null;   // hitAt: 안타가 정해지는(함성이 터질) 시각
   if(pitched){
     // 던질 때: 구종 이름이나 "던졌습니다!" (공을 놓는 순간 끝나게)
-    const thr = G.mode !== 'simple' && A.t && Math.random() < 0.45 ? `pt_${A.t}` : pick1('p_throw1', 'p_throw2', 'p_throw3', 'p_throw4', 'p_throw5', 'p_throw6');
+    // 히트 앤드 런이 걸린 공이면 "히트 앤드 런!"(녹음이 있을 때)을 던지는 말 대신 말함
+    const hrCall = isE(evs, 'hitrun') && CAST.idx && (CAST.idx.c_hitrun1 || CAST.idx.c_hitrun2) && Math.random() < 0.7 ? pick1('c_hitrun1', 'c_hitrun2') : null;
+    const thr = hrCall || (G.mode !== 'simple' && A.t && Math.random() < 0.45 ? `pt_${A.t}` : pick1('p_throw1', 'p_throw2', 'p_throw3', 'p_throw4', 'p_throw5', 'p_throw6'));
     at(Math.max(0, tl.contact - 0.05 - castDur(thr)), thr);   // 공이 도착하기 전에 끝나게
     const ps = A.bb && A.bb.ps;
     if(A.res === 'inplay' && A.bb){
@@ -138,7 +140,9 @@ function castResult(res, opt = {}){
       const fly = [ps && ps.bunt ? 'r_bunt' : has('batBig') ? pick1('c_hit1', 'c_hit2', 'c_hit4', 'c_hit5') : pick1('c_hit3', 'c_soft1', 'c_soft2')];
       if(!(ps && ps.bunt)){
         fly.push(bb.type === 'gb' ? pick1('c_ground1', 'c_ground2') : bb.type === 'ld' ? 'c_liner' : pick1('c_high1', 'c_high2'));
-        fly.push(['c_left', 'c_center', 'c_right'][bb.fi ?? 1]);
+        // 타구가 가는 곳: 야수 이름 녹음(pos_<포지션>_to 앞으로 · _at 쪽으로)이 있으면 그것을, 없으면 왼쪽·가운데·오른쪽
+        const dirId = pl && pl.pos ? `pos_${pl.pos}_${bb.type === 'gb' ? 'to' : 'at'}` : null;
+        fly.push(dirId && CAST.idx && CAST.idx[dirId] ? dirId : ['c_left', 'c_center', 'c_right'][bb.fi ?? 1]);
         if(bb.type === 'fb' && (bb.d || 0) >= fence - 18) fly.push(pick1('c_far1', 'c_far2', 'c_far3'), 'c_back');
         else if(bb.type !== 'gb') fly.push('c_chase');
         if(dive) fly.push('c_dive');
@@ -247,6 +251,10 @@ function castResult(res, opt = {}){
     if(typeof line === 'string') at(resAt + 0.01, line);
     CAST.score = sc;
   }
+  // 송구를 묻는 순간("송구 선택!")과 던지지 않기로 한 순간, 히트 앤드 런이 걸린 공의 해설 한마디 (녹음이 있을 때만)
+  if(isE(evAll, 'throwq') && CAST.idx && CAST.idx.thr_ask) at(0, 'thr_ask');
+  { const th = evAll.filter(e => e.k === 'throw').pop(); if(th && th.chosen && th.base < 0 && CAST.idx && CAST.idx.thr_none) at(resAt, 'thr_none'); }
+  if(isE(evs, 'hitrun') && pitched) at(resAt + 0.02, ana(0.3, 'a_hitrun1', 'a_hitrun2'));
   // 득점
   if(has('score') && !has('hr') && !CAST.scoreSaid) at(resAt, pick1('r_score1', 'r_score2'));
   CAST.scoreSaid = false;

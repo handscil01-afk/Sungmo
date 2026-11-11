@@ -92,6 +92,7 @@ function record(sc, i){
 const snap = scenes.map(record);
 
 // ---- 이닝 끝 해설이 이닝 상황과 맞는지 (새 녹음 아이디까지 있는 것처럼 꾸며서) ----
+const POSN = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'], isE2 = (r, k) => (r.events || []).some(e => e.k === k);
 const NEWIDS = ['a_inn_big', 'a_inn_run1', 'a_inn_runs', 'a_inn_k', 'a_inn_dp', 'a_inn_lob', 'a_inn_escape'];
 const innErrs = [], seenCat = {};
 {
@@ -119,6 +120,43 @@ const innErrs = [], seenCat = {};
   }
   CAST.idx = real; globalThis.SET.analyst = 'some';
   ['clean', 'escape', 'run1'].forEach(k => { if(!seenCat[k]) innErrs.push(`이닝 끝 해설 시험: ${k} 경우가 한 번도 나오지 않음`); });
+}
+// ---- 새 녹음 아이디(수비수·송구·히트 앤드 런)가 있는 것처럼 꾸며서, 맞는 때에 나오는지 ----
+{
+  const real = CAST.idx; CAST.idx = { ...real };
+  const NEW2 = ['thr_ask', 'thr_none', 'c_hitrun1', 'c_hitrun2', 'a_hitrun1', 'a_hitrun2', ...POSN.flatMap(k => [`pos_${k}_c`, `pos_${k}_to`, `pos_${k}_at`]), 'thr_0', 'thr_1', 'thr_2', 'thr_3'];
+  NEW2.forEach(id => { CAST.idx[id] = 1; CAST.buf[id] = { duration: dur(id), id }; });
+  globalThis.SET.analyst = 'often';
+  const seen2 = {};
+  for(let gs = 200; gs < 240; gs++){
+    const G = newGame({ mode:'detail', innings:3, teams:[TEAMS[gs % 10].key, TEAMS[(gs + 5) % 10].key], ctrl:['human', 'human'], easy:1, seed: 1300 + gs });
+    globalThis.G = G; CAST.until = 0; CAST.last = {}; CAST.score = null;
+    flush(G); let guard = 0, step = 0;
+    while(!G.over && guard++ < 2500){
+      let res, forced = null;
+      if(G.pendingThrow){ const p = G.pendingThrow; forced = p.opts.some(o => o.base < 0) && step++ % 2 ? -1 : p.auto; res = resolveThrow(G, forced); }
+      else if(G.review) res = resolveReview(G, false);
+      else { const O = aiOffChoice(G); if(G.bases[0] != null && G.bases[1] == null && ['swing', 'power', 'contact'].includes(O.k) && step % 3 === 0) O.hr = true; res = playStep(G, aiDefChoice(G), O); step++; }
+      played.length = 0; seedRandom(gs * 13 + guard);
+      const asked = isE2(res, 'throwq'); castResult(res);
+      const ids = played.map(p => p[1].replace(/-\d+$/, '')), pl = (res.events || []).find(e => e.k === 'play'), A = G.anim;
+      if(asked){ seenCat2('ask'); if(!ids.includes('thr_ask')) innErrs.push(`${gs}번 경기: 송구를 묻는데 "송구 선택!"이 없음`); }
+      else if(ids.includes('thr_ask')) innErrs.push(`${gs}번 경기: 묻지 않는데 "송구 선택!"`);
+      if(forced === -1){ seenCat2('none'); if(!ids.includes('thr_none')) innErrs.push(`${gs}번 경기: 던지지 않기로 했는데 thr_none이 없음`); }
+      else if(ids.includes('thr_none')) innErrs.push(`${gs}번 경기: 던졌는데 thr_none`);
+      if((res.events || []).some(e => e.k === 'hitrun')){ seenCat2('hitrun'); if(ids.some(i => /^c_hitrun/.test(i))) seenCat2('hitrunSaid'); }
+      else if(ids.some(i => /^c_hitrun/.test(i))) innErrs.push(`${gs}번 경기: 히트 앤드 런이 아닌데 "히트 앤드 런!"`);
+      if(pl && pl.pos && A && A.res === 'inplay'){
+        const want = `pos_${pl.pos}_${A.bb && A.bb.type === 'gb' ? 'to' : 'at'}`, other = `pos_${pl.pos}_${A.bb && A.bb.type === 'gb' ? 'at' : 'to'}`;
+        if(ids.includes(want)) seenCat2('pos'); if(ids.includes(other)) innErrs.push(`${gs}번 경기: 땅볼/뜬공에 맞지 않는 방향 말 ${other}`);
+        if(ids.some(i => /^pos_/.test(i) && !i.startsWith(`pos_${pl.pos}_`))) innErrs.push(`${gs}번 경기: 다른 야수(${ids.filter(i => /^pos_/.test(i)).join(',')})를 말함. 실제 ${pl.pos}`);
+      }
+    }
+  }
+  CAST.idx = real; globalThis.SET.analyst = 'some';
+  ['ask', 'none', 'hitrun', 'hitrunSaid', 'pos'].forEach(k => { if(!seen2[k]) innErrs.push(`새 녹음 연결 시험: ${k} 경우가 한 번도 나오지 않음`); });
+  console.log(`새 녹음 연결 시험: ${Object.keys(seen2).join(', ')} 확인`);
+  function seenCat2(k){ seen2[k] = 1; }
 }
 console.log(`이닝 끝 맥락 시험: ${Object.keys(seenCat).join(', ')} 확인, 어긋남 ${innErrs.length}건`);
 

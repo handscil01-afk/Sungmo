@@ -1,5 +1,7 @@
 # 새 녹음 대본 (Phase 6)
 
+> **AI Studio에서 음성을 만들 때는 `docs/VOICE-SCRIPT-STUDIO.md`를 쓰세요.** 묶음별로 Speaker, Style, 본문이 그대로 붙여 넣을 수 있게 정리되어 있습니다. 이 문서는 어떤 줄이 왜 필요한지 설명한 것입니다.
+
 코드는 이미 아래 아이디를 읽도록 되어 있어서, **녹음 파일(mp3)을 `voice/`에 넣고 `voice/index.json`의 `variants`에 아이디와 개수를 적으면 바로 나옵니다.** 녹음이 없는 줄은 건너뛰므로 일부만 먼저 받아도 됩니다.
 녹음을 자르고 확인하는 방법은 `voice/README.md`와 `voice/check.html`을 따르세요.
 

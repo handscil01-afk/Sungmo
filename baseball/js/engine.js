@@ -767,7 +767,7 @@ function playPitch(G, Psel, Bsel){
 
   /* 치지 않기 (지켜보기 · 도루) */
   let swing = false;
-  if(hr){ swing = zd < 1.6; emit(G, '히트 앤드 런 작전, 1루 주자가 먼저 뜁니다.', 'c'); }
+  if(hr){ swing = zd < 1.6; (G.evs ||= []).push({ k:'hitrun' }); emit(G, '히트 앤드 런 작전, 1루 주자가 먼저 뜁니다.', 'c'); }
   else if(swingIntent){
     if(inZone) swing = true;
     else {
