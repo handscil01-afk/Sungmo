@@ -56,10 +56,10 @@ function simPlay0(G, bb, opt = {}){
   const ev = [], fmove = {}, call = [];
   const mv = (pos, path) => { fmove[pos] = path; };
   const res = { bb, ev, fmove, call, outs:0, bat:0, runners:[], err:null, pos:null };
-  const vB = runV(Bt.spd) + [0, 0.1, 0.4][G.easy || 0], tB1 = 0.62 + 27.4 / vB - (Bt.hand === 'L' ? 0.08 : 0) - (bb.bunt ? 0.25 : 0);   // 번트는 대면서 바로 뛰어 나감
+  const vB = runV(Bt.spd) + [0, 0.05, 0.35][G.easy || 0], tB1 = 0.62 + 27.4 / vB - (Bt.hand === 'L' ? 0.08 : 0) - (bb.bunt ? 0.25 : 0);   // 번트는 대면서 바로 뛰어 나감
   const hr = G.hrun ? 1.0 : 0;
   // 주자들: 베이스별 출발 (리드 3미터, 히트 앤드 런이면 먼저 뜀)
-  const runners = [0, 1, 2].filter(i => bases[i] != null).map(i => ({ i, id: bases[i], v: runV2(T.bat[bases[i]].spd) + [0, 0.1, 0.4][G.easy || 0], lead: 0.1 - (i === 0 ? hr : 0) }));
+  const runners = [0, 1, 2].filter(i => bases[i] != null).map(i => ({ i, id: bases[i], v: runV2(T.bat[bases[i]].spd) + [0, 0.05, 0.35][G.easy || 0], lead: 0.1 - (i === 0 ? hr : 0) }));
 
   // ---------- 땅볼 ----------
   // 번트: 투수·포수·1루수·3루수가 달려 나와 잡음. 번트가 예상되면(주자 있고 2아웃 전, 전진 수비) 1·3루수가 미리 앞으로
@@ -87,7 +87,7 @@ function simPlay0(G, bb, opt = {}){
       const pick = retrieve(G, F, ballAt, tStop, bb);
       ev.pop(); ev.push({ k:'ball', t0:0, t1: Math.max(0.3, Math.min(pick.t - 0.35, tStop)), from:[0, 0], to: pick.p, h:0 });
       mv(pick.pos, [[0, F[pick.pos].at], [pick.t - 0.35, pick.p]]);
-      return hitPlay(G, F, res, pick, 1, runners, vB, tB1);
+      return hitPlay(G, F, res, pick, 1, runners, vB, tB1, opt);
     }
     const f = F[best.pos]; res.pos = best.pos;
     mv(best.pos, [[0, f.at], [best.t, best.p]]);
@@ -131,7 +131,7 @@ function simPlay0(G, bb, opt = {}){
   }
   const f = F[catcher.pos]; res.pos = catcher.pos;
   const apex = bb.type === 'pu' ? 30 : bb.type === 'ld' ? 4 : 18 + bb.d / 6;
-  const glove = 0.72 + f.def / 400 - [0, 0.06, 0.14][G.easy || 0];
+  const glove = 0.72 + f.def / 400 - [0, 0.04, 0.12][G.easy || 0];
   const pCatch = catcher.margin >= 0.25 ? 0.995 : clamp((catcher.margin + 0.38) / 0.63, 0, 1) * glove;
   const caught = !opt.wall && rnd(G) < pCatch;
   const dive = catcher.margin < 0.12;
@@ -158,7 +158,7 @@ function simPlay0(G, bb, opt = {}){
   const tPick = Math.max(reachT(f, P1, 'air'), tRoll) + 0.45 + (wall ? 0.7 : 0);
   ev.push({ k:'ball', t0: hang, t1: tRoll, from: L, to: P1, h: 0 });
   mv(catcher.pos, [[0, f.at], [tPick - 0.35, P1]]);
-  const out = hitPlay(G, F, res, { pos: catcher.pos, t: tPick, p: P1, wall, air: hang }, 1, runners, vB, tB1);
+  const out = hitPlay(G, F, res, { pos: catcher.pos, t: tPick, p: P1, wall, air: hang }, 1, runners, vB, tB1, opt);
   // 넉넉히 잡을 수 있던 공을 놓치면 실책 (안타가 아님)
   if(!opt.wall && catcher.margin >= 0.25 && !out.err){ out.err = { pos: catcher.pos, kind:'drop' }; out.kind = 'err'; }
   return out;
@@ -175,7 +175,7 @@ function foulFly(G){
   const hang = 1.5 + Math.hypot(p[0], p[1]) / 24 + rnd(G) * 0.6;
   let best = null;
   ['C', ...POS_INF].forEach(pos => { const t = reachT(F[pos], p, 'air'); if(!best || t < best.t) best = { pos, t }; });
-  const margin = hang - best.t, glove = 0.72 + F[best.pos].def / 400 - [0, 0.06, 0.14][G.easy || 0];
+  const margin = hang - best.t, glove = 0.72 + F[best.pos].def / 400 - [0, 0.04, 0.12][G.easy || 0];
   const pCatch = margin >= 0.25 ? 0.995 : clamp((margin + 0.38) / 0.63, 0, 1) * glove;
   return { pos: best.pos, p, hang: Math.round(hang * 100) / 100, margin: Math.round(margin * 100) / 100, caught: rnd(G) < pCatch };
 }
@@ -232,7 +232,7 @@ function simPlay(G, bb, opt = {}){
   const T = batTeam(G);
   res.runners.forEach(x => {
     const id = G.bases[x.from]; if(id == null) return;
-    const v = runV2(T.bat[id].spd) + [0, 0.1, 0.4][G.easy || 0];
+    const v = runV2(T.bat[id].spd) + [0, 0.05, 0.35][G.easy || 0];
     if(x.to == null){ x.t = x.tOut; if(x.t0 == null) x.t0 = Math.max(0, x.tOut - (x.back ? 0.6 : (x.at - x.from) * 27.4 / v)); }
     else if(x.to > x.from){ if(!x.t) x.t = (x.to - x.from) * 27.4 / v; if(x.t0 == null) x.t0 = Math.max(0, x.t - (x.to - x.from) * 27.4 / v); }
     else { x.t0 = 0; x.t = 0; }
@@ -345,7 +345,7 @@ function retrieve(G, F, ballAt, tStop, bb){
   return best;
 }
 /* 안타: 주운 야수가 송구하고, 주자들은 송구와 비교해 몇 베이스 갈지 정함 */
-function hitPlay(G, F, res, pick, minBase, runners, vB, tB1){
+function hitPlay(G, F, res, pick, minBase, runners, vB, tB1, opt = {}){
   const f = F[pick.pos], Pp = pick.p, tp = pick.t, ev = res.ev;
   res.pos = pick.pos; res.kind = 'hit'; res.wall = pick.wall;
   ev.push({ k:'pickup', t: tp, pos: pick.pos });
@@ -353,11 +353,12 @@ function hitPlay(G, F, res, pick, minBase, runners, vB, tB1){
   const throwT = base => { const dd = dist2(Pp, BASE_XY[base]); return tp + 0.55 + dd / f.arm * (dd > 55 ? 1.22 : 1); };
   // 주자별 베이스 도착 시각 (b는 0=1루 … 3=홈)
   const all = [...runners.map(r => ({ ...r })).sort((a, b) => b.i - a.i), { i:-1, bat:true, v: vB, lead:0 }];
-  const vB2 = runV2(curBatter(G).spd) + [0, 0.1, 0.4][G.easy || 0];
+  const vB2 = runV2(curBatter(G).spd) + [0, 0.05, 0.35][G.easy || 0];
   // 뜬공·직선타가 떨어진 안타: 2아웃 전이면 주자는 잡힐지 몰라 중간쯤(약 11미터)에서 기다렸다가 떨어지는 순간 뜀
   const wait = pick.air != null && G.outs < 2;
   const arr = (r, b) => r.bat ? (b === 0 ? tB1 : tB1 + b * 27.4 / vB2) : Math.max(r.lead + (b - r.i) * 27.4 / r.v - 4 / r.v, wait ? pick.air + 0.2 + ((b - r.i) * 27.4 - 11) / r.v : 0);
   let target = null, ahead = 4, last = 0;
+  const cands = [];   // 송구 선택 후보: 한 베이스 넘게 가려는 주자가 향하는 베이스 (opt.throwTo로 던질 곳을 정함, -1이면 던지지 않고 중계)
   all.forEach((r, idx) => {
     const from = r.bat ? -1 : r.i;
     let to = Math.max(from + 1, r.bat ? minBase - 1 : from + 1);
@@ -377,7 +378,8 @@ function hitPlay(G, F, res, pick, minBase, runners, vB, tB1){
     const t = arr(r, to);
     // 송구는 앞 주자가 노리는 베이스로 (첫 번째로 한 베이스 넘게 가려는 주자)
     let out = false;
-    if(target == null && to > from + 1 && to < 4){
+    if(to > from + 1 && to < 4 && !cands.some(c => c.base === to)) cands.push({ base: to, who: r.bat ? -1 : r.i, eta: throwT(to), rEta: t, m: t - throwT(to) });
+    if(target == null && to > from + 1 && to < 4 && (opt.throwTo == null || opt.throwTo === to)){
       target = to;
       const tt = throwT(to);
       ev.push({ k:'ball', t0: tp + 0.5, t1: tt, from: Pp, to: BASE_XY[to], h: 3 });
@@ -391,6 +393,8 @@ function hitPlay(G, F, res, pick, minBase, runners, vB, tB1){
     if(!out) ahead = to;
     last = Math.max(last, t);
   });
+  res.tgt = target;
+  if(cands.length >= 2 && opt.throwTo == null) res.throwOpts = [...cands.map(c => ({ base: c.base, who: c.who, eta: Math.round(c.eta * 100) / 100, rEta: Math.round(c.rEta * 100) / 100, m: Math.round(c.m * 100) / 100, force:false, dp:false })), { base:-1, who:-1, eta:0, rEta:0, m:0.5, force:false, dp:false }];
   if(target == null){ const tt = throwT(Math.min(3, Math.max(1, res.bat))); ev.push({ k:'ball', t0: tp + 0.5, t1: tt, from: Pp, to: BASE_XY[Math.min(3, Math.max(1, res.bat))], h: 3 }); }
   res.result = Math.max(tp, last, ...res.call.map(c => c.t));
   return res;
@@ -440,7 +444,7 @@ function stealSim(G, from, o = {}){
   const T = batTeam(G), F = fieldTeam(G), P = curPitcher(G), R = T.bat[G.bases[from]];
   const spd = o.simple ? 55 : R.spd, C = F.bat.find(x => x.pos === 'C') || { def:50 }, cdef = o.simple ? 50 : C.def;
   const lead = runnerLead(G, from, spd) - (o.dbl ? 0.3 : 0);
-  const v = runV2(spd) - 0.5 + [0, 0.08, 0.3][G.easy || 0];
+  const v = runV2(spd) - 0.5 + [0, 0.02, 0.25][G.easy || 0];
   const jump = 0.26 + gauss(G) * 0.1 - (o.breaking ? 0.04 : 0);
   const tR = jump + (27.4 - lead) / v;
   const vel = o.vel || 145, loc = o.loc || { x:0, y:0 };

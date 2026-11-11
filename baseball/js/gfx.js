@@ -780,15 +780,21 @@ function situationRow(G){
   const hist = G.hist || [], A = G.anim, B = curBatter(G);
   const flip = B.hand === 'L' ? -1 : 1, X = 72, S = 30;   // 그림 한가운데와 1단위의 크기(점)
   const px = x => X + x * flip * S, py = y => X - y * S;   // 몸쪽(x가 음수)은 오른손 타자 기준 왼쪽
-  const col = l => l === '스트라이크' || l === '헛스윙' || l === '삼진' ? '#f8b800' : l === '볼' || l === '볼넷' ? '#58d854' : l === '파울' ? '#fff' : '#f87858';
+  const col = l => l === '스트라이크' || l === '헛스윙' || l === '삼진' ? '#f8b800' : l === '볼' || l === '볼넷' ? '#58d854' : l === '파울' ? '#fff' : l === '아웃' ? '#3cbcfc' : '#f87858';
   const aim = typeof GS !== 'undefined' && GS.aim && G.pa === GS.guessPA ? GS.aim : null;
   let svg = `<svg viewBox="0 0 144 144" class="gs-zone" role="img" aria-hidden="true"><rect x="${X - S}" y="${X - S}" width="${2 * S}" height="${2 * S}" fill="#0d1430" stroke="#c9d3f0" stroke-width="2"/>`
     + [1, 2].map(k => `<path d="M${X - S + k * 2 * S / 3} ${X - S}v${2 * S}M${X - S} ${X - S + k * 2 * S / 3}h${2 * S}" stroke="#3a4678" stroke-width="1"/>`).join('');
   if(aim){ const ax = [-1, 0, 1][aim.c] * 2 / 3, ay = [1, 0, -1][aim.r] * 2 / 3; svg += `<rect x="${px(ax) - S / 3}" y="${py(ay) - S / 3}" width="${2 * S / 3}" height="${2 * S / 3}" fill="none" stroke="#b8f818" stroke-width="2.5" stroke-dasharray="4 3"/>`; }
   hist.forEach((h, i) => { const last = i === hist.length - 1; svg += `<circle cx="${px(h.x)}" cy="${py(h.y)}" r="${last ? 9 : 7}" fill="${col(h.l)}" stroke="#000" stroke-width="2"${last ? '' : ' opacity="0.8"'}/><text x="${px(h.x)}" y="${py(h.y) + 4}" text-anchor="middle" font-size="11" font-weight="700" fill="#000">${i + 1}</text>`; });
   svg += '</svg>';
+  // 작은 구장 그림: 최근 친 공의 방향과 떨어진 곳 (번호는 위 공 자취와 같음). 안타는 주황, 아웃은 파랑
+  const HX = 72, HY = 128, SC = 0.62, fx = x => HX + x * SC, fy = y => HY - y * SC;
+  let fld = `<svg viewBox="0 0 144 144" class="gs-zone gs-field" role="img" aria-hidden="true"><path d="M${HX} ${HY} L${fx(-72)} ${fy(72)} A${100 * SC} ${100 * SC} 0 0 1 ${fx(72)} ${fy(72)} Z" fill="#14401f" stroke="#c9d3f0" stroke-width="1.5"/>`
+    + `<path d="M${HX} ${HY} L${fx(19.4)} ${fy(19.4)} L${HX} ${fy(38.8)} L${fx(-19.4)} ${fy(19.4)} Z" fill="#7a4a24" stroke="#fff" stroke-width="1"/>`;
+  hist.forEach((h, i) => { if(!h.land) return; const lx = fx(h.land[0]), ly = fy(h.land[1]); fld += `<path d="M${HX} ${HY} L${lx} ${ly}" stroke="${col(h.l)}" stroke-width="2" stroke-dasharray="3 2" opacity="${i === hist.length - 1 ? 1 : 0.6}"/><circle cx="${lx}" cy="${ly}" r="6" fill="${col(h.l)}" stroke="#000" stroke-width="1.5"/><text x="${lx}" y="${ly + 3.5}" text-anchor="middle" font-size="9" font-weight="700" fill="#000">${i + 1}</text>`; });
+  fld += '</svg>';
   const list = hist.map((h, i) => `<span class="gs-h3"><i style="background:${col(h.l)}">${i + 1}</i>${esc(PITCH[h.t].name)} ${h.vel}km <b>${esc(h.l)}</b></span>`).join('');
-  return `<div class="gs-situ" data-gs="1">${svg}<div class="gs-list"><div class="gs-t">${G.pitchNo ? `이번 타석 ${G.pitchNo}구까지` : '첫 공 전'}${aim ? ' · 노려 치기 칸 표시' : ''}</div>${list || '<span class="gs-h3">아직 던진 공이 없습니다.</span>'}</div></div>`;
+  return `<div class="gs-situ" data-gs="1">${svg}${fld}<div class="gs-list"><div class="gs-t">${G.pitchNo ? `이번 타석 ${G.pitchNo}구까지` : '첫 공 전'}${aim ? ' · 노려 치기 칸 표시' : ''}</div>${list || '<span class="gs-h3">아직 던진 공이 없습니다.</span>'}</div></div>`;
 }
 
 /* ---------- 선수 육성 장면: GPT 그림(배경 cr-*, 동작 cr-train·cr-life, 사람 cr-people, 소품 cr-props) ----------

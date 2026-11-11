@@ -381,8 +381,9 @@ const PORT = 8766;
     const r = await page.evaluate(() => {
       const fake = { currentTime:0, state:'running' }; audio = () => fake; SET.snd = true; SET.sndKind = 'rec'; SET.cast = false;
       const rec = { swell:[], glove:0, pitches:0 }; crowdSwell = (c, t0, t1, kind, sc) => rec.swell.push({ t0, t1, kind, sc }); SOUNDS.glove = () => { rec.glove++; };
-      G = newGame({ mode:'detail', innings:3, teams:[TEAMS[0].key, TEAMS[1].key], ctrl:['cpu', 'cpu'], easy:1, seed:41 }); flush(G);
-      const out = [], kinds = {}; let guard = 0;
+      const out = [], kinds = {}; let guard = 0, seed = 41;
+      for(; seed < 53 && !(kinds.hit && kinds.xbh && kinds.big); seed++){
+      G = newGame({ mode:'detail', innings:3, teams:[TEAMS[0].key, TEAMS[1].key], ctrl:['cpu', 'cpu'], easy:1, seed }); flush(G); guard = 0;
       while(!G.over && guard++ < 2500){
         const res = G.review ? resolveReview(G, false) : playStep(G, aiDefChoice(G), aiOffChoice(G));
         const pitched = res.events.some(e => e.k === 'pitch'), n0 = rec.swell.length, g0 = rec.glove, top0 = res.events.some(e => e.k === 'inning') ? !G.top : G.top;
@@ -406,6 +407,7 @@ const PORT = 8766;
         if(taken && rec.glove === g0) out.push('스트라이크·볼·헛스윙인데 미트 소리가 없음');
         if(!taken && rec.glove > g0) out.push('치거나 파울인데 미트 소리가 남');
       }
+      }   // 씨앗을 바꿔 가며 안타·장타·홈런 함성을 모두 볼 때까지
       return { out: [...new Set(out)], kinds, pitches: rec.pitches, glove: rec.glove };
     });
     if(r.out.length) errors.push('효과음 시험: ' + r.out.join(' / '));
@@ -413,6 +415,92 @@ const PORT = 8766;
     if(!r.kinds.hit || !r.kinds.xbh) errors.push('효과음 시험: 안타·장타 함성이 모두 나오지 않음 ' + JSON.stringify(r.kinds));
     console.log('효과음 시험:', JSON.stringify(r));
     await ctx.close();
+  }
+  // 옛 경기 저장(새 칸이 없는 이어 하기 파일)을 불러와 끝까지 진행할 수 있어야 함
+  {
+    const ctx = await browser.newContext({ viewport:{ width:390, height:844 } });
+    const page = await ctx.newPage();
+    page.on('pageerror', e => errors.push(`옛 경기 저장: ${e.message}`));
+    page.on('console', m => { if(m.type() === 'error') errors.push(`옛 경기 저장 console: ${m.text()}`); });
+    await page.goto(`http://localhost:${PORT}/baseball/`); await page.waitForSelector('#opts .opt');
+    await page.keyboard.press('2');
+    const made = await page.evaluate(() => {
+      startGame({ mode:'detail', unit:'pa', innings:2, teams:[TEAMS[1].key, TEAMS[4].key], ctrl:['human', 'cpu'], who:['', ''], diff:1, easy:1, seed:2024 }, 'click');
+      for(let i = 0; i < 25 && !G.over; i++){ if(G.review) resolveReview(G, false); else playStep(G, aiDefChoice(G), aiOffChoice(G)); }
+      saveGame();
+      // 새 형식에서 더한 칸을 모두 지워 옛 저장처럼 만듦
+      const s = JSON.parse(localStorage.getItem('bb_game'));
+      ['hist', 'histN', 'inningLog', 'hs', 'evs', 'pendingThrow', 'mv'].forEach(k => delete s.G[k]);
+      localStorage.setItem('bb_game', JSON.stringify(s));
+      return { over: G.over, inning: G.inning };
+    });
+    if(made.over) errors.push('옛 경기 저장: 시험용 경기가 벌써 끝남');
+    await page.reload(); await page.waitForSelector('#opts .opt');
+    if(!(await page.evaluate(() => !!loadSaved()))){ errors.push('옛 경기 저장: 저장한 경기를 불러올 수 없음'); }
+    else {
+      await page.evaluate(() => resumeGame('click'));
+      await page.waitForFunction(() => document.querySelector('#boardSec') && !document.querySelector('#boardSec').hidden);
+      const n = await playToEnd(page, '옛 경기 저장', false);
+      const sum = await page.evaluate(() => ({ log: (G.inningLog || []).length, runs: G.teams.map(runsOf).join('-') }));
+      if(!sum.log) errors.push('옛 경기 저장: 이어 한 경기에 이닝 기록이 쌓이지 않음');
+      console.log(`옛 경기 저장: 불러와서 ${n}번 만에 끝, 이닝 기록 ${sum.log}개, 점수 ${sum.runs}`);
+    }
+    await ctx.close();
+  }
+  // 덕킹: 중계가 나오는 중에 안내 음성(speak)이 시작되면 중계 음량이 줄어들었다가 돌아와야 함
+  {
+    const ctx = await browser.newContext({ viewport:{ width:390, height:844 } });
+    const page = await ctx.newPage();
+    page.on('pageerror', e => errors.push(`덕킹 시험: ${e.message}`));
+    await page.goto(`http://localhost:${PORT}/baseball/`); await page.waitForSelector('#opts .opt');
+    const r = await page.evaluate(() => {
+      const calls = []; const gain = { value:1, cancelScheduledValues(){}, setTargetAtTime(v, t, k){ calls.push(v); } };
+      const fake = { currentTime:10, state:'running', destination:{}, createGain(){ return { gain, connect(){} }; } };
+      audio = () => fake; SET.voice = 'sr'; CAST.master = null; CAST.until = 0;
+      speak('조용할 때는 줄이지 않습니다.'); const quiet = calls.length;
+      CAST.until = 15; speak('중계가 나오는 중에 읽는 안내입니다.');
+      return { quiet, calls };
+    });
+    if(r.quiet !== 0) errors.push('덕킹: 중계가 없을 때도 음량을 줄임');
+    if(r.calls[0] !== 0.35 || r.calls[1] !== 1) errors.push('덕킹: 중계 중 안내가 나왔는데 줄였다가 되돌리지 않음 ' + JSON.stringify(r.calls));
+    console.log('덕킹 시험:', JSON.stringify(r));
+    await ctx.close();
+  }
+  // 접근성 점검: 여러 화면에서 모든 선택지가 "N번. 이름"으로 시작하는 이름을 갖고, 번호가 겹치지 않고, 읽는 순서가 질문 → 선택지 → 뒤로인지
+  {
+    const audit = async view => {
+      const ctx = await browser.newContext({ viewport:{ width:390, height:844 } });
+      const page = await ctx.newPage();
+      page.on('pageerror', e => errors.push(`접근성 점검: ${e.message}`));
+      await page.goto(`http://localhost:${PORT}/baseball/`); await page.waitForSelector('#opts .opt');
+      await page.keyboard.press(view);
+      const screens = ["go(homeScreen, 'click')", ...[0, 1, 2, 3, 4, 5].map(i => `go(() => settingsScreen(() => go(homeScreen, 'click'), ${i}), 'click')`), "NEW.kind = '1p'; go(() => teamScreen(0), 'click')",
+        "startGame({ mode:'detail', unit:'pa', innings:3, teams:[TEAMS[0].key, TEAMS[1].key], ctrl:['human', 'cpu'], who:['', ''], diff:1, easy:1, seed:11 }, 'click')",
+        "startGame({ mode:'detail', unit:'pa', innings:3, teams:[TEAMS[0].key, TEAMS[1].key], ctrl:['cpu', 'human'], who:['', ''], diff:1, easy:1, seed:12 }, 'click')",
+        "startGame({ mode:'simple', unit:'pa', innings:3, teams:[TEAMS[0].key, TEAMS[1].key], ctrl:['human', 'cpu'], who:['', ''], diff:1, easy:1, seed:13 }, 'click')",
+        "go(moreScreen, 'click')", "go(swingScreen, 'click')", "go(aimScreen, 'click')", "go(() => vibScreen(() => {}), 'click')"];
+      let n = 0;
+      for(const sc of screens){
+        try{ await page.evaluate(f => { window.__susp = true; SET.picks = { ...picks(), swing9:true, aim:true }; eval(f); }, sc); }catch(e){ continue; }
+        await page.waitForTimeout(80);
+        const bad = await page.evaluate(() => {
+          const out = [], opts = [...document.querySelectorAll('#opts .opt')], seen = new Set();
+          opts.forEach(o => { const t = o.textContent.replace(/\s+/g, ' ').trim(), num = o.dataset.n;
+            if(!new RegExp('^' + num + '번\\. ').test(t)) out.push(`선택지 이름이 "${num}번. "으로 시작하지 않음: ${t.slice(0, 30)}`);
+            if(seen.has(num)) out.push('번호 겹침 ' + num); seen.add(num);
+            if(o.tagName !== 'BUTTON') out.push('단추가 아님'); });
+          const q = document.getElementById('q'), box = document.getElementById('opts'), back = document.getElementById('backBtn');
+          if(q && box && !(q.compareDocumentPosition(box) & Node.DOCUMENT_POSITION_FOLLOWING)) out.push('질문이 선택지보다 뒤에 있음');
+          if(back && box && !(box.compareDocumentPosition(back) & Node.DOCUMENT_POSITION_FOLLOWING)) out.push('뒤로 단추가 선택지보다 앞에 있음');
+          if(!document.getElementById('live')) out.push('알림 칸(live)이 없음');
+          return out;
+        });
+        bad.forEach(b => errors.push(`접근성 점검(${view === '1' ? '그림' : '소리와 글'}) ${sc.slice(0, 40)}: ${b}`)); n++;
+      }
+      await ctx.close(); return n;
+    };
+    const a = await audit('2'), g = await audit('1');
+    console.log(`접근성 점검: 소리와 글 ${a}개 화면, 그림 ${g}개 화면`);
   }
   await browser.close(); srv.kill();
   if(errors.length){ console.log('오류:\n' + [...new Set(errors)].join('\n')); process.exit(1); }

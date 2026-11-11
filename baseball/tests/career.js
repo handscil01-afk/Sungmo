@@ -44,6 +44,9 @@ function playDay(L, rndk){
   if(c.offer){ const can = faEligible(L, p); if(can && rndk() < 0.5){ const fa = faOffers(L); signContract(L, fa[Math.floor(rndk() * fa.length)]); c.offer && delete c.offer; } else signContract(L, c.offer); }
   if(L.phase === 'done'){ const r = nextSeasonCore(L); return r.retire ? 'retire' : 'season'; }
   if(!c.hurt){ if((c.fatigue || 0) > 55) trainDay(L, null); else { const list = isPit(p) ? PIT_TRAIN : BAT_TRAIN, t = list[Math.floor(rndk() * list.length)]; trainDay(L, t[0], t[2]); } }
+  // 돈이 넉넉하면 개인 코치를 고용하고 기부함 (돈 쓸 곳)
+  if(L.phase === 'season' && c.coach !== L.season && c.money > c.salary * 0.5 && c.where !== 'minor') c.coach = L.season;
+  if(c.donated !== L.season && c.money > c.salary * 0.4 && c.where !== 'minor'){ c.money -= Math.round(c.salary * 0.1); c.donated = L.season; c.fame += 4; }
   // 돈이 있으면 장비 구입·강화·수리
   if(c.money > 400 && rndk() < 0.3){
     const it = ITEMS.filter(x => fits(x, p) && !c.owned.includes(x.id) && x.price <= c.money)[0];

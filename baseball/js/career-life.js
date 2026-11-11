@@ -63,8 +63,10 @@ const gearTag = (c, it) => { const st = gearState(c, it.id); return `${GRADE_NAM
 function payDay(L){
   const c = life(L);
   if(L.phase !== 'season') return [];
-  const pay = Math.max(1, Math.round(c.salary / Math.max(18, L.len)));
+  const per = Math.max(18, L.len), pay = Math.max(1, Math.round(c.salary / per));
   c.money += pay;
+  // 개인 코치: 시즌 동안 연봉의 25%를 날마다 나눠 냄. 돈이 모자라면 계약이 끝남
+  if(c.coach === L.season){ const fee = Math.max(1, Math.round(c.salary * 0.25 / per)); if(c.money >= fee) c.money -= fee; else { delete c.coach; return ['돈이 모자라 개인 코치와 계약이 끝났습니다.']; } }
   return [];
 }
 // 경기 보너스 (2군은 절반)
@@ -195,6 +197,8 @@ function visitScreen(msg){
     { n:2, t:'내 가방', s:`장비: ${equipText(L)}`, act: v => go(bagScreen, v) },
     { n:3, t:'팬 사인회', s: lock || '인기와 용돈이 오릅니다. 가끔 피곤해집니다.', act: v => done ? stay(lock) : fanMeet(v) },
     { n:4, t:'특별 코치 레슨 (300만 원)', s: lock || '유명 코치에게 하루 집중 지도를 받아 성장 점수가 크게 오릅니다.', act: v => done ? stay(lock) : go(coachScreen, v) },
+    { n:7, t: c.coach === L.season ? '개인 코치 계약 끝내기' : `개인 코치 고용 (시즌 동안 연봉의 25%, 약 ${won(Math.round(c.salary * 0.25))})`, s: c.coach === L.season ? '더 이상 비용을 내지 않습니다.' : '이번 시즌 동안 훈련 성장 효과가 1.25배가 됩니다. 비용은 날마다 나눠 나갑니다.', act: () => { if(c.coach === L.season){ delete c.coach; saveLeague(); stay('개인 코치 계약을 끝냈습니다.'); } else { c.coach = L.season; saveLeague(); stay('개인 코치를 고용했습니다. 이번 시즌 훈련 효과가 1.25배가 됩니다.'); } } },
+    { n:8, t:`기부하기 (연봉의 10%, ${won(Math.round(c.salary * 0.1))})`, s: c.donated === L.season ? '이번 시즌에는 이미 했습니다.' : '인기가 4 오릅니다. 시즌에 한 번.', act: () => { const cost = Math.round(c.salary * 0.1); if(c.donated === L.season){ stay('이번 시즌에는 이미 기부했습니다.'); return; } if(c.money < cost){ stay('돈이 모자랍니다.'); return; } c.money -= cost; c.donated = L.season; c.fame += 4; saveLeague(); stay(`기부했습니다. 인기 4 올라 ${c.fame}.`); } },
     { n:6, t:'휴가 (150만 원)', s: lock || '하루를 통째로 쉽니다. 피로가 크게 풀리고 컨디션이 좋아집니다.', act: v => done ? stay(lock) : vacation(v) },
     { n:5, t: c.hurt > 0 ? '재활 센터 (100만 원)' : '마사지 숍 (50만 원)', s: lock || (c.hurt > 0 ? '부상이 2일 빨리 낫습니다.' : '컨디션이 한 단계 좋아집니다.'), act: v => done ? stay(lock) : clinic(v) },
   ] };

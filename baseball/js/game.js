@@ -471,7 +471,7 @@ function offMain(){
 const BASE_NAME = ['1루', '2루', '3루', '홈'];
 const throwMargin = m => m >= 0.3 ? '여유 있게 아웃시킬 수 있습니다' : m >= 0.1 ? '아웃시킬 가능성이 높습니다' : m > -0.1 ? '아슬아슬합니다' : '주자가 먼저 닿을 것 같습니다';
 function throwScreen(){
-  const p = G.pendingThrow, T = batTeam(G);
+  const p = G.pendingThrow, T = batTeam(G), isHit = p.kind === 'hit';
   const runnerOf = o => o.who < 0 ? '타자 주자' : (T.bat[G.bases[o.who]] || { name:'주자' }).name;
   const choose = (base, v) => {
     clearTimeout(GS.throwT);
@@ -481,10 +481,12 @@ function throwScreen(){
   // 시간 안에 고르지 않으면 컴퓨터가 고른 곳으로
   clearTimeout(GS.throwT);
   if(SET.throwSec > 0){ const id = p.n; GS.throwT = setTimeout(() => { if(G && G.pendingThrow && G.pendingThrow.n === id && UI.make === throwScreen) choose(null, 'auto'); }, SET.throwSec * 1000); }
-  const opts = p.opts.slice().sort((a, b) => a.base - b.base).map(o => ({ n: o.base + 1, t:`${BASE_NAME[o.base]}${o.base === p.auto ? ' (컴퓨터 추천)' : ''}`,
-    s:`${runnerOf(o)} 주자. ${throwMargin(o.m)}.${o.dp ? ' 잡으면 1루로 이어 던져 병살도 노릴 수 있습니다.' : ''}`, act: v => choose(o.base, v) }));
-  opts.push({ n:5, t:'컴퓨터가 고르게 하기', s:`추천은 ${BASE_NAME[p.auto]}입니다.`, act: v => choose(null, v) });
-  return { board:true, q:`${p.who}, 땅볼을 잡았습니다. 어디로 던질까요?${SET.throwSec > 0 ? ` (${SET.throwSec}초 안에 고르세요)` : ''}`, opts };
+  const opts = p.opts.slice().sort((a, b) => a.base - b.base).map(o => o.base < 0
+    ? { n:6, t:`던지지 않고 중계${o.base === p.auto ? ' (컴퓨터 추천)' : ''}`, s:'공을 중계 야수에게 돌려 더 가려는 주자를 막지 않습니다. 대신 위험한 송구를 하지 않습니다.', act: v => choose(-1, v) }
+    : { n: o.base + 1, t:`${BASE_NAME[o.base]}${o.base === p.auto ? ' (컴퓨터 추천)' : ''}`,
+      s:`${runnerOf(o)} 주자. ${throwMargin(o.m)}.${o.dp ? ' 잡으면 1루로 이어 던져 병살도 노릴 수 있습니다.' : ''}`, act: v => choose(o.base, v) });
+  opts.push({ n:5, t:'컴퓨터가 고르게 하기', s:`추천은 ${p.auto < 0 ? '던지지 않고 중계' : BASE_NAME[p.auto]}입니다.`, act: v => choose(null, v) });
+  return { board:true, q:`${p.who}, ${isHit ? '공을 잡았습니다. 주자들이 더 가려고 합니다' : '땅볼을 잡았습니다'}. 어디로 던질까요?${SET.throwSec > 0 ? ` (${SET.throwSec}초 안에 고르세요)` : ''}`, opts };
 }
 function guessScreen(){
   const p = picks();

@@ -29,6 +29,7 @@ function ttsSay(text){
 // 모든 안내는 여기로
 function speak(text){
   if(!text) return;
+  if(typeof castDuck === 'function') castDuck(Math.min(6, 0.8 + text.length * 0.09));   // 안내를 읽는 동안 중계는 작게
   if(SET.voice === 'tts') ttsSay(text);
   else if(SET.voice === 'sr' || SET.voice === 'cast') liveSay(text);
 }

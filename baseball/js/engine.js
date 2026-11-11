@@ -70,13 +70,15 @@ function fx(G, ...names){
 // 공마다 자취(구종·구속·위치·결과)를 최근 3개만 남김: 화면 보며 하기의 상황 줄이 보여 줌. 결과 이름은 사건에서 정함
 function pitchLabel(evs){
   const pa = r => evs.some(e => e.k === 'pa' && e.r === r), call = c => evs.some(e => e.k === 'call' && e.c === c);
-  return pa('k') ? '삼진' : pa('bb') ? '볼넷' : call('whiff') ? '헛스윙' : call('strike') ? '스트라이크' : call('ball') ? '볼' : call('foul') ? '파울' : evs.some(e => e.k === 'contact' && !e.foul) ? '인플레이' : '';
+  return pa('k') ? '삼진' : pa('bb') ? '볼넷' : call('whiff') ? '헛스윙' : call('strike') ? '스트라이크' : call('ball') ? '볼' : call('foul') ? '파울' : evs.some(e => e.k === 'contact' && !e.foul) ? (pa('hr') ? '홈런' : pa('b2') || pa('b3') ? '장타' : pa('b1') ? '안타' : pa('out') ? '아웃' : '인플레이') : '';
 }
 function flush(G){
   const evs = G.evs || [];
   if(G.anim && G.anim.n !== G.histN && evs.some(e => e.k === 'pitch')){
     G.histN = G.anim.n;
-    (G.hist ||= []).push({ n: G.anim.n, t: G.anim.t, vel: G.anim.vel || 0, x: Math.round(G.anim.x * 100) / 100, y: Math.round(G.anim.y * 100) / 100, l: pitchLabel(evs) });
+    // 친 공이면 떨어진 곳(land, 미터: 홈 기준 x는 1루 쪽, y는 중견수 쪽)도 남김: 상황 줄의 작은 구장 그림이 방향을 보여 줌
+    const fb = G.anim.bb && G.anim.bb.ps && (G.anim.bb.ps.ev || []).find(e => e.k === 'ball');
+    (G.hist ||= []).push({ n: G.anim.n, t: G.anim.t, vel: G.anim.vel || 0, x: Math.round(G.anim.x * 100) / 100, y: Math.round(G.anim.y * 100) / 100, l: pitchLabel(evs), ...(fb && fb.to ? { land: [Math.round(fb.to[0]), Math.round(fb.to[1])] } : {}) });
     if(G.hist.length > 3) G.hist.shift();
   }
   const r = { lines: G.out, fx: G.fx, events: G.evs || [] }; G.out = []; G.fx = []; G.evs = []; return r; }
@@ -424,7 +426,7 @@ function onHit(G, n, ev, simple){
   }
   const spd = i => simple ? 55 : T.bat[i].spd;
   if(n >= 4){ for(let k = 2; k >= 0; k--) if(b[k] != null){ sc.push(b[k]); b[k] = null; } sc.push(T.bi); scoreRuns(G, sc, true); return; }
-  const nb = [null, null, null], ofAdj = [-0.18, 0, 0.1][F.align.of] + EZ(G, [0, 0.08, 0.16]);
+  const nb = [null, null, null], ofAdj = [-0.18, 0, 0.1][F.align.of] + EZ(G, [0, 0.02, 0.1]);
   for(let k = 2; k >= 0; k--){
     const r = b[k]; if(r == null) continue;
     let to = k + n;
@@ -792,7 +794,7 @@ function playPitch(G, Psel, Bsel){
   if(aimBonus) emit(G, `판정 노려 치기: 노린 칸과 공의 거리에 따른 보정 ${aimBonus > 0 ? '+' : ''}${Math.round(aimBonus * 10) / 10}.`, 'd');
   const bq = soft(B.con, 0.7) + B.cond * 4 + SP.bq + guess + timing + aimBonus;
   const cen = clamp(1 - zd, 0, 1);
-  const pCon = 0.84 + EZ(G, [0, 0.02, 0.05]) + (bq - pq) / 110 - (inZone ? 0.12 * (1 - cen) : 0.14 + (zd - 1) * 1.0);
+  const pCon = 0.84 + EZ(G, [0, 0.01, 0.04]) + (bq - pq) / 110 - (inZone ? 0.12 * (1 - cen) : 0.14 + (zd - 1) * 1.0);
   const kk = sw <= 4 ? 'contact' : sw >= 7 ? 'power' : 'swing';
   if(guess > 0) emit(G, '노리던 공이 들어옵니다.', 'd');
   if(timing < 0) emit(G, '느린 공에 타이밍을 빼앗깁니다.', 'd');
@@ -840,7 +842,7 @@ function playPitch(G, Psel, Bsel){
   // 방향 노리기: 바깥쪽 공을 밀어치거나 몸쪽 공을 당겨치면 잘 맞고, 반대면 빗맞기 쉬움
   const dirFit = !Bsel.d ? 0 : (Bsel.d === 'oppo' ? x : -x) > 0.25 ? 0.08 : (Bsel.d === 'oppo' ? x : -x) < -0.25 ? -0.08 : 0;
   if(dirFit) emit(G, dirFit > 0 ? '노린 방향으로 칠 수 있는 공입니다.' : '노린 방향과 반대쪽 공입니다.', 'd');
-  const q = clamp(rnd(G) * 0.75 + 0.08 + dirFit + EZ(G, [0, 0.03, 0.06]) + (bq - pq) / 220 + (inZone ? 0.18 * cen : -0.12), 0, 1);
+  const q = clamp(rnd(G) * 0.75 + 0.08 + dirFit + EZ(G, [0, 0.015, 0.05]) + (bq - pq) / 220 + (inZone ? 0.18 * cen : -0.12), 0, 1);
   const ev = clamp(0.45 * q + 0.45 * soft(B.pow + B.cond * 4, 0.5) / 100 + SP.ev + (pt.fast && vel >= 153 ? 0.02 : 0) + gauss(G) * 0.035, 0, 1.08);
   emit(G, `판정 타구: 정확도 ${Math.round(q * 100)}, 힘 ${Math.round(ev * 100)}.`, 'd');
   fx(G, q > 0.75 ? 'batBig' : 'bat'); G.anim.res = 'inplay';
@@ -970,13 +972,13 @@ function inPlay(G, o){
   if(type === 'fb'){ bb.d = opt.wall ? fence - 1 : d; bb.hang = 2.1 + bb.d / 46; }
   const rng0 = G.rng, r = simPlay(G, bb, opt), info = { d, raw, wind, fence, fi };
   // 송구 선택: 사람이 수비하고 던질 곳이 둘 이상이면 잡은 순간에 멈추고 묻음. 같은 난수로 고른 곳을 다시 계산함(resolveThrow)
-  if(type === 'gb' && !opt.hr && r.throwOpts && r.throwOpts.length >= 2 && askThrow(G)){
+  if((type === 'gb' || r.kind === 'hit') && !opt.hr && r.throwOpts && r.throwOpts.length >= 2 && askThrow(G)){
     G.rng = rng0;
     const who = fielder(F, r.pos);
-    G.pendingThrow = { opts: r.throwOpts, pos: r.pos, who, auto: r.tgt, bb, opt, fi, info, hrun: !!G.hrun, fx: G.fx.splice(0), evs: (G.evs || []).splice(0), n: G.anim ? G.anim.n : 0 };
+    G.pendingThrow = { kind: r.kind === 'hit' ? 'hit' : 'gb', opts: r.throwOpts, pos: r.pos, who, auto: r.tgt ?? -1, bb, opt, fi, info, hrun: !!G.hrun, fx: G.fx.splice(0), evs: (G.evs || []).splice(0), n: G.anim ? G.anim.n : 0 };
     if(G.anim) G.anim.n--;   // 이 공의 그림·소리·중계는 고른 뒤에 한꺼번에 (그림이 먼저 끝까지 가 버리지 않게)
     (G.evs ||= []).push({ k:'throwq', pos: r.pos, who, opts: r.throwOpts.map(o => o.base) });   // (이 함수 안에서 ev는 타구 힘이라 ev()를 못 씀)
-    emit(G, `${head} 땅볼 타구가 ${who}에게 갑니다! 잡았습니다. 어디로 던질까요?`, 'r');
+    emit(G, r.kind === 'hit' ? `${head} ${ga(who)} 공을 잡았습니다! 주자들이 더 가려고 합니다. 어디로 던질까요?` : `${head} 땅볼 타구가 ${who}에게 갑니다! 잡았습니다. 어디로 던질까요?`, 'r');
     return;
   }
   playOrReview(G, bb, r, fi, head, info);
@@ -993,7 +995,7 @@ function resolveThrow(G, base){
   const r = simPlay(G, p.bb, valid ? { ...p.opt, throwTo: base } : p.opt);
   G.hrun = false;
   ev(G, { k:'throw', base: valid ? base : p.auto, chosen: valid, auto: !valid || base === p.auto });
-  if(valid) emit(G, `${josa(p.who, '은', '는')} ${BASE_TO[base]} 던지기로 합니다.`, 'c');
+  if(valid) emit(G, base < 0 ? `${josa(p.who, '은', '는')} 던지지 않고 중계 플레이로 돌립니다.` : `${josa(p.who, '은', '는')} ${BASE_TO[base]} 던지기로 합니다.`, 'c');
   playOrReview(G, p.bb, r, p.fi, '', p.info);
   if(!G.review) endPA(G);
   return flush(G);

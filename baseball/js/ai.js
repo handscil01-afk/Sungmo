@@ -38,7 +38,9 @@ function aiPitch(G, order){
   if(r === 1 && c === 1 && e !== 'in') c = rnd(G) < 0.5 ? 0 : 2;
   // 세기
   const f = fatigue(P);
-  const w = s === 2 && rnd(G) < 0.35 ? 8 : f > 0.5 && rnd(G) < 0.3 ? 3 : wpick(G, [[5, 0.75], [8, 0.15], [3, 0.10]]);   // 전력 8 · 보통 5 · 힘 빼고 3
+  // 세기 1(가장 느림)~9(최대 전력): 보통(5) 근처가 가장 많고, 2스트라이크면 세게, 지쳤으면 약하게
+  const w = s === 2 && rnd(G) < 0.45 ? wpick(G, [[7, 0.25], [8, 0.55], [9, 0.2]]) : f > 0.5 && rnd(G) < 0.35 ? wpick(G, [[2, 0.2], [3, 0.5], [4, 0.3]])
+    : wpick(G, [[1, 0.02], [2, 0.03], [3, 0.08], [4, 0.1], [5, 0.45], [6, 0.1], [7, 0.07], [8, 0.12], [9, 0.03]]);
   G.prevTypes = [t, ...(G.prevTypes || [])].slice(0, 2);
   return { k:'pitch', t, r, c, e, w };
 }
@@ -75,7 +77,13 @@ function aiSwing(G, B, T, b, s, order){
   if(order === 'aggr' && s < 2 && rnd(G) < 0.3) k = 'power';
   if(order === 'patient' && k === 'power') k = 'swing';
   const g = b > s ? (rnd(G) < 0.5 ? 'fast' : null) : (rnd(G) < 0.15 ? 'break' : null);
-  return { k, g };
+  // 스윙 세기 1~9: 고른 방식(맞히기·치기·강하게) 근처에서 조금씩 다르게
+  const sw = k === 'contact' ? wpick(G, [[2, 0.25], [3, 0.55], [4, 0.2]]) : k === 'power' ? wpick(G, [[7, 0.25], [8, 0.55], [9, 0.2]]) : wpick(G, [[4, 0.2], [5, 0.6], [6, 0.2]]);
+  const kk = sw <= 4 ? 'contact' : sw >= 7 ? 'power' : 'swing';
+  // 노려 치기: 선구안이 좋은 타자는 가끔 직전에 던진 공의 칸을 노림 (같은 곳으로 또 오기 쉽다고 읽음)
+  let aim = null;
+  if(G.lastLoc && B.eye >= 55 && rnd(G) < (B.eye - 40) / 200){ const { x, y } = G.lastLoc; aim = { r: y > 0.34 ? 0 : y < -0.34 ? 2 : 1, c: x < -0.34 ? 0 : x > 0.34 ? 2 : 1 }; }
+  return { k: kk, s: sw, g, aim };
 }
 
 /* ---------- 간단 모드 ---------- */

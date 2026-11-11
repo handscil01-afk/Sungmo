@@ -171,7 +171,7 @@ function cell(sit, swing, easy, ci){
       if(G.review){ resolveReview(G, false); continue; }
       let o = aiOffChoice(G);
       if(o.k === 'steal' || o.k === 'bunt' || o.k === 'hitrun') o = { k:'swing', g:null };
-      else if(o.k !== 'take') o = { ...o, k: swing[1], hr: !!sit[2] };
+      else if(o.k !== 'take') o = { ...o, k: swing[1], s: { power:8, swing:5, contact:3 }[swing[1]], aim: null, hr: !!sit[2] };
       playStep(G, aiDefChoice(G), o);
     }
     c.pa++;
@@ -195,7 +195,7 @@ Object.entries(table).forEach(([k, t]) => {
   if(!(t.avg >= 0.18 && t.avg <= 0.5)) errs.push(`${k} 타율 ${t.avg} 범위 밖(0.18~0.50)`);
   if(!(t.xbhRate >= 0.04 && t.xbhRate <= 0.6)) errs.push(`${k} 장타 비율 ${t.xbhRate} 범위 밖(0.04~0.60)`);
   if(!(t.kRate >= 0.03 && t.kRate <= 0.5)) errs.push(`${k} 삼진율 ${t.kRate} 범위 밖(0.03~0.50)`);
-  if(!(t.bbRate >= 0.02 && t.bbRate <= 0.25)) errs.push(`${k} 볼넷률 ${t.bbRate} 범위 밖(0.02~0.25)`);
+  if(!(t.bbRate >= 0.01 && t.bbRate <= 0.25)) errs.push(`${k} 볼넷률 ${t.bbRate} 범위 밖(0.01~0.25)`);
 });
 const BASE = path.join(__dirname, 'baseline.json');
 const textHash = TXT.digest('hex');

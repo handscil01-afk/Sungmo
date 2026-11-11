@@ -153,7 +153,7 @@ function grow(L, k, amt){
   ensureGrowth(L, p);
   // 성장 = 기본 × 나이(성장 유형 반영) × 잠재력까지 남은 거리 × 피로. 한계에 가까울수록 느려지고, 한계에 닿으면 더 오르지 않음
   const room = clamp(((p.pot[k] ?? 99) - p[k]) / 12, 0, 1);
-  c.pts[k] = (c.pts[k] || 0) + amt * growMul(growAge(p)) * room * fatigueMul(c);
+  c.pts[k] = (c.pts[k] || 0) + amt * growMul(growAge(p)) * room * fatigueMul(c) * (c.coach === L.season ? 1.25 : 1);
   while(c.pts[k] >= 10){
     c.pts[k] -= 10;
     const max = Math.min(potCap(k), p.pot[k] ?? 99);

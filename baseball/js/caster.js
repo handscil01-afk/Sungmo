@@ -43,6 +43,18 @@ function castPreload(){
   });
 }
 ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { if(castOn()) castPreload(); }, { capture:true, once:true }));
+// 중계 소리의 전체 음량 조절기: 안내 음성(질문·선택지)을 읽는 동안 중계를 작게 함(덕킹)
+function castMaster(c){
+  if(!CAST.master || CAST.masterCtx !== c){ const m = c.createGain(); m.gain.value = 1; m.connect(c.destination); CAST.master = m; CAST.masterCtx = c; }
+  return CAST.master;
+}
+// sec초 동안 중계를 작게 (중계가 나오는 중일 때만 호출됨)
+function castDuck(sec){
+  const c = audio(); if(!c || !CAST.until || CAST.until <= c.currentTime) return;
+  const g = castMaster(c).gain; if(!g.setTargetAtTime) return;
+  const t = c.currentTime;
+  try{ g.cancelScheduledValues(t); g.setTargetAtTime(0.35, t, 0.05); g.setTargetAtTime(1, t + sec, 0.3); }catch(e){}
+}
 // 조각들을 at초 뒤부터 이어서 틂 (앞 중계가 아직 나오는 중이면 끝난 뒤에). 끝나는 시각을 돌려줌
 function castPlay(ids, at = 0){
   const c = audio(); if(!c || !castOn()) return 0;
@@ -52,7 +64,7 @@ function castPlay(ids, at = 0){
     const name = castFile(id); if(!name) return;
     const b = CAST.buf[name]; if(!b){ castLoad(name); return; }
     const s = c.createBufferSource(), g = c.createGain();
-    s.buffer = b; g.gain.value = 1; s.connect(g); g.connect(c.destination); s.start(t);
+    s.buffer = b; g.gain.value = 1; s.connect(g); g.connect(castMaster(c)); s.start(t);
     CAST.src.push(s); s.onended = () => { const i = CAST.src.indexOf(s); if(i >= 0) CAST.src.splice(i, 1); };
     t += b.duration + 0.08;
   });
