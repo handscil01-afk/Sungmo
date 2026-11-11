@@ -34,6 +34,22 @@ const SET_DEF = { fs:1, theme:'dark', voice:'sr', dice:false, pad:'phone', snd:t
 const SET = { ...SET_DEF, ...migrate('set', ls.get('bb_set', {})) };
 if(SET.voice === 'cast'){ SET.voice = 'sr'; SET.cast = true; }
 const saveSet = () => ls.set('bb_set', SET);
+/* 화면 방식(화면 보며 하기 gfx · 소리와 글로 하기 a11y)에 따른 차이를 한곳에 모음. 경기 계산은 두 방식이 같고, 이 객체가 "이 방식에서 무엇을 어떻게 보일지"만 정함.
+   다른 파일에서 SET.view를 직접 비교하지 않고 여기를 거침 */
+const VIEW = {
+  get gfx(){ return SET.view === 'gfx'; },
+  get a11y(){ return SET.view !== 'gfx'; },
+  // 경기 화면(그림 + 짧은 결과 + 선택지를 한 화면에): 화면 보며 하기에서 경기 상황판이 있을 때
+  game(S){ return VIEW.gfx && !!S.board && typeof G !== 'undefined' && !!G; },
+  // 메뉴·설정 화면(경기 화면이 아닐 때)의 꾸밈
+  menu(S){ return VIEW.gfx && !VIEW.game(S) && !S.board; },
+  // 결과 글을 숨기는 때: 소리와 글로 하기에서 결과 전달이 '소리만'이고 중계 음성이 결과를 말할 때
+  castOnly(S){ return VIEW.a11y && !!S.board && typeof G !== 'undefined' && !!G && !G.over && typeof castOn === 'function' && castOn() && SET.deliver === 'sound'; },
+  // 선택지를 방향대로 배치(코스·높이·붙이기): 화면 보며 하기는 늘, 소리와 글은 설정(숫자판 방향 배치)을 켰을 때
+  dirLayout(){ return VIEW.gfx || !!SET.padDir; },
+  // 경기 내내 깔아 주는 관중 소리는 그림이 있는 화면 방식에서만
+  crowd(){ return VIEW.gfx && !!SET.crowd; },
+};
 function applySet(){
   const r = document.documentElement;
   r.dataset.fs = SET.fs; r.dataset.theme = SET.theme;

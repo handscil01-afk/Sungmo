@@ -313,7 +313,7 @@ function selDesc(s){
 }
 // 선택지를 방향대로 배치: 화면 보며 하기는 늘, 시청각장애인 모드는 설정(숫자판 방향 배치)을 켰을 때.
 // 왼손 타자면 몸쪽이 오른쪽 (투구 화면과 같은 방향)
-const dirLayout = () => SET.view === 'gfx' || !!SET.padDir;
+const dirLayout = () => VIEW.dirLayout();
 const dispCol = c => dirLayout() && G && curBatter(G).hand === 'L' ? 2 - c : c;
 function heightScreen(){
   if(dirLayout()){

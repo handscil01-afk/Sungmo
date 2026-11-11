@@ -740,7 +740,7 @@ function gfxRender(G, fx, lines, evs){
 }
 
 // 화면 모드면 시작하자마자 그림을 미리 불러옴 (처음 경기 화면에서 임시 그림이 보이지 않게)
-if(typeof SET !== 'undefined' && SET.view === 'gfx') gfxLoad();
+if(typeof SET !== 'undefined' && VIEW.gfx) gfxLoad();
 
 /* ---------- 지금 타자·투수 능력치 게이지 (화면 보며 하기, 선택지 아래 빈자리) ----------
    우리 팀은 숫자와 길이 그대로, 상대 팀은 등급(5단계)만 보이게 해서 글로 듣는 정보와 같은 만큼만 알려 줌 */
@@ -751,19 +751,44 @@ function gstatRender(G){
   const bi = G.top ? 0 : 1, fi = 1 - bi, B = curBatter(G), P = curPitcher(G);
   const own = typeof ownTeam === 'function' ? ownTeam : () => true;
   const lvl = v => v >= 80 ? 5 : v >= 65 ? 4 : v >= 45 ? 3 : v >= 32 ? 2 : 1;
-  const bar = (label, v, mine, color) => {
+  // 막대 한 줄: big이면 굵게(파워·체력). 상대 팀은 숫자 대신 등급(5단계)만
+  const bar = (label, v, mine, color, big) => {
     const w = mine ? Math.max(4, Math.min(100, v)) : lvl(v) * 20;
-    return `<div class="gs-row"><span class="gs-l">${label}</span><span class="gs-bar"><i style="width:${w}%;background:${color}"></i></span><span class="gs-v">${mine ? v : gradeWord(v)}</span></div>`;
+    return `<div class="gs-row${big ? ' big' : ''}"><span class="gs-l">${label}</span><span class="gs-bar"><i style="width:${w}%;background:${color}"></i></span><span class="gs-v">${mine ? v : gradeWord(v)}</span></div>`;
   };
+  // 컨디션 화살표: 좋으면 ▲ 나쁘면 ▼ (색과 모양을 함께). 상대 컨디션은 첫 타석 뒤에만 앎
+  const condMark = (c, show) => !show || !c ? '' : `<span class="gs-cond ${c > 0 ? 'up' : 'dn'}">${c > 0 ? '▲'.repeat(c) : '▼'.repeat(-c)}</span>`;
   const mb = own(bi), mp = own(fi), left = Math.round(clamp(1 - P.load / P.sta, 0, 1) * 100);
   const staCol = left > 60 ? '#58d854' : left > 30 ? '#f8b800' : '#f83800';
+  const velPct = Math.round(clamp((P.vel - 120) / 40, 0, 1) * 100);
+  const pitches = P.pitches.map(x => `<span class="gs-p">${esc(PITCH[x.t].name)} <b>${mp ? x.g : gradeWord(x.g)}</b></span>`).join('');
   box.hidden = false;
-  box.innerHTML = `
-    <div class="gs-card" style="--tc:${G.teams[bi].color}"><div class="gs-h"><b>타자</b> ${esc(B.name)} <small>${B.hand === 'L' ? '좌타' : '우타'} · ${esc(batterLine(B))}</small></div>
-      ${bar('컨택', B.con, mb, '#3cbcfc')}${bar('파워', B.pow, mb, '#f87858')}${bar('선구안', B.eye, mb, '#b8f818')}${bar('스피드', B.spd, mb, '#f8d878')}</div>
-    <div class="gs-card" style="--tc:${G.teams[fi].color}"><div class="gs-h"><b>투수</b> ${esc(P.name)} <small>${P.hand === 'L' ? '좌투' : '우투'} · ${P.n}구 · 최고 ${P.vel}km</small></div>
-      ${bar('제구', P.ctl, mp, '#3cbcfc')}${bar('구위', P.stf, mp, '#f87858')}
-      <div class="gs-row"><span class="gs-l">체력</span><span class="gs-bar"><i style="width:${Math.max(3, left)}%;background:${staCol}"></i></span><span class="gs-v">${left}%</span></div></div>`;
+  box.dataset.v = SET.gview === 'trace' ? 'trace' : 'bars';   // 자리가 좁으면 능력치와 공 자취 가운데 하나만 (아주 큰 화면은 둘 다)
+  box.innerHTML = situationRow(G) + `
+    <div class="gs-card" style="--tc:${G.teams[bi].color}"><div class="gs-h"><button type="button" class="gs-tog" data-gs="1" aria-hidden="true" tabindex="-1" title="능력치와 공 자취 바꾸기 (V)">⇄</button><b>타자</b> ${esc(B.name)} ${condMark(B.cond, mb || B.seen)} <small>${B.hand === 'L' ? '좌타' : '우타'} · ${esc(batterLine(B))}</small></div>
+      ${bar('컨택', B.con, mb, '#3cbcfc')}${bar('파워', B.pow, mb, '#f87858', true)}${bar('선구안', B.eye, mb, '#b8f818')}${bar('주력', B.spd, mb, '#f8d878')}${bar('수비', B.def, mb, '#c8a0f8')}</div>
+    <div class="gs-card" style="--tc:${G.teams[fi].color}"><div class="gs-h"><b>투수</b> ${esc(P.name)} ${condMark(P.cond, mp)} <small>${P.hand === 'L' ? '좌투' : '우투'} · ${P.n}구</small></div>
+      ${mp ? `<div class="gs-row"><span class="gs-l">구속</span><span class="gs-bar"><i style="width:${velPct}%;background:#f8b8d8"></i></span><span class="gs-v">${P.vel}km</span></div>` : ''}${bar('제구', P.ctl, mp, '#3cbcfc')}${bar('구위', P.stf, mp, '#f87858')}
+      <div class="gs-row big"><span class="gs-l">체력</span><span class="gs-bar"><i style="width:${Math.max(3, left)}%;background:${staCol}"></i></span><span class="gs-v">${left}%</span></div>
+      <div class="gs-pit">${pitches}</div></div>`;
+}
+// 상황 줄: 이번 공(구종·구속)과 지난 공 세 개의 자취를 스트라이크 존 그림 위에 번호로 찍고(위치), 내가 노린 칸을 점선으로 보여 줌.
+// 존의 좌우는 타자 쪽(몸쪽)이 왼쪽이 되게 하고, 왼손 타자면 뒤집음 (코스 고르기 화면과 같은 방향)
+// 능력치 ↔ 공 자취 바꾸기 (V 키나 단추)
+function gstatToggle(){ SET.gview = SET.gview === 'trace' ? 'bars' : 'trace'; saveSet(); if(typeof G !== 'undefined' && G) gstatRender(G); }
+function situationRow(G){
+  const hist = G.hist || [], A = G.anim, B = curBatter(G);
+  const flip = B.hand === 'L' ? -1 : 1, X = 72, S = 30;   // 그림 한가운데와 1단위의 크기(점)
+  const px = x => X + x * flip * S, py = y => X - y * S;   // 몸쪽(x가 음수)은 오른손 타자 기준 왼쪽
+  const col = l => l === '스트라이크' || l === '헛스윙' || l === '삼진' ? '#f8b800' : l === '볼' || l === '볼넷' ? '#58d854' : l === '파울' ? '#fff' : '#f87858';
+  const aim = typeof GS !== 'undefined' && GS.aim && G.pa === GS.guessPA ? GS.aim : null;
+  let svg = `<svg viewBox="0 0 144 144" class="gs-zone" role="img" aria-hidden="true"><rect x="${X - S}" y="${X - S}" width="${2 * S}" height="${2 * S}" fill="#0d1430" stroke="#c9d3f0" stroke-width="2"/>`
+    + [1, 2].map(k => `<path d="M${X - S + k * 2 * S / 3} ${X - S}v${2 * S}M${X - S} ${X - S + k * 2 * S / 3}h${2 * S}" stroke="#3a4678" stroke-width="1"/>`).join('');
+  if(aim){ const ax = [-1, 0, 1][aim.c] * 2 / 3, ay = [1, 0, -1][aim.r] * 2 / 3; svg += `<rect x="${px(ax) - S / 3}" y="${py(ay) - S / 3}" width="${2 * S / 3}" height="${2 * S / 3}" fill="none" stroke="#b8f818" stroke-width="2.5" stroke-dasharray="4 3"/>`; }
+  hist.forEach((h, i) => { const last = i === hist.length - 1; svg += `<circle cx="${px(h.x)}" cy="${py(h.y)}" r="${last ? 9 : 7}" fill="${col(h.l)}" stroke="#000" stroke-width="2"${last ? '' : ' opacity="0.8"'}/><text x="${px(h.x)}" y="${py(h.y) + 4}" text-anchor="middle" font-size="11" font-weight="700" fill="#000">${i + 1}</text>`; });
+  svg += '</svg>';
+  const list = hist.map((h, i) => `<span class="gs-h3"><i style="background:${col(h.l)}">${i + 1}</i>${esc(PITCH[h.t].name)} ${h.vel}km <b>${esc(h.l)}</b></span>`).join('');
+  return `<div class="gs-situ" data-gs="1">${svg}<div class="gs-list"><div class="gs-t">${G.pitchNo ? `이번 타석 ${G.pitchNo}구까지` : '첫 공 전'}${aim ? ' · 노려 치기 칸 표시' : ''}</div>${list || '<span class="gs-h3">아직 던진 공이 없습니다.</span>'}</div></div>`;
 }
 
 /* ---------- 선수 육성 장면: GPT 그림(배경 cr-*, 동작 cr-train·cr-life, 사람 cr-people, 소품 cr-props) ----------

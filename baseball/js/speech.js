@@ -212,7 +212,7 @@ function crowdSwell(c, t0, t1, kind){
 // 화면 모드의 배경 관중 소리 (설정에서 켜고 끔)
 const CROWD = { src:null };
 function crowdSync(){
-  const want = SET.snd && SET.sndKind !== 'synth' && SET.crowd && SET.view === 'gfx' && !!(UI.S && UI.S.board) && !document.hidden;
+  const want = SET.snd && SET.sndKind !== 'synth' && VIEW.crowd() && !!(UI.S && UI.S.board) && !document.hidden;
   if(!want){ if(CROWD.src){ try{ CROWD.src.stop(); }catch(e){} CROWD.src = null; } return; }
   if(CROWD.src) return;
   const c = SFX.ctx; if(!c) return;   // 첫 터치 전에는 소리를 만들지 않음

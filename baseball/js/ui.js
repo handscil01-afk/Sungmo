@@ -87,10 +87,10 @@ function render(){
   const S = UI.S, hadFocus = $('#opts').contains(document.activeElement);
   applySet();
   // 화면 보며 하기의 경기 화면: 그림 + 짧은 결과 한 줄 + 선택지만 한 화면에 (머리줄·글 상황판·기록은 숨김)
-  const gg = SET.view === 'gfx' && !!S.board && !!G;
+  const gg = VIEW.game(S);
   document.documentElement.classList.toggle('gfxgame', gg);
   // 화면 보며 하기의 메뉴·설정: 따로 꾸밈 (시청각장애인 모드는 그대로)
-  const gu = SET.view === 'gfx' && !gg && !S.board;
+  const gu = VIEW.menu(S);
   document.documentElement.classList.toggle('gfxui', gu);
   document.documentElement.classList.toggle('gfxinput', !!S.input);
   let hero = $('#hero');
@@ -101,16 +101,16 @@ function render(){
   const bs = $('#boardSec');
   if(S.board && typeof boardHTML === 'function' && G){
     bs.hidden = false;
-    const keep = SET.view === 'gfx' && typeof gfxRender === 'function' && bs.querySelector('.gfxwrap');
+    const keep = VIEW.gfx && typeof gfxRender === 'function' && bs.querySelector('.gfxwrap');
     bs.innerHTML = boardHTML();
-    if(SET.view === 'gfx' && typeof gfxRender === 'function'){ if(keep) bs.prepend(keep); gfxRender(G, UI.lastFx || [], UI.lastLines || [], UI.lastEv || []); UI.lastFx = []; UI.lastLines = []; UI.lastEv = []; }
+    if(VIEW.gfx && typeof gfxRender === 'function'){ if(keep) bs.prepend(keep); gfxRender(G, UI.lastFx || [], UI.lastLines || [], UI.lastEv || []); UI.lastFx = []; UI.lastLines = []; UI.lastEv = []; }
   }
-  else if(S.scene && SET.view === 'gfx' && typeof gfxScene === 'function'){ bs.hidden = false; gfxScene(bs, S.scene); }
+  else if(S.scene && VIEW.gfx && typeof gfxScene === 'function'){ bs.hidden = false; gfxScene(bs, S.scene); }
   else { bs.hidden = true; bs.innerHTML = ''; if(typeof GX !== 'undefined') GX.scene = null; }
   $('#say').innerHTML = (S.say || []).map(l => `<p class="${l.k ? 'k-' + l.k : ''}${l.after ? ' after' : ''}${l.tail ? ' cur' : ''}">${esc(l.s || l)}${l.tail ? `<span class="tail"> ${esc(l.tail)}</span>` : ''}</p>`).join('');
   // 시청각장애인 모드에서 중계 음성이 켜져 있으면 경기 중 결과 글은 소리로만 (화면 낭독기가 같은 내용을 또 읽지 않게): 지금 내 차례의 질문과 선택지만
   // 결과 전달: 소리와 글(기본) · 소리만 · 글만. '소리만'일 때만 결과 글과 기록을 숨김. 기본에서는 글이 화면과 점자 단말기에 남고, 낭독기는 중계와 겹치지 않게 질문부터 읽음
-  const castOnly = SET.view !== 'gfx' && !!S.board && typeof G !== 'undefined' && G && !G.over && typeof castOn === 'function' && castOn() && SET.deliver === 'sound';
+  const castOnly = VIEW.castOnly(S);
   $('#say').hidden = !(S.say || []).length || castOnly;
   if($('#logSec')) $('#logSec').dataset.castOnly = castOnly ? '1' : '';
   // 메모: 화면이 정한 글, 없으면 방금 note()로 띄운 글 (전체화면 전환 같은 다시 그리기에도 남음)
@@ -286,6 +286,7 @@ document.addEventListener('click', e => {
     return;
   }
   if(e.target.closest && e.target.closest('#backBtn')){ back('click'); return; }
+  if(e.target.closest && e.target.closest('[data-gs], #gstat .gs-card') && typeof gstatToggle === 'function'){ gstatToggle(); return; }
   const tb = e.target.closest && e.target.closest('[data-tab]');
   if(tb && UI.S && UI.S.onTab){ UI.S.onTab(Number(tb.dataset.tab), 'click'); return; }
   if(e.target.closest && e.target.closest('#menuBtn')){ stopAutoPlay(); if(typeof openMenu === 'function') openMenu('click'); }
@@ -308,6 +309,7 @@ document.addEventListener('keydown', e => {
   if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   // 좌우 화살표: 탭이 있는 화면(설정)에서만 앞뒤 탭으로 (다른 화면에서는 화면 낭독기가 쓰도록 건드리지 않음)
   if((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && UI.S && UI.S.onTab){ e.preventDefault(); UI.S.onTab(e.key === 'ArrowRight' ? 1 : -1, 'key', true); return; }
+  if((e.key === 'v' || e.key === 'V') && VIEW.gfx && UI.S && UI.S.board && typeof gstatToggle === 'function'){ e.preventDefault(); gstatToggle(); return; }   // 능력치 ↔ 공 자취
   const k = keyName(e);
   if(!k) return;
   e.preventDefault();

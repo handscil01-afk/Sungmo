@@ -67,7 +67,19 @@ function fx(G, ...names){
   names.forEach(n => { const e = FX_EV[n] || (/^whiff-/.test(n) ? { k:'call', c:'whiff', kind:n[6] } : null); if(e) ev(G, { ...e }); });
 }
 // 이번 선택으로 생긴 문장·효과음·사건을 꺼냄
-function flush(G){ const r = { lines: G.out, fx: G.fx, events: G.evs || [] }; G.out = []; G.fx = []; G.evs = []; return r; }
+// 공마다 자취(구종·구속·위치·결과)를 최근 3개만 남김: 화면 보며 하기의 상황 줄이 보여 줌. 결과 이름은 사건에서 정함
+function pitchLabel(evs){
+  const pa = r => evs.some(e => e.k === 'pa' && e.r === r), call = c => evs.some(e => e.k === 'call' && e.c === c);
+  return pa('k') ? '삼진' : pa('bb') ? '볼넷' : call('whiff') ? '헛스윙' : call('strike') ? '스트라이크' : call('ball') ? '볼' : call('foul') ? '파울' : evs.some(e => e.k === 'contact' && !e.foul) ? '인플레이' : '';
+}
+function flush(G){
+  const evs = G.evs || [];
+  if(G.anim && G.anim.n !== G.histN && evs.some(e => e.k === 'pitch')){
+    G.histN = G.anim.n;
+    (G.hist ||= []).push({ n: G.anim.n, t: G.anim.t, vel: G.anim.vel || 0, x: Math.round(G.anim.x * 100) / 100, y: Math.round(G.anim.y * 100) / 100, l: pitchLabel(evs) });
+    if(G.hist.length > 3) G.hist.shift();
+  }
+  const r = { lines: G.out, fx: G.fx, events: G.evs || [] }; G.out = []; G.fx = []; G.evs = []; return r; }
 
 /* ---------- 선수 만들기 ---------- */
 function newName(G){

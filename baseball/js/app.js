@@ -51,7 +51,7 @@ function teamScreen(which, page = 0){
   // 10팀이라 한 쪽에 8팀씩: 9번은 다음 쪽 / 앞 쪽
   const desc = t => `${STYLES[t.style].name}. 홈구장 ${parkInfo(t.key).name}: ${parkInfo(t.key).desc}`;
   // 화면 보며 하기: 한 화면에 모든 팀 (번호 키는 1~9, 그 뒤는 눌러서)
-  if(SET.view === 'gfx'){
+  if(VIEW.gfx){
     const opts = list.map((t, i) => ({ n: i + 1, t: t.name, s: desc(t), act: v => set(t.key, v) }));
     opts.push({ n: list.length + 1, t:'아무 팀이나', s:'무작위로 고릅니다.', act: v => set(list[Math.floor(Math.random() * list.length)].key, v) });
     return { q, opts, back: v => go(which ? () => teamScreen(0) : NEW.kind === 'career' ? careerTypeScreen : NEW.mode === 'simple' ? unitScreen : modeScreen, v) };
@@ -171,11 +171,11 @@ function settingsScreen(backTo, tab){
       { t:`경기 결과 전달: ${DELIVER[SET.deliver || 'both']}`, s:'소리와 글: 중계 음성으로 듣고, 결과 글도 화면과 점자 단말기에 남깁니다(낭독기는 중계와 겹치지 않게 질문부터 읽습니다). 소리만: 결과 글을 숨깁니다. 글만: 중계 음성으로 결과를 말하지 않고 낭독기가 글을 읽습니다.',
         act: ch(() => { SET.deliver = cycle(['both', 'sound', 'text'], SET.deliver || 'both'); }, () => `경기 결과 전달 ${DELIVER[SET.deliver]}`) },
       { t:`코스 번호 배열: ${SET.pad === 'pc' ? '컴퓨터 숫자판식 (7 8 9가 위)' : '전화기식 (1 2 3이 위)'}`, s:'코스를 고를 때 숫자와 스트라이크 존 칸을 맞추는 방법입니다. 쓰는 키보드의 숫자 배열에 맞추세요.', act: ch(() => { SET.pad = SET.pad === 'pc' ? 'phone' : 'pc'; }, () => `코스 번호 ${SET.pad === 'pc' ? '7 8 9가 높은 공' : '1 2 3이 높은 공'}`) },
-      { t:`숫자판 방향 배치: ${onOff(!!SET.padDir)}`, hide: SET.view === 'gfx', s:'켜면 코스·높이·붙이기를 숫자판 방향대로 놓습니다. 왼손 타자는 좌우가 뒤집힙니다.', act: ch(() => { SET.padDir = !SET.padDir; }, () => `숫자판 방향 배치 ${onOff(!!SET.padDir)}`) },
+      { t:`숫자판 방향 배치: ${onOff(!!SET.padDir)}`, hide: VIEW.gfx, s:'켜면 코스·높이·붙이기를 숫자판 방향대로 놓습니다. 왼손 타자는 좌우가 뒤집힙니다.', act: ch(() => { SET.padDir = !SET.padDir; }, () => `숫자판 방향 배치 ${onOff(!!SET.padDir)}`) },
       { t:`명령 칸 숫자 바로 고르기: ${onOff(SET.quick)}`, s:'켜면 명령 칸에 숫자 하나만 적어도 바로 고릅니다. 끄면 입력 키를 눌러야 고릅니다. 선택지가 열 개를 넘는 화면에서는 두 자리를 연달아 누르세요.', act: ch(() => { SET.quick = !SET.quick; }, () => `숫자 바로 고르기 ${onOff(SET.quick)}`) },
       { t:`진동: ${onOff(SET.vib)}`, s:'안드로이드 휴대폰에서 스트라이크, 볼, 안타, 홈런, 아웃, 득점 등을 진동 모양으로 알립니다.', act: ch(() => { SET.vib = !SET.vib; }, () => `진동 ${onOff(SET.vib)}`) },
       { t:'진동 뜻 익히기', s:'진동 모양을 하나씩 느껴 보고 뜻을 듣습니다.', act: v => go(() => vibScreen(w => go(() => settingsScreen(backTo), w)), v) },
-      { t:`저시력 크게 보기: ${onOff(!!SET.lowvis)}`, hide: SET.view === 'gfx', s:'켜면 단추와 글자를 크게 보여 줍니다. 끄면 한 화면에 더 많이 보이게 작게 보여 줍니다.', act: ch(() => { SET.lowvis = !SET.lowvis; applySet(); }, () => `저시력 크게 보기 ${onOff(!!SET.lowvis)}`) },
+      { t:`저시력 크게 보기: ${onOff(!!SET.lowvis)}`, hide: VIEW.gfx, s:'켜면 단추와 글자를 크게 보여 줍니다. 끄면 한 화면에 더 많이 보이게 작게 보여 줍니다.', act: ch(() => { SET.lowvis = !SET.lowvis; applySet(); }, () => `저시력 크게 보기 ${onOff(!!SET.lowvis)}`) },
     ],
     // 화면
     [
