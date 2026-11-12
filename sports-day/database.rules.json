@@ -188,19 +188,13 @@
       "marks": {
         ".read": "auth != null",
         ".write": "auth != null && root.child('goldenbell1/masters/' + auth.uid).exists()",
-        "$id": {
-          "q": {
-            ".write": "auth != null && (root.child('goldenbell1/masters/' + auth.uid).exists() || root.child('goldenbell1/staffs/' + auth.uid).exists())",
-            ".validate": "newData.isString() && newData.val().length < 60"
-          },
-          "p": {
-            ".write": "auth != null && (root.child('goldenbell1/masters/' + auth.uid).exists() || root.child('goldenbell1/staffs/' + auth.uid).exists())",
-            ".validate": "newData.isString() && newData.val().length < 60"
-          },
-          "by": {
-            "$u": {
-              ".write": "auth != null && (root.child('goldenbell1/masters/' + auth.uid).exists() || (root.child('goldenbell1/staffs/' + auth.uid).exists() && auth.uid === $u))",
-              ".validate": "!newData.exists() || (newData.child('n').isString() && newData.child('n').val().length <= 20 && newData.child('t').isNumber() && newData.child('r').isString())"
+        "$pid": {
+          "$qid": {
+            "by": {
+              "$u": {
+                ".write": "auth != null && root.child('goldenbell1/staffs/' + auth.uid).exists() && auth.uid === $u && root.child('goldenbell1/zonep/' + auth.uid + '/' + $pid).exists()",
+                ".validate": "!newData.exists() || (newData.child('n').isString() && newData.child('n').val().length <= 20 && newData.child('t').isNumber() && newData.child('r').isString())"
+              }
             }
           }
         }
@@ -232,7 +226,36 @@
           }
         }
       },
-      "rv2": {
+      "assign": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('goldenbell1/masters/' + auth.uid).exists()"
+      },
+      "zonep": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('goldenbell1/masters/' + auth.uid).exists()"
+      },
+      "done": {
+        ".read": "auth != null && (root.child('goldenbell1/masters/' + auth.uid).exists() || root.child('goldenbell1/staffs/' + auth.uid).exists())",
+        ".write": "auth != null && root.child('goldenbell1/masters/' + auth.uid).exists()",
+        "$qid": {
+          "$u": {
+            ".write": "auth != null && root.child('goldenbell1/staffs/' + auth.uid).exists() && auth.uid === $u",
+            ".validate": "!newData.exists() || newData.isNumber()"
+          }
+        }
+      },
+      "logos": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('goldenbell1/masters/' + auth.uid).exists()",
+        "$id": {
+          ".validate": "!newData.exists() || (newData.child('img').isString() && newData.child('img').val().length < 600000)"
+        }
+      },
+      "awards": {
+        ".read": "auth != null",
+        ".write": "auth != null && root.child('goldenbell1/masters/' + auth.uid).exists()"
+      },
+      "rv3": {
         ".read": "auth != null",
         ".write": false
       }

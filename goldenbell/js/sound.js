@@ -52,6 +52,23 @@ const SND = {
   busy(){ return this.tones([[480, 0, 0.1], [480, 0.17, 0.1], [480, 0.34, 0.1]], 0.4); },   // 누가 말하는 중: '뚜뚜뚜'
   ping(){ return this.tones([[1250, 0, 0.09]], 0.25); },                                     // 문자 무전 도착
   chime(){ return this.tones([[523.25, 0, 0.9], [659.25, 0.42, 0.9], [783.99, 0.84, 0.9], [1046.5, 1.26, 1.5]], 0.45); }, // 딩동댕동
+  fanfare(){ return this.tones([[523.25, 0, 0.25], [659.25, 0.18, 0.25], [783.99, 0.36, 0.25], [1046.5, 0.54, 1.1]], 0.5); },
+  // 정답 발표 직전 '두구두구' 북소리 (소리 파일이 없을 때): 걸리는 시간(초)을 돌려줌
+  drumroll(sec = 1.6){
+    const c = this.ensure(); if(!c) return 0;
+    const t0 = c.currentTime + 0.03, n = Math.floor(sec / 0.055);
+    const nb = c.createBuffer(1, Math.floor(c.sampleRate * 0.08), c.sampleRate), d = nb.getChannelData(0);
+    for(let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (c.sampleRate * 0.02));
+    for(let i = 0; i < n; i++){
+      const s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+      s.buffer = nb; f.type = 'bandpass'; f.frequency.value = 180 + Math.random() * 40; f.Q.value = 0.9;
+      g.gain.value = 0.35 + 0.45 * (i / n);
+      s.connect(f).connect(g).connect(c.destination); s.start(t0 + i * 0.055 + Math.random() * 0.008);
+    }
+    // 마지막에 '쾅'
+    this.tone(98, t0 + sec, 0.6, 0.6); this.tone(147, t0 + sec, 0.5, 0.35);
+    return sec + 0.15;
+  },
   // 골든벨 '땡!': 금속 종처럼 배음이 어긋난 소리를 세게 한 번 치고 길게 울림
   bell(vol = 0.9){
     const c = this.ensure(); if(!c) return 0;

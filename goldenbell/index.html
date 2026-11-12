@@ -46,9 +46,9 @@ else if(/Android/i.test(u)&&/NAVER\(inapp|Instagram|FBAN|FBAV|everytimeApp|BAND\
       </div>
       <p class="muted" style="margin:0">이 기기에서 맡을 역할을 고르세요. 진행자 노트북 한 대로 진행자 도구와 프로젝터 화면을 함께 띄우고, 직원은 각자 휴대폰으로 들어옵니다.</p>
       <div class="roles">
-        <button class="role" data-act="role" data-r="host"><b>진행자 도구</b><span>PPT 발표자 보기처럼 지금 문제·다음 문제·정답을 보며 넘기고, 좌석표에서 정답자를 체크합니다. 문제·명단·현수막·방송 문구도 여기서 정합니다.</span><code>진행자 비밀번호 필요</code></button>
-        <button class="role" data-act="role" data-r="screen"><b>프로젝터 화면</b><span>원하는 모니터에 전체 화면으로 현수막·문제·타이머·점수판을 띄웁니다. 보통은 진행자 도구의 '프로젝터 창 열기'로 엽니다.</span><code>진행자로 들어온 기기에서</code></button>
-        <button class="role" data-act="role" data-r="staff"><b>현장 직원</b><span>휴대폰으로 지금 문제와 정답을 보고, 맡은 줄 참가자가 맞혔는지 확인해 체크합니다. 무전(음성·문자)도 여기서 합니다.</span><code>직원 비밀번호 또는 진행자 승인</code></button>
+        <button class="role" data-act="role" data-r="host"><b>진행자 도구</b><span>PPT 발표자 보기처럼 지금 문제·다음 문제·정답을 보며 넘기고, 좌석표에서 정답자를 체크합니다. 문제·명단·현수막·방송 문구·소리·시상도 여기서 정합니다.</span><code>진행자 비밀번호 필요</code></button>
+        <button class="role" data-act="role" data-r="screen"><b>프로젝터 화면</b><span>원하는 모니터에 전체 화면으로 현수막·문제·타이머·점수판·시상식을 띄우고 소리를 냅니다. 보통은 진행자 도구의 '프로젝터 창'으로 엽니다.</span><code>진행자로 들어온 기기에서</code></button>
+        <button class="role" data-act="role" data-r="staff"><b>현장 직원</b><span>휴대폰으로 지금 문제와 정답을 보고, 맡은 자리 참가자가 맞혔는지 확인해 체크합니다. 무전(음성·문자)도 여기서 합니다.</span><code>직원 비밀번호 또는 진행자 승인</code></button>
       </div>
       <div class="row"><button class="btn sm" data-act="install" id="installBtn2">홈 화면에 설치하기</button><button class="btn sm" data-act="settings">설정</button><span class="muted demo-note" hidden>연습 모드: 이 브라우저 안에서만 저장됩니다 (진행자·직원 비밀번호 0000)</span></div>
     </div>
@@ -63,6 +63,7 @@ else if(/Android/i.test(u)&&/NAVER\(inapp|Instagram|FBAN|FBAV|everytimeApp|BAND\
       <b>어느 화면에 띄울까요?</b>
       <div class="ss-list" id="ssList"></div>
       <small>리모컨(프레젠터)·키보드: 다음 → · PageDown · Space / 이전 ← · PageUp / 화면 끄기 B</small>
+      <small id="ssSfx"></small>
     </div>
   </div>
   <div class="screen-menu">
@@ -74,117 +75,117 @@ else if(/Android/i.test(u)&&/NAVER\(inapp|Instagram|FBAN|FBAV|everytimeApp|BAND\
 
 <!-- ============ 진행자 도구 ============ -->
 <section id="vHost" class="view" hidden>
-  <header class="bar">
-    <div class="brand">점자 골든벨 <small>진행자 도구</small></div>
+  <header class="hbar">
+    <div class="brand">골든벨</div>
     <nav class="tabs" id="hostTabs">
       <button data-act="tab" data-t="run" class="on">진행</button>
-      <button data-act="tab" data-t="ann">방송 문구</button>
-      <button data-act="tab" data-t="qs">문제 편집</button>
-      <button data-act="tab" data-t="seat">좌석·명단</button>
-      <button data-act="tab" data-t="staff">직원·기기</button>
-      <button data-act="tab" data-t="set">현수막·설정</button>
+      <button data-act="tab" data-t="ann">방송·안내</button>
+      <button data-act="tab" data-t="qs">문제</button>
+      <button data-act="tab" data-t="seat">좌석·점수</button>
+      <button data-act="tab" data-t="staff">직원</button>
+      <button data-act="tab" data-t="banner">현수막</button>
+      <button data-act="tab" data-t="award">시상</button>
+      <button data-act="tab" data-t="set">설정</button>
     </nav>
-    <div class="sp"></div>
     <span class="pill net">연결 확인 중</span>
-    <button class="btn sm primary" data-act="openScreen">프로젝터 창 열기</button>
+    <button class="btn sm primary" data-act="openScreen" title="고른 모니터에 프로젝터 화면 열기">프로젝터 창</button>
     <button class="hbtn fsbtn" data-act="fsToggle" aria-label="전체화면"></button>
-    <button class="btn sm" data-act="pick">역할 바꾸기</button>
+    <button class="hbtn" data-act="pick" title="역할 바꾸기" aria-label="역할 바꾸기">⇄</button>
   </header>
 
   <!-- 진행 -->
-  <div class="wrap" id="tab-run">
+  <div id="tab-run">
     <div class="run-ctrl">
-      <div class="grp">
-        <button class="btn" data-act="stepPrev" title="← / PageUp">◀ 이전</button>
-        <button class="btn primary big-next" data-act="stepNext" id="nextBtn" title="→ / PageDown / Space">다음 ▶</button>
+      <button class="btn" data-act="stepPrev" title="← / PageUp">◀ 이전</button>
+      <button class="btn primary big-next" data-act="stepNext" id="nextBtn" title="→ / PageDown / Space">다음 ▶</button>
+      <div class="seg" id="modeSeg">
+        <button data-act="mode" data-m="banner" title="H">현수막</button>
+        <button data-act="mode" data-m="intro">소개</button>
+        <button data-act="mode" data-m="title">안내</button>
+        <button data-act="mode" data-m="question" title="Q">문제</button>
+        <button data-act="mode" data-m="answer" title="A">정답</button>
+        <button data-act="mode" data-m="seats" title="G">좌석판</button>
+        <button data-act="mode" data-m="score" title="S">순위</button>
+        <button data-act="mode" data-m="award">시상</button>
+        <button data-act="mode" data-m="blank" title="B">끄기</button>
       </div>
-      <div class="grp" id="modeSeg">
-        <span class="lbl">화면</span>
-        <button class="btn sm" data-act="mode" data-m="banner">현수막</button>
-        <button class="btn sm" data-act="mode" data-m="question">문제</button>
-        <button class="btn sm" data-act="mode" data-m="answer">정답 공개</button>
-        <button class="btn sm" data-act="mode" data-m="seats">좌석판</button>
-        <button class="btn sm" data-act="mode" data-m="score">점수 순위</button>
-        <button class="btn sm" data-act="mode" data-m="blank">화면 끄기</button>
-      </div>
-      <div class="grp">
-        <span class="lbl">타이머</span>
+      <div class="grp" title="T: 시작·멈춤">
         <span id="hTimer">30</span>
         <button class="btn sm" data-act="tToggle" id="tToggleBtn">시작</button>
-        <button class="btn sm" data-act="tPlus">+10초</button>
-        <button class="btn sm" data-act="tReset">처음으로</button>
-        <select id="tDur" aria-label="제한 시간">
-          <option value="10">10초</option><option value="15">15초</option><option value="20">20초</option><option value="30">30초</option><option value="45">45초</option><option value="60">60초</option><option value="90">90초</option><option value="120">2분</option><option value="180">3분</option>
-        </select>
+        <button class="btn sm" data-act="tPlus">+10</button>
+        <button class="btn sm" data-act="tReset" title="처음으로">↺</button>
       </div>
-      <div class="grp">
-        <label class="chk"><input type="checkbox" id="optTimer"> 타이머 표시</label>
-        <label class="chk"><input type="checkbox" id="optAuthor"> 출제자 표시</label>
-        <label class="chk"><input type="checkbox" id="optAuto"> 문제 띄우면 타이머 자동 시작</label>
-      </div>
+      <div class="grp" id="sndGrp"></div>
     </div>
     <div class="ann-quick" id="annQuick"></div>
-    <div class="run-main">
-      <div class="run-col">
-        <div class="card">
-          <div class="card-h">지금 프로젝터 화면 <span class="hint" id="modeName"></span></div>
-          <div class="stage-wrap mini" id="miniStage"></div>
+    <div class="wrap run-wrap">
+      <div class="run-main">
+        <div class="run-col">
+          <div class="card">
+            <div class="card-h">지금 프로젝터 화면 <span class="hint" id="modeName"></span></div>
+            <div class="stage-wrap mini" id="miniStage"></div>
+          </div>
+          <div class="card notes" id="hostNotes"></div>
+          <div class="card nextq" id="hostNext"></div>
+          <div class="card">
+            <div class="card-h">문제 바로 가기 <span class="hint">번호를 누르면 그 문제를 띄웁니다</span></div>
+            <div class="qstrip" id="qStrip"></div>
+            <p class="keys">리모컨·키보드: 다음 → PageDown Space · 이전 ← PageUp · 정답 A · 타이머 T · 현수막 H · 좌석판 G · 순위 S · 끄기 B</p>
+          </div>
         </div>
-        <div class="card notes" id="hostNotes"></div>
-        <div class="card nextq" id="hostNext"></div>
-        <div class="card">
-          <div class="card-h">문제 바로 가기 <span class="hint">번호를 누르면 그 문제를 띄웁니다</span></div>
-          <div class="qstrip" id="qStrip"></div>
-          <p class="keys">리모컨·키보드: 다음 단계 → PageDown Space · 이전 ← PageUp · 정답 A · 타이머 T · 현수막 H · 좌석판 G · 순위 S · 화면 끄기 B</p>
+        <div class="run-col">
+          <div class="card">
+            <div class="card-h">정답자 체크 <span class="mark-count" id="markCount"></span><span class="hint">이름을 누르면 이번 문제 정답(+1점), 다시 누르면 취소 · 길게 누르면 점수 보정</span></div>
+            <div class="done-row" id="doneRow"></div>
+            <div class="seat-scroll"><div class="front-lbl">무대 (앞)</div><div id="hostSeats"></div></div>
+          </div>
+          <div class="card radio-card" id="radioHost"></div>
         </div>
-      </div>
-      <div class="run-col">
-        <div class="card">
-          <div class="card-h">정답자 체크 <span class="mark-count" id="markCount"></span><span class="hint">이름을 누르면 이번 문제 정답(+1점), 다시 누르면 취소 · 길게 누르거나 오른쪽 클릭하면 점수 조정</span></div>
-          <div class="seat-scroll"><div class="front-lbl">무대 (앞)</div><div id="hostSeats"></div></div>
-        </div>
-        <div class="card radio-card" id="radioHost"></div>
       </div>
     </div>
   </div>
 
-  <!-- 방송 문구 -->
+  <!-- 방송·안내 -->
   <div class="wrap" id="tab-ann" hidden>
     <div class="ann-wrap">
       <div class="card">
-        <div class="card-h">프로젝터에 문구 띄우기 <span class="hint">TV 방송 자막처럼 지금 화면 위에 띄웁니다</span></div>
-        <textarea id="annText" rows="3" maxlength="120" placeholder="예: 잠시 후 다음 문제가 시작됩니다"></textarea>
+        <div class="card-h">방송 문구 <span class="hint">TV 자막처럼 지금 화면 위에 띄웁니다</span></div>
+        <textarea id="annText" rows="3" maxlength="120" placeholder="예: 잠시 후 1시부터 점자 골든벨을 시작합니다. 자리에 앉아 OX 팻말과 1234 팻말을 준비해 주세요."></textarea>
         <div class="row" style="margin-top:8px">
-          <span class="lbl muted">띄우는 방식</span>
           <label class="chk"><input type="radio" name="annStyle" value="full" checked> 크게 띄운 뒤 아래 띠로</label>
           <label class="chk"><input type="radio" name="annStyle" value="band"> 아래 띠로만</label>
         </div>
         <div class="row" style="margin-top:6px">
-          <span class="lbl muted">크게 보여 줄 시간</span>
+          <span class="lbl">크게 보여 줄 시간</span>
           <select id="annSecs"><option value="5">5초</option><option value="8" selected>8초</option><option value="12">12초</option><option value="20">20초</option><option value="0">내릴 때까지</option></select>
           <label class="chk"><input type="checkbox" id="annChime" checked> 딩동댕동 소리</label>
         </div>
         <div class="row" style="margin-top:10px">
           <button class="btn primary" data-act="annSend">띄우기</button>
           <button class="btn" data-act="annSave">자주 쓰는 문구에 저장</button>
-          <button class="btn danger" data-act="annClear" id="annClearBtn">지금 문구 내리기</button>
+          <button class="btn danger" data-act="annClear">지금 문구 내리기</button>
         </div>
         <div class="ann-now" id="annNow"></div>
+        <div class="card-h" style="margin-top:14px">자주 쓰는 문구 <span class="hint">누르면 바로 띄웁니다 · 진행 탭 위에도 나옵니다</span></div>
+        <div class="fav-list" id="favList"></div>
       </div>
       <div class="card">
-        <div class="card-h">자주 쓰는 문구 <span class="hint">누르면 바로 띄웁니다 · 진행 탭 위쪽에도 나옵니다</span></div>
-        <div class="fav-list" id="favList"></div>
+        <div class="card-h">안내 화면 <span class="hint">화면 가득 큰 글씨 (쉬는 시간·댄스 타임처럼)</span></div>
+        <div class="title-presets" id="titlePresets"></div>
+        <label class="field" style="margin-top:10px"><span>큰 글씨</span><input type="text" id="ttText" maxlength="40" placeholder="예: 쉬는 시간"></label>
+        <label class="field" style="margin-top:6px"><span>작은 글씨 (없어도 됨)</span><input type="text" id="ttSub" maxlength="80" placeholder="예: 2시 40분에 2부를 시작합니다"></label>
+        <div class="row" style="margin-top:10px"><button class="btn primary" data-act="ttShow">안내 화면 띄우기</button></div>
       </div>
     </div>
   </div>
 
-  <!-- 문제 편집 -->
+  <!-- 문제 -->
   <div class="wrap" id="tab-qs" hidden>
     <div class="qs-wrap">
       <div class="card">
         <div class="card-h">문제 붙여넣기</div>
-        <p class="muted small">한글·메모장에 정리한 문제를 그대로 붙여넣으세요. <b>&lt;홍길동 출제&gt;</b> 줄은 출제자로, <b>1. 2. 3. 4.</b> 보기는 객관식으로, <b>정답:</b> 줄은 정답과 해설로, <b>맞으면 O, 틀리면 X</b>는 OX 문제로 알아서 나눕니다. 문제와 문제 사이는 빈 줄로 띄워 주세요.</p>
-        <textarea id="pasteBox" rows="12" placeholder="&lt;홍길동 출제&gt;&#10;1. 한글 점자의 자음 초성 기역은 4점이다. 맞으면 O, 틀리면 X.&#10;정답: O&#10;&#10;박두성 선생님이 만든 한글 점자의 이름은 무엇일까요?&#10;1. 훈맹정음&#10;2. 훈민정음&#10;정답: 1"></textarea>
+        <p class="muted small">한글·메모장의 문제를 그대로 붙여넣으세요. <b>&lt;홍길동 출제&gt;</b> → 출제자, <b>1. 2. 3. 4.</b> 보기 → 객관식, <b>정답:</b> → 정답과 해설, <b>맞으면 O, 틀리면 X</b> → OX. 문제 사이는 빈 줄로 띄웁니다.<br>구분 줄을 넣으면 그 아래 문제에 적용됩니다: <b>&lt;연습&gt;</b> <b>&lt;1부&gt;</b> <b>&lt;이벤트&gt;</b> <b>&lt;2부&gt;</b> <b>&lt;결승&gt;</b></p>
+        <textarea id="pasteBox" rows="12" placeholder="&lt;연습&gt;&#10;점자는 손가락으로 읽는 글자이다. 맞으면 O, 틀리면 X.&#10;정답: O&#10;&#10;&lt;1부&gt;&#10;&lt;홍길동 출제&gt;&#10;1. 한글 점자의 자음 초성 기역은 4점이다. 맞으면 O, 틀리면 X.&#10;정답: O"></textarea>
         <div class="row" style="margin-top:8px"><button class="btn" data-act="parse">읽어오기</button><span id="parseInfo" class="muted"></span></div>
         <div class="parse-prev" id="parsePrev"></div>
         <div class="row" id="parseBtns" style="margin-top:8px" hidden>
@@ -199,8 +200,13 @@ else if(/Android/i.test(u)&&/NAVER\(inapp|Instagram|FBAN|FBAV|everytimeApp|BAND\
     </div>
   </div>
 
-  <!-- 좌석·명단 -->
+  <!-- 좌석·점수 -->
   <div class="wrap" id="tab-seat" hidden>
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-h">점수 현황 <span class="hint">좌석 배치대로 · 누르면 점수 보정</span><div class="sp"></div>
+        <div class="seg sm"><button data-act="scoreView" data-v="map" id="svMap" class="on">배치도</button><button data-act="scoreView" data-v="table" id="svTable">표</button></div></div>
+      <div id="scoreBoard"></div>
+    </div>
     <div class="card" style="margin-bottom:12px">
       <div class="row">
         <b>좌석</b>
@@ -221,73 +227,120 @@ else if(/Android/i.test(u)&&/NAVER\(inapp|Instagram|FBAN|FBAV|everytimeApp|BAND\
         <div class="row" style="margin:8px 0 12px"><button class="btn sm primary" data-act="addPeople">명단에 추가</button><span class="muted small" id="peopleCount"></span></div>
         <div class="card-h" style="margin-bottom:6px">아직 자리 없는 사람 <span class="hint">끌어서 좌석에 놓거나, 이름을 누른 다음 좌석을 누르세요</span></div>
         <div class="pool" id="pool"></div>
+        <div class="card-h" style="margin:14px 0 6px">이름 고치기·빼기</div>
+        <div class="tbl-scroll"><table class="ptable" id="pTable"></table></div>
       </div>
       <div class="card">
         <div class="card-h">좌석 배치 <span class="hint">앉은 사람을 끌어 다른 자리에 놓으면 서로 바뀝니다. × 는 자리에서 빼기</span></div>
         <div class="seat-scroll"><div class="front-lbl">무대 (앞)</div><div id="layoutSeats"></div></div>
       </div>
     </div>
-    <div class="card" style="margin-top:12px">
-      <div class="card-h">전체 명단과 점수 <span class="hint">이름은 바로 고칠 수 있습니다. 보정은 문제와 상관없이 더하거나 빼는 점수입니다.</span></div>
-      <div class="tbl-scroll"><table class="ptable" id="pTable"></table></div>
-    </div>
   </div>
 
-  <!-- 직원·기기 -->
+  <!-- 직원 -->
   <div class="wrap" id="tab-staff" hidden>
-    <div class="set-wrap">
+    <div class="staff-wrap">
       <div class="card">
-        <div class="card-h">직원 비밀번호</div>
-        <p class="muted small">직원은 휴대폰에서 이 링크를 열고 '현장 직원'을 고른 뒤, 이름과 이 비밀번호를 넣으면 바로 들어옵니다. 비밀번호 없이 들어온 직원은 아래 목록에서 '직원으로 승인'을 누르세요.</p>
-        <div class="row"><input type="text" id="staffPwIn" maxlength="30" placeholder="4자 이상" autocomplete="off"><button class="btn primary" data-act="setStaffPw">비밀번호 정하기</button></div>
-        <p class="muted small" id="staffPwInfo"></p>
+        <div class="card-h">담당 자리 정하기 <span class="hint">직원을 고른 뒤 좌석이나 '줄 전체'를 누르세요. 직원은 맡은 자리만 체크할 수 있습니다</span></div>
+        <div class="staff-chips" id="staffChips"></div>
+        <div class="seat-scroll" style="margin-top:10px"><div class="front-lbl">무대 (앞)</div><div id="assignSeats"></div></div>
+        <div class="row" style="margin-top:10px"><div class="sp"></div><button class="btn sm danger" data-act="assignClear">담당 모두 지우기</button></div>
       </div>
-      <div class="card">
-        <div class="card-h">접속한 기기 <span class="hint" id="devHint"></span></div>
-        <div class="dev-list" id="devList"></div>
+      <div class="side-col">
+        <div class="card">
+          <div class="card-h">직원 비밀번호</div>
+          <p class="muted small">직원은 휴대폰에서 이 링크를 열고 '현장 직원'을 고른 뒤, 이름과 이 비밀번호를 넣으면 바로 들어옵니다. 비밀번호 없이 들어온 직원은 아래 목록에서 '직원으로 승인'을 누르세요.</p>
+          <div class="row"><input type="text" id="staffPwIn" maxlength="30" placeholder="4자 이상" autocomplete="off"><button class="btn primary" data-act="setStaffPw">정하기</button></div>
+          <p class="muted small" id="staffPwInfo"></p>
+        </div>
+        <div class="card">
+          <div class="card-h">접속한 기기 <span class="hint" id="devHint"></span></div>
+          <div class="dev-list" id="devList"></div>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- 현수막·설정 -->
+  <!-- 현수막 -->
+  <div class="wrap" id="tab-banner" hidden>
+    <div class="banner-wrap">
+      <div class="card">
+        <div class="card-h">현수막 꾸미기 <span class="hint">로고·글을 끌어서 옮기고, 누르면 아래에서 크기·내용을 바꿉니다</span></div>
+        <div class="stage-wrap mini edit" id="bannerEdit"></div>
+        <div class="row" style="margin-top:10px">
+          <label class="btn sm primary"><input type="file" id="logoFile" accept="image/*" multiple hidden>후원사 로고 넣기</label>
+          <button class="btn sm" data-act="biAddText">글 넣기</button>
+          <span class="muted small">로고는 배경이 투명한 PNG가 가장 잘 어울립니다</span>
+        </div>
+        <div class="bi-panel" id="biPanel"></div>
+      </div>
+      <div class="side-col">
+        <div class="card">
+          <div class="card-h">현수막 바탕</div>
+          <label class="field"><span>윗줄</span><input type="text" id="bnL1" maxlength="40"></label>
+          <label class="field"><span>큰 글씨</span><input type="text" id="bnL2" maxlength="30"></label>
+          <label class="field"><span>주최·주관</span><input type="text" id="bnSub" maxlength="60"></label>
+          <label class="field"><span>날짜·장소</span><input type="text" id="bnInfo" maxlength="80" placeholder="예: 2026. 11. 20.(금) 13:00 · 센터 교육장"></label>
+          <div class="field"><span>현수막 이미지 (넣으면 글 대신 이 이미지가 바탕이 됩니다. 로고·글은 그 위에 올라갑니다)</span>
+            <div class="row"><label class="btn sm"><input type="file" id="bnFile" accept="image/*" hidden>이미지 올리기</label><button class="btn sm danger" data-act="bnClear" id="bnClearBtn">이미지 지우기</button><span class="muted small" id="bnImgInfo"></span></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-h">위쪽 현수막 띠</div>
+          <p class="muted small">문제·좌석판·순위 화면 맨 위에 현수막을 띠처럼 늘 띄워 둡니다.</p>
+          <div class="seg" id="stripSeg">
+            <button data-act="strip" data-v="off">안 띄움</button><button data-act="strip" data-v="s">얇게</button><button data-act="strip" data-v="m">보통</button><button data-act="strip" data-v="l">두껍게</button>
+          </div>
+          <label class="chk"><input type="checkbox" id="optStripLogos"> 띠 양쪽에 후원사 로고도 띄우기</label>
+          <div class="stage-wrap mini" id="stripPrev"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 시상 -->
+  <div class="wrap" id="tab-award" hidden>
+    <div class="award-wrap">
+      <div class="card">
+        <div class="card-h">시상 순서 <span class="hint">위에서부터 차례로 발표합니다. 진행 탭의 '다음'을 누를 때마다 상 이름 → 수상자 순으로 넘어갑니다</span></div>
+        <div class="aw-list" id="awList"></div>
+        <div class="row" style="margin-top:10px"><button class="btn sm" data-act="awAdd">상 추가</button><button class="btn sm" data-act="awDefault">콘티 순서로 되돌리기</button><div class="sp"></div><button class="btn primary" data-act="awStart">시상식 시작</button></div>
+      </div>
+      <div class="card">
+        <div class="card-h">미리 보는 수상자 <span class="hint">진행자만 봅니다</span></div>
+        <div id="awPreview"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 설정 -->
   <div class="wrap" id="tab-set" hidden>
     <div class="set-wrap">
       <div class="card">
-        <div class="card-h">현수막</div>
-        <div class="stage-wrap mini" id="bannerPrev"></div>
-        <label class="field"><span>윗줄</span><input type="text" id="bnL1" maxlength="40"></label>
-        <label class="field"><span>큰 글씨</span><input type="text" id="bnL2" maxlength="30"></label>
-        <label class="field"><span>주최·주관</span><input type="text" id="bnSub" maxlength="60"></label>
-        <label class="field"><span>날짜·장소</span><input type="text" id="bnInfo" maxlength="80" placeholder="예: 2026. 11. 20.(금) 14:00 · 센터 교육장"></label>
-        <div class="field"><span>현수막 이미지 (넣으면 글 대신 이 이미지를 씁니다)</span>
-          <div class="row"><label class="btn sm"><input type="file" id="bnFile" accept="image/*" hidden>이미지 올리기</label><button class="btn sm danger" data-act="bnClear" id="bnClearBtn">이미지 지우기</button><span class="muted small" id="bnImgInfo"></span></div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-h">위쪽 현수막 띠</div>
-        <p class="muted small">문제·좌석판·점수 순위 화면 맨 위에 현수막을 띠처럼 늘 띄워 둡니다.</p>
-        <div class="row" id="stripSeg">
-          <button class="btn sm" data-act="strip" data-v="off">안 띄움</button><button class="btn sm" data-act="strip" data-v="s">얇게</button><button class="btn sm" data-act="strip" data-v="m">보통</button><button class="btn sm" data-act="strip" data-v="l">두껍게</button>
-        </div>
-        <div class="stage-wrap mini" id="stripPrev"></div>
-      </div>
-      <div class="card">
-        <div class="card-h">프로젝터 글자와 소리</div>
-        <div class="field"><span>문제 글자 크기 (저시력 참가자가 많으면 크게)</span>
-          <div class="row" id="scaleSeg">
-            <button class="btn sm" data-act="scale" data-v="0.85">작게</button><button class="btn sm" data-act="scale" data-v="1">보통</button><button class="btn sm" data-act="scale" data-v="1.15">크게</button><button class="btn sm" data-act="scale" data-v="1.3">아주 크게</button>
+        <div class="card-h">진행</div>
+        <label class="chk"><input type="checkbox" id="optTimer"> 프로젝터에 타이머 보이기</label>
+        <label class="chk"><input type="checkbox" id="optAuthor"> 프로젝터에 출제자 보이기</label>
+        <label class="chk"><input type="checkbox" id="optAuto"> 문제를 띄우면 타이머 자동 시작</label>
+        <div class="field"><span>문제 형식별 기본 시간 (통역 시간 포함, 문제마다 따로 바꿀 수도 있어요)</span>
+          <div class="row">
+            <label class="row" style="gap:4px">OX <select id="secOx"></select></label>
+            <label class="row" style="gap:4px">4지선다 <select id="secChoice"></select></label>
+            <label class="row" style="gap:4px">주관식 <select id="secShort"></select></label>
           </div>
         </div>
-        <label class="chk"><input type="checkbox" id="optSound"> 시간이 다 되면 프로젝터에서 '땡!' 소리 내기</label>
-        <div class="row"><button class="btn sm" data-act="testBell">이 기기에서 '땡' 들어 보기</button></div>
-        <p class="muted small">타이머가 가는 동안에는 소리가 나지 않습니다. 프로젝터 창은 처음에 한 번 눌러야 소리가 납니다.</p>
+        <div class="field"><span>문제 글자 크기 (저시력 참가자가 많으면 크게)</span>
+          <div class="seg" id="scaleSeg">
+            <button data-act="scale" data-v="0.85">작게</button><button data-act="scale" data-v="1">보통</button><button data-act="scale" data-v="1.15">크게</button><button data-act="scale" data-v="1.3">아주 크게</button>
+          </div>
+        </div>
       </div>
+      <div class="card" id="sfxCard"></div>
       <div class="card">
         <div class="card-h">결과와 초기화</div>
         <div class="row"><button class="btn" data-act="csv">결과 표(CSV) 저장</button></div>
-        <p class="muted small">순위, 이름, 좌석, 점수와 문제별 정답 여부가 엑셀에서 열리는 표로 저장됩니다.</p>
+        <p class="muted small">순위, 이름, 좌석, 1부·2부·결승 점수와 문제별 정답 여부가 엑셀에서 열리는 표로 저장됩니다.</p>
         <div class="row"><button class="btn danger" data-act="resetScores">정답 체크와 점수 모두 지우기</button></div>
-        <p class="muted small">리허설 뒤 본 행사 전에 쓰세요. 문제와 명단은 그대로 남습니다.</p>
+        <p class="muted small">리허설 뒤 본 행사 전에 쓰세요. 문제·명단·담당 자리는 그대로 남습니다.</p>
       </div>
     </div>
   </div>
@@ -300,22 +353,22 @@ else if(/Android/i.test(u)&&/NAVER\(inapp|Instagram|FBAN|FBAV|everytimeApp|BAND\
     <div class="sp"></div>
     <span class="pill net">연결 확인 중</span>
     <button class="hbtn fsbtn" data-act="fsToggle" aria-label="전체화면"></button>
-    <button class="btn sm" data-act="staffSetup">내 정보</button>
-    <button class="btn sm" data-act="pick">역할 바꾸기</button>
+    <button class="btn sm" data-act="staffSetup">내 이름</button>
+    <button class="hbtn" data-act="pick" title="역할 바꾸기" aria-label="역할 바꾸기">⇄</button>
   </header>
   <div class="wrap staff-pad">
     <div class="staff-col">
       <div class="card" id="staffSetup" hidden>
-        <div class="card-h">내 정보 <span class="hint">무전에 나오는 이름과 맡은 줄</span></div>
-        <label class="field"><span>이름</span><input type="text" id="meName" maxlength="20" placeholder="예: 정성모"></label>
-        <div class="field" style="margin-top:8px"><span>맡은 줄 (여러 개 고를 수 있어요)</span><div class="zone-btns" id="zoneBtns"></div></div>
+        <div class="card-h">내 이름 <span class="hint">무전과 정답 체크에 나오는 이름</span></div>
+        <input type="text" id="meName" maxlength="20" placeholder="예: 정성모">
         <div class="row" style="margin-top:10px"><button class="btn primary" data-act="staffSave">저장</button></div>
       </div>
       <div class="card" id="staffQ"></div>
       <div class="card">
-        <div class="card-h">정답 확인 <span class="mark-count" id="staffCount"></span><div class="sp"></div><label class="chk"><input type="checkbox" id="onlyMine"> 내 줄만 보기</label></div>
-        <p class="muted small" style="margin:-4px 0 10px">참가자가 맞힌 걸 확인했으면 이름을 누르세요. 진행자 화면에 바로 올라가고 1점이 됩니다. 잘못 눌렀으면 다시 누르면 취소됩니다.</p>
+        <div class="card-h">정답 확인 <span class="mark-count" id="staffCount"></span><div class="sp"></div><label class="chk"><input type="checkbox" id="showAll"> 전체 자리 보기</label></div>
+        <p class="muted small" id="staffHint" style="margin:-4px 0 10px"></p>
         <div class="seat-scroll"><div class="front-lbl">무대 (앞)</div><div id="staffSeats"></div></div>
+        <div class="row" style="margin-top:12px"><button class="btn done-btn" data-act="myDone" id="myDoneBtn">✓ 내 담당 체크 끝</button></div>
       </div>
       <div class="card radio-card" id="radioStaff"></div>
     </div>
@@ -331,6 +384,7 @@ else if(/Android/i.test(u)&&/NAVER\(inapp|Instagram|FBAN|FBAV|everytimeApp|BAND\
 <script src="js/config.js"></script>
 <script src="js/util.js"></script>
 <script src="js/sound.js"></script>
+<script src="js/sfx.js"></script>
 <script src="js/store.js"></script>
 <script src="js/parse.js"></script>
 <script src="js/stage.js"></script>

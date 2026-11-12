@@ -86,6 +86,8 @@ function screenGo(i){
   $('#screenStart').hidden = true;
   fullOn(s || (i === -1 ? null : guessProjector()));
   keepAwake();
+  // 브라우저는 화면을 한 번 눌러야 소리를 낼 수 있어서, 이때 켜져 있던 음악을 다시 맞춤
+  if(typeof musicFollow === 'function'){ if(SFX.music) musicStop(true); musicFollow(); }
 }
 async function keepAwake(){ try{ if(navigator.wakeLock) await navigator.wakeLock.request('screen'); }catch(e){} }
 document.addEventListener('visibilitychange', () => { if(ROLE === 'screen' && document.visibilityState === 'visible') keepAwake(); });
