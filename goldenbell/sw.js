@@ -1,4 +1,4 @@
-const CACHE = 'goldenbell-v5';
+const CACHE = 'goldenbell-v6';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './roger.wav',
   './css/app.css',
   './js/config.js', './js/util.js', './js/sound.js', './js/sfx.js', './js/store.js', './js/parse.js', './js/stage.js', './js/screens.js', './js/radio.js', './js/pwa.js', './js/app.js',

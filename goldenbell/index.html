@@ -18,10 +18,18 @@ else if(/Android/i.test(u)&&/NAVER\(inapp|Instagram|FBAN|FBAV|everytimeApp|BAND\
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <title>점자 골든벨</title>
+<!-- 서버 연결을 페이지와 함께 미리 시작 (로그인·데이터 서버, 서버 프로그램 파일) -->
+<link rel="preconnect" href="https://securetoken.googleapis.com">
+<link rel="preconnect" href="https://identitytoolkit.googleapis.com">
+<link rel="preconnect" href="https://handscil-sports-default-rtdb.asia-southeast1.firebasedatabase.app">
+<link rel="modulepreload" href="vendor/firebase-app.js">
+<link rel="modulepreload" href="vendor/firebase-auth.js">
+<link rel="modulepreload" href="vendor/firebase-database.js">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
-<link rel="stylesheet" href="css/app.css?v=5">
+<!-- 글꼴은 화면을 막지 않고 뒤에서 받음 (받기 전에는 맑은 고딕) -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="css/app.css?v=6">
 </head>
 <body>
 
@@ -389,16 +397,16 @@ else if(/Android/i.test(u)&&/NAVER\(inapp|Instagram|FBAN|FBAV|everytimeApp|BAND\
 <div id="pop" hidden></div>
 <div id="talkBar" hidden></div>
 
-<script src="js/config.js?v=5"></script>
-<script src="js/util.js?v=5"></script>
-<script src="js/sound.js?v=5"></script>
-<script src="js/sfx.js?v=5"></script>
-<script src="js/store.js?v=5"></script>
-<script src="js/parse.js?v=5"></script>
-<script src="js/stage.js?v=5"></script>
-<script src="js/screens.js?v=5"></script>
-<script src="js/radio.js?v=5"></script>
-<script src="js/pwa.js?v=5"></script>
-<script src="js/app.js?v=5"></script>
+<script src="js/config.js?v=6"></script>
+<script src="js/util.js?v=6"></script>
+<script src="js/sound.js?v=6"></script>
+<script src="js/sfx.js?v=6"></script>
+<script src="js/store.js?v=6"></script>
+<script src="js/parse.js?v=6"></script>
+<script src="js/stage.js?v=6"></script>
+<script src="js/screens.js?v=6"></script>
+<script src="js/radio.js?v=6"></script>
+<script src="js/pwa.js?v=6"></script>
+<script src="js/app.js?v=6"></script>
 </body>
 </html>

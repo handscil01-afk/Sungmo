@@ -460,6 +460,7 @@ function render(flags){
     if(ROLE === 'staff') renderStaff();
     radioRender();
     showErr(null);
+    saveSnapSoon();
   }catch(e){ console.error(e); showErr(e); }
 }
 // 화면을 그리다 오류가 나면 빈 화면 대신 오류 내용을 띄움 (새로 고침 안내 + 알려 줄 글)
@@ -1073,8 +1074,45 @@ document.addEventListener('keydown', e => { const c = e.target.closest && e.targ
 $('#peopleIn').addEventListener('keydown', e => { if(e.key === 'Enter' && (e.ctrlKey || e.metaKey)) addPeople(); });
 let idleT = null; document.addEventListener('mousemove', () => { document.body.classList.remove('idle'); clearTimeout(idleT); if(ROLE === 'screen') idleT = setTimeout(() => document.body.classList.add('idle'), 3000); });
 
+/* ===================== 마지막 화면 기억 (빠른 시작) =====================
+   서버에 로그인·연결하는 데 1~2초가 걸려서, 이 기기에서 마지막으로 본 상태를 저장해 두었다가 켜자마자 먼저 그림.
+   서버 자료가 오면 그대로 바뀜(저장해 둔 것은 rev 0으로 읽어 서버 자료가 늘 이김). 문제(정답)는 진행자·직원 기기에만 저장 */
+const SNAP_KEY = 'snap1';
+function loadSnap(){
+  if(DEMO) return;
+  const s = ls.get(SNAP_KEY, null); if(!s || typeof s !== 'object') return;
+  try{
+    if(s.live) S.live = { ...clone(DEF_LIVE), ...s.live, timer:{ ...DEF_LIVE.timer, ...(s.live.timer || {}) }, cfg:{ ...DEF_CFG, ...(s.live.cfg || {}) }, rev:0 };
+    if(s.qs && Array.isArray(s.qs)) S.qs = { list:s.qs.map(normQ), rev:0 };
+    if(s.seats) S.seats = { ...S.seats, ...s.seats, rev:0 };
+    if(s.banner) S.banner = { ...S.banner, ...s.banner, items:asList(s.banner.items).map(normBI), rev:0 };
+    if(s.bimg) S.bimg = { img:s.bimg, rev:0 };
+    if(s.logos) S.logos = s.logos;
+    if(s.marks) S.marks = s.marks;
+    if(s.assign) S.assign = s.assign;
+    if(Array.isArray(s.favs)) S.favs = s.favs;
+    if(Array.isArray(s.awards)) S.awards = s.awards;
+    lastAnnId = S.live.ann ? S.live.ann.id : '-';
+  }catch(e){}
+}
+let snapT = 0;
+function saveSnapSoon(){
+  if(DEMO || !DB) return;
+  clearTimeout(snapT);
+  snapT = setTimeout(() => {
+    const o = { at:now(), live:S.live, seats:S.seats, banner:S.banner, marks:S.marks, assign:S.assign, favs:S.favs, awards:S.awards };
+    if(ME.master || ME.staff) o.qs = S.qs.list;
+    // 이미지는 크면 빼고 저장 (브라우저 저장 공간이 작음)
+    if(S.bimg.img && S.bimg.img.length < 900000) o.bimg = S.bimg.img;
+    const lg = Object.values(S.logos).reduce((n, v) => n + v.length, 0); if(lg && lg < 1200000) o.logos = S.logos;
+    try{ localStorage.setItem('gb1_' + SNAP_KEY, JSON.stringify(o)); }
+    catch(e){ try{ delete o.bimg; delete o.logos; localStorage.setItem('gb1_' + SNAP_KEY, JSON.stringify(o)); }catch(x){} }
+  }, 1500);
+}
+
 /* ===================== 시작 ===================== */
 async function boot(){
+  loadSnap();
   observeStages(); route(); paintInstall();
   if(DEMO) $$('.demo-note').forEach(x => x.hidden = false);
   try{ DB = DEMO ? demoDB() : await firebaseDB(); }

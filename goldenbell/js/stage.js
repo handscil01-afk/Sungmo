@@ -204,6 +204,8 @@ const RO = ('ResizeObserver' in window) ? new ResizeObserver(es => es.forEach(e 
 function observeStages(){ $$('.stage-wrap').forEach(w => RO && RO.observe(w)); }
 window.addEventListener('resize', () => $$('.stage-wrap').forEach(fitStage));
 document.addEventListener('fullscreenchange', () => $$('.stage-wrap').forEach(fitStage));
+// 글꼴은 뒤에서 받으므로, 다 받으면 글자 크기를 다시 맞춤
+if(document.fonts){ document.fonts.addEventListener('loadingdone', () => $$('.stage-wrap').forEach(fitStage)); document.fonts.ready.then(() => $$('.stage-wrap').forEach(fitStage)).catch(() => {}); }
 
 /* ---------- 타이머 · 시간 끝 소리 · 방송 문구 시간 ---------- */
 let lastCeil = null, lastAnn = '', lastAnnId = '';
