@@ -502,6 +502,28 @@ const PORT = 8766;
     const a = await audit('2'), g = await audit('1');
     console.log(`접근성 점검: 소리와 글 ${a}개 화면, 그림 ${g}개 화면`);
   }
+  // 경기가 끝났다는 표시는 그 결과에서 경기가 끝났을 때만: 육성·건너뛰기에서 내 타석 뒤에 경기가 끝까지 진행되어도 내 타석에 "끝내기!"를 붙이지 않음
+  {
+    const ctx = await browser.newContext({ viewport:{ width:1024, height:768 } });
+    const page = await ctx.newPage();
+    page.on('pageerror', e => errors.push(`끝내기 표시 시험: ${e.message}`));
+    await page.goto(`http://localhost:${PORT}/baseball/`); await page.waitForSelector('#opts .opt'); await page.keyboard.press('1');
+    const r = await page.evaluate(() => {
+      let found = null;
+      for(let n = 0; n < 300 && !found; n++){
+        G = newGame({ mode:'detail', innings:3, teams:[TEAMS[n % 10].key, TEAMS[(n + 3) % 10].key], ctrl:['cpu', 'cpu'], easy:1, seed:9100 + n }); flush(G);
+        let g = 0, last; while(!G.over && g++ < 3000) last = G.review ? resolveReview(G, false) : playStep(G, aiDefChoice(G), aiOffChoice(G));
+        if(G.walkoff && !last.events.some(e => e.k === 'pa' && e.r === 'hr')) found = last;
+      }
+      const mine = [{ k:'pitch' }, { k:'contact', big:false }, { k:'pa', r:'b1' }];   // 건너뛰기 전에 내가 한 타석의 사건 (경기 끝 사건 없음)
+      return { over: G.over, walkoff: G.walkoff, mine: bannerOf(mine), end: bannerOf(found.events), none: bannerOf([{ k:'pa', r:'out' }]) };
+    });
+    if(!r.over || !r.walkoff) errors.push('끝내기 표시 시험: 시험용 끝내기 경기를 만들지 못함');
+    if(!r.mine || r.mine[0] !== '안타!') errors.push('끝내기 표시 시험: 경기가 이미 끝난 상태에서 내 타석 결과가 안타가 아닌 글씨로 나옴 ' + JSON.stringify(r.mine));
+    if(!r.end || r.end[0] !== '끝내기!') errors.push('끝내기 표시 시험: 끝내기 결과에 끝내기 글씨가 없음 ' + JSON.stringify(r.end));
+    console.log('끝내기 표시 시험:', JSON.stringify({ 내타석: r.mine && r.mine[0], 마지막타석: r.end && r.end[0] }));
+    await ctx.close();
+  }
   await browser.close(); srv.kill();
   if(errors.length){ console.log('오류:\n' + [...new Set(errors)].join('\n')); process.exit(1); }
   console.log('오류 없음');

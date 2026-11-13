@@ -103,7 +103,7 @@ function careerStatus(L){
   out.push(isPit(p) ? `능력치: 구속 ${p.vel}, 제구 ${p.ctl}, 구위 ${p.stf}, 체력 ${p.sta}. 컨디션 ${COND[p.cond]}.` : `능력치: 컨택 ${p.con}, 파워 ${p.pow}, 선구안 ${p.eye}, 스피드 ${p.spd}, 수비 ${p.def}. 컨디션 ${COND[p.cond]}.`);
   const s = p.ss || {}, m = c.minor || {};
   if(c.where !== 'minor') out.push(isPit(p) ? `이번 시즌 1군: ${pitLine(p).replace(/^[^:]+: /, '')}` : `이번 시즌 1군: ${batLine(p).replace(/^[^:]+: /, '')}`);
-  if(m.g) out.push(isPit(p) ? `퓨처스리그: ${m.g}경기 ${m.w || 0}승, ${ipText(m.out || 0)}, 평균자책점 ${m.out ? (m.r * 27 / m.out).toFixed(2) : '-'}.` : `퓨처스리그: ${m.g}경기 타율 ${avgText(m.ab ? m.h / m.ab : 0)}, 홈런 ${m.hr || 0}.`);
+  if(m.g) out.push(isPit(p) ? `퓨처스리그: ${m.g}경기 ${m.w || 0}승, ${ipText(m.out || 0)}, 평균자책점 ${m.out ? (Math.max(0, m.r - (m.ur || 0)) * 27 / m.out).toFixed(2) : '-'}.` : `퓨처스리그: ${m.g}경기 타율 ${avgText(m.ab ? m.h / m.ab : 0)}, 홈런 ${m.hr || 0}.`);
   life(L); out.push(`연봉 ${won(c.salary)}${c.contract ? ` (계약 ${Math.max(0, c.contract.until - L.season + 1)}시즌 남음)` : ''}, 가진 돈 ${won(c.money)}. 피로 ${fatigueWord(c)}. 장비: ${equipText(L)}.`);
   if(L.phase === 'season') out.push(`${L.season}시즌 ${L.day + 1}일째. 팀은 ${myRank(L).rank}위, ${T.w}승 ${T.l}패.`);
   else if(L.phase === 'post') out.push(seriesText(L));
@@ -251,7 +251,7 @@ function careerGrowFromGame(L, G, minor){
   }
   out.push(...gameBonus(L, ln, G, minor));
   addFatigue(c, minor ? 3 : 5); out.push(...wearGear(L, minor ? 1 : 2));
-  if(minor){ const mm = c.minor; mm.g = (mm.g || 0) + 1; ['ab', 'h', 'hr', 'out', 'r'].forEach(k => { mm[k] = (mm[k] || 0) + (s[k] || 0); }); if((G.decision || {}).w === c.id) mm.w = (mm.w || 0) + 1; }
+  if(minor){ const mm = c.minor; mm.g = (mm.g || 0) + 1; ['ab', 'h', 'hr', 'out', 'r', 'ur'].forEach(k => { mm[k] = (mm[k] || 0) + (s[k] || 0); }); if((G.decision || {}).w === c.id) mm.w = (mm.w || 0) + 1; }
   return out;
 }
 // 인터뷰: 잘한 날 가끔 (인기가 오름)

@@ -577,7 +577,7 @@ function drawCard(A){
   ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 32, 256, 192);
   R(10, y0, 236, 120, '#000'); R(10, y0, 236, 2, PAL.ink); R(10, y0 + 118, 236, 2, PAL.ink);
   // 제목
-  if(A.mode === 'end') banner(G.walkoff ? '끝내기!' : '게임 셋!', y0 - 2, PAL.ink, 18);
+  if(A.mode === 'end') banner(A.walkoff ? '끝내기!' : '게임 셋!', y0 - 2, PAL.ink, 18);
   else pxText(A.mode === 'skip' ? '▶▶ 내 차례까지 넘어감' : '공수 교대', 128, y0 + 6, PAL.ink, 16);
   // 이닝별 점수: 마지막 9이닝까지, 그리고 R(점수)·H(안타)
   const n = Math.max(G.innings, G.inning), first = Math.max(1, n - 8), cols = n - first + 1;
@@ -601,7 +601,9 @@ function drawCard(A){
 // 결과 글씨: 이번 결과의 사건 목록(engine.js의 ev)으로 정함. 문장을 읽지 않음
 function bannerOf(evs){
   const pa = r => evs.some(e => e.k === 'pa' && e.r === r), call = c => evs.some(e => e.k === 'call' && e.c === c), pl = evs.find(e => e.k === 'play');
-  if(G && G.over) return [G.walkoff ? '끝내기!' : '게임 셋!', PAL.ink, pa('hr')];
+  // 경기가 끝났다는 글씨는 이 결과에 경기 끝 사건이 들어 있을 때만 (육성 건너뛰기처럼 내 타석 뒤에 경기가 끝까지 진행된 경우, 내 타석에 끝내기·게임 셋을 붙이지 않음). 끝내기는 득점으로 이겨 끝날 때만
+  const gend = evs.find(e => e.k === 'game' && e.e === 'end');
+  if(gend) return [gend.walkoff ? '끝내기!' : '게임 셋!', PAL.ink, pa('hr')];
   if(pa('hr')) return ['홈런!', PAL.red, true];
   if(pl && pl.kind === 'err') return ['실책!', PAL.red];
   if(pl && pl.kind === 'dp') return ['병살!', '#3cbcfc'];
@@ -624,7 +626,7 @@ function gfxStart(G, fx, lines, pre, skip, evs){
   const list = [];
   if(newPitch){
     document.documentElement.classList.add('gfxhold');   // 결과 글은 공을 잡거나 떨어질 때 보여 줌
-    if(G.over) document.documentElement.classList.add('gfxholdall');   // 마지막 공: 잡히기 전에는 '경기가 끝났습니다'와 선택지도 숨김
+    if(evs.some(e => e.k === 'game' && e.e === 'end')) document.documentElement.classList.add('gfxholdall');   // 마지막 공: 잡히기 전에는 '경기가 끝났습니다'와 선택지도 숨김
     // 도루·견제의 세이프·아웃은 뒤의 베이스 장면에서 보여 줌
     const pfx = newPlay && A0.res !== 'inplay' ? evs.filter(e => !(e.k === 'pa' && (e.r === 'safe' || e.r === 'out'))) : evs;
     let bn = bannerOf(pfx);
@@ -640,7 +642,7 @@ function gfxStart(G, fx, lines, pre, skip, evs){
   }
   if(skip){ list.push({ kind:'card', mode:'skip', from: skip.from }); }
   // 공수 교대·경기 끝: 이닝별 점수판 카드를 이어서 보여 줌
-  else if(G.over && GX.overShown !== G.at){ GX.overShown = G.at; list.push({ kind:'card', mode:'end' }); }
+  else if(evs.some(e => e.k === 'game' && e.e === 'end') && GX.overShown !== G.at){ GX.overShown = G.at; list.push({ kind:'card', mode:'end', walkoff: !!evs.find(e => e.k === 'game' && e.e === 'end').walkoff }); }
   else if(evs.some(e => e.k === 'inning')) list.push({ kind:'card', mode:'change' });
   if(!list.length){ const bn = bannerOf(evs); if(bn) list.push({ kind:'banner', ph:'result', t0:1, banner: bn[0], bannerColor: bn[1], hr: bn[2] }); }
   if(!list.length) return;

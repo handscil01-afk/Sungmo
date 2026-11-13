@@ -15,11 +15,12 @@ function run(mode, unit, easy){
     const keys = TEAMS.map(t => t.key), K = keys.length, a = n % K, h = (a + 1 + (n >> 4) % (K - 1)) % K;
     const G = newGame({ mode, innings:9, teams:[keys[a], keys[h]], ctrl:['cpu', 'cpu'], unit, easy, seed: 1000 + n });
     flush(G);
-    let guard = 0, evRuns = 0, evHalves = 0;
+    let guard = 0, evRuns = 0, evHalves = 0, lastEv = [];
     while(!G.over){
       if(++guard > 5000) throw new Error('끝나지 않는 경기 ' + n);
       const res = G.review ? resolveReview(G, aiChallenge(G)) : playStep(G, aiDefChoice(G), aiOffChoice(G));
       // 사건 목록 확인: 모든 사건에 종류가 있고, 득점 사건·이닝 기록이 실제 점수와 맞아야 함
+      lastEv = res.events || [];
       (res.events || []).forEach(e => { if(!e || !e.k) throw new Error('종류 없는 사건 ' + JSON.stringify(e)); if(e.k === 'score') evRuns += e.n; if(e.k === 'inning') evHalves++; });
       // 규칙 확인
       const on = G.bases.filter(x => x != null);
@@ -29,6 +30,9 @@ function run(mode, unit, easy){
       G.log.forEach(l => { if(/undefined|NaN|null/.test(l.s)) throw new Error('문장 이상: ' + l.s); });
     }
     G.log.forEach(l => TXT.update(l.k + l.s + '\n'));
+    // 끝내기 규칙: 홈런이 아닌 끝내기는 결승점이 들어오는 순간 끝나므로 최종 점수 차가 정확히 1점. 끝내기가 아닌데 말 마지막 이닝에 홈이 이겨 끝날 수는 없음
+    if(G.walkoff){ const lead = runsOf(G.teams[1]) - runsOf(G.teams[0]), hr = lastEv.some(e => e.k === 'pa' && e.r === 'hr'); if(!(lead === 1 || hr)) throw new Error(`끝내기 점수 차 ${lead}점 (경기 ${n}, ${mode}): 결승점 뒤의 득점이 인정됨. 마지막 사건 ${JSON.stringify(lastEv.filter(e => e.k !== 'fx').map(e => e.k + (e.kind || e.r || e.c || '')))} 마지막 글 ${G.log.filter(l => l.k === 'r').slice(-2).map(l => l.s).join(' | ')}`); if(lead < 1) throw new Error('끝내기인데 홈이 앞서지 않음'); }
+    G.teams.forEach(T => T.pit.forEach(P => { if((P.st.ur || 0) > P.st.r) throw new Error(`비자책점 ${P.st.ur} > 실점 ${P.st.r} (경기 ${n})`); }));
     const totRuns = G.teams.reduce((n, T) => n + runsOf(T), 0), logRuns = (G.inningLog || []).reduce((n, h) => n + h.runs, 0);
     if(evRuns !== totRuns) throw new Error(`득점 사건 ${evRuns}점 ≠ 실제 ${totRuns}점 (경기 ${n})`);
     if(logRuns !== totRuns) throw new Error(`이닝 기록 득점 ${logRuns}점 ≠ 실제 ${totRuns}점 (경기 ${n})`);

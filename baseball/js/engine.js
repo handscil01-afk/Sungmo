@@ -301,7 +301,7 @@ function endPA(G, keep){
 }
 // 이닝 기록(inningLog): 초·말마다 득점·안타·볼넷·실책·삼진·병살·잔루를 쌓아, 이닝 끝 중계가 맥락(삼자범퇴인지, 실점했는지)을 보고 말하게 함
 const teamKs = T => T.pit.reduce((s, p) => s + p.st.k, 0);
-function halfBegin(G){ const T = batTeam(G), F = fieldTeam(G); G.hs = { H:T.H, BB:T.BB, E:F.E, K:teamKs(F), dp:0 }; }
+function halfBegin(G){ const T = batTeam(G), F = fieldTeam(G); G.errOn = []; G.hs = { H:T.H, BB:T.BB, E:F.E, K:teamKs(F), dp:0 }; }
 function halfEnd(G){
   const T = batTeam(G), F = fieldTeam(G), hs = G.hs || { H:0, BB:0, E:0, K:0, dp:0 };
   const e = { inning:G.inning, top:G.top, runs:T.R[G.inning - 1] || 0, hits:T.H - hs.H, walks:T.BB - hs.BB, errors:F.E - hs.E, ks:teamKs(F) - hs.K, dp:hs.dp, lob:G.bases.filter(x => x != null).length };
@@ -336,6 +336,7 @@ function endHalf(G){
   startPA(G);
 }
 function gameOver(G){
+  if(G.over) return;
   G.over = true;
   if(G.hs && !G.hs.done) halfEnd(G);   // 끝내기처럼 3아웃 없이 끝난 마지막 초·말도 이닝 기록에 넣음
   const [A, H] = G.teams, a = runsOf(A), h = runsOf(H);
@@ -386,7 +387,9 @@ function feat(G, kind, text, P, T){
 function scoreRuns(G, list, rbi){
   if(!list.length) return;
   const T = batTeam(G), B = curBatter(G), P = curPitcher(G);
-  list.forEach(i => { T.R[G.inning - 1] = (T.R[G.inning - 1] || 0) + 1; T.bat[i].st.r++; P.st.r++; if(rbi) B.st.rbi++; });
+  list.forEach(i => { T.R[G.inning - 1] = (T.R[G.inning - 1] || 0) + 1; T.bat[i].st.r++; P.st.r++; if(rbi) B.st.rbi++;
+    // 비자책점: 실책이 난 플레이에서 들어왔거나, 실책으로 나가 있던 주자가 들어온 점수는 평균자책점에 넣지 않음
+    if(G.curErr || (G.errOn || []).includes(i)) P.st.ur = (P.st.ur || 0) + 1; });
   const names = list.map(i => T.bat[i].name).join(', ');
   emit(G, `${names} 홈인! ${list.length > 1 ? list.length + '점' : '1점'}. ${scoreText(G)}.`, 'r');
   fx(G, 'score');
@@ -400,6 +403,8 @@ function scoreRuns(G, list, rbi){
     else G.dec = null;
     G.leader = leader;
   }
+  // 끝내기: 승부를 가르는 점수가 들어오는 순간 경기가 끝남 (타석 도중의 폭투·포일·도루·견제 실책으로 난 점수도 마찬가지)
+  if(G.walkoff && !G.over) gameOver(G);
 }
 const leadFor = (G, ti) => runsOf(G.teams[ti]) - runsOf(G.teams[1 - ti]);
 function addOut(G, n = 1){ G.outs += n; curPitcher(G).st.out += n; }
@@ -757,7 +762,7 @@ function playPitch(G, Psel, Bsel){
       }
       emit(G, `${head} ${why} ${close}${pickSay(G, SAY.ball)} ${countText(G)}.${tail}`, 'p');
       const lb = looseBall(G, x, y, breaking, false);
-      if(lb){ emit(G, lb.text, 'r'); fx(G, lb.outs ? 'out' : 'safe'); scoreRuns(G, lb.sc, false); if(G.outs >= 3) return 'end3'; }
+      if(lb){ emit(G, lb.text, 'r'); fx(G, lb.outs ? 'out' : 'safe'); scoreRuns(G, lb.sc, false); if(G.over) return 'end'; if(G.outs >= 3) return 'end3'; }
     }
     return 'go';
   };
@@ -809,14 +814,14 @@ function playPitch(G, Psel, Bsel){
         fx(G, 'k', lb.batSafe ? 'safe' : 'out'); scoreRuns(G, lb.sc, false);
         return end();
       }
-      if(lb){ emit(G, lb.text, 'r'); scoreRuns(G, lb.sc, false); }
+      if(lb){ emit(G, lb.text, 'r'); scoreRuns(G, lb.sc, false); if(G.over) return end(); }
       emit(G, `${head} ${pickSay(G, SAY.whiff[kk])} 삼진 아웃!${tail}`, 'r');
       B.st.ab++; B.st.k++; P.st.k++; addOut(G); fx(G, 'k');
       if(hr && G.outs < 3) doSteal(G, false, breaking);
       return end();
     }
     emit(G, `${head} ${pickSay(G, SAY.whiff[kk])} ${countText(G)}.${tail}`, 'p');
-    if(!hr){ const lb = looseBall(G, x, y, breaking, false); if(lb){ emit(G, lb.text, 'r'); fx(G, lb.outs ? 'out' : 'safe'); scoreRuns(G, lb.sc, false); if(G.outs >= 3){ endPA(G, true); return flush(G); } } }
+    if(!hr){ const lb = looseBall(G, x, y, breaking, false); if(lb){ emit(G, lb.text, 'r'); fx(G, lb.outs ? 'out' : 'safe'); scoreRuns(G, lb.sc, false); if(G.over) return flush(G); if(G.outs >= 3){ endPA(G, true); return flush(G); } } }
     if(hr){ doSteal(G, false, breaking, true); if(G.review) return flush(G); if(G.outs >= 3){ endPA(G, true); return flush(G); } }
     return flush(G);
   }
@@ -1063,7 +1068,7 @@ function describePlay(e){
       const wallW = e.wall ? '담장을 맞고 나오는 ' : '';
       const hb = e.hb || e.tried;
       const base = hb >= 3 ? `${wallW}타구가 ${dirW} 깊숙이 굴러갑니다. 3루까지! 3루타!` : hb === 2 ? `${wallW}타구가 ${dirW}를 가릅니다. 2루까지! 2루타!` : e.type === 'gb' ? `땅볼이 ${dirW === '가운데' ? '투수 옆을' : dirW === '왼쪽' ? '3루수와 유격수 사이를' : '1루수와 2루수 사이를'} 빠져나갑니다. 안타!` : `${ga(who)} 쫓아가지만 앞에 떨어집니다. 안타!`;
-      const extraN = !e.err && e.bat > hb ? e.bat : 0;
+      const extraN = !e.err && !e.walk && e.bat > hb ? e.bat : 0;
       return base + (extraN ? ` 다른 베이스로 송구가 가는 사이 타자 주자는 ${extraN}루까지 갑니다.` : '') + (e.bat === 0 ? ` 타자 주자는 한 베이스 더 노리다 아웃! ${outW()}` : '') + (e.err ? ' 송구가 빠지는 사이 한 베이스 더 갑니다!' : '');
     }
   }
@@ -1083,8 +1088,20 @@ function applyPlay(G, r, head, info = {}){
   });
   if(r.bat >= 1 && r.bat <= 3){ let b = r.bat - 1; while(b < 3 && nb[b] != null) b++; if(b < 3) nb[b] = T.bi; else scored.push(T.bi); }
   if(r.bat === 4) scored.push(T.bi);
+  // 끝내기 규칙: 말 마지막 이닝 이후에 이 플레이로 홈 팀이 앞서면, 결승점이 들어오는 순간 경기가 끝남.
+  // 그 뒤에 들어올 점수는 인정하지 않고, 타자의 안타는 결승 주자가 나아간 베이스 수까지만 인정함 (홈런은 모두 인정)
+  let walkCap = null;
+  if(!G.top && G.inning >= G.innings && r.kind !== 'hr' && scored.length){
+    const need = runsOf(G.teams[0]) - runsOf(G.teams[1]) + 1;   // 이길 때까지 필요한 득점
+    if(need >= 1 && scored.length >= need){
+      const order = scored.map(id => { const x = r.runners.find(y => G.bases[y.from] === id); return { id, t: x ? (x.t || 0) : 0, from: x ? x.from : -1 }; }).sort((a, b) => a.t - b.t);
+      scored.length = 0; order.slice(0, need).forEach(o => scored.push(o.id));
+      if(r.kind === 'hit' && order[need - 1].from >= 0) walkCap = 3 - order[need - 1].from;
+    }
+  }
   // 기록
-  const hitN = r.kind === 'hr' ? 4 : r.kind === 'hit' ? (r.hitBases || (r.batTried || r.bat || 1) - (r.bat === 0 ? 1 : 0)) : r.kind === 'ifh' ? 1 : 0;
+  let hitN = r.kind === 'hr' ? 4 : r.kind === 'hit' ? (r.hitBases || (r.batTried || r.bat || 1) - (r.bat === 0 ? 1 : 0)) : r.kind === 'ifh' ? 1 : 0;
+  if(walkCap != null && hitN > walkCap) hitN = walkCap;
   const sacBunt = r.bb && r.bb.bunt && r.kind === 'go' && r.runners.some(x => x.to > x.from);
   if(!(r.sac && r.outs === 1 && r.kind === 'fo') && !sacBunt) B.st.ab++;
   if(hitN > 0){
@@ -1097,7 +1114,7 @@ function applyPlay(G, r, head, info = {}){
   if(r.outs) addOut(G, r.outs);
   // 사건: 타구 하나의 결과를 구조로 남기고, 문장은 이 사건에서 만듦(describePlay). 중계·효과음·그림은 문장이 아니라 이 사건을 읽음
   const pe = { k:'play', kind:r.kind, pos:r.pos || null, who, dir:info.fi ?? 1, dirW, hitBases:hitN, outs:r.outs || 0, o:G.outs, bunt:!!(r.bb && r.bb.bunt), type: r.bb ? r.bb.type : null,
-    cover:r.cover || null, tgt:r.tgt, dive:!!r.dive, err: r.err ? (r.err.kind || 'misc') : null, tried:r.batTried || r.bat, hb:r.hitBases || 0, bat:r.bat, wall:!!r.wall, sac:!!r.sac,
+    cover:r.cover || null, tgt:r.tgt, dive:!!r.dive, err: r.err ? (r.err.kind || 'misc') : null, tried:r.batTried || r.bat, hb: walkCap != null && hitN === walkCap ? hitN : (r.hitBases || 0), walk: walkCap != null && hitN === walkCap, bat:r.bat, wall:!!r.wall, sac:!!r.sac,
     adv:r.runners.some(x => x.to > x.from), d:info.d, raw:info.raw, fence:info.fence, wind:info.wind, rm:scored.length };
   ev(G, pe);
   if(r.kind === 'dp' || r.kind === 'ldp') (G.hs || {}).dp++;
@@ -1108,9 +1125,11 @@ function applyPlay(G, r, head, info = {}){
   else if(r.err) fx(G, 'safe'); else fx(G, 'out');
   if(r.sac && r.kind === 'fo') emit(G, '3루 주자가 태그업해서 홈으로! 희생 플라이.', 'r');
   G.bases = nb;
+  if(r.err){ G.curErr = true; (G.errOn ||= []).push(T.bi); }   // 실책이 낀 플레이: 이 플레이에서 들어오는 점수와 실책으로 나간 타자가 나중에 들어오는 점수는 비자책
   // 3아웃이 된 플레이(포스 아웃·뜬공)에서는 득점이 인정되지 않음 (안타 뒤 주루사는 먼저 들어온 득점 인정)
   if(G.outs >= 3 && r.kind !== 'hit') scored.length = 0;
   scoreRuns(G, scored, !(r.kind === 'dp' || r.kind === 'err'));
+  G.curErr = false;
 }
 /* ---------- 타석 한 번 (간단 모드) ----------
    D(수비): 'attack' 정면 승부 · 'nibble' 유인구 승부 · 'ibb' 고의 볼넷

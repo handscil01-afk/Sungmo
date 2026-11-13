@@ -161,33 +161,38 @@ function castResult(res, opt = {}){
       fly.forEach((id, i) => { const d = castDur(id); if(i === 0 || used + d <= room){ fit.push(id); used += d; } });
       at(tl.contact, fit);
       const post = [], dpFallback = !pl && isE(evs, 'play', 'kind', 'dp');
+      let later = null;   // 나중에(타자 주자가 도착할 때) 말할 것
+      // 안타 말: 땅볼이 빠져나간 안타에는 "떨어집니다"를, 뜬 타구에는 "내야를 빠져나갑니다"를 쓰지 않음
+      const hitWord = () => bb.type === 'gb' ? pick1('r_hit2', 'r_hit3', 'r_hit4', 'r_hit5', 'r_hit6') : pick1('r_hit1', 'r_hit3', 'r_hit4', 'r_hit5');
       const pk = pl ? pl.kind : ps ? ps.kind : (dpFallback ? 'dp' : '');
       if(pl && pl.outs >= 3) post.push('r_tp');   // 삼중살
       else if(pk === 'dp' || pk === 'ldp') post.push(pick1('r_dp', 'r_dp2'));
       else if(pk === 'err') post.push(pl && pl.err === 'throw' ? 'r_error2' : 'r_error1');
       else if(has('hr')){ const on = ps ? (ps.rm || []).filter(m => m.to === 3).length : 0;
-        post.push(G.walkoff && CAST.idx && CAST.idx.r_walkoff_hr ? 'r_walkoff_hr' : on >= 3 ? 'r_hr_grand' : pick1('r_hr1', 'r_hr2', 'r_hr3', 'r_hr4', 'r_hr5', 'r_hr6'));
+        post.push(isE(evs, 'score', 'walkoff', true) && CAST.idx && CAST.idx.r_walkoff_hr ? 'r_walkoff_hr' : on >= 3 ? 'r_hr_grand' : pick1('r_hr1', 'r_hr2', 'r_hr3', 'r_hr4', 'r_hr5', 'r_hr6'));
         if(on === 1 || on === 2) post.push(CAST.idx && CAST.idx[on === 1 ? 'r_hr_two' : 'r_hr_three'] ? (on === 1 ? 'r_hr_two' : 'r_hr_three') : null);
-        if(on >= 3 || G.walkoff || isE(evs, 'score', 'lc', true)) post.push(pick1('r_wow1', 'r_wow2', 'r_wow3')); }
-      else if(has('b3')) post.push(pick1('r_triple', 'r_triple2'));
-      else if(has('b2')) post.push(pick1('r_double', 'r_double2'));
-      else if(has('hit')) post.push(dive && !caught ? 'r_sigh2' : null, pick1('r_hit1', 'r_hit2', 'r_hit3', 'r_hit4', 'r_hit5', 'r_hit6'));
+        if(on >= 3 || isE(evs, 'score', 'walkoff', true) || isE(evs, 'score', 'lc', true)) post.push(pick1('r_wow1', 'r_wow2', 'r_wow3')); }
+      // 2루타·3루타는 공이 떨어질 때 "안타!"까지만 말하고, 타자 주자가 그 베이스에 닿는 순간에 "2루타!"·"3루타!"를 말함 (치자마자 알 수 없으므로)
+      else if(has('b3') || has('b2')){ later = has('b3') ? pick1('r_triple', 'r_triple2') : pl && pl.wall ? pick1('r_double', 'r_double2') : 'r_double2';   // "펜스까지 굴러갑니다"는 담장을 맞고 나온 타구일 때만
+        post.push(dive && !caught ? 'r_sigh2' : null, hitWord()); }
+      else if(has('hit')) post.push(dive && !caught ? 'r_sigh2' : null, hitWord());
       else if(has('out')){
         // 누가 잡았는지(녹음 pos_<포지션>_c)와 어디로 던지는지(thr_<베이스>): 녹음이 있을 때만 말함
         if(pl && pl.pos && CAST.idx && CAST.idx[`pos_${pl.pos}_c`]) post.push(`pos_${pl.pos}_c`);
         if(pl && pl.kind === 'go' && pl.tgt != null && CAST.idx && CAST.idx[`thr_${pl.tgt}`]) post.push(`thr_${pl.tgt}`);
-        if(bb.type === 'gb') post.push(pick1('r_groundout1', 'r_groundout2', 'r_groundout3'));
+        if(bb.type === 'gb') post.push(pl && pl.kind !== 'go' ? pick1('r_groundout2', 'r_groundout3') : pick1('r_groundout1', 'r_groundout2', 'r_groundout3'));   // "1루에서 아웃"은 타자가 1루에서 아웃될 때만 (선행 주자를 2루·3루·홈에서 잡았을 때는 아님)
         else if(caught && (caught.dive || caught.far)) post.push(pick1('r_supercatch1', 'r_supercatch2', 'r_supercatch3'));
-        else post.push(Math.random() < 0.25 ? 'r_out_sad' : pick1('r_catch1', 'r_catch2', 'r_catch3', 'r_catch4'));
+        else post.push(Math.random() < 0.25 ? 'r_out_sad' : bb.type === 'ld' ? pick1('r_catch1', 'r_catch2', 'r_catch3') : pick1('r_catch1', 'r_catch2', 'r_catch3', 'r_catch4'));   // "평범한 뜬공"은 직선타에는 쓰지 않음
       }
       else if(has('safe')) post.push(pick1('r_safe1', 'r_safe2', 'r_safe3'));
       if(isHit && hitT != null){
         resAt = tl.contact + hitT; hitAt = resAt; at(resAt, post);
+        if(later) at(Math.max(resAt + 0.35, tl.contact + (ps.runT || hitT + 1)), later);   // 타자 주자가 2루·3루에 닿는 순간
         // 그 뒤 베이스 승부: 홈에서 세이프면 득점, 아웃이면 "아웃! 잡아냅니다", 그 밖의 세이프는 "세이프!"
         (ps.call || []).filter(c => c.base != null && !c.catch && c.t > hitT + 0.2 && !(c.base === 0 && !c.out)).sort((a, b) => a.t - b.t)
           .forEach(c => at(tl.contact + c.t, c.out ? 'r_steal_out' : c.base === 3 ? pick1('r_score1', 'r_score2', 'r_score3', 'r_score4') : pick1('r_safe1', 'r_safe3')));
         CAST.scoreSaid = (ps.call || []).some(c => c.base === 3 && !c.out && c.t > hitT + 0.2);
-      } else { resAt = tl.result; at(resAt, post); }
+      } else { resAt = tl.result; at(resAt, post, later); }
     } else {
       // 공이 미트에 들어가는(또는 방망이가 헛도는) 순간 판정, 이어서 볼카운트
       resAt = tl.contact;
@@ -199,7 +204,8 @@ function castResult(res, opt = {}){
       else if(has('ball')) call.push(pick1('r_walk', 'r_walk2'));
       else if(has('strike')) call.push(pick1('r_strike1', 'r_strike2', 'r_strike3', 'r_strike4'));
       else if(has('ballc')) call.push(pick1('r_ball1', 'r_ball2', 'r_ball3', 'r_ball4', 'r_ball5'));
-      const endPA = has('batter') || has('change') || G.over || has('k') || has('ball');
+      const gameEnd = evAll.find(e => e.k === 'game' && e.e === 'end');
+      const endPA = has('batter') || has('change') || !!gameEnd || has('k') || has('ball');
       // 몰린 카운트: 투 스트라이크(타자)·쓰리 볼(투수)이 되는 공에서 가끔 한마디
       if(!endPA && has('strike') && G.strikes === 2 && Math.random() < 0.35) call.push('c_twostrike');
       if(!endPA && has('ballc') && G.balls === 3 && Math.random() < 0.35) call.push('c_threeball');
@@ -261,8 +267,9 @@ function castResult(res, opt = {}){
   // 끝·공수 교대·새 타자 안내 (앞 중계가 끝난 뒤). 육성처럼 바로 건너뛸 때는 빼고, 건너뛴 뒤 지금 상황을 따로 말함(castSkip)
   const after = [];
   if(!opt.noAfter){
-  if(G.over){
-    after.push(G.walkoff ? pick1('r_walkoff', 'r_walkoff2') : 'end', 'j_score', teamClip(G.teams[0]), numClip(runsOf(G.teams[0])), 'j_vs', numClip(runsOf(G.teams[1])), teamClip(G.teams[1]));
+  const gameEnd = evAll.find(e => e.k === 'game' && e.e === 'end');   // 경기가 끝났다는 말은 이 결과에 경기 끝 사건이 있을 때만
+  if(gameEnd){
+    after.push(gameEnd.walkoff ? pick1('r_walkoff', 'r_walkoff2') : 'end', 'j_score', teamClip(G.teams[0]), numClip(runsOf(G.teams[0])), 'j_vs', numClip(runsOf(G.teams[1])), teamClip(G.teams[1]));
     const w = runsOf(G.teams[0]) === runsOf(G.teams[1]) ? -1 : runsOf(G.teams[0]) > runsOf(G.teams[1]) ? 0 : 1;
     if(w >= 0 && CAST.idx && CAST.idx.c_winner) after.push('c_winner', teamClip(G.teams[w], true));
     after.push(ana(1, 'a_bye', 'a_end1'), CAST.idx && CAST.idx.c_thanks ? 'c_thanks' : null);
@@ -322,7 +329,8 @@ function situationClips(count){
 function castSkip(){
   if(!castOn() || !G) return 0;
   castLoadIndex();
-  const ids = G.over ? [G.walkoff ? 'r_walkoff' : 'end', 'j_score', teamClip(G.teams[0]), numClip(runsOf(G.teams[0])), 'j_vs', numClip(runsOf(G.teams[1])), teamClip(G.teams[1])] : situationClips(true);
+  // 건너뛴 사이에 경기가 끝났어도 "끝내기!"처럼 마지막 장면을 외치지 않음(내가 한 타석이 마지막이 아니었으므로). 끝났다는 사실과 점수만 말함
+  const ids = G.over ? ['end', 'j_score', teamClip(G.teams[0]), numClip(runsOf(G.teams[0])), 'j_vs', numClip(runsOf(G.teams[1])), teamClip(G.teams[1])] : situationClips(true);
   castSeen();
   return castPlay(ids, 0.3);
 }

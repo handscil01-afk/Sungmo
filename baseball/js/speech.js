@@ -244,7 +244,8 @@ function crowdSync(){
 }
 ['pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => setTimeout(crowdSync, 50), { capture:true }));
 document.addEventListener('visibilitychange', () => crowdSync());
-function playFx(list){
+// vibMs: 진동을 미룰 시간(ms). 결과가 정해지는 순간(공이 닿거나 타자가 베이스에 닿는 때)에 울리게 하려고 결과를 기다리는 시간만큼 미룸
+function playFx(list, vibMs = 0){
   if(!list || !list.length) return;
   const uniq = [...new Set(list)];
   if(SET.snd){
@@ -260,6 +261,6 @@ function playFx(list){
   if(SET.vib && navigator.vibrate){
     const vn = uniq.map(n => /^whiff-/.test(n) ? 'strike' : n);   // 헛스윙도 스트라이크
     const top = FX_RANK.find(n => vn.includes(n) && VIB[n]);
-    if(top) try{ navigator.vibrate(VIB[top]); }catch(e){}
+    if(top){ const buzz = () => { try{ navigator.vibrate(VIB[top]); }catch(e){} }; if(vibMs > 0) setTimeout(buzz, vibMs); else buzz(); }
   }
 }

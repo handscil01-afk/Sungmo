@@ -124,7 +124,7 @@ function leagueApply(L, G, post){
       if(!used.has(p.id)){ if(P.role !== '선발'){ P.streak = 0; P.rest = 0; } return; }
       const s = P[key] ||= {};
       addTo(s, 'g', 1); if(p.gs) addTo(s, 'gs', 1);
-      ['out', 'h', 'r', 'bb', 'k', 'hr'].forEach(k => addTo(s, k, p.st[k]));
+      ['out', 'h', 'r', 'ur', 'bb', 'k', 'hr'].forEach(k => addTo(s, k, p.st[k]));
       if(!post) milestone(L, P, T, { w: dec.w === p.id ? 1 : 0, sv: dec.s === p.id ? 1 : 0, k: p.st.k });
       if(dec.w === p.id) addTo(s, 'w', 1);
       if(dec.l === p.id) addTo(s, 'l', 1);
@@ -239,7 +239,7 @@ function seriesResult(L, g, G){
 /* ---------- 시상 ---------- */
 const ipText = out => `${Math.floor(out / 3)}${out % 3 ? ` ${out % 3}/3` : ''}이닝`;
 const avgOf = s => s && s.ab ? s.h / s.ab : 0;
-const eraOf = s => s && s.out ? s.r * 27 / s.out : 99;
+const eraOf = s => s && s.out ? Math.max(0, s.r - (s.ur || 0)) * 27 / s.out : 99;   // 평균자책점 = 자책점(실점 − 비자책점) × 9이닝 ÷ 이닝
 // 타율 0.312를 "3할 1푼 2리"로
 function avgText(v){
   const m = Math.round(v * 1000); if(m >= 1000) return '10할';

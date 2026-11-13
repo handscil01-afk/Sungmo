@@ -158,6 +158,44 @@ const innErrs = [], seenCat = {};
   console.log(`새 녹음 연결 시험: ${Object.keys(seen2).join(', ')} 확인`);
   function seenCat2(k){ seen2[k] = 1; }
 }
+// ---- 2루타·3루타는 타자 주자가 그 베이스에 닿은 뒤에 말하는지, 경기 끝 외침은 경기가 그 결과에서 끝날 때만 하는지 ----
+{
+  const seenX = {};
+  for(let gs = 300; gs < 340; gs++){
+    const G = newGame({ mode:'detail', innings:3, teams:[TEAMS[gs % 10].key, TEAMS[(gs + 2) % 10].key], ctrl:['cpu', 'cpu'], easy:1, seed: 2300 + gs });
+    globalThis.G = G; CAST.until = 0; CAST.last = {}; CAST.score = null;
+    flush(G); let guard = 0;
+    while(!G.over && guard++ < 2500){
+      const res = G.review ? resolveReview(G, aiChallenge(G)) : playStep(G, aiDefChoice(G), aiOffChoice(G));
+      const evs = res.events || [], pa = r => evs.some(e => e.k === 'pa' && e.r === r);
+      played.length = 0; seedRandom(gs * 17 + guard); castResult(res);
+      const A = G.anim, ps = A && A.bb && A.bb.ps, tl = ps ? playTL(A, evs) : null;
+      const base = p => p[1].replace(/-\d+$/, '');
+      const xbh = played.filter(p => /^r_(double|triple)2?$/.test(base(p))), hit = played.filter(p => /^r_hit\d$/.test(base(p)));
+      if(ps && (pa('b2') || pa('b3')) && ps.runT){
+        seenX.xbh = 1;
+        xbh.forEach(x => { if(x[0] < tl.contact + ps.runT - 0.01) innErrs.push(`${gs}번 경기: ${base(x)}를 타자 주자가 도착하기 전(${x[0]}초 < ${(tl.contact + ps.runT).toFixed(2)}초)에 말함`); });
+        if(xbh.length && hit.length && xbh[0][0] < hit[0][0]) innErrs.push(`${gs}번 경기: 안타 말보다 장타 말이 먼저`);
+        if(xbh.length) seenX.said = 1;
+      }
+      if(!(pa('b2') || pa('b3')) && xbh.length) innErrs.push(`${gs}번 경기: 장타가 아닌데 2루타·3루타를 말함`);
+      const endsNow = evs.some(e => e.k === 'game' && e.e === 'end'), walk = evs.some(e => e.k === 'game' && e.walkoff);
+      if(played.some(p => /^r_walkoff/.test(base(p))) && !walk) innErrs.push(`${gs}번 경기: 끝내기가 아닌데 끝내기를 외침`);
+      if(played.some(p => base(p) === 'end') && !endsNow) innErrs.push(`${gs}번 경기: 경기가 이 결과에서 끝나지 않았는데 끝났다고 말함`);
+      // 말이 실제 상황과 맞는지: 1루에서 아웃은 타자가 1루에서 아웃일 때만, "떨어집니다"는 땅볼 안타에 쓰지 않음 등
+      const plE = evs.find(e => e.k === 'play'), typ = A && A.bb && A.bb.type, has1 = id => played.some(p => base(p) === id);
+      if(has1('r_groundout1') && !(plE && plE.kind === 'go')) innErrs.push(`${gs}번 경기: 타자가 1루에서 아웃이 아닌데 "1루에서 아웃"`);
+      if(has1('r_hit6') && typ !== 'gb') innErrs.push(`${gs}번 경기: 땅볼이 아닌데 "내야를 빠져나갑니다"`);
+      if(has1('r_hit1') && typ === 'gb') innErrs.push(`${gs}번 경기: 땅볼 안타에 "떨어집니다"`);
+      if(played.some(p => base(p) === 'r_double') && !(plE && plE.wall)) innErrs.push(`${gs}번 경기: 담장을 맞지 않았는데 "펜스까지 굴러갑니다"`);
+      if(has1('r_catch4') && typ === 'ld') innErrs.push(`${gs}번 경기: 직선타에 "평범한 뜬공"`);
+      if(has1('r_groundout1') || has1('r_hit6') || has1('r_catch4')) seenX.rules = 1;
+      if(walk) seenX.walk = 1;
+    }
+  }
+  ['xbh', 'said', 'walk', 'rules'].forEach(k => { if(!seenX[k]) innErrs.push(`장타·끝내기 시험: ${k} 경우가 한 번도 나오지 않음`); });
+  console.log(`장타·끝내기 시험: ${Object.keys(seenX).join(', ')} 확인`);
+}
 console.log(`이닝 끝 맥락 시험: ${Object.keys(seenCat).join(', ')} 확인, 어긋남 ${innErrs.length}건`);
 
 // ---- 점검: 스냅샷과 별개로 늘 지켜야 하는 것 ----
