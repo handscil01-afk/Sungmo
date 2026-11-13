@@ -182,7 +182,7 @@ function stageHTML(mode, opt){
 const stageCache = new WeakMap();
 function paintStage(wrap, mode, opt){
   if(!wrap) return;
-  const html = `<div class="stage">${stageHTML(mode, opt)}</div>`;
+  const html = `<div class="stage${S.live.theme === 'day' ? ' day' : ''}">${stageHTML(mode, opt)}</div>`;
   if(stageCache.get(wrap) === html){ fitStage(wrap); return; }
   stageCache.set(wrap, html); wrap.innerHTML = html; fitStage(wrap);
 }

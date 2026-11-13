@@ -1,7 +1,7 @@
 'use strict';
 /* ===================== 점자 골든벨: 상태 · 화면 · 동작 ===================== */
 const DEF_CFG = { ox:60, choice:120, short:60, timeup:'both', revealSfx:true, vol:0.8 };
-const DEF_LIVE = { mode:'banner', qi:0, showTimer:true, showAuthor:true, autoTimer:false, scale:1, strip:'m', stripLogos:false,
+const DEF_LIVE = { mode:'banner', theme:'night', qi:0, showTimer:true, showAuthor:true, autoTimer:false, scale:1, strip:'m', stripLogos:false,
   timer:{ dur:60, endAt:0, remain:60, running:false }, ann:null, intro:0, title:{ text:'', sub:'' }, award:{ i:0, show:false },
   music:null, sfx:null, cfg:{ ...DEF_CFG }, rev:0 };
 // 콘티의 시상 순서 (시상 탭에서 바꿀 수 있음)
@@ -518,6 +518,7 @@ function renderHost(flags){
     paintStage($('#miniStage'));
     $('#modeName').textContent = '· ' + MODE_LABEL[L.mode] + (annPhase() ? ' · 방송 문구 표시 중' : '');
     $$('#modeSeg [data-m]').forEach(b => b.classList.toggle('on', b.dataset.m === L.mode));
+    $$('.theme-seg [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === (L.theme === 'day' ? 'day' : 'night')));
     $('#annQuick').innerHTML = annQuickHTML(); $('#annQuick').hidden = !$('#annQuick').innerHTML;
     $('#sndGrp').innerHTML = sndGrpHTML();
     if(L.mode === 'intro'){ $('#hostNotes').innerHTML = introNotesHTML(); $('#hostNext').innerHTML = notesHTML(q, '그다음 문제 · ' + qTitle(L.qi), L.qi); }
@@ -883,6 +884,7 @@ function renderSettings(){
   $('#optTimer').checked = !!L.showTimer; $('#optAuthor').checked = !!L.showAuthor; $('#optAuto').checked = !!L.autoTimer;
   [['#secOx', 'ox'], ['#secChoice', 'choice'], ['#secShort', 'short']].forEach(([s, k]) => { const el = $(s); if(document.activeElement !== el) el.innerHTML = secOptions(Number(cfg[k])); });
   $$('#scaleSeg [data-v]').forEach(x => x.classList.toggle('on', Number(x.dataset.v) === Number(L.scale || 1)));
+  $$('.theme-seg [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === (L.theme === 'day' ? 'day' : 'night')));
   const card = $('#sfxCard');
   if(card.contains(document.activeElement) && document.activeElement.tagName === 'SELECT') return;
   card.innerHTML = `<div class="card-h">소리 <span class="hint">효과음·배경음 파일은 이 PC의 브라우저에만 저장됩니다</span></div>
@@ -1010,6 +1012,7 @@ document.addEventListener('click', e => {
     case 'biDone': BI.sel = null; schedule(); break;
     case 'strip': setLive({ strip:el.dataset.v }); break;
     case 'scale': setLive({ scale:Number(el.dataset.v) }); break;
+    case 'theme': setLive({ theme:el.dataset.v === 'day' ? 'day' : 'night' }); toast(el.dataset.v === 'day' ? '프로젝터를 낮(밝은 바탕) 화면으로 바꿨습니다' : '프로젝터를 밤(어두운 바탕) 화면으로 바꿨습니다'); break;
     case 'awAdd': awardsEdit(L => L.push({ rank:'', title:'', prize:'' })); break;
     case 'awDefault': if(arm(el, 'awDef', '한 번 더 누르면 되돌립니다')){ S.awards = clone(DEFAULT_AWARDS); saveAwards(); } break;
     case 'awUp': case 'awDown': case 'awDel': { const i = +el.closest('.aw-row').dataset.i; awardsEdit(L => { if(a === 'awDel') L.splice(i, 1); else { const j = a === 'awUp' ? i - 1 : i + 1; if(j >= 0 && j < L.length) [L[i], L[j]] = [L[j], L[i]]; } }); break; }
