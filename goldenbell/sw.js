@@ -1,4 +1,4 @@
-const CACHE = 'goldenbell-v3';
+const CACHE = 'goldenbell-v4';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png', './roger.wav',
   './css/app.css',
   './js/config.js', './js/util.js', './js/sound.js', './js/sfx.js', './js/store.js', './js/parse.js', './js/stage.js', './js/screens.js', './js/radio.js', './js/pwa.js', './js/app.js',
@@ -10,13 +10,13 @@ self.addEventListener('fetch', e => {
   const url = new URL(req.url);
   // 앱 화면은 인터넷이 되면 항상 새 버전을, 안 되면 저장해 둔 버전을 씀
   if (req.mode === 'navigate') {
-    e.respondWith(fetch(req).then(r => { const cp = r.clone(); caches.open(CACHE).then(c => c.put('./index.html', cp)); return r; })
+    e.respondWith(fetch(req, { cache:'no-cache' }).then(r => { const cp = r.clone(); caches.open(CACHE).then(c => c.put('./index.html', cp)); return r; })
       .catch(() => caches.match('./index.html').then(r => r || caches.match('./'))));
     return;
   }
   // 앱 파일(css·js)은 인터넷이 되면 새 파일을 먼저 받고, 안 되면 저장해 둔 파일을 씀
   if (url.origin === location.origin) {
-    e.respondWith(fetch(req).then(r => { if (r && r.ok) { const cp = r.clone(); caches.open(CACHE).then(c => c.put(req, cp)); } return r; })
+    e.respondWith(fetch(req, { cache:'no-cache' }).then(r => { if (r && r.ok) { const cp = r.clone(); caches.open(CACHE).then(c => c.put(req, cp)); } return r; })
       .catch(() => caches.match(req, { ignoreSearch: true })));
   }
 });

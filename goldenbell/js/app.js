@@ -453,12 +453,24 @@ function schedule(flag){
   requestAnimationFrame(run); setTimeout(run, 120);
 }
 function render(flags){
-  $('#pickTitle').innerHTML = `${esc(S.banner.l1)} <em>${esc(S.banner.l2)}</em>`;
-  if(ROLE === 'screen'){ paintStage($('#fullStage')); const ss = $('#ssSfx'); if(ss) ss.textContent = Object.keys(SFX.files).length ? `이 PC에 저장된 소리 파일 ${Object.keys(SFX.files).length}개를 여기서 재생합니다.` : '이 PC에 저장된 소리 파일이 없습니다 (땡·두구두구는 기본 소리로 납니다).'; }
-  if(ROLE === 'host') renderHost(flags);
-  if(ROLE === 'staff') renderStaff();
-  radioRender();
+  try{
+    $('#pickTitle').innerHTML = `${esc(S.banner.l1)} <em>${esc(S.banner.l2)}</em>`;
+    if(ROLE === 'screen'){ paintStage($('#fullStage')); const ss = $('#ssSfx'); if(ss) ss.textContent = Object.keys(SFX.files).length ? `이 PC에 저장된 소리 파일 ${Object.keys(SFX.files).length}개를 여기서 재생합니다.` : '이 PC에 저장된 소리 파일이 없습니다 (땡·두구두구는 기본 소리로 납니다).'; }
+    if(ROLE === 'host') renderHost(flags);
+    if(ROLE === 'staff') renderStaff();
+    radioRender();
+    showErr(null);
+  }catch(e){ console.error(e); showErr(e); }
 }
+// 화면을 그리다 오류가 나면 빈 화면 대신 오류 내용을 띄움 (새로 고침 안내 + 알려 줄 글)
+function showErr(e){
+  let b = $('#errBar');
+  if(!e){ if(b) b.hidden = true; return; }
+  if(!b){ b = document.createElement('div'); b.id = 'errBar'; document.body.appendChild(b); }
+  b.hidden = false;
+  b.innerHTML = `<b>화면을 그리지 못했습니다.</b> Ctrl+Shift+R(강력 새로 고침)을 눌러 보세요. 계속되면 아래 글을 알려 주세요.<br><code>${esc(String(e && (e.stack || e.message) || e).split('\n').slice(0, 3).join(' / ')).slice(0, 300)}</code>`;
+}
+window.addEventListener('error', e => { if(e && e.error && /\/goldenbell\/js\//.test(String(e.filename || ''))) showErr(e.error); });
 function answerText(q){ if(!q) return ''; if(q.type === 'ox') return q.answer || ''; if(q.type === 'choice'){ const c = (q.choices || [])[Number(q.answer) - 1]; return q.answer ? `${q.answer}번${c ? ' · ' + c : ''}` : ''; } return q.answer || ''; }
 const KIND_TAG = q => q.kind !== 'main' ? `<span class="kind-chip k-${q.kind}">${KINDS[q.kind]}${q.kind === 'final' ? '' : ' · 점수 없음'}</span>` : '';
 function notesHTML(q, ttl, i){

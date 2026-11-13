@@ -342,6 +342,8 @@ body.screen-mode #talkBar{display:none}
 #pop .pn{font-weight:700;font-size:16px}
 #pop .ps{color:var(--gold);font-family:var(--f-disp);font-size:22px}
 
+#errBar{position:fixed;left:12px;right:12px;bottom:12px;z-index:200;background:#3a0d12;border:2px solid var(--no);color:#fff;border-radius:12px;padding:10px 14px;font-size:14px;line-height:1.5}
+#errBar code{font-size:12px;color:#ffc9c9;word-break:break-all}
 /* ===================== 2판: 좁은 머리줄 · 새 화면 · 꾸미기 ===================== */
 .hbar{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;min-height:44px;padding:4px max(12px,env(safe-area-inset-right,0px)) 4px max(12px,env(safe-area-inset-left,0px));background:var(--stage2);border-bottom:1px solid var(--line)}
 .hbar .brand{font-size:17px;flex:none}

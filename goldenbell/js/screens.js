@@ -43,7 +43,9 @@ function fullOn(s){
 
 /* 진행자 도구: '프로젝터 창 열기' → 모니터 고르기 → 그 모니터에 창을 열기 */
 async function openScreenFlow(){
-  const url = location.href.split('#')[0] + '#screen';
+  // 주소에 매번 새 값(w=)을 붙여, 예전에 열어 둔 프로젝터 창이 있어도 새 버전으로 다시 열리게 함 (?demo=1 등은 그대로)
+  const q = new URLSearchParams(location.search); q.set('w', Date.now().toString(36));
+  const url = location.pathname + '?' + q.toString() + '#screen';
   if(!scrSupported()){ openScreenWin(url, null); return; }
   const list = await loadScreens();
   if(!list.length){ toast(SCR.err === 'NotAllowedError' ? '창 관리 권한이 꺼져 있어 지금 창 옆에 엽니다. 주소창 왼쪽 자물쇠에서 창 관리를 허용하면 모니터를 고를 수 있어요.' : '모니터 목록을 읽지 못해 새 창으로 엽니다.'); openScreenWin(url, null); return; }
