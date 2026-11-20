@@ -109,6 +109,7 @@ async function tts(b){
 const apiMsg = e => {
   const why = e.code === 429 ? (e.daily ? `오늘 이 모델(${cfg.model})의 무료 한도를 다 썼습니다. 내일 이어서 만들거나, 설정에서 모델을 바꿔 만들 수 있습니다.` : '1분 한도에 걸렸습니다. 잠시 뒤 다시 시도합니다.')
     : e.code === 400 && /api key/i.test(e.message) ? 'API 키가 맞지 않습니다.'
+    : e.code === 403 && /free tier is not available/i.test(e.message) ? '이 키가 속한 구글 프로젝트는 무료로 쓸 수 없습니다. 무료로 쓸 수 있는 다른 프로젝트의 키를 넣거나, 이 프로젝트에 결제를 연결해야 합니다.'
     : e.code === 403 ? '이 키로는 만들 수 없다고 합니다(403).'
     : e.code === 404 ? `모델(${cfg.model})을 찾지 못했습니다. 설정에서 다른 모델을 고르세요.` : '만들지 못했습니다.';
   return e.code > 0 && e.code !== 429 ? `${why} 구글 메시지: ${e.message} (오류 ${e.code})` : e.code === 429 ? why : `${why} ${e.message}`;
