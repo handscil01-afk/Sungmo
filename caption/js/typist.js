@@ -1,18 +1,22 @@
 'use strict';
 /* ===================== 입력 화면 (통역하는 분의 노트북) =====================
-   치는 글은 DRAFT_MS 간격으로 drafts/<기기>에 보내고, Enter를 누르면 lines에 한 줄로 넣음.
-   보낸 줄을 누르면 고치거나 지울 수 있고, 고친 내용은 읽는 화면의 같은 줄에 바로 반영됨 */
+   보내는 방식 두 가지 (방마다 rooms/<방>/mode, 통역 중에도 바꿀 수 있음)
+   - 한 줄씩(line, 영화 자막): 아래 칸에 치고 Enter를 누르면 한 줄이 통째로 감. 치는 중인 글은 안 보냄
+   - 바로바로(live, 대화): 메모장 칸 하나. 바뀐 줄만 DRAFT_MS 간격으로 보내고, 내 커서 위치도 보냄
+   두 방식 모두 같은 lines(줄 열쇠 → 글)를 쓰므로 방식을 바꿔도 내용이 이어짐 */
 const TS = { size:2, name:'', ...ls.get('tp', {}) };
 const saveTS = () => ls.set('tp', TS);
 const TSIZES = [15, 17, 20, 24, 28, 34];
 const PREFIX = { '1':'[해설] ', '2':'[소리] ', '3':'[음악] ' };
-const TP = { code:null, host:false, pin:null, meta:null, lines:{}, drafts:{}, readers:{}, unsub:[], hb:0, sentDraft:'', draftT:0, dirty:false, pendingEnter:false, rows:new Map(), warned:false };
+const MAX_LINE = 5000;
+const TP = { code:null, host:false, pin:null, meta:null, mode:'line', doc:{}, keys:[], readers:{}, unsub:[], hb:0, pendingEnter:false, rows:new Map(), warned:false,
+  sent:[], dirty:false, again:false, flushT:0, composing:false, lastCur:'', longWarned:false };
 const tbase = () => 'rooms/' + TP.code + '/';
 const cleanLine = t => String(t || '').replace(/\s*[\r\n]+\s*/g, ' ');
 
 function rulesSheet(){
   openSheet(`<h2 tabindex="-1">서버 규칙을 먼저 게시해 주세요</h2>
-    <p>문자통역 자료를 저장할 자리가 서버에 아직 열려 있지 않아요. 한 번만 하면 됩니다.</p>
+    <p>문자통역 자료를 저장할 자리가 서버에 아직 열려 있지 않거나, 예전 규칙이 게시되어 있어요. 한 번만 하면 됩니다.</p>
     <ol><li><b>console.firebase.google.com</b> → <b>handscil-sports</b> 프로젝트를 엽니다.</li>
     <li><b>Realtime Database → 규칙</b> 탭을 엽니다.</li>
     <li>저장소의 <b>sports-day/database.rules.json</b> 내용을 그대로 붙여 넣고 <b>게시</b>를 누릅니다.</li></ol>
@@ -31,6 +35,10 @@ function typistStartSheet(){
     <div class="card"><h3>새 방 만들기</h3>
       <label class="field"><span>방 이름 (읽는 분 화면에 보입니다)</span><input type="text" id="nTitle" maxlength="40" value="${esc((h && h.title) || '영화 문자통역')}"></label>
       <label class="field"><span>내 이름 (교대할 때 구분용)</span><input type="text" id="nName" maxlength="20" value="${esc(TS.name || '')}" placeholder="예: 김통역"></label>
+      <fieldset class="fs"><legend>보내는 방식 (통역 중에도 바꿀 수 있어요)</legend>
+        <label class="chk srow"><input type="radio" name="nMode" value="line" checked> <b>한 줄씩</b> <small class="muted">영화 자막처럼 한 줄을 다 치고 Enter를 누르면 보냅니다</small></label>
+        <label class="chk srow"><input type="radio" name="nMode" value="live"> <b>바로바로</b> <small class="muted">대화처럼 메모장에 치는 글자가 그대로 보입니다</small></label>
+      </fieldset>
       <div class="row"><button class="btn ${h ? '' : 'primary'}" data-new>새 방 만들기</button></div></div>
     <div class="card"><h3>교대 입력자로 들어가기</h3>
       <p class="muted small">방을 만든 노트북의 '방 정보'에 나오는 방 번호와 교대 비밀번호를 넣으세요.</p>
@@ -45,7 +53,8 @@ function typistStartSheet(){
       if(b.hasAttribute('data-resume')){ b.disabled = true; const ok = await typistResume({ code:h.code, host:true }); if(ok) closeSheet(); else { b.disabled = false; toast('그 방이 없어졌어요. 새 방을 만들어 주세요'); ls.del('host'); } }
       if(b.hasAttribute('data-new')){
         TS.name = $('#nName', box).value.trim().slice(0, 20); saveTS();
-        b.disabled = true; const ok = await typistCreate($('#nTitle', box).value); b.disabled = false;
+        const mode = ($('input[name=nMode]:checked', box) || {}).value === 'live' ? 'live' : 'line';
+        b.disabled = true; const ok = await typistCreate($('#nTitle', box).value, mode); b.disabled = false;
         if(ok) closeSheet();
       }
       if(b.hasAttribute('data-shift')){
@@ -57,7 +66,7 @@ function typistStartSheet(){
     }, h ? 'button[data-resume]' : '#nTitle');
 }
 
-async function typistCreate(title){
+async function typistCreate(title, mode){
   title = String(title || '').trim().slice(0, 40) || '영화 문자통역';
   const name = TS.name || '입력자 1';
   for(let i = 0; i < 15; i++){
@@ -67,7 +76,7 @@ async function typistCreate(title){
     catch(e){ writeErr(e); return false; }
     if(meta && DB.now() - (meta.at || 0) < ROOM_STALE_MS) continue;
     const pin = String(1000 + Math.floor(Math.random() * 9000));
-    try{ await DB.set('rooms/' + code, { meta:{ host:DB.uid, title, at:DB.ts(), open:true }, secret:{ pin }, typers:{ [DB.uid]:{ name, pin } } }); }
+    try{ await DB.set('rooms/' + code, { meta:{ host:DB.uid, title, at:DB.ts(), open:true }, mode:mode || 'line', secret:{ pin }, typers:{ [DB.uid]:{ name, pin } } }); }
     catch(e){ if(isDenied(e) && i === 0){ TP.warned = false; writeErr(e); return false; } continue; }
     await DB.set('lobby/' + code, { title, at:DB.ts() }).catch(() => {});
     ls.set('host', { code, pin, title });
@@ -111,13 +120,15 @@ async function typistResume(t){
 
 function typistEnter(code, host, pin){
   typistStop();
-  Object.assign(TP, { code, host, pin, meta:null, lines:{}, drafts:{}, readers:{}, sentDraft:'', pendingEnter:false, warned:false });
+  Object.assign(TP, { code, host, pin, meta:null, mode:null, doc:{}, keys:[], readers:{}, pendingEnter:false, warned:false, sent:[], dirty:false, again:false, composing:false, lastCur:'', longWarned:false });
   TP.rows.forEach(el => el.remove()); TP.rows.clear();
   ls.set('typing', { code, host });
   showView('vType');
   $('#tCode').textContent = code;
+  $('#tIn').value = ''; $('#tPad').value = '';
   applyTypistLook();
   const b = tbase();
+  let gotLines = false;
   TP.unsub.push(DB.on(b + 'meta', v => {
     TP.meta = v;
     if(TP.host && v && v.host !== DB.uid){ toast('다른 노트북이 이 방 번호를 가져갔어요'); typistLeave(false); return; }
@@ -125,10 +136,15 @@ function typistEnter(code, host, pin){
     $('#tTitle').textContent = v.title || '';
     if(TP.host && !TP.pin) DB.get(b + 'secret').then(s => { if(s && s.pin){ TP.pin = s.pin; const h = ls.get('host'); if(h && h.code === code){ h.pin = s.pin; ls.set('host', h); } } }).catch(() => {});
   }));
-  TP.unsub.push(DB.on(b + 'lines', v => { TP.lines = v || {}; renderLog(); }, writeErr));
-  TP.unsub.push(DB.on(b + 'drafts', v => { TP.drafts = v || {}; renderDrafts(); }));
-  TP.unsub.push(DB.on(b + 'readers', v => { TP.readers = v || {}; const n = Object.keys(TP.readers).length; $('#tReaders').textContent = '읽는 기기 ' + n + '대'; }));
-  DB.discRemove(b + 'drafts/' + DB.uid);
+  TP.unsub.push(DB.on(b + 'lines', v => {
+    TP.doc = v || {}; TP.keys = Object.keys(TP.doc).sort();
+    renderLog();
+    if(TP.mode === 'live') syncPad(!gotLines);
+    gotLines = true;
+  }, writeErr));
+  TP.unsub.push(DB.on(b + 'mode', v => setMode(v === 'live' ? 'live' : 'line')));
+  TP.unsub.push(DB.on(b + 'readers', v => { TP.readers = v || {}; $('#tReaders').textContent = '접속 중인 읽기 화면 ' + Object.keys(TP.readers).length + '대'; }));
+  DB.discRemove(b + 'cursors/' + DB.uid);
   const beat = () => {
     if(!TP.code || !TP.meta) return;
     DB.set('lobby/' + TP.code, { title:TP.meta.title || '문자통역', at:DB.ts() }).catch(() => {});
@@ -137,18 +153,18 @@ function typistEnter(code, host, pin){
   TP.hb = setInterval(beat, 60000);
   setTimeout(beat, 1500);
   WAKE.on();
-  const inp = $('#tIn'); inp.value = ''; setTimeout(() => inp.focus(), 50);
 }
 function typistStop(){
   TP.unsub.forEach(f => { try{ f(); }catch(e){} }); TP.unsub = [];
   if(TP.hb){ clearInterval(TP.hb); TP.hb = 0; }
-  if(TP.draftT){ clearTimeout(TP.draftT); TP.draftT = 0; }
+  if(TP.flushT){ clearTimeout(TP.flushT); TP.flushT = 0; }
 }
 async function typistLeave(close){
   const code = TP.code, b = tbase(), host = TP.host;
+  if(code && TP.mode === 'live' && TP.dirty) liveFlush();
   typistStop();
   if(code){
-    DB.remove(b + 'drafts/' + DB.uid).catch(() => {});
+    DB.remove(b + 'cursors/' + DB.uid).catch(() => {});
     if(close && host){
       await DB.update(b + 'meta', { open:false, at:DB.ts() }).catch(() => {});
       await DB.remove('lobby/' + code).catch(() => {});
@@ -159,68 +175,129 @@ async function typistLeave(close){
   showStart();
 }
 
-/* ---------- 치기 ---------- */
-function draftNow(){
-  if(!TP.code) return;
-  const t = cleanLine($('#tIn').value);
-  if(t === TP.sentDraft) return;
-  TP.sentDraft = t;
-  DB.set(tbase() + 'drafts/' + DB.uid, t.trim() ? { t, n:TS.name || '', at:DB.ts() } : null).catch(writeErr);
+/* ---------- 보내는 방식 ---------- */
+function setMode(m){
+  if(m === TP.mode) return;
+  const first = TP.mode == null;
+  if(TP.mode === 'live' && TP.dirty) liveFlush();
+  TP.mode = m;
+  $('#tLinePanel').hidden = m !== 'line';
+  $('#tLivePanel').hidden = m !== 'live';
+  $$('[data-mode]').forEach(b => { const on = b.dataset.mode === m; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+  if(m === 'live'){
+    // 한 줄씩 칸에 치던 글이 있으면 메모장 끝에 이어 붙임
+    const left = cleanLine($('#tIn').value).trim(); $('#tIn').value = '';
+    syncPad(true);
+    if(left){ const pad = $('#tPad'); pad.value += (pad.value ? '\n' : '') + left; TP.dirty = true; kickFlush(); }
+    const pad = $('#tPad'); setTimeout(() => { pad.focus(); pad.setSelectionRange(pad.value.length, pad.value.length); pad.scrollTop = pad.scrollHeight; kickFlush(); }, 30);
+  } else {
+    TP.lastCur = '';
+    DB.remove(tbase() + 'cursors/' + DB.uid).catch(() => {});
+    renderLog(true);
+    setTimeout(() => $('#tIn').focus(), 30);
+  }
+  if(!first) toast(m === 'live' ? '바로바로 보내기: 메모장에 치는 글자가 그대로 보입니다' : '한 줄씩 보내기: Enter를 누르면 한 줄이 보내집니다');
 }
-function draftKick(){
-  if(TP.draftT){ TP.dirty = true; return; }
-  draftNow();
-  TP.draftT = setTimeout(() => { TP.draftT = 0; if(TP.dirty){ TP.dirty = false; draftKick(); } }, DRAFT_MS);
-}
+
+/* ---------- 한 줄씩 ---------- */
 function commitLine(){
   const inp = $('#tIn');
-  const t = cleanLine(inp.value).trim();
+  const t = cleanLine(inp.value).trim().slice(0, MAX_LINE);
   if(!t || !TP.code) return;
-  if(TP.draftT){ clearTimeout(TP.draftT); TP.draftT = 0; } TP.dirty = false;
-  TP.sentDraft = '';
   inp.value = '';
-  const k = DB.key(tbase() + 'lines');
-  DB.update(tbase(), { ['lines/' + k]:{ t, at:DB.ts(), by:DB.uid }, ['drafts/' + DB.uid]:null }).catch(writeErr);
+  const k = lineKeyBetween(TP.keys[TP.keys.length - 1] || null, null);
+  DB.set(tbase() + 'lines/' + k, t).catch(writeErr);
 }
-function setPrefix(p){
+function insertPrefix(p){
+  if(TP.mode === 'live'){
+    const pad = $('#tPad');
+    pad.focus();
+    pad.setRangeText(p, pad.selectionStart, pad.selectionEnd, 'end');
+    TP.dirty = true; kickFlush();
+    return;
+  }
   const inp = $('#tIn');
   const body = inp.value.replace(/^\s*\[[^\]]{1,8}\]\s*/, '');
   inp.value = p + body;
   inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length);
-  draftKick();
 }
 
-/* ---------- 보낸 줄 목록 ---------- */
-function renderLog(){
+/* ---------- 바로바로 (메모장) ---------- */
+// 서버 내용을 메모장에 반영 (치는 중이 아닐 때만. 교대 입력자가 고친 내용을 받아옴)
+function syncPad(force){
+  if(TP.mode !== 'live') return;
+  if(!force && (TP.dirty || TP.flushT || TP.composing)) return;
+  TP.sent = TP.keys.map(k => ({ id:k, t:lineText(TP.doc[k]) }));
+  const nv = TP.sent.map(x => x.t).join('\n');
+  const pad = $('#tPad');
+  if(force){ pad.value = nv; pad.setSelectionRange(nv.length, nv.length); pad.scrollTop = pad.scrollHeight; }
+  else spliceText(pad, nv);
+}
+function kickFlush(){
+  if(TP.flushT){ TP.again = true; return; }
+  liveFlush();
+  TP.flushT = setTimeout(() => {
+    TP.flushT = 0;
+    if(TP.again){ TP.again = false; kickFlush(); }
+    else if(!TP.dirty) syncPad(false);
+  }, DRAFT_MS);
+}
+// 메모장과 마지막으로 보낸 줄을 비교해서 바뀐 줄만 보냄
+function liveFlush(){
+  if(!TP.code || TP.mode !== 'live') return;
+  const pad = $('#tPad');
+  const nl = pad.value.split('\n');
+  const old = TP.sent;
+  const m = Math.min(old.length, nl.length);
+  let p = 0; while(p < m && old[p].t === nl[p]) p++;
+  let s = 0; while(s < m - p && old[old.length - 1 - s].t === nl[nl.length - 1 - s]) s++;
+  const oMid = old.slice(p, old.length - s), nMid = nl.slice(p, nl.length - s);
+  const keep = Math.min(oMid.length, nMid.length);
+  const upd = {}, mid = [];
+  const clip = t => { if(t.length > MAX_LINE){ if(!TP.longWarned){ TP.longWarned = true; toast('한 줄이 너무 길어요. Enter로 줄을 바꿔 주세요'); } return t.slice(0, MAX_LINE); } return t; };
+  for(let i = 0; i < keep; i++){ upd['lines/' + oMid[i].id] = clip(nMid[i]); mid.push({ id:oMid[i].id, t:nMid[i] }); }
+  for(let i = keep; i < oMid.length; i++) upd['lines/' + oMid[i].id] = null;
+  let prev = mid.length ? mid[mid.length - 1].id : p > 0 ? old[p - 1].id : null;
+  const next = s > 0 ? old[old.length - s].id : null;
+  for(let i = keep; i < nMid.length; i++){ const id = lineKeyBetween(prev, next); upd['lines/' + id] = clip(nMid[i]); mid.push({ id, t:nMid[i] }); prev = id; }
+  TP.sent = old.slice(0, p).concat(mid, old.slice(old.length - s));
+  TP.dirty = false;
+  // 내 커서 위치 (읽는 분이 따라오는 곳)
+  const pos = pad.selectionEnd, before = pad.value.slice(0, pos);
+  const li = (before.match(/\n/g) || []).length, c = pos - (before.lastIndexOf('\n') + 1);
+  const cur = TP.sent[li];
+  if(cur){ const sig = cur.id + ':' + c; if(sig !== TP.lastCur){ TP.lastCur = sig; upd['cursors/' + DB.uid] = { k:cur.id, c, at:DB.ts() }; } }
+  if(Object.keys(upd).length) DB.update(tbase(), upd).catch(writeErr);
+  $('#tCount').textContent = TP.sent.length + '줄';
+}
+
+/* ---------- 보낸 줄 목록 (한 줄씩) ---------- */
+function renderLog(force){
+  $('#tCount').textContent = TP.keys.length + '줄';
+  if(TP.mode !== 'line' && !force) return;
   const rowsBox = $('#tRows'), log = $('#tLog');
-  const near = log.scrollHeight - log.scrollTop - log.clientHeight < 120;
-  const keys = Object.keys(TP.lines).sort();
-  for(const [id, el] of TP.rows) if(!TP.lines[id]){ el.remove(); TP.rows.delete(id); }
+  const near = force || log.scrollHeight - log.scrollTop - log.clientHeight < 120;
+  for(const [id, el] of TP.rows) if(TP.doc[id] == null){ el.remove(); TP.rows.delete(id); }
   let prev = null;
-  keys.forEach(id => {
-    const l = TP.lines[id] || {};
+  TP.keys.forEach((id, i) => {
     let el = TP.rows.get(id);
     if(!el){ el = document.createElement('button'); el.type = 'button'; el.className = 'ln'; el.dataset.id = id; el.innerHTML = '<span class="tm"></span><span class="tx"></span>'; TP.rows.set(id, el); }
-    const tm = typeof l.at === 'number' ? hm(l.at) : '';
-    if(el.firstChild.textContent !== tm) el.firstChild.textContent = tm;
-    if(el.lastChild.textContent !== String(l.t || '')) el.lastChild.textContent = String(l.t || '');
+    const no = String(i + 1), t = lineText(TP.doc[id]);
+    if(el.firstChild.textContent !== no) el.firstChild.textContent = no;
+    if(el.lastChild.textContent !== t) el.lastChild.textContent = t;
     const ref = prev ? prev.nextSibling : rowsBox.firstChild;
     if(ref !== el) rowsBox.insertBefore(el, ref);
     prev = el;
   });
-  $('#tEmpty').hidden = keys.length > 0;
-  $('#tCount').textContent = keys.length + '줄';
+  $('#tEmpty').hidden = TP.keys.length > 0;
   if(near) log.scrollTop = log.scrollHeight;
 }
-function renderDrafts(){
-  const others = Object.entries(TP.drafts).filter(([u, d]) => u !== DB.uid && d && d.t);
-  $('#tDrafts').innerHTML = others.map(([, d]) => `<div class="ln draft"><span class="tm">${esc(d.n || '다른 입력자')}</span><span class="tx">${esc(d.t)}</span></div>`).join('');
-}
 function editLine(id){
-  const l = TP.lines[id]; if(!l) return;
+  if(TP.doc[id] == null) return;
+  const old = lineText(TP.doc[id]);
   const box = openSheet(`<h2 tabindex="-1">보낸 줄 고치기</h2>
-    <p class="muted small">고친 내용은 읽는 화면의 같은 줄에 바로 바뀝니다. 앞부분을 읽던 분의 커서는 그대로 있어요.</p>
-    <textarea id="eTx" rows="3">${esc(l.t || '')}</textarea>
+    <p class="muted small">고친 내용은 읽는 화면의 같은 줄에 바로 바뀝니다.</p>
+    <textarea id="eTx" rows="3">${esc(old)}</textarea>
     <div class="row"><button class="btn danger" data-del>이 줄 지우기</button><div class="sp"></div><button class="btn ghost" data-close>취소</button><button class="btn primary" data-ok>고치기</button></div>`, e => {
       if(e.target.closest('[data-ok]')) save();
       const d = e.target.closest('[data-del]');
@@ -228,9 +305,9 @@ function editLine(id){
     }, '#eTx');
   const ta = $('#eTx', box);
   const save = () => {
-    const t = cleanLine(ta.value).trim();
+    const t = cleanLine(ta.value).trim().slice(0, MAX_LINE);
     if(!t){ toast('지우려면 \'이 줄 지우기\'를 누르세요'); return; }
-    if(t !== l.t) DB.update(tbase() + 'lines/' + id, { t }).catch(writeErr);
+    if(t !== old) DB.set(tbase() + 'lines/' + id, t).catch(writeErr);
     closeSheet(); $('#tIn').focus();
   };
   ta.addEventListener('keydown', e => { if(e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229){ e.preventDefault(); save(); } });
@@ -254,14 +331,13 @@ function typistInfo(){
     });
 }
 function typistSave(){
-  const keys = Object.keys(TP.lines).sort();
-  if(!keys.length){ toast('아직 저장할 내용이 없어요'); return; }
-  downloadText('문자통역_' + TP.code + '_' + ymd() + '.txt', keys.map(k => String(TP.lines[k].t || '')).join('\n') + '\n');
+  if(!TP.keys.length){ toast('아직 저장할 내용이 없어요'); return; }
+  downloadText('문자통역_' + TP.code + '_' + ymd() + '.txt', TP.keys.map(k => lineText(TP.doc[k])).join('\n') + '\n');
 }
 function applyTypistLook(){ document.documentElement.style.setProperty('--tsize', TSIZES[Math.max(0, Math.min(TSIZES.length - 1, TS.size))] + 'px'); }
 function typistSettings(){
   const box = openSheet(`<h2 tabindex="-1">설정</h2>
-    <label class="field"><span>내 이름 (교대할 때 다른 입력자 화면에 보입니다)</span><input type="text" id="stName" maxlength="20" value="${esc(TS.name || '')}"></label>
+    <label class="field"><span>내 이름 (교대할 때 구분용)</span><input type="text" id="stName" maxlength="20" value="${esc(TS.name || '')}"></label>
     <div class="row"><span>글자 크기</span><button class="btn" data-sz="-1">작게</button><button class="btn" data-sz="1">크게</button></div>
     ${pwaSettingsHtml()}
     <div class="row"><div class="sp"></div><button class="btn primary" data-close>닫기</button></div>`, e => {
@@ -274,25 +350,36 @@ function typistSettings(){
 }
 
 function typistInit(){
-  const inp = $('#tIn');
-  inp.addEventListener('input', draftKick);
+  const inp = $('#tIn'), pad = $('#tPad');
+  const altPrefix = e => {
+    if(!e.altKey) return false;
+    const n = PREFIX[e.key] ? e.key : /^Digit[123]$/.test(e.code) ? e.code.slice(5) : null;
+    if(!n) return false;
+    e.preventDefault(); insertPrefix(PREFIX[n]); return true;
+  };
   inp.addEventListener('keydown', e => {
     if(e.key === 'Enter' || e.keyCode === 13){
       e.preventDefault();
       if(e.shiftKey) return;
-      // 한글 조합 중에 누른 Enter: 조합이 끝난 뒤에 줄을 끝냄 (크롬은 Enter가 두 번 오므로 두 번째에서 끝나고, 남은 한 번은 빈 칸이라 무시됨)
+      // 한글 조합 중에 누른 Enter: 조합이 끝난 뒤에 줄을 보냄 (크롬은 Enter가 두 번 오므로 두 번째에서 보내고, 남은 한 번은 빈 칸이라 무시됨)
       if(e.isComposing || e.keyCode === 229){ TP.pendingEnter = true; return; }
       commitLine(); return;
     }
-    if(e.key === 'Escape' && $('#sheet').hidden){ e.preventDefault(); inp.value = ''; draftKick(); return; }
-    if(e.altKey && PREFIX[e.key]){ e.preventDefault(); setPrefix(PREFIX[e.key]); return; }
-    if(e.altKey && /^Digit[123]$/.test(e.code)){ e.preventDefault(); setPrefix(PREFIX[e.code.slice(5)]); return; }
-    if(e.key === 'ArrowUp' && !inp.value){ const ks = Object.keys(TP.lines).sort(); if(ks.length){ e.preventDefault(); editLine(ks[ks.length - 1]); } }
+    if(e.key === 'Escape' && $('#sheet').hidden){ e.preventDefault(); inp.value = ''; return; }
+    if(altPrefix(e)) return;
+    if(e.key === 'ArrowUp' && !inp.value && TP.keys.length){ e.preventDefault(); editLine(TP.keys[TP.keys.length - 1]); }
   });
   inp.addEventListener('compositionend', () => { if(TP.pendingEnter){ TP.pendingEnter = false; setTimeout(commitLine, 0); } });
+  // 메모장: 고칠 때마다 바뀐 줄을 보내고, 커서만 움직여도 위치를 보냄
+  pad.addEventListener('input', () => { TP.dirty = true; kickFlush(); });
+  pad.addEventListener('keydown', e => { altPrefix(e); });
+  pad.addEventListener('compositionstart', () => { TP.composing = true; });
+  pad.addEventListener('compositionend', () => { TP.composing = false; TP.dirty = true; kickFlush(); });
+  ['keyup', 'mouseup'].forEach(t => pad.addEventListener(t, () => { if(TP.mode === 'live') kickFlush(); }));
   $('#vType').addEventListener('click', e => {
     const ln = e.target.closest('.ln[data-id]'); if(ln){ editLine(ln.dataset.id); return; }
-    const pre = e.target.closest('[data-pre]'); if(pre){ setPrefix(PREFIX[pre.dataset.pre]); return; }
+    const pre = e.target.closest('[data-pre]'); if(pre){ insertPrefix(PREFIX[pre.dataset.pre]); return; }
+    const md = e.target.closest('[data-mode]'); if(md){ if(TP.code && md.dataset.mode !== TP.mode) DB.set(tbase() + 'mode', md.dataset.mode).catch(writeErr); return; }
     const b = e.target.closest('[data-t]'); if(!b) return;
     const a = b.dataset.t;
     if(a === 'info') typistInfo();
