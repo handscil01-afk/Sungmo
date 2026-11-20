@@ -11,6 +11,7 @@
 - 쿠팡 비교견적 도우미(PC 크롬 템퍼몽키): https://handscil01-afk.github.io/Sungmo/coupang-compare/
 - 가을운동회 점수판: https://handscil01-afk.github.io/Sungmo/sports-day/
 - 손잡다 야구(듣고 고르는 확률 야구): https://handscil01-afk.github.io/Sungmo/baseball/
+- 중계 녹음실(손잡다 야구 음성 만들기): https://handscil01-afk.github.io/Sungmo/voice-studio/
 - 기안 점검판(PC 크롬·엣지): https://handscil01-afk.github.io/Sungmo/doc-check/
 - 기안 도우미(PC 크롬·엣지, 검수는 휴대폰도 됨): https://handscil01-afk.github.io/Sungmo/gian/
 - 출장 여비 기안 만들기(PC 크롬·엣지): https://handscil01-afk.github.io/Sungmo/travel-expense/
@@ -138,6 +139,17 @@
 ## DICEBOUND 운명의 주사위 (`dicebound/`)
 
 주사위 5개를 굴리고 일부를 다시 굴려 족보를 완성하는 다크 판타지 로그라이크입니다. 자세한 규칙과 파일 구조, 점검 방법은 [`dicebound/README.md`](dicebound/README.md)에 있습니다.
+
+## 중계 녹음실 (`voice-studio/`)
+
+손잡다 야구(`baseball/`)의 중계 음성(캐스터 이하늘, 해설위원 강태산)을 Gemini API의 음성 만들기로 녹음하는 도구입니다.
+- 대본: `baseball/voice/script.txt`·`script2.txt`·`script3.txt`(522줄)를 `python3 baseball/tools/voice_studio_lines.py`로 묶어 `voice-studio/lines.json`(같은 화자·같은 말투끼리 최대 20줄, 40묶음)을 만듭니다. 대본을 고치면 이 명령을 다시 실행합니다.
+- API 키는 이 기기(localStorage)에만 저장하고, 설정에서 바로 바꾸거나 지웁니다. 목소리(캐스터·해설)와 모델을 고릅니다.
+- "차례대로 만들기"는 묶음을 하나씩 요청하고, 하루 한도에 걸리면 멈춥니다. 만든 녹음은 IndexedDB에 남아 다음에 이어서 만듭니다.
+- 자르기(`js/cut.js`): 소리가 작은 곳을 모두 후보로 찾고, 줄마다 글자 수로 예상 길이를 정한 뒤, 조각 길이가 예상과 비슷하고 길게 쉰 곳에서 자르는 조합을 동적 계획법으로 고릅니다. 예상과 많이 다른 줄은 "확인 필요"로 표시하고, ◀ ▶로 경계를 이웃 쉬는 곳으로 옮깁니다.
+- AI Studio에서 직접 만든 파일은 묶음의 "파일 넣기"로 넣으면 똑같이 잘립니다("AI Studio용 글 복사"로 지시문을 복사).
+- "zip으로 받기" → `python3 baseball/tools/voice_import.py 받은파일.zip`으로 `baseball/voice/`에 mp3로 넣고 `index.json`과 야구 앱 `sw.js` 캐시 이름을 고칩니다.
+- 시험: `node voice-studio/tests/e2e.js [실제녹음.wav 묶음코드]` (구글 API는 가짜 응답으로 바꿔 끝까지 진행).
 
 ## 다과비 계산기 (`snack-calc/`)
 
