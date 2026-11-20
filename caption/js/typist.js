@@ -4,7 +4,8 @@
    - 한 줄씩(line, 영화 자막): 아래 칸에 치고 Enter를 누르면 한 줄이 통째로 감. 치는 중인 글은 안 보냄
    - 바로바로(live, 대화): 메모장 칸 하나. 바뀐 줄만 DRAFT_MS 간격으로 보내고, 내 커서 위치도 보냄
    두 방식 모두 같은 lines(줄 열쇠 → 글)를 쓰므로 방식을 바꿔도 내용이 이어짐 */
-const TS = { size:2, name:'', ...ls.get('tp', {}) };
+const DEFAULT_SPK = ['화자1', '화자2', '화자3'];
+const TS = { size:2, name:'', minutes:false, speakers:DEFAULT_SPK.slice(), ...ls.get('tp', {}) };
 const saveTS = () => ls.set('tp', TS);
 const TSIZES = [15, 17, 20, 24, 28, 34];
 const PREFIX = { '1':'[해설] ', '2':'[소리] ', '3':'[음악] ' };
@@ -36,8 +37,9 @@ function typistStartSheet(){
       <label class="field"><span>방 이름 (읽는 분 화면에 보입니다)</span><input type="text" id="nTitle" maxlength="40" value="${esc((h && h.title) || '영화 문자통역')}"></label>
       <label class="field"><span>내 이름 (교대할 때 구분용)</span><input type="text" id="nName" maxlength="20" value="${esc(TS.name || '')}" placeholder="예: 김통역"></label>
       <fieldset class="fs"><legend>보내는 방식 (통역 중에도 바꿀 수 있어요)</legend>
-        <label class="chk srow"><input type="radio" name="nMode" value="line" checked> <b>한 줄씩</b> <small class="muted">영화 자막처럼 한 줄을 다 치고 Enter를 누르면 보냅니다</small></label>
-        <label class="chk srow"><input type="radio" name="nMode" value="live"> <b>바로바로</b> <small class="muted">대화처럼 메모장에 치는 글자가 그대로 보입니다</small></label>
+        <label class="chk srow"><input type="radio" name="nMode" value="line" checked> <b>한 줄씩 (영화)</b> <small class="muted">영화 자막처럼 한 줄을 다 치고 Enter를 누르면 보냅니다</small></label>
+        <label class="chk srow"><input type="radio" name="nMode" value="memo"> <b>메모장 (행사·대화)</b> <small class="muted">메모장에 치는 글자가 그대로 보입니다</small></label>
+        <label class="chk srow"><input type="radio" name="nMode" value="minutes"> <b>회의록</b> <small class="muted">메모장 + 화자 이름 단축키(Alt+숫자, Tab), 저장하면 화자별로 줄을 나눈 회의록 파일</small></label>
       </fieldset>
       <div class="row"><button class="btn ${h ? '' : 'primary'}" data-new>새 방 만들기</button></div></div>
     <div class="card"><h3>교대 입력자로 들어가기</h3>
@@ -53,9 +55,10 @@ function typistStartSheet(){
       if(b.hasAttribute('data-resume')){ b.disabled = true; const ok = await typistResume({ code:h.code, host:true }); if(ok) closeSheet(); else { b.disabled = false; toast('그 방이 없어졌어요. 새 방을 만들어 주세요'); ls.del('host'); } }
       if(b.hasAttribute('data-new')){
         TS.name = $('#nName', box).value.trim().slice(0, 20); saveTS();
-        const mode = ($('input[name=nMode]:checked', box) || {}).value === 'live' ? 'live' : 'line';
-        b.disabled = true; const ok = await typistCreate($('#nTitle', box).value, mode); b.disabled = false;
-        if(ok) closeSheet();
+        const pick = ($('input[name=nMode]:checked', box) || {}).value || 'line';
+        TS.minutes = pick === 'minutes'; saveTS();
+        b.disabled = true; const ok = await typistCreate($('#nTitle', box).value, pick === 'line' ? 'line' : 'live'); b.disabled = false;
+        if(ok){ closeSheet(); if(pick === 'minutes' && isDefaultSpk()) setTimeout(speakerSheet, 300); }
       }
       if(b.hasAttribute('data-shift')){
         const name = $('#sName', box).value.trim().slice(0, 20) || '교대 입력자';
@@ -183,7 +186,7 @@ function setMode(m){
   TP.mode = m;
   $('#tLinePanel').hidden = m !== 'line';
   $('#tLivePanel').hidden = m !== 'live';
-  $$('[data-mode]').forEach(b => { const on = b.dataset.mode === m; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+  paintModeBtns();
   if(m === 'live'){
     // 한 줄씩 칸에 치던 글이 있으면 메모장 끝에 이어 붙임
     const left = cleanLine($('#tIn').value).trim(); $('#tIn').value = '';
@@ -196,7 +199,102 @@ function setMode(m){
     renderLog(true);
     setTimeout(() => $('#tIn').focus(), 30);
   }
-  if(!first) toast(m === 'live' ? '바로바로 보내기: 메모장에 치는 글자가 그대로 보입니다' : '한 줄씩 보내기: Enter를 누르면 한 줄이 보내집니다');
+  if(!first) toast(m === 'line' ? '한 줄씩: Enter를 누르면 한 줄이 보내집니다' : modeToast());
+}
+
+const modeKey = () => TP.mode === 'line' ? 'line' : TS.minutes ? 'minutes' : 'memo';
+const modeToast = () => TS.minutes ? '회의록: Alt+숫자로 화자 이름, Tab으로 직전 사람을 넣습니다' : '메모장: 치는 글자가 그대로 보입니다';
+function paintModeBtns(){
+  const k = modeKey();
+  $$('[data-mode]').forEach(b => { const on = b.dataset.mode === k; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+  const mins = k === 'minutes';
+  $('#tLivePanel').classList.toggle('minutes', mins);
+  $('#tSpk').hidden = !mins;
+  $('#tPadHint').textContent = mins
+    ? 'Alt+1~9: 화자 이름 · Tab: 직전 사람 · Shift+Tab: 지금 사람 한 번 더 · 저장하면 화자별로 줄을 나눈 회의록 파일'
+    : '메모장처럼 치면 치는 글자가 그대로 보입니다 · Enter: 줄 바꾸기 · 앞부분을 고쳐도 바로 반영 · 읽는 분은 내 커서를 따라옵니다';
+  if(mins) renderSpeakers();
+}
+function chooseMode(k){
+  if(!TP.code) return;
+  if(k === 'line'){ if(TP.mode !== 'line') DB.set(tbase() + 'mode', 'line').catch(writeErr); return; }
+  const was = TS.minutes;
+  TS.minutes = k === 'minutes'; saveTS();
+  if(TP.mode === 'live'){ paintModeBtns(); if(was !== TS.minutes) toast(modeToast()); $('#tPad').focus(); }
+  else DB.set(tbase() + 'mode', 'live').catch(writeErr);
+  if(k === 'minutes' && isDefaultSpk()) setTimeout(speakerSheet, 200);
+}
+
+/* ---------- 회의록: 화자 이름 ---------- */
+const SPK_RE = /^([^\s:\[][^:\n]{0,14}):\s/;
+const reEsc = t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const spkNames = () => (TS.speakers || []).map(x => String(x || '').trim()).filter(Boolean);
+const isDefaultSpk = () => spkNames().join(',') === DEFAULT_SPK.join(',');
+function renderSpeakers(){
+  const box = $('#tSpk');
+  box.innerHTML = (TS.speakers || []).map((n, i) => String(n || '').trim() ? `<button class="btn sm spk" data-spk="${i}"><small>Alt+${i + 1}</small> ${esc(String(n).trim())}</button>` : '').join('')
+    + '<button class="btn sm" data-spk-tab>직전 사람 <small>Tab</small></button><button class="btn sm ghost" data-spk-edit>이름 넣기·고치기</button>';
+}
+function speakerSheet(){
+  const rows = Array.from({ length:9 }, (_, i) => `<label class="field"><span>Alt+${i + 1}</span><input type="text" data-sp="${i}" maxlength="15" value="${esc((TS.speakers || [])[i] || '')}"></label>`).join('');
+  const box = openSheet(`<h2 tabindex="-1">화자 이름</h2>
+    <p class="muted small">회의에 나오는 사람 이름을 넣어 두면 Alt+숫자로 "이름: "이 들어갑니다. 지금 줄에 글이 있으면 다음 줄로 넘어가서 넣습니다.<br>Tab은 지금 말하던 사람 직전의 사람을 넣어서, 두 사람이 주고받을 때 Tab만 누르면 번갈아 들어갑니다. Shift+Tab은 지금 사람을 한 번 더 넣습니다.</p>
+    <div class="spkgrid">${rows}</div>
+    <div class="row"><div class="sp"></div><button class="btn ghost" data-close>취소</button><button class="btn primary" data-ok>저장</button></div>`, e => {
+      if(!e.target.closest('[data-ok]')) return;
+      const v = $$('input[data-sp]', box).map(x => x.value.replace(/[:\n\r]/g, '').trim().slice(0, 15));
+      while(v.length && !v[v.length - 1]) v.pop();
+      TS.speakers = v; saveTS(); renderSpeakers(); closeSheet();
+      setTimeout(() => $('#tPad').focus(), 30);
+    }, 'input[data-sp]');
+}
+// 커서 위쪽에서 최근에 말한 두 사람 [지금 사람, 직전 사람]
+function labelsIn(line, known){
+  const found = [];
+  const m = line.match(SPK_RE); if(m) found.push({ i:0, n:m[1].trim() });
+  if(known.length){
+    const re = new RegExp('\\s(' + known.map(reEsc).join('|') + '):\\s', 'g'); let x;
+    while((x = re.exec(line))) found.push({ i:x.index + 1, n:x[1] });
+  }
+  return found.sort((a, b) => a.i - b.i).map(f => f.n);
+}
+function recentSpeakers(){
+  const pad = $('#tPad'), v = pad.value, pos = pad.selectionStart;
+  let end = v.indexOf('\n', pos); if(end < 0) end = v.length;
+  const lines = v.slice(0, end).split('\n'), known = spkNames(), out = [];
+  for(let i = lines.length - 1; i >= 0 && i >= lines.length - 400 && out.length < 2; i--){
+    const ls2 = labelsIn(lines[i], known);
+    for(let j = ls2.length - 1; j >= 0 && out.length < 2; j--) if(!out.includes(ls2[j])) out.push(ls2[j]);
+  }
+  return out;
+}
+function insertSpeaker(name){
+  if(!name){ toast('먼저 화자 이름을 넣어 주세요'); speakerSheet(); return; }
+  const pad = $('#tPad'); pad.focus();
+  const v = pad.value, s = pad.selectionStart, e = pad.selectionEnd;
+  const ls2 = v.lastIndexOf('\n', s - 1) + 1; let le = v.indexOf('\n', s); if(le < 0) le = v.length;
+  const line = v.slice(ls2, le), label = name + ': ';
+  const m = line.match(SPK_RE);
+  // 빈 줄이나 이름만 있는 줄이면 그 줄을 이 이름으로, 글이 있으면 다음 줄에 새로 넣음
+  if(!line.trim() || (m && !line.slice(m[0].length).trim())) pad.setRangeText(label, ls2, le, 'end');
+  else pad.setRangeText((v.slice(ls2, s).trim() ? '\n' : '') + label, s, e, 'end');
+  TP.dirty = true; kickFlush();
+}
+function speakerSwap(){ const [cur, prev] = recentSpeakers(); insertSpeaker(prev || spkNames().find(n => n !== cur) || cur); }
+function speakerAgain(){ const [cur] = recentSpeakers(); insertSpeaker(cur || spkNames()[0]); }
+// 저장용: 한 줄에 여러 사람이 섞여 있으면 사람마다 줄을 나누고, 말하는 사람이 바뀌면 빈 줄을 넣음
+function minutesText(lines){
+  const known = new Set(spkNames());
+  lines.forEach(l => { const m = l.match(SPK_RE); if(m) known.add(m[1].trim()); });
+  const names = [...known].filter(Boolean).sort((a, b) => b.length - a.length);
+  const re = names.length ? new RegExp('\\s+(?=(?:' + names.map(reEsc).join('|') + '):\\s)', 'g') : null;
+  const out = [];
+  lines.forEach(l => (re ? l.replace(re, '\n') : l).split('\n').forEach(x => {
+    const m = x.match(SPK_RE);
+    if(m && known.has(m[1].trim()) && out.length && out[out.length - 1] !== '') out.push('');
+    out.push(x.replace(/\s+$/, ''));
+  }));
+  return out.join('\n');
 }
 
 /* ---------- 한 줄씩 ---------- */
@@ -332,7 +430,15 @@ function typistInfo(){
 }
 function typistSave(){
   if(!TP.keys.length){ toast('아직 저장할 내용이 없어요'); return; }
-  downloadText('문자통역_' + TP.code + '_' + ymd() + '.txt', TP.keys.map(k => lineText(TP.doc[k])).join('\n') + '\n');
+  const lines = TP.keys.map(k => lineText(TP.doc[k]));
+  const title = (TP.meta && TP.meta.title) || '문자통역';
+  if(modeKey() === 'minutes'){
+    downloadText('회의록_' + fileStamp() + '.txt', title + ' 회의록\n' + longDate() + '\n\n' + minutesText(lines) + '\n');
+    toast('회의록을 저장했어요 (화자별로 줄을 나눔)');
+  } else {
+    downloadText('문자통역_' + fileStamp() + '.txt', lines.join('\n') + '\n');
+    toast('내용을 저장했어요');
+  }
 }
 function applyTypistLook(){ document.documentElement.style.setProperty('--tsize', TSIZES[Math.max(0, Math.min(TSIZES.length - 1, TS.size))] + 'px'); }
 function typistSettings(){
@@ -372,14 +478,26 @@ function typistInit(){
   inp.addEventListener('compositionend', () => { if(TP.pendingEnter){ TP.pendingEnter = false; setTimeout(commitLine, 0); } });
   // 메모장: 고칠 때마다 바뀐 줄을 보내고, 커서만 움직여도 위치를 보냄
   pad.addEventListener('input', () => { TP.dirty = true; kickFlush(); });
-  pad.addEventListener('keydown', e => { altPrefix(e); });
+  pad.addEventListener('keydown', e => {
+    if(TP.mode === 'live' && TS.minutes){
+      // 한글 조합 중에 누른 단축키는 조합이 끝난 뒤에 실행
+      const run = f => { if(e.isComposing || e.keyCode === 229) TP.pendingIns = f; else f(); };
+      if(e.key === 'Tab' && !e.ctrlKey && !e.altKey && !e.metaKey){ e.preventDefault(); run(e.shiftKey ? speakerAgain : speakerSwap); return; }
+      const d = e.altKey && !e.ctrlKey && /^(Digit|Numpad)[1-9]$/.test(e.code) ? Number(e.code.slice(-1)) : 0;
+      if(d){ e.preventDefault(); const n = String((TS.speakers || [])[d - 1] || '').trim(); if(n) run(() => insertSpeaker(n)); else toast('Alt+' + d + '에 넣은 이름이 없어요'); return; }
+    }
+    altPrefix(e);
+  });
   pad.addEventListener('compositionstart', () => { TP.composing = true; });
-  pad.addEventListener('compositionend', () => { TP.composing = false; TP.dirty = true; kickFlush(); });
+  pad.addEventListener('compositionend', () => { TP.composing = false; TP.dirty = true; kickFlush(); if(TP.pendingIns){ const f = TP.pendingIns; TP.pendingIns = null; setTimeout(f, 0); } });
   ['keyup', 'mouseup'].forEach(t => pad.addEventListener(t, () => { if(TP.mode === 'live') kickFlush(); }));
   $('#vType').addEventListener('click', e => {
     const ln = e.target.closest('.ln[data-id]'); if(ln){ editLine(ln.dataset.id); return; }
     const pre = e.target.closest('[data-pre]'); if(pre){ insertPrefix(PREFIX[pre.dataset.pre]); return; }
-    const md = e.target.closest('[data-mode]'); if(md){ if(TP.code && md.dataset.mode !== TP.mode) DB.set(tbase() + 'mode', md.dataset.mode).catch(writeErr); return; }
+    const md = e.target.closest('[data-mode]'); if(md){ chooseMode(md.dataset.mode); return; }
+    const sp = e.target.closest('[data-spk]'); if(sp){ insertSpeaker(String(TS.speakers[Number(sp.dataset.spk)] || '').trim()); return; }
+    if(e.target.closest('[data-spk-tab]')){ speakerSwap(); return; }
+    if(e.target.closest('[data-spk-edit]')){ speakerSheet(); return; }
     const b = e.target.closest('[data-t]'); if(!b) return;
     const a = b.dataset.t;
     if(a === 'info') typistInfo();

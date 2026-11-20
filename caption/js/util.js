@@ -110,4 +110,7 @@ function downloadText(name, text){
   }catch(e){ toast('파일을 저장하지 못했어요'); }
 }
 const ymd = (d = new Date()) => d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+const p2 = n => String(n).padStart(2, '0');
+const fileStamp = (d = new Date()) => d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + '_' + p2(d.getHours()) + p2(d.getMinutes());
+const longDate = (d = new Date()) => d.getFullYear() + '년 ' + (d.getMonth() + 1) + '월 ' + d.getDate() + '일 (' + '일월화수목금토'[d.getDay()] + ') ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
 const hm = t => { const d = new Date(t); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };

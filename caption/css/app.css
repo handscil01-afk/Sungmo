@@ -120,3 +120,7 @@ button.ln:hover{background:var(--panel)}
 .tpre .hint{color:var(--faint);font-size:12.5px}
 .tin{width:100%;resize:none;font-size:calc(var(--tsize) + 2px);line-height:1.45;border:2px solid var(--acc);background:#0b0e13;padding:10px 12px}
 @media (max-width:640px){ .tpre .hint{display:none} .ttitle{display:none} }
+.spkbar{flex:none;padding:6px max(16px,env(safe-area-inset-left,0px)) 8px;background:#000;border-bottom:1px solid var(--line)}
+.btn.spk{border-color:var(--acc)}
+#tLivePanel.minutes .padbar .btn small{display:none}
+.spkgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}

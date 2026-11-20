@@ -145,7 +145,7 @@ function readerNet(c){
 function readerSave(){
   const t = readerModel().text;
   if(!t){ toast('아직 저장할 내용이 없어요'); return; }
-  downloadText('문자통역_' + RD.code + '_' + ymd() + '.txt', t + '\n');
+  downloadText('문자통역_' + fileStamp() + '.txt', t + '\n');
   rSay('내용을 파일로 저장했어요.');
 }
 function readerSettings(){
