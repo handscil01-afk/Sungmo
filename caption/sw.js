@@ -1,7 +1,7 @@
-const CACHE = 'caption-v9';
+const CACHE = 'caption-v10';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png',
   './css/app.css',
-  './js/config.js', './js/util.js', './js/store.js', './js/pwa.js', './js/reader.js', './js/typist.js', './js/app.js',
+  './js/config.js', './js/util.js', './js/store.js', './js/pwa.js', './js/reader.js', './js/typist.js', './js/stt.js', './js/app.js',
   './vendor/firebase-app.js', './vendor/firebase-auth.js', './vendor/firebase-database.js'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

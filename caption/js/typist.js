@@ -5,7 +5,7 @@
    - 바로바로(live, 대화): 메모장 칸 하나. 바뀐 줄만 DRAFT_MS 간격으로 보내고, 내 커서 위치도 보냄
    두 방식 모두 같은 lines(줄 열쇠 → 글)를 쓰므로 방식을 바꿔도 내용이 이어짐 */
 const DEFAULT_SPK = ['화자1', '화자2', '화자3'];
-const TS = { size:2, name:'', minutes:false, speakers:DEFAULT_SPK.slice(), ...ls.get('tp', {}) };
+const TS = { size:2, name:'', sttTo:'send', minutes:false, speakers:DEFAULT_SPK.slice(), ...ls.get('tp', {}) };
 const saveTS = () => ls.set('tp', TS);
 const TSIZES = [15, 17, 20, 24, 28, 34];
 const PREFIX = { '1':'[해설] ', '2':'[소리] ', '3':'[음악] ' };
@@ -123,7 +123,7 @@ async function typistResume(t){
 
 function typistEnter(code, host, pin){
   typistStop();
-  Object.assign(TP, { code, host, pin, meta:null, mode:null, doc:{}, keys:[], readers:{}, pendingEnter:false, warned:false, sent:[], dirty:false, again:false, composing:false, lastCur:'', longWarned:false });
+  Object.assign(TP, { lastKey:null, code, host, pin, meta:null, mode:null, doc:{}, keys:[], readers:{}, pendingEnter:false, warned:false, sent:[], dirty:false, again:false, composing:false, lastCur:'', longWarned:false });
   TP.rows.forEach(el => el.remove()); TP.rows.clear();
   ls.set('typing', { code, host });
   showView('vType');
@@ -158,6 +158,7 @@ function typistEnter(code, host, pin){
   WAKE.on();
 }
 function typistStop(){
+  if(typeof sttStop === 'function' && STT.on) sttStop();
   TP.unsub.forEach(f => { try{ f(); }catch(e){} }); TP.unsub = [];
   if(TP.hb){ clearInterval(TP.hb); TP.hb = 0; }
   if(TP.flushT){ clearTimeout(TP.flushT); TP.flushT = 0; }
@@ -298,13 +299,22 @@ function minutesText(lines){
 }
 
 /* ---------- 한 줄씩 ---------- */
+// 맨 끝에 한 줄 붙이기 (Enter·음성인식이 연달아 보내도 열쇠가 겹치지 않게 마지막으로 만든 열쇠도 봄)
+function appendLine(t){
+  t = cleanLine(t).trim().slice(0, MAX_LINE);
+  if(!t || !TP.code) return;
+  let last = TP.keys[TP.keys.length - 1] || null;
+  if(TP.lastKey && (!last || TP.lastKey > last)) last = TP.lastKey;
+  const k = lineKeyBetween(last, null);
+  TP.lastKey = k;
+  DB.set(tbase() + 'lines/' + k, t).catch(writeErr);
+}
 function commitLine(){
   const inp = $('#tIn');
-  const t = cleanLine(inp.value).trim().slice(0, MAX_LINE);
-  if(!t || !TP.code) return;
+  const t = inp.value;
+  if(!cleanLine(t).trim() || !TP.code) return;
   inp.value = '';
-  const k = lineKeyBetween(TP.keys[TP.keys.length - 1] || null, null);
-  DB.set(tbase() + 'lines/' + k, t).catch(writeErr);
+  appendLine(t);
 }
 function insertPrefix(p){
   if(TP.mode === 'live'){
@@ -450,6 +460,11 @@ function typistSettings(){
   const box = openSheet(`<h2 tabindex="-1">설정</h2>
     <label class="field"><span>내 이름 (교대할 때 구분용)</span><input type="text" id="stName" maxlength="20" value="${esc(TS.name || '')}"></label>
     <div class="row"><span>글자 크기</span><button class="btn" data-sz="-1">작게</button><button class="btn" data-sz="1">크게</button></div>
+    <fieldset class="fs"><legend>음성인식 결과 (한 줄씩 방식)</legend>
+      <label class="chk srow"><input type="radio" name="sttTo" value="send" ${TS.sttTo !== 'input' ? 'checked' : ''}> 바로 보내기 <small class="muted">말 한 마디가 끝나면 한 줄로 바로</small></label>
+      <label class="chk srow"><input type="radio" name="sttTo" value="input" ${TS.sttTo === 'input' ? 'checked' : ''}> 입력 칸에 넣기 <small class="muted">확인하고 고친 뒤 Enter로 보냄</small></label>
+      <p class="muted small">메모장·회의록 방식에서는 메모장 맨 끝에 새 줄로 붙입니다.</p>
+    </fieldset>
     ${pwaSettingsHtml()}
     <div class="row"><div class="sp"></div><button class="btn primary" data-close>닫기</button></div>`, e => {
       if(pwaSettingsBind(box, e)) return;
@@ -457,6 +472,7 @@ function typistSettings(){
       if(sz){ TS.size = Math.max(0, Math.min(TSIZES.length - 1, TS.size + Number(sz.dataset.sz))); saveTS(); applyTypistLook(); }
     });
   pwaSettingsBind(box);
+  $$('input[name=sttTo]', box).forEach(r => r.addEventListener('change', () => { TS.sttTo = r.value; saveTS(); paintStt(); }));
   $('#stName', box).addEventListener('input', e => { TS.name = e.target.value.trim().slice(0, 20); saveTS(); });
 }
 
@@ -494,8 +510,11 @@ function typistInit(){
     altPrefix(e);
   });
   pad.addEventListener('compositionstart', () => { TP.composing = true; });
-  pad.addEventListener('compositionend', () => { TP.composing = false; TP.dirty = true; kickFlush(); if(TP.pendingIns){ const f = TP.pendingIns; TP.pendingIns = null; setTimeout(f, 0); } });
+  pad.addEventListener('compositionend', () => { TP.composing = false; TP.dirty = true; kickFlush(); if(TP.pendingIns){ const f = TP.pendingIns; TP.pendingIns = null; setTimeout(f, 0); } setTimeout(sttFlushQueue, 0); });
   ['keyup', 'mouseup'].forEach(t => pad.addEventListener(t, () => { if(TP.mode === 'live') kickFlush(); }));
+  document.addEventListener('keydown', e => {
+    if(e.key === 'F2' && TP.code && !$('#vType').hidden && $('#sheet').hidden){ e.preventDefault(); sttToggle(); }
+  });
   $('#vType').addEventListener('click', e => {
     const ln = e.target.closest('.ln[data-id]'); if(ln){ editLine(ln.dataset.id); return; }
     const pre = e.target.closest('[data-pre]'); if(pre){ insertPrefix(PREFIX[pre.dataset.pre]); return; }
@@ -508,6 +527,8 @@ function typistInit(){
     if(a === 'info') typistInfo();
     else if(a === 'save') typistSave();
     else if(a === 'settings') typistSettings();
+    else if(a === 'stt') sttToggle();
+    else if(a === 'sttGuide') sttGuide(false);
     else if(a === 'close'){ if(arm(b, 'close', TP.host ? '한 번 더 누르면 방을 닫습니다' : '한 번 더 누르면 나갑니다')) typistLeave(true); }
   });
 }

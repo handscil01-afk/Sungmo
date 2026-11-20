@@ -26,7 +26,7 @@ window.inAppName=(function(u){return /KAKAOTALK/i.test(u)?'카카오톡':/ Line\
 <link rel="modulepreload" href="vendor/firebase-app.js">
 <link rel="modulepreload" href="vendor/firebase-auth.js">
 <link rel="modulepreload" href="vendor/firebase-database.js">
-<link rel="stylesheet" href="css/app.css?v=9">
+<link rel="stylesheet" href="css/app.css?v=10">
 </head>
 <body>
 
@@ -98,12 +98,17 @@ window.inAppName=(function(u){return /KAKAOTALK/i.test(u)?'카카오톡':/ Line\
       <button class="btn sm" data-mode="minutes" aria-pressed="false">회의록 <small>화자 이름</small></button>
     </div>
     <div class="sp"></div>
+    <button class="btn sm stt" data-t="stt" id="sttBtn" title="F2" aria-pressed="false">🎤 음성인식</button>
     <button class="btn sm" data-t="info">방 정보</button>
     <button class="btn sm" data-t="save">저장</button>
     <button class="btn sm" data-t="settings">설정</button>
     <button class="hbtn fsbtn" data-act="fs" aria-label="전체화면"></button>
     <button class="btn sm danger" data-t="close">방 닫기</button>
   </header>
+  <div id="tStt" class="sttbar" hidden>
+    <div class="row"><span id="sttState" class="sttstate"></span><span class="meter" aria-hidden="true"><span id="sttLevel"></span></span><div class="sp"></div><button class="btn sm ghost" data-t="sttGuide">소리 연결 방법</button><button class="btn sm" data-t="stt">멈추기</button></div>
+    <div id="sttInterim" class="sttinterim" aria-live="off"></div>
+  </div>
   <div class="tmain">
     <div id="tLinePanel" class="tpanel" hidden>
       <div id="tLog" class="tlog">
@@ -136,12 +141,13 @@ window.inAppName=(function(u){return /KAKAOTALK/i.test(u)?'카카오톡':/ Line\
 <div id="sheet" hidden><div id="sheetBox" class="sheet-box" role="dialog" aria-modal="true"></div></div>
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script src="js/config.js?v=9"></script>
-<script src="js/util.js?v=9"></script>
-<script src="js/store.js?v=9"></script>
-<script src="js/pwa.js?v=9"></script>
-<script src="js/reader.js?v=9"></script>
-<script src="js/typist.js?v=9"></script>
-<script src="js/app.js?v=9"></script>
+<script src="js/config.js?v=10"></script>
+<script src="js/util.js?v=10"></script>
+<script src="js/store.js?v=10"></script>
+<script src="js/pwa.js?v=10"></script>
+<script src="js/reader.js?v=10"></script>
+<script src="js/typist.js?v=10"></script>
+<script src="js/stt.js?v=10"></script>
+<script src="js/app.js?v=10"></script>
 </body>
 </html>
