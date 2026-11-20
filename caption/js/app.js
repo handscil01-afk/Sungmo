@@ -28,6 +28,7 @@ document.addEventListener('click', e => {
   const act = a.dataset.act;
   if(act === 'fs') FS.toggle();
   else if(act === 'install') installSheet();
+  else if(act === 'external'){ try{ window.openExternal(); }catch(e){} }
   else if(act === 'installLater'){ UIP.installDismissed = true; saveUIP(); paintInstall(); }
   else if(act === 'typist'){ if(!DB){ toast('서버에 연결하는 중이에요'); return; } typistStartSheet(); }
   else if(act === 'resume'){ const h = ls.get('host'); if(h && DB) typistResume({ code:h.code, host:true }).then(ok => { if(!ok){ ls.del('host'); showStart(); toast('그 방이 없어졌어요. 새 방을 만들어 주세요'); } }); }
@@ -67,7 +68,7 @@ async function checkUpdate(){
   const view = ($$('.view').find(x => !x.hidden) || {}).id;
   if(view === 'vStart' && $('#sheet').hidden){ location.reload(); return; }
   if(view === 'vRead'){
-    const following = RD.live && (RS.view === 'box' || document.activeElement === RD.liveEl || document.activeElement === $('#rList') || !document.activeElement || document.activeElement === document.body);
+    const following = RD.live && (RS.view === 'box' || (RS.move && (document.activeElement === RD.liveEl || document.activeElement === $('#rList') || !document.activeElement || document.activeElement === document.body)));
     if(following){ location.reload(); return; }
     if(!UPDATE.told){ UPDATE.told = true; rSay('새 판이 나왔어요. Enter를 누르면 새 판으로 바뀌고 지금 치는 곳으로 갑니다.'); }
     return;
@@ -77,5 +78,6 @@ async function checkUpdate(){
 setInterval(checkUpdate, 3 * 60 * 1000);
 document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') checkUpdate(); });
 $$('.appver').forEach(e => { e.textContent = APP_VER; });
+if(window.inAppName){ const n = $('#inAppNote'); n.querySelector('span').textContent = window.inAppName + ' 안에서 열렸어요. 이대로 쓰셔도 됩니다.'; n.hidden = false; }
 boot();
 setTimeout(checkUpdate, 5000);

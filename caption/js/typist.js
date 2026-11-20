@@ -5,7 +5,7 @@
    - 바로바로(live, 대화): 메모장 칸 하나. 바뀐 줄만 DRAFT_MS 간격으로 보내고, 내 커서 위치도 보냄
    두 방식 모두 같은 lines(줄 열쇠 → 글)를 쓰므로 방식을 바꿔도 내용이 이어짐 */
 const DEFAULT_SPK = ['화자1', '화자2', '화자3'];
-const TS = { size:2, name:'', minutes:false, speakers:DEFAULT_SPK.slice(), ...ls.get('tp', {}) };
+const TS = { size:2, name:'', sttTo:'send', minutes:false, speakers:DEFAULT_SPK.slice(), ...ls.get('tp', {}) };
 const saveTS = () => ls.set('tp', TS);
 const TSIZES = [15, 17, 20, 24, 28, 34];
 const PREFIX = { '1':'[해설] ', '2':'[소리] ', '3':'[음악] ' };
@@ -123,7 +123,7 @@ async function typistResume(t){
 
 function typistEnter(code, host, pin){
   typistStop();
-  Object.assign(TP, { code, host, pin, meta:null, mode:null, doc:{}, keys:[], readers:{}, pendingEnter:false, warned:false, sent:[], dirty:false, again:false, composing:false, lastCur:'', longWarned:false });
+  Object.assign(TP, { lastKey:null, code, host, pin, meta:null, mode:null, doc:{}, keys:[], readers:{}, pendingEnter:false, warned:false, sent:[], dirty:false, again:false, composing:false, lastCur:'', longWarned:false });
   TP.rows.forEach(el => el.remove()); TP.rows.clear();
   ls.set('typing', { code, host });
   showView('vType');
@@ -158,6 +158,7 @@ function typistEnter(code, host, pin){
   WAKE.on();
 }
 function typistStop(){
+  if(typeof sttStop === 'function' && STT.on) sttStop();
   TP.unsub.forEach(f => { try{ f(); }catch(e){} }); TP.unsub = [];
   if(TP.hb){ clearInterval(TP.hb); TP.hb = 0; }
   if(TP.flushT){ clearTimeout(TP.flushT); TP.flushT = 0; }
@@ -298,13 +299,22 @@ function minutesText(lines){
 }
 
 /* ---------- 한 줄씩 ---------- */
+// 맨 끝에 한 줄 붙이기 (Enter·음성인식이 연달아 보내도 열쇠가 겹치지 않게 마지막으로 만든 열쇠도 봄)
+function appendLine(t){
+  t = cleanLine(t).trim().slice(0, MAX_LINE);
+  if(!t || !TP.code) return;
+  let last = TP.keys[TP.keys.length - 1] || null;
+  if(TP.lastKey && (!last || TP.lastKey > last)) last = TP.lastKey;
+  const k = lineKeyBetween(last, null);
+  TP.lastKey = k;
+  DB.set(tbase() + 'lines/' + k, t).catch(writeErr);
+}
 function commitLine(){
   const inp = $('#tIn');
-  const t = cleanLine(inp.value).trim().slice(0, MAX_LINE);
-  if(!t || !TP.code) return;
+  const t = inp.value;
+  if(!cleanLine(t).trim() || !TP.code) return;
   inp.value = '';
-  const k = lineKeyBetween(TP.keys[TP.keys.length - 1] || null, null);
-  DB.set(tbase() + 'lines/' + k, t).catch(writeErr);
+  appendLine(t);
 }
 function insertPrefix(p){
   if(TP.mode === 'live'){
@@ -422,6 +432,11 @@ function typistInfo(){
     <p>읽는 분은 <b>${esc(APP_ADDR)}</b>에 들어가서 방을 고르거나 방 번호를 넣으면 됩니다. 아래 주소로 열면 방 번호 없이 바로 들어갑니다.</p>
     <p class="addr">${esc(link)}</p>
     <div class="row"><button class="btn" data-copy>주소 복사</button><button class="btn" data-open>읽는 화면 열어 보기</button></div>
+    <details class="card"><summary><b>넷플릭스 자막을 이 방으로 보내기</b></summary>
+      <p class="small">넷플릭스를 트는 PC 크롬에 템퍼몽키를 설치한 뒤 아래 주소를 열어 스크립트를 설치합니다. 넷플릭스에서 자막을 <b>한국어(CC)</b>로 켜고, 오른쪽 위 '문자통역 자막' 패널에 이 방 번호와 교대 비밀번호를 넣으면 자막이 바뀔 때마다 한 줄씩 들어옵니다. '화면에서 자막 숨기기'로 프로젝터에서는 자막을 감출 수 있습니다.</p>
+      <p class="addr">https://${esc(APP_ADDR)}netflix-caption.user.js</p>
+      <div class="row"><a class="btn" href="netflix-caption.user.js" target="_blank" rel="noopener">스크립트 설치하기</a></div>
+    </details>
     ${TP.host ? `<p>교대 입력 비밀번호: <b class="pin">${esc(TP.pin || '불러오는 중')}</b> <small class="muted">다른 노트북에서 '교대 입력자로 들어가기'에 넣습니다.</small></p>` : '<p class="muted">교대 입력자로 들어와 있어요.</p>'}
     <div class="row"><div class="sp"></div><button class="btn primary" data-close>닫기</button></div>`, async e => {
       if(e.target.closest('[data-copy]')){ try{ await navigator.clipboard.writeText(link); toast('주소를 복사했어요'); }catch(err){ toast('복사하지 못했어요. 주소를 직접 적어 주세요'); } }
@@ -445,6 +460,12 @@ function typistSettings(){
   const box = openSheet(`<h2 tabindex="-1">설정</h2>
     <label class="field"><span>내 이름 (교대할 때 구분용)</span><input type="text" id="stName" maxlength="20" value="${esc(TS.name || '')}"></label>
     <div class="row"><span>글자 크기</span><button class="btn" data-sz="-1">작게</button><button class="btn" data-sz="1">크게</button></div>
+    <fieldset class="fs"><legend>음성인식 결과 (한 줄씩 방식)</legend>
+      <label class="chk srow"><input type="radio" name="sttTo" value="send" ${TS.sttTo !== 'input' ? 'checked' : ''}> 바로 보내기 <small class="muted">말 한 마디가 끝나면 한 줄로 바로</small></label>
+      <label class="chk srow"><input type="radio" name="sttTo" value="input" ${TS.sttTo === 'input' ? 'checked' : ''}> 입력 칸에 넣기 <small class="muted">확인하고 고친 뒤 Enter로 보냄</small></label>
+      <p class="muted small">메모장·회의록 방식에서는 메모장 맨 끝에 새 줄로 붙입니다.</p>
+      <label class="chk srow"><input type="checkbox" id="stMeter" ${TS.sttMeter !== false ? 'checked' : ''}> 소리 막대 보기 <small class="muted">음성인식이 글을 받아 적지 못하면 꺼 보세요</small></label>
+    </fieldset>
     ${pwaSettingsHtml()}
     <div class="row"><div class="sp"></div><button class="btn primary" data-close>닫기</button></div>`, e => {
       if(pwaSettingsBind(box, e)) return;
@@ -452,6 +473,8 @@ function typistSettings(){
       if(sz){ TS.size = Math.max(0, Math.min(TSIZES.length - 1, TS.size + Number(sz.dataset.sz))); saveTS(); applyTypistLook(); }
     });
   pwaSettingsBind(box);
+  $('#stMeter', box).addEventListener('change', e => { TS.sttMeter = e.target.checked; saveTS(); if(STT.on){ if(TS.sttMeter) sttMeterStart(); else sttMeterStop(); } });
+  $$('input[name=sttTo]', box).forEach(r => r.addEventListener('change', () => { TS.sttTo = r.value; saveTS(); paintStt(); }));
   $('#stName', box).addEventListener('input', e => { TS.name = e.target.value.trim().slice(0, 20); saveTS(); });
 }
 
@@ -489,8 +512,11 @@ function typistInit(){
     altPrefix(e);
   });
   pad.addEventListener('compositionstart', () => { TP.composing = true; });
-  pad.addEventListener('compositionend', () => { TP.composing = false; TP.dirty = true; kickFlush(); if(TP.pendingIns){ const f = TP.pendingIns; TP.pendingIns = null; setTimeout(f, 0); } });
+  pad.addEventListener('compositionend', () => { TP.composing = false; TP.dirty = true; kickFlush(); if(TP.pendingIns){ const f = TP.pendingIns; TP.pendingIns = null; setTimeout(f, 0); } setTimeout(sttFlushQueue, 0); });
   ['keyup', 'mouseup'].forEach(t => pad.addEventListener(t, () => { if(TP.mode === 'live') kickFlush(); }));
+  document.addEventListener('keydown', e => {
+    if(e.key === 'F2' && TP.code && !$('#vType').hidden && $('#sheet').hidden){ e.preventDefault(); sttToggle(); }
+  });
   $('#vType').addEventListener('click', e => {
     const ln = e.target.closest('.ln[data-id]'); if(ln){ editLine(ln.dataset.id); return; }
     const pre = e.target.closest('[data-pre]'); if(pre){ insertPrefix(PREFIX[pre.dataset.pre]); return; }
@@ -503,6 +529,8 @@ function typistInit(){
     if(a === 'info') typistInfo();
     else if(a === 'save') typistSave();
     else if(a === 'settings') typistSettings();
+    else if(a === 'stt') sttToggle();
+    else if(a === 'sttGuide') sttGuide(false);
     else if(a === 'close'){ if(arm(b, 'close', TP.host ? '한 번 더 누르면 방을 닫습니다' : '한 번 더 누르면 나갑니다')) typistLeave(true); }
   });
 }

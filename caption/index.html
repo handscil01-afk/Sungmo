@@ -2,12 +2,14 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<script>/* 카카오톡·라인 같은 앱 안 브라우저로 열면 바로 기기의 기본 브라우저로 다시 엶 (홈 화면 설치·저장된 정보가 한 브라우저에 모이게) */
-(function(){var u=navigator.userAgent,h=location.href,ios=/iPhone|iPad|iPod/i.test(u);
-if(/KAKAOTALK/i.test(u)){location.href='kakaotalk://web/openExternal?url='+encodeURIComponent(h);setTimeout(function(){location.href=ios?'kakaoweb://closeBrowser':'kakaotalk://inappbrowser/close';},1500);}
-else if(/ Line\//i.test(u)&&!/openExternalBrowser=1/.test(h)){location.href=h+(h.indexOf('?')<0?'?':'&')+'openExternalBrowser=1';}
-else if(/Android/i.test(u)&&/NAVER\(inapp|Instagram|FBAN|FBAV|everytimeApp|BAND\//i.test(u)){location.href='intent://'+h.replace(/^https?:\/\//,'')+'#Intent;scheme=https;package=com.android.chrome;end';}
-})();</script>
+<script>/* 카카오톡·라인 같은 앱 안 브라우저: 이 앱은 자동으로 넘기지 않음.
+   한소네의 카카오톡에서는 기본 브라우저(크롬)가 이 주소 대신 빈 새 탭(광고 기사)으로만 열리고 카톡 창은 닫혀서,
+   앱 안 브라우저에서 그대로 쓰게 하고, 원하는 사람만 처음 화면의 '기본 브라우저로 열기' 버튼으로 넘김 */
+window.openExternal=function(){var u=navigator.userAgent,h=location.href;
+if(/KAKAOTALK/i.test(u))location.href='kakaotalk://web/openExternal?url='+encodeURIComponent(h);
+else if(/ Line\//i.test(u))location.href=h+(h.indexOf('?')<0?'?':'&')+'openExternalBrowser=1';
+else if(/Android/i.test(u))location.href='intent://'+h.replace(/^https?:\/\//,'')+'#Intent;scheme=https;package=com.android.chrome;end';};
+window.inAppName=(function(u){return /KAKAOTALK/i.test(u)?'카카오톡':/ Line\//i.test(u)?'라인':/NAVER\(inapp/i.test(u)?'네이버':/Instagram/i.test(u)?'인스타그램':/FBAN|FBAV/i.test(u)?'페이스북':/BAND\//i.test(u)?'밴드':/everytimeApp/i.test(u)?'에브리타임':'';})(navigator.userAgent);</script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#000000">
 <meta name="mobile-web-app-capable" content="yes">
@@ -24,7 +26,7 @@ else if(/Android/i.test(u)&&/NAVER\(inapp|Instagram|FBAN|FBAV|everytimeApp|BAND\
 <link rel="modulepreload" href="vendor/firebase-app.js">
 <link rel="modulepreload" href="vendor/firebase-auth.js">
 <link rel="modulepreload" href="vendor/firebase-database.js">
-<link rel="stylesheet" href="css/app.css?v=6">
+<link rel="stylesheet" href="css/app.css?v=11">
 </head>
 <body>
 
@@ -38,6 +40,7 @@ else if(/Android/i.test(u)&&/NAVER\(inapp|Instagram|FBAN|FBAV|everytimeApp|BAND\
     </div>
     <h1>실시간 문자통역 <small class="ver">(<span class="appver"></span>판)</small></h1>
     <p id="startMsg" class="msg" role="alert" hidden></p>
+    <p id="inAppNote" class="note" hidden><span></span> <button class="btn sm" data-act="external">기본 브라우저로 열기</button></p>
     <h2>읽을 방 고르기</h2>
     <div id="roomList" class="rooms"><p class="muted">방 목록을 불러오는 중이에요.</p></div>
     <form id="codeForm" class="codeform">
@@ -62,7 +65,8 @@ else if(/Android/i.test(u)&&/NAVER\(inapp|Instagram|FBAN|FBAV|everytimeApp|BAND\
 <!-- ============ 읽기 화면 ============ -->
 <section id="vRead" class="view" hidden>
   <h1 id="rTitle" class="rtitle">문자통역</h1>
-  <div id="rList" class="rlist" tabindex="0" role="region" aria-label="통역 내용"></div>
+  <div id="rList" class="rlist" tabindex="-1"></div>
+  <div id="rAnn" class="sr-only" aria-live="polite"></div>
   <textarea id="rText" class="rtext" aria-label="통역 내용" inputmode="none" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
   <p id="rEmpty" class="rempty" hidden aria-hidden="true">통역이 시작되면 여기에 글이 나옵니다.</p>
   <div class="rbar">
@@ -94,12 +98,19 @@ else if(/Android/i.test(u)&&/NAVER\(inapp|Instagram|FBAN|FBAV|everytimeApp|BAND\
       <button class="btn sm" data-mode="minutes" aria-pressed="false">회의록 <small>화자 이름</small></button>
     </div>
     <div class="sp"></div>
+    <button class="btn sm stt" data-t="stt" id="sttBtn" title="F2" aria-pressed="false">🎤 음성인식</button>
     <button class="btn sm" data-t="info">방 정보</button>
     <button class="btn sm" data-t="save">저장</button>
     <button class="btn sm" data-t="settings">설정</button>
     <button class="hbtn fsbtn" data-act="fs" aria-label="전체화면"></button>
     <button class="btn sm danger" data-t="close">방 닫기</button>
   </header>
+  <div id="tStt" class="sttbar" hidden>
+    <div class="row"><span id="sttState" class="sttstate"></span><span class="meter" aria-hidden="true"><span id="sttLevel"></span></span><div class="sp"></div><button class="btn sm ghost" data-t="sttGuide">소리 연결 방법</button><button class="btn sm" data-t="stt">멈추기</button></div>
+    <div id="sttInterim" class="sttinterim" aria-live="off"></div>
+    <div id="sttDiag" class="sttdiag"></div>
+    <p id="sttHint" class="stthint" role="status" hidden></p>
+  </div>
   <div class="tmain">
     <div id="tLinePanel" class="tpanel" hidden>
       <div id="tLog" class="tlog">
@@ -132,12 +143,13 @@ else if(/Android/i.test(u)&&/NAVER\(inapp|Instagram|FBAN|FBAV|everytimeApp|BAND\
 <div id="sheet" hidden><div id="sheetBox" class="sheet-box" role="dialog" aria-modal="true"></div></div>
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script src="js/config.js?v=6"></script>
-<script src="js/util.js?v=6"></script>
-<script src="js/store.js?v=6"></script>
-<script src="js/pwa.js?v=6"></script>
-<script src="js/reader.js?v=6"></script>
-<script src="js/typist.js?v=6"></script>
-<script src="js/app.js?v=6"></script>
+<script src="js/config.js?v=11"></script>
+<script src="js/util.js?v=11"></script>
+<script src="js/store.js?v=11"></script>
+<script src="js/pwa.js?v=11"></script>
+<script src="js/reader.js?v=11"></script>
+<script src="js/typist.js?v=11"></script>
+<script src="js/stt.js?v=11"></script>
+<script src="js/app.js?v=11"></script>
 </body>
 </html>

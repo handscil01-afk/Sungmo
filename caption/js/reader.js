@@ -7,14 +7,14 @@
    - 따라가기: 새 글이 오면 바로 넣고 커서를 지금 치는 곳(한 줄씩: 맨 끝, 바로바로: 통역하는 분의 커서)으로 옮김
    - 멈춤: 읽는 분이 커서를 직접 움직이거나 Space를 누르면 멈춤. 새 글이 와도 칸을 전혀 건드리지 않음
      (점자 줄이 튕기지 않게). Enter를 누르면 모아 둔 새 글을 넣고 다시 따라가기 */
-const RS = { size:3, theme:'dark', ro:false, view:'list', gran:'word', ...ls.get('rd', {}) };
+const RS = { size:3, theme:'dark', ro:false, view:'list', gran:'word', move:false, ann:false, ...ls.get('rd', {}) };
 const GRAN = { word:'낱말마다 (띄어쓰기하거나 잠깐 멈추면)', sent:'문장이 끝나면 (점자 줄이 가장 덜 바뀜)', char:'글자마다 (치는 대로 바로)' };
 const WORD_IDLE = 800, SENT_IDLE = 2500;
 const saveRS = () => ls.set('rd', RS);
 const SIZES = [18, 22, 26, 32, 40, 50, 62, 76];
 const THEMES = { dark:'흰 글씨 · 검은 바탕', yellow:'노란 글씨 · 검은 바탕', light:'검은 글씨 · 흰 바탕' };
 const MODE_NAME = { line:'한 줄씩 보내기', live:'바로바로 보내기' };
-const RD = { lastEdit:0, holdT:0, liveEl:null, lastLine:null, code:null, meta:null, mode:'line', lines:{}, cursors:{}, text:'', follow:0, live:true, unsub:[], stopPres:null, renderT:0, wasConnected:true, gotLines:false, waiting:false, setting:false };
+const RD = { tabEl:null, annDone:new Set(), annInit:false, lastEdit:0, holdT:0, liveEl:null, lastLine:null, code:null, meta:null, mode:'line', lines:{}, cursors:{}, text:'', follow:0, live:true, unsub:[], stopPres:null, renderT:0, wasConnected:true, gotLines:false, waiting:false, setting:false };
 
 // 메모장 방식에서 지금 치고 있는 줄의 끝부분은 낱말·문장이 끝날 때까지 잠깐 기다렸다가 보여 줌 (점자 줄이 덜 깜빡이게)
 function holdTail(t, c){
@@ -87,32 +87,53 @@ function setCaret(ta, pos){
 }
 /* 줄마다 따로 보기 */
 const RL = new Map();   // 줄 열쇠 → 줄 항목
+// 줄 하나에만 tabindex 를 둠 (가상 커서에는 평범한 문단으로 보이고, Tab으로 들어오면 읽던 줄로)
+function focusLine(el){
+  if(!el) return;
+  if(RD.tabEl && RD.tabEl !== el) RD.tabEl.removeAttribute('tabindex');
+  el.tabIndex = 0; RD.tabEl = el;
+  el.focus({ preventScroll:true }); el.scrollIntoView({ block:'nearest' });
+}
+// 새로 다 친 줄을 알림으로 읽어 줌 (설정에서 켰을 때만. 읽던 자리는 그대로)
+function announceNew(shown, liveK){
+  if(!RD.gotLines) return;
+  const done = x => RD.mode === 'line' || x.k !== liveK;
+  if(!RD.annInit){ RD.annInit = true; shown.forEach(x => { if(done(x)) RD.annDone.add(x.k); }); return; }
+  const fresh = shown.filter(x => done(x) && !RD.annDone.has(x.k));
+  fresh.forEach(x => RD.annDone.add(x.k));
+  if(RS.ann && fresh.length){ const a = $('#rAnn'); a.textContent = ''; setTimeout(() => { a.textContent = fresh.map(x => x.t).join(' '); }, 60); }
+}
 function renderList(md){
   const box = $('#rList'), act = document.activeElement;
-  const wasLive = act === box || (!!RD.liveEl && act === RD.liveEl);
+  const onBox = act === box, onLive = !!RD.liveEl && act === RD.liveEl;
   const near = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
-  const keep = new Set(md.items.map(x => x.k));
+  // 빈 줄은 목록에 넣지 않음 (가상 커서가 빈 줄에서 멈추지 않게)
+  const shown = []; let liveK = null;
+  md.items.forEach((it, i) => { if(it.t){ shown.push(it); if(i <= md.curItem) liveK = it.k; } });
+  if(liveK == null && shown.length) liveK = shown[shown.length - 1].k;
+  const keep = new Set(shown.map(x => x.k));
   let lostFocus = false;
-  for(const [k, el] of RL) if(!keep.has(k)){ if(el === act) lostFocus = true; el.remove(); RL.delete(k); }
+  for(const [k, el] of RL) if(!keep.has(k)){ if(el === act) lostFocus = true; if(el === RD.tabEl) RD.tabEl = null; el.remove(); RL.delete(k); }
   let prev = null;
-  md.items.forEach(({ k, t:tx }) => {
+  shown.forEach(({ k, t }) => {
     let el = RL.get(k);
-    if(!el){ el = document.createElement('p'); el.className = 'rl'; el.tabIndex = -1; el.dataset.k = k; RL.set(k, el); }
-    const t = tx || '\u00a0';
+    if(!el){ el = document.createElement('p'); el.className = 'rl'; el.dataset.k = k; RL.set(k, el); }
     if(el.textContent !== t) el.textContent = t;
     const ref = prev ? prev.nextSibling : box.firstChild;
     if(ref !== el) box.insertBefore(el, ref);
     prev = el;
   });
   RD.text = md.text;
-  const liveEl = md.curItem >= 0 ? RL.get(md.items[md.curItem].k) || null : null;
+  const liveEl = liveK ? RL.get(liveK) || null : null;
   if(RD.liveEl && RD.liveEl !== liveEl) RD.liveEl.classList.remove('now');
   if(liveEl) liveEl.classList.add('now');
-  // 맨 끝 줄(지금 치는 줄)에 있던 분만 새 줄로 옮김. 앞줄을 읽는 중이면 그대로
-  if(liveEl && liveEl !== act && ((RD.live && wasLive) || lostFocus)) (RD.live ? liveEl : box).focus({ preventScroll:true });
+  announceNew(shown, liveK);
+  // 초점을 옮기는 때: 처음 들어와 아직 아무 줄도 없을 때, 읽던 줄이 지워졌을 때,
+  // "새 줄로 옮기기"를 켠 분이 맨 끝 줄에 있을 때만. 그 밖에는 읽던 자리를 절대 옮기지 않음 (가상 커서가 끌려가지 않게)
+  if(liveEl && liveEl !== act && (onBox || lostFocus || (RS.move && RD.live && onLive))) focusLine(liveEl);
   else if(lostFocus) box.focus({ preventScroll:true });
   RD.liveEl = liveEl;
-  if(RD.live && (wasLive || near)){ if(liveEl) liveEl.scrollIntoView({ block:'nearest' }); else box.scrollTop = box.scrollHeight; }
+  if(RD.live && (onBox || onLive || near)){ if(liveEl) liveEl.scrollIntoView({ block:'nearest' }); else box.scrollTop = box.scrollHeight; }
 }
 function render(){
   const ta = $('#rText');
@@ -133,6 +154,10 @@ function scheduleRender(){
 function paintFollow(md){
   const f = $('#rFollow'); if(!f) return;
   const pb = $('[data-r="pause"]'); if(pb) pb.textContent = RD.live ? '멈춤' : '다시 따라가기';
+  if(RS.view === 'list' && !RS.move){
+    f.textContent = '새 줄은 맨 아래에 붙고, 읽던 자리는 움직이지 않아요 · "지금 치는 곳으로": 맨 끝 줄로';
+    f.classList.remove('back'); return;
+  }
   if(RS.view === 'list'){
     const act = document.activeElement, onLine = act && act.classList && act.classList.contains('rl');
     let t, back = false;
@@ -154,8 +179,7 @@ function goLive(){
   RD.live = true;
   if(RS.view === 'list'){
     render();
-    const el = RD.liveEl || $('#rList');
-    el.focus({ preventScroll:true }); el.scrollIntoView({ block:'nearest' });
+    if(RD.liveEl) focusLine(RD.liveEl); else $('#rList').focus();
     paintFollow();
     return;
   }
@@ -175,8 +199,10 @@ function applyReaderLook(){
   if(RS.ro) ta.setAttribute('readonly', ''); else ta.removeAttribute('readonly');
   const list = RS.view === 'list';
   ta.hidden = list; $('#rList').hidden = !list;
+  const pb = $('[data-r="pause"]'); if(pb) pb.hidden = list && !RS.move;
   $('#rHelp').textContent = list
-    ? '위아래 방향키로 한 줄씩 읽습니다. 맨 끝 줄에 있으면 새 줄로 따라가고, 앞줄을 읽는 동안에는 움직이지 않습니다. Enter를 누르면 지금 치는 곳으로 갑니다.'
+    ? (RS.move ? '위아래 방향키로 한 줄씩 읽습니다. 맨 끝 줄에 있으면 새 줄로 따라가고, 앞줄을 읽는 동안에는 움직이지 않습니다. Enter를 누르면 지금 치는 곳으로 갑니다.'
+               : '센스리더 가상 커서나 위아래 방향키로 한 줄씩 읽습니다. 새 줄은 맨 아래에 붙고 읽던 자리는 움직이지 않으니, 맨 끝 줄에서 아래 방향키를 누르면 새 줄을 읽습니다. 지금 치는 곳으로 버튼을 누르면 맨 끝 줄로 갑니다.')
     : '통역 내용 칸에서 Enter를 누르면 지금 치는 곳으로 갑니다. 커서를 움직이거나 Space를 누르면 멈추고, 멈춘 동안에는 새 글이 와도 화면이 그대로 있습니다.';
 }
 
@@ -188,7 +214,7 @@ async function readerJoin(code){
   catch(e){ startMsg(isDenied(e) ? '서버 규칙이 아직 게시되지 않았어요. 통역하는 분께 알려 주세요.' : '방을 불러오지 못했어요. 인터넷 연결을 확인해 주세요.'); return; }
   if(!meta){ startMsg('방 번호 ' + code + '인 방이 없어요. 번호를 다시 확인해 주세요.'); ls.del('lastRead'); return; }
   readerLeave(true);
-  RL.forEach(el => el.remove()); RL.clear();
+  RL.forEach(el => el.remove()); RL.clear(); RD.tabEl = null; RD.annDone = new Set(); RD.annInit = false; $('#rAnn').textContent = '';
   Object.assign(RD, { liveEl:null, lastLine:null, code, meta, mode:'line', lines:{}, cursors:{}, text:'', follow:0, live:true, gotLines:false, waiting:false });
   ls.set('lastRead', { code, at:Date.now() });
   const ta = $('#rText'); ta.value = '';
@@ -223,7 +249,7 @@ async function readerJoin(code){
   RD.unsub.push(DB.on(base + 'cursors', v => { RD.lastEdit = Date.now(); RD.cursors = v || {}; if(RD.mode === 'live') scheduleRender(); }));
   RD.stopPres = DB.presence(base + 'readers/' + DB.uid, () => ({ at:DB.ts() }));
   WAKE.on();
-  setTimeout(() => { if(RS.view === 'list') $('#rList').focus(); else { ta.focus(); setCaret(ta, RD.follow); } }, 50);
+  setTimeout(() => { if(RS.view === 'list'){ if(RD.liveEl) focusLine(RD.liveEl); else $('#rList').focus(); } else { ta.focus(); setCaret(ta, RD.follow); } }, 50);
 }
 function paintRoomTitle(){
   const m = RD.meta;
@@ -257,6 +283,8 @@ function readerSettings(){
     <fieldset class="fs"><legend>읽는 모양</legend>
       <label class="chk srow"><input type="radio" name="rView" value="list" ${RS.view === 'list' ? 'checked' : ''}> 줄마다 따로 <small class="muted">위아래로 한 줄씩 옮기고, 벗어났다 돌아와도 읽던 줄로 돌아옵니다</small></label>
       <label class="chk srow"><input type="radio" name="rView" value="box" ${RS.view !== 'list' ? 'checked' : ''}> 한 칸에 모두 <small class="muted">편집 칸 하나에서 커서로 읽습니다</small></label>
+      <label class="chk srow"><input type="checkbox" id="rMove" ${RS.move ? 'checked' : ''}> 줄마다 따로: 맨 끝 줄에 있으면 새 줄로 초점 옮기기 <small class="muted">센스리더 가상 커서로 읽을 때는 끄세요 (읽던 자리가 끌려갈 수 있음)</small></label>
+      <label class="chk srow"><input type="checkbox" id="rAnnChk" ${RS.ann ? 'checked' : ''}> 줄마다 따로: 새로 다 친 줄을 알림으로 읽어 주기 <small class="muted">읽던 자리는 그대로 두고 음성·점자 알림으로만</small></label>
     </fieldset>
     <fieldset class="fs"><legend>메모장·회의록 방식에서 치는 중인 글 보이기</legend>
       ${Object.entries(GRAN).map(([k, v]) => `<label class="chk srow"><input type="radio" name="rGran" value="${k}" ${RS.gran === k ? 'checked' : ''}> ${v}</label>`).join('')}
@@ -274,6 +302,8 @@ function readerSettings(){
     });
   pwaSettingsBind(box);
   $$('input[name=rGran]', box).forEach(r => r.addEventListener('change', () => { RS.gran = r.value; saveRS(); scheduleRender(); }));
+  $('#rMove', box).addEventListener('change', e => { RS.move = e.target.checked; saveRS(); applyReaderLook(); paintFollow(); });
+  $('#rAnnChk', box).addEventListener('change', e => { RS.ann = e.target.checked; saveRS(); });
   $$('input[name=rView]', box).forEach(r => r.addEventListener('change', () => { RS.view = r.value; saveRS(); applyReaderLook(); RD.live = true; render(); paintFollow(); }));
   $('#rTheme', box).addEventListener('change', e => { RS.theme = e.target.value; saveRS(); applyReaderLook(); });
   $('#rRo', box).addEventListener('change', e => { RS.ro = e.target.checked; saveRS(); applyReaderLook(); });
@@ -308,17 +338,16 @@ function readerInit(){
     if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){
       e.preventDefault();
       const to = cur ? (e.key === 'ArrowDown' ? cur.nextElementSibling : cur.previousElementSibling) : (RD.liveEl || list.lastElementChild);
-      if(to){ to.focus({ preventScroll:true }); to.scrollIntoView({ block:'nearest' }); }
+      if(to) focusLine(to);
     }
-    if(e.key === 'Home' || e.key === 'End'){ e.preventDefault(); const to = e.key === 'Home' ? list.firstElementChild : list.lastElementChild; if(to){ to.focus({ preventScroll:true }); to.scrollIntoView({ block:'nearest' }); } }
+    if(e.key === 'Home' || e.key === 'End'){ e.preventDefault(); focusLine(e.key === 'Home' ? list.firstElementChild : list.lastElementChild); }
   });
   list.addEventListener('focusin', e => {
     const ln = e.target.closest('.rl');
-    if(ln){ RD.lastLine = ln.dataset.k; paintFollow(); return; }
-    if(e.target === list){ const back = (RD.lastLine && RL.get(RD.lastLine)) || RD.liveEl; if(back){ back.focus({ preventScroll:true }); back.scrollIntoView({ block:'nearest' }); } }
+    if(ln){ RD.lastLine = ln.dataset.k; if(RD.tabEl !== ln){ if(RD.tabEl) RD.tabEl.removeAttribute('tabindex'); ln.tabIndex = 0; RD.tabEl = ln; } paintFollow(); return; }
     paintFollow();
   });
-  list.addEventListener('click', e => { const ln = e.target.closest('.rl'); if(ln) ln.focus(); });
+  list.addEventListener('click', e => { const ln = e.target.closest('.rl'); if(ln) focusLine(ln); });
   $('#vRead').addEventListener('click', e => {
     const b = e.target.closest('[data-r]'); if(!b) return;
     const a = b.dataset.r;
