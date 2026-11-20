@@ -7,8 +7,10 @@
    인식 중인 말(중간 결과)은 입력 화면 위쪽 띠에만 보이고 보내지 않음.
    크롬은 1분쯤 지나거나 조용하면 인식을 끝내므로, 켜져 있는 동안은 저절로 다시 시작함 */
 const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-const STT = { on:false, rec:null, interim:'', restartT:0, errs:0, note:'', queue:[], stream:null, ac:null, raf:0, dev:'',
+const STT = { speechSince:0, lastFinal:'', lastFinalAt:0, on:false, rec:null, interim:'', restartT:0, errs:0, note:'', queue:[], stream:null, ac:null, raf:0, dev:'',
   diag:'', lastErr:'', results:0, restarts:0, gotAudio:false, gotSound:false, loudMs:0, lastTick:0, hint:'', meterT:0, checkT:0 };
+// 휴대폰·태블릿: 마이크를 한 번에 한 앱만 쓸 수 있어서, 소리 막대를 열면 구글 음성인식이 소리를 못 받음 → 막대를 열지 않음
+const STT_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const STT_ERR = { 'no-speech':'말소리 없음', 'aborted':'중단됨', 'audio-capture':'소리 입력 장치 없음', 'network':'구글 음성 서버 연결 안 됨', 'not-allowed':'마이크 허용 안 됨', 'service-not-allowed':'음성인식 서비스 막힘', 'language-not-supported':'한국어 지원 안 됨', 'bad-grammar':'설정 오류' };
 // 음성인식 기능이 있는 것처럼 보이지만 구글 서버에 연결하지 못하는 브라우저
 const STT_BAD_BROWSER = (() => { const u = navigator.userAgent; return navigator.brave ? '브레이브' : /Whale\//.test(u) ? '네이버 웨일' : /OPR\//.test(u) ? '오페라' : /SamsungBrowser/.test(u) ? '삼성 인터넷' : /YaBrowser/.test(u) ? '얀덱스' : ''; })();
@@ -22,21 +24,21 @@ function sttStart(){
   if(STT_BAD_BROWSER) STT.hint = STT_BAD_BROWSER + ' 브라우저는 음성인식이 되지 않을 수 있어요. 안 되면 크롬이나 엣지에서 열어 주세요.';
   paintStt(); sttRun();
   // 소리 막대는 음성인식이 먼저 마이크를 잡은 뒤에 엶 (마이크를 동시에 열 때 부딪히지 않게). 3초 안에 못 잡으면 그래도 엶
-  clearTimeout(STT.meterT); STT.meterT = setTimeout(() => { if(STT.on && !STT.stream) sttMeterStart(); }, 3000);
+  clearTimeout(STT.meterT); if(!STT_MOBILE) STT.meterT = setTimeout(() => { if(STT.on && !STT.stream) sttMeterStart(); }, 3000);
   clearInterval(STT.checkT); STT.checkT = setInterval(sttCheckStuck, 2000);
 }
 function sttRun(){
   if(!STT.on) return;
   let rec;
   try{ rec = new SpeechRec(); }catch(e){ sttFail('음성인식을 시작하지 못했어요'); return; }
-  rec.lang = 'ko-KR'; rec.continuous = true; rec.interimResults = true; rec.maxAlternatives = 1;
+  rec.lang = 'ko-KR'; rec.continuous = !STT_MOBILE; rec.interimResults = true; rec.maxAlternatives = 1;
   const step = d => { STT.diag = d; paintStt(); };
   rec.onstart = () => step('인식기 켜짐');
-  rec.onaudiostart = () => { STT.gotAudio = true; step('마이크 연결됨'); if(!STT.stream) setTimeout(() => { if(STT.on && !STT.stream) sttMeterStart(); }, 300); };
+  rec.onaudiostart = () => { STT.gotAudio = true; step('마이크 연결됨'); if(!STT_MOBILE && !STT.stream) setTimeout(() => { if(STT.on && !STT.stream) sttMeterStart(); }, 300); };
   rec.onsoundstart = () => { STT.gotSound = true; step('소리 감지'); };
-  rec.onspeechstart = () => { STT.gotSound = true; step('말소리 감지'); };
+  rec.onspeechstart = () => { STT.gotSound = true; if(!STT.speechSince) STT.speechSince = Date.now(); step('말소리 감지'); };
   rec.onresult = e => {
-    STT.results++; STT.loudMs = 0; STT.diag = '받아 적는 중';
+    STT.results++; STT.loudMs = 0; STT.speechSince = 0; STT.diag = '받아 적는 중';
     if(STT.hint && !STT_BAD_BROWSER) STT.hint = '';
     let interim = '';
     for(let i = e.resultIndex; i < e.results.length; i++){
@@ -82,6 +84,9 @@ function sttFail(msg){
 function sttFinal(t){
   t = cleanLine(t).replace(/\s{2,}/g, ' ').trim();
   if(!t || !TP.code) return;
+  // 같은 말이 3초 안에 또 오면(휴대폰 크롬에서 생기는 되풀이) 한 번만
+  if(t === STT.lastFinal && Date.now() - STT.lastFinalAt < 3000) return;
+  STT.lastFinal = t; STT.lastFinalAt = Date.now();
   if(TP.mode === 'live') sttToPad(t);
   else if(TS.sttTo === 'input'){
     const inp = $('#tIn');
@@ -102,7 +107,7 @@ function sttFlushQueue(){ while(STT.queue.length && !TP.composing) sttToPad(STT.
 /* 소리 크기 막대 (소리가 들어오는지 확인용. 기본 소리 입력 장치) */
 async function sttMeterStart(){
   sttMeterStop();
-  if(TS.sttMeter === false) return;
+  if(TS.sttMeter === false || STT_MOBILE) return;
   try{
     const s = await navigator.mediaDevices.getUserMedia({ audio:true });
     if(!STT.on){ s.getTracks().forEach(t => t.stop()); return; }
@@ -134,12 +139,13 @@ function sttMeterStop(){
 // 소리는 들어오는데 10초 넘게 받아 적은 것이 없으면 원인별 확인 방법을 띄움
 function sttCheckStuck(){
   if(!STT.on) return;
-  if(STT.loudMs < 10000){ return; }
+  const stuck = STT_MOBILE ? (STT.speechSince && Date.now() - STT.speechSince > 15000) : STT.loudMs >= 10000;
+  if(!stuck) return;
   let h;
   if(STT_BAD_BROWSER) h = STT_BAD_BROWSER + ' 브라우저는 음성인식이 되지 않아요. 크롬이나 엣지에서 이 주소를 열어 주세요.';
   else if(STT.lastErr === 'network') h = '구글 음성 서버에 연결되지 않아요. 기관 인터넷에서 막혀 있을 수 있으니 휴대폰 핫스팟으로 바꿔 시험해 보세요.';
   else if(!STT.gotSound) h = '소리 막대는 움직이는데 음성인식이 소리를 받지 못하고 있어요. 설정에서 "소리 막대 보기"를 끄고 음성인식을 껐다 켜 보세요. 그래도 안 되면 chrome://settings/content/microphone 에서 막대와 같은 장치를 골라 주세요.';
-  else h = '말소리는 감지되는데 받아 적은 글이 오지 않아요. 인터넷 연결을 확인하거나, 크롬·엣지를 다시 열어 주세요.';
+  else h = '말소리는 감지되는데 받아 적은 글이 오지 않아요. 인터넷 연결을 확인하거나, ' + (STT_MOBILE ? '다른 앱(통화·녹음·음성 비서)이 마이크를 쓰고 있지 않은지 확인하고 크롬을 다시 열어 주세요.' : '크롬·엣지를 다시 열어 주세요.');
   if(h !== STT.hint){ STT.hint = h; paintStt(); }
 }
 function paintStt(){
@@ -149,7 +155,8 @@ function paintStt(){
   bar.hidden = !STT.on;
   if(!STT.on) return;
   const where = TP.mode === 'live' ? '메모장 끝에 붙임' : TS.sttTo === 'input' ? '입력 칸에 넣음' : '한 줄씩 바로 보냄';
-  $('#sttState').textContent = '● 듣는 중 · ' + where + (STT.dev ? ' · 소리 입력: ' + STT.dev : '') + (STT.note ? ' · ' + STT.note : '');
+  $('#sttState').textContent = '● 듣는 중 · ' + where + (STT_MOBILE ? '' : STT.dev ? ' · 소리 입력: ' + STT.dev : '') + (STT.note ? ' · ' + STT.note : '');
+  const mt = bar.querySelector('.meter'); if(mt) mt.hidden = STT_MOBILE || TS.sttMeter === false;
   $('#sttInterim').textContent = STT.interim || '(말을 기다리는 중)';
   $('#sttDiag').textContent = '음성인식 상태: ' + (STT.diag || '-') + ' · 받아 적은 말 ' + STT.results + '번 · 다시 시작 ' + STT.restarts + '번' + (STT.lastErr ? ' · 마지막 오류: ' + (STT_ERR[STT.lastErr] || STT.lastErr) : '');
   const hn = $('#sttHint'); hn.hidden = !STT.hint; hn.textContent = STT.hint;
