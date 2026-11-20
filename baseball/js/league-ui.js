@@ -58,14 +58,14 @@ function leagueHome(){
     note:['10개 팀이 정규 시즌을 치르고, 상위 5팀이 와일드카드 결정전, 준플레이오프, 플레이오프, 한국시리즈를 치릅니다.', '내 팀 경기는 직접 하고, 다른 경기는 결과만 나옵니다. 선수 기록이 쌓이고 시즌이 끝나면 시상식을 합니다.'],
     opts:[{ n:1, t:'새 리그 만들기', act: v => { NEW.kind = 'league'; go(modeScreen, v); } }, { n:2, t:'백업 파일 불러오기', act: () => leagueImport() }] };
   const g = myGameToday(L), saved = isMineSaved(L), done = L.phase === 'done';
-  return { q: done ? '시즌이 끝났습니다. 다음 시즌을 시작할까요?' : '무엇을 할까요?', back: v => go(homeScreen, v), note: leagueStatus(L), opts:[
+  return { q: done ? '시즌이 끝났습니다. FA 영입과 신인 드래프트는 구단 사무실에서 합니다. 다음 시즌을 시작할까요?' : '무엇을 할까요?', back: v => go(homeScreen, v), note: leagueStatus(L), opts:[
     done ? { n:1, t:'다음 시즌 시작', s:'선수들이 한 살씩 나이를 먹고, 성장하거나 은퇴하며 신인이 들어옵니다.', act: v => { leagueNextSeason(L); saveLeague(); go(lhome(), v, leagueNews(L)); } }
          : { n:1, t: saved ? '진행 중인 경기 이어하기' : '오늘 경기 하기', hide: !g, s: saved ? situation(saved.G) : `${lmodeName(L)}로 합니다.`, act: v => saved ? resumeGame(v) : leaguePlay(v) },
     { n:2, t: g ? '오늘 경기 결과만 보고 넘기기' : '다음 경기 결과 보기', hide: done, s: g ? '우리 팀 경기도 컴퓨터가 진행합니다.' : '', act: v => leagueRun(1, v) },
     { n:3, t:'여러 날 넘기기', hide: done, act: v => go(skipScreen, v) },
     { n:4, t:'순위표', act: v => go(standScreen, v) },
     { n:5, t:'이번 시즌 기록 순위', act: v => go(() => leadersScreen(null), v) },
-    { n:6, t:'내 팀 선수', act: v => go(myTeamScreen, v) },
+    { n:6, key:'office', t:'구단 사무실', s:`내 팀 선수, 트레이드${done ? ', FA 영입, 신인 드래프트' : ''}, 연봉 총액`, act: v => go(officeScreen, v) },
     { n:7, t: L.phase === 'post' || done ? '포스트시즌 결과' : '일정과 지난 결과', act: v => go(schedScreen, v) },
     { n:8, t:'기록실과 명예의 전당', s:'역대 우승, 통산 순위, 시즌 최고 기록, 명예의 전당, 대기록, 내 감독 기록', act: v => go(archiveScreen, v) },
     { n:9, t:'리그 설정', s:`경기 방식: ${lmodeName(L)}. 백업, 새 리그, 리그 지우기`, act: v => go(leagueSet, v) },
@@ -219,8 +219,9 @@ function myTeamScreen(){
   const pt = p => { const s = p.ss || {}; return { cells:[p.role, p.name, `${s.w || 0}-${s.l || 0}`, s.sv || 0, s.hd || 0, s.out ? eraOf(s).toFixed(2) : '-', s.k || 0] }; };
   const table = [{ title:'타자', cols:['', '선수', '자리', '타율', '홈런', '타점', '도루'], rows:[...T.bat.map((p, i) => bt(p, i)), ...T.bench.map(p => bt(p))] },
     { title:'투수', cols:['', '선수', '승-패', '세', '홀', '자책', '삼진'], rows:[...T.sp, ...T.rp].map(pt) }];
-  return { q:`${teamInfo(L.my).name} 선수 기록입니다.`, say, table, back: v => go(lhome(), v), opts:[
-    { n:1, t:'돌아가기', act: v => go(lhome(), v) },
+  const bk = v => go(LSRC === 'league' ? officeScreen : lhome(), v);
+  return { q:`${teamInfo(L.my).name} 선수 기록입니다.`, say, table, back: bk, opts:[
+    { n:1, t:'돌아가기', act: bk },
     { n:2, t:'추천 타순으로 바꾸기', s:'감독 모드에서는 경기 전 준비에서 직접 바꿀 수 있고, 바꾼 타순이 다음 경기에도 이어집니다.', act: v => { T.bat = bestOrder(T.bat); saveLeague(); go(myTeamScreen, v, ['추천 타순으로 바꿨습니다.']); } },
   ] };
 }

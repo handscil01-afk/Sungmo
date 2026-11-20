@@ -274,7 +274,22 @@ function ctNum(S){
     ${(() => { const o = b(9); return o ? `<button type="button" class="crplay" data-sk="opt" data-n="${o.n}"><span class="pp">✓</span><span><b>${esc(o.t)}</b></span></button>` : ''; })()}`;
 }
 
-const CAREER_SK = { 'cr-camp':crCamp, 'ct-home':ctHome, 'ct-num':ctNum, 'cr-talk':crTalk, 'cr-game':crGame, 'cr-log':crLogSkin, 'cr-home':crHome, 'cr-visit':crVisit, 'cr-shop':crShop, 'cr-bag':crBag, 'cr-train':crTrain, 'cr-info':crInfo, 'cr-face':crFacePick };
+/* ---------- 구단 사무실 (리그 감독 모드, office-ui.js) ---------- */
+function foHome(S){
+  const L = typeof LG === 'function' ? LG() : null; if(!L) return null;
+  const T = teamInfo(L.my), col = T.color, pct = clamp(S.pay / S.cap * 100, 0, 100);
+  const o = officeFresh(L), off = offseason(L);
+  const ICO = { roster:'list', trade:'swap', fa:'flag', draft:'check', moves:'next' };
+  const opts = (S.opts || []).filter(x => !x.hide).map(x => `<button type="button" class="fo-b${x.key === 'trade' ? ' pri' : ''}" data-sk="opt" data-n="${x.n}">${skIco(ICO[x.key] || 'next')}<span class="tx"><b>${esc(x.t)}</b>${x.s ? `<small>${esc(x.s)}</small>` : ''}</span></button>`).join('');
+  return `<div class="fo" style="background-image:url(img/cr-office.png)">
+      <div class="fo-gm"><span class="tk-p" style="background-image:url(${skTint('cr-people2', col)});background-position:0 0" aria-hidden="true"></span><span class="tk-nm">단장</span></div>
+      <div class="fo-card">${emb(T, 'big')}<b>${esc(T.name)}</b>
+        <small>연봉 총액 <b>${eok(S.pay)}</b> / 상한 ${eok(S.cap)}</small><span class="fb big"><i style="width:${pct}%;background:${pct > 95 ? '#ff4d5e' : pct > 80 ? '#ffb800' : '#2ec463'}"></i></span>
+        <small>트레이드 ${o.trades}/${TRADE_MAX}${off ? ` · FA ${o.fa}/${FA_MAX} · 드래프트 ${o.drafted ? '마침' : draftPick(L) + '순위'}` : ' · FA·드래프트는 시즌 뒤'}</small></div>
+    </div><div class="fo-opts">${opts}</div>`;
+}
+
+const CAREER_SK = { 'fo-home':foHome, 'cr-camp':crCamp, 'ct-home':ctHome, 'ct-num':ctNum, 'cr-talk':crTalk, 'cr-game':crGame, 'cr-log':crLogSkin, 'cr-home':crHome, 'cr-visit':crVisit, 'cr-shop':crShop, 'cr-bag':crBag, 'cr-train':crTrain, 'cr-info':crInfo, 'cr-face':crFacePick };
 function careerSkin(S){
   const f = S && S.kind && CAREER_SK[S.kind];
   if(!f) return null;

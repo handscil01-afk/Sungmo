@@ -84,7 +84,7 @@
 - 9-1c (완료) 선수 육성 화면 개편 1차(docs/CAREER-UI.md의 1~3단계): 라커룸·마을 지도·용품점·가방·훈련·선수 카드·얼굴 고르기. 이어서 대화 창(이벤트·계약·FA), 경기 대진 카드, 업적 연표까지 완료(4단계).
 - 9-2 (완료) 우리 센터 팀 만들기: js/center.js(편집 화면, 저장 bb_center), data.js의 CENTER·centerInfo(key 'center'), engine.js의 makeCenterTeam, league.js의 leagueCenterTeam·leagueKeys(리그에서는 star 자리). 온라인은 제외. 시험 tests/center.js, tests/skin.js(키보드만으로 만들기→경기).
 - 9-3 (완료) 육성 이야기: js/career-story.js. 라이벌(c.rival, 시즌 점수 seasonScore로 견줌), 2군 승격 경쟁(promoteGap, 승격 규칙은 promote 그대로), 스프링캠프(c.camp 사흘, campScreen), 은퇴 뒤 감독(becomeManager: 리그를 bb_league로 복사). 남은 후보: 감독·동료와의 관계(신뢰도), 1군 부진 때 2군 강등.
-- 9-4 구단 운영: 트레이드, FA, 신인 드래프트, 연봉 총액, 2군 육성.
+- 9-4 (완료) 구단 운영: office.js(가치 fov·연봉 fsal·상한 capOf, doTrade·signFA·draftSign, L.office·L.moves·L.faPool·L.draftPool), office-ui.js(리그 첫 화면 6번). 컴퓨터 구단끼리의 트레이드는 아직 없음.
 - 9-5 올스타전·홈런 더비.
 
 ## 7.7단계 (예정): 시각장애인들이 아는 숫자 야구 규칙

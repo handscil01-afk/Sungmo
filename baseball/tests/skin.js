@@ -134,6 +134,28 @@ const PORT = 8767;
     console.log(`${tag}: 라커룸·마을·용품점·가방·훈련·선수 카드·얼굴·이벤트·대진·업적·캠프·감독 확인`);
     await ctx.close();
   }
+  // 구단 사무실: 화면 보며 하기에서 트레이드를 눌러서 하고, 시즌 끝에 드래프트
+  {
+    const ctx = await browser.newContext({ viewport:{ width:390, height:844 }, hasTouch:true });
+    const page = await ctx.newPage(), tag = '구단 사무실';
+    page.on('pageerror', e => errors.push(`${tag}: ${e.message}`));
+    await page.goto(`http://localhost:${PORT}/baseball/`); await page.waitForSelector('#opts .opt'); await page.keyboard.press('1');
+    await page.evaluate(() => { LSRC = 'league'; const L = leagueNew({ my:'star', len:18, mode:'manager', inn:9, seed:7 }); setLG(L); saveLeague(); go(leagueHome, 'click'); });
+    await page.click('#sk [data-sk="opt"][data-n="6"]'); await page.waitForSelector('.fo-card');
+    await page.click('.fo-b.pri');                                     // 트레이드
+    await page.click('#sk [data-sk="opt"][data-n="3"]');               // 내보낼 타자
+    await page.click('#sk [data-sk="opt"][data-n="1"]');               // 상대 구단
+    const ok = await page.evaluate(() => { const i = (UI.S.opts || []).findIndex(o => /받아들일|해 볼 만/.test(o.s || '')); return i < 0 ? null : UI.S.opts[i].n; });
+    if(ok == null) errors.push(`${tag}: 받아들일 만한 트레이드 후보가 없음`);
+    else { await page.click(`#sk [data-sk="opt"][data-n="${ok}"]`); await page.waitForSelector('#dlg.open'); await page.click('#dlg [data-dlg="0"]');
+      if(!(await page.evaluate(() => LG().office.trades === 1 && UI.S.kind === 'fo-home'))) errors.push(`${tag}: 트레이드가 성사되지 않음 (${await page.evaluate(() => (UI.say || []).map(l => l.s || l).join(' '))})`); }
+    await page.evaluate(() => { const L = LG(); while(L.phase !== 'done') leagueAdvance(L, null); saveLeague(); go(officeScreen, 'click'); });
+    await page.click('#sk [data-sk="opt"][data-n="4"]'); await page.click('#sk [data-sk="opt"][data-n="1"]'); await page.click('#sk [data-sk="opt"][data-n="10"]');
+    if(!(await page.evaluate(() => LG().office.drafted))) errors.push(`${tag}: 드래프트가 되지 않음`);
+    const bad = await page.evaluate(() => { const b = document.querySelector('#skBody'); return b.classList.contains('scroll'); }); if(bad) errors.push(`${tag}: 한 화면을 넘침`);
+    console.log(`${tag}: 트레이드·드래프트 누르기 확인`);
+    await ctx.close();
+  }
   // 우리 센터 팀: 소리와 글로 하기에서 번호 키와 명령 칸만으로 팀 이름·선수 이름을 정해 저장하고, 팀 고르기에서 골라 경기를 끝까지
   {
     const ctx = await browser.newContext({ viewport:{ width:390, height:844 } });

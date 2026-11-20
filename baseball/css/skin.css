@@ -682,3 +682,21 @@ html.skin .sk-body.f2 .story{ display:none; }
   html.skin .k-cr-camp .trt{ grid-template-columns:1fr; justify-items:center; text-align:center; padding:.3rem; } html.skin .k-cr-camp .trt .tico{ grid-row:auto; width:2.2rem; height:2.2rem; }
   html.skin .story{ grid-template-columns:1fr 1fr; }
 }
+/* 구단 사무실 */
+html.skin .fo{ position:relative; display:grid; grid-template-columns:auto minmax(0, 1fr); align-items:end; gap:8px; padding:10px; border-radius:16px; border:3px solid var(--line); min-height:10rem;
+  background:#6b4a2e center 30% / cover no-repeat; image-rendering:pixelated; box-shadow:0 3px 0 var(--line2); }
+html.skin .fo-gm{ display:grid; justify-items:center; gap:2px; }
+html.skin .fo-card{ display:grid; gap:3px; padding:8px 10px; border-radius:12px; background:rgba(255,255,255,.92); border:2px solid #fff; color:var(--ink); }
+html.skin .fo-card .emb.big{ width:2.4rem; height:2.4rem; } html.skin .fo-card > b{ font-size:1rem; font-weight:900; }
+html.skin .fo-card small{ font-size:.68rem; color:var(--ink2); font-weight:800; } html.skin .fo-card small b{ color:var(--ink); }
+html.skin .fo-opts{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:7px; flex:1 1 auto !important; grid-auto-rows:minmax(0, 1fr); max-height:20rem; }
+html.skin .fo-b{ display:flex; align-items:center; gap:8px; padding:.5rem .7rem; border-radius:16px; text-align:left; border:3px solid var(--line); color:#fff; text-shadow:0 1px 0 #0b3a8c;
+  background:linear-gradient(180deg, #4aa9ff, #1a62c9); box-shadow:inset 0 2px 0 rgba(255,255,255,.45), 0 3px 0 var(--line2); overflow:hidden; }
+html.skin .fo-b .ico{ width:1.6em; height:1.6em; } html.skin .fo-b .tx{ display:grid; min-width:0; } html.skin .fo-b b{ font-size:.95rem; font-weight:900; }
+html.skin .fo-b small{ font-size:.64rem; opacity:.9; line-height:1.25; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+html.skin .fo-b.pri{ border-color:#a86c00; color:#4a2a00; text-shadow:none; background:linear-gradient(180deg, #fff27e, #ffc21a 55%, #ffad00); box-shadow:inset 0 2px 0 rgba(255,255,255,.6), 0 3px 0 #a86c00; }
+html.skin .sk-body.f1 .fo{ min-height:7rem; } html.skin .sk-body.f1 .fo-b small{ display:none; }
+@media (orientation:landscape) and (max-height:620px){
+  html.skin .sk-body.k-fo-home{ display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); column-gap:8px; align-content:start; }
+  html.skin .fo-opts{ grid-template-columns:minmax(0, 1fr); max-height:none; }
+}
