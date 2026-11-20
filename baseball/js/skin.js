@@ -432,7 +432,8 @@ function timingEnd(tm){
 /* ---------- 메뉴 화면 ---------- */
 function topHTML(S){
   const fsOn = typeof FS !== 'undefined' && FS.on(), canFs = typeof isStandalone === 'function' && !isStandalone();
-  const CRT = { 'cr-home':'라커룸', 'cr-visit':'마을', 'cr-train':'훈련', 'cr-bag':'내 가방', 'cr-info':'내 선수', 'cr-face':'얼굴 고르기', 'cr-log':'업적과 경력' };
+  const CRT = { 'cr-home':'라커룸', 'cr-visit':'마을', 'cr-train':'훈련', 'cr-bag':'내 가방', 'cr-info':'내 선수', 'cr-face':'얼굴 고르기', 'cr-log':'업적과 경력', 'cr-game':'오늘 경기' };
+  if(S.kind === 'cr-talk') CRT['cr-talk'] = S.who === 'gm' ? '연봉 계약' : S.who === 'agent' ? 'FA 시장' : '이벤트!';
   const title = S.hero ? '' : S.onTab ? '설정' : CRT[S.kind] || menuTitle(S).title;
   return `<div class="bar">${S.back ? `<button type="button" class="rb" data-sk="back" aria-label="뒤로">${skIco('back')}</button>` : ''}
     <b class="ttl">${esc(title)}</b>

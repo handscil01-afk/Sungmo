@@ -115,7 +115,14 @@ const PORT = 8767;
     await page.evaluate(() => go(careerInfoScreen, 'click')); await need('.lock.info', '선수 카드'); await fit('선수 카드');
     await page.evaluate(() => go(() => careerFaceScreen(careerInfoScreen), 'click')); await page.click('.facec:nth-child(5)');
     if(await page.evaluate(() => CR().career.face) !== 4) errors.push(`${tag}: 얼굴 바꾸기가 안 됨`);
-    console.log(`${tag}: 라커룸·마을·용품점·가방·훈련·선수 카드·얼굴 확인`);
+    // 이벤트 대화 창 → 고르면 첫 화면으로, 경기 대진 카드, 업적 연표
+    await page.evaluate(() => { const L = CR(); L.career.event = 'fan'; saveLeague(); go(careerHome, 'click'); });
+    await need('.talk .tk-bub', '이벤트 대화 창'); await fit('이벤트 대화 창');
+    const fame0 = await page.evaluate(() => CR().career.fame); await page.click('.tk-o');
+    if(await page.evaluate(() => CR().career.fame) <= fame0) errors.push(`${tag}: 이벤트 고르기 결과가 반영되지 않음`);
+    await page.evaluate(() => go(() => careerGameChoice(true), 'click')); await need('.vs .vs-row', '대진 카드'); await fit('대진 카드');
+    await page.evaluate(() => go(careerLogScreen, 'click')); await need('.tl .tl-h', '업적 연표'); await fit('업적 연표');
+    console.log(`${tag}: 라커룸·마을·용품점·가방·훈련·선수 카드·얼굴·이벤트·대진·업적 확인`);
     await ctx.close();
   }
   await browser.close(); srv.kill();

@@ -177,7 +177,63 @@ function crFacePick(S){
   return `<div class="faceg">${(S.opts || []).filter(o => !o.hide).map(o => `<button type="button" class="facec" data-sk="opt" data-n="${o.n}" aria-label="${esc(o.t)}">${crFace(o.face, col, 'mid')}</button>`).join('')}</div>`;
 }
 
-const CAREER_SK = { 'cr-home':crHome, 'cr-visit':crVisit, 'cr-shop':crShop, 'cr-bag':crBag, 'cr-train':crTrain, 'cr-info':crInfo, 'cr-face':crFacePick };
+/* ---------- 대화 창 (이벤트·계약·FA) ---------- */
+// 말하는 사람: cr-people2(4칸 × 2줄) 칸 번호와 이름. me는 내 선수 얼굴
+const WHO = { gm:[0, '단장'], fan:[1, '팬'], agent:[2, '에이전트'], legend:[3, '레전드 선수'], coach:[4, '코치'], rival:[5, '라이벌 신인'], mate:[6, '동료 선수'], press:[7, '기자'] };
+function crTalk(S){
+  const L = crL(); if(!L || !L.career) return null;
+  const c = L.career, p = myP(L), col = crColor(L), w = WHO[S.who];
+  const who = w ? `<span class="tk-p" style="background-image:url(${skTint('cr-people2', col)});background-position:${(w[0] % 4) * 100 / 3}% ${Math.floor(w[0] / 4) * 100}%" aria-hidden="true"></span>` : crFace(crFaceOf(L, c, p), col, 'mid');
+  const name = w ? w[1] : p.name;
+  const notes = (S.note || []).map(l => `<p>${esc(l)}</p>`).join('');
+  const opts = (S.opts || []).filter(o => !o.hide).map(o => o.team
+    ? `<button type="button" class="tk-o team" data-sk="opt" data-n="${o.n}">${emb(teamInfo(o.team), 'big')}<span class="tx"><b>${esc(o.t)}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</span></button>`
+    : `<button type="button" class="tk-o" data-sk="opt" data-n="${o.n}"><span class="tx"><b>${esc(o.t)}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</span><span class="chev">${skIco('next1')}</span></button>`).join('');
+  return `${crRes(L)}${(S.say || []).length ? `<div class="crmsg">${S.say.map(l => `<p>${esc(l.s || l)}</p>`).join('')}</div>` : ''}
+    <div class="talk"><div class="tk-who">${who}<span class="tk-nm">${esc(name)}</span></div>
+      <div class="tk-bub"><p>${esc(S.text || skClean(S.q))}</p>${notes ? `<div class="tk-note">${notes}</div>` : ''}</div></div>
+    <div class="tk-opts${(S.opts || []).some(o => o.team) ? ' teams' : ''}">${opts}</div>`;
+}
+
+/* ---------- 오늘 경기 대진 카드 ---------- */
+function crGame(S){
+  const L = crL(); if(!L || !L.career) return null;
+  const c = L.career, p = myP(L), col = crColor(L), g = !S.minor && typeof myGameToday === 'function' ? myGameToday(L) : null;
+  const me = teamInfo(L.my), opp = g ? teamInfo(g.a === L.my ? g.h : g.a) : null, home = g ? g.h === L.my : true;
+  const park = g ? parkInfo(g.h) : null, T = L.teams[L.my];
+  const role = c.where === 'minor' ? '퓨처스리그(2군)' : isPit(p) ? `${p.role}` : `${T.bat.indexOf(p) + 1}번 타자`;
+  const side = (t, lab) => t ? `<div class="vs-t">${emb(t, 'big')}<b>${esc(t.short)}</b><small>${lab}</small></div>` : `<div class="vs-t"><span class="vs-q">?</span><b>2군 상대</b><small>퓨처스리그</small></div>`;
+  const ICON = ['swing', 'take', 'next'];
+  const opts = (S.opts || []).filter(o => !o.hide).map((o, i) => `<button type="button" class="gm-o${i === 0 ? ' pri' : ''}" data-sk="opt" data-n="${o.n}">${skIco(ICON[i] || 'next')}<span class="tx"><b>${esc(o.t)}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</span></button>`).join('');
+  return `${crRes(L)}<div class="vs">
+      <div class="vs-h">${S.minor ? '퓨처스리그(2군)' : `${L.season}시즌 ${L.day + 1}일째`}${park ? ` · ${esc(park.name)}` : ''}</div>
+      <div class="vs-row">${side(me, home ? '홈' : '원정')}<span class="vs-x">VS</span>${side(opp, home ? '원정' : '홈')}</div>
+      <div class="vs-me">${crFace(crFaceOf(L, c, p), col, 'sm')}<span><b>${esc(p.name)}</b> · ${esc(role)}${p.cond ? ` · 컨디션 ${esc(COND[p.cond])}` : ''}</span></div>
+    </div><div class="gm-opts">${opts}</div>`;
+}
+
+/* ---------- 업적 연표 ---------- */
+// 시상 아이콘(awards.png 4칸 × 2줄): 우승·MVP·신인왕·홈런왕 / 타격왕·골든글러브·명예의 전당·올스타
+const awardIco = i => `<span class="aw" style="background-position:${(i % 4) * 100 / 3}% ${Math.floor(i / 4) * 100}%" aria-hidden="true"></span>`;
+const awardIdx = t => /한국시리즈 우승|우승/.test(t) ? 0 : /MVP/.test(t) ? 1 : /신인왕/.test(t) ? 2 : /홈런/.test(t) ? 3 : /타율|타격왕/.test(t) ? 4 : /골든/.test(t) ? 5 : /명예의 전당/.test(t) ? 6 : /올스타/.test(t) ? 7 : -1;
+function crLogSkin(S){
+  const L = crL(); if(!L || !L.career) return null;
+  const c = L.career, p = myP(L) || c.p || {}, by = {};
+  (c.ach || []).forEach(a => { (by[a.season] ||= { ach:[], aw:[] }).ach.push(a); });
+  (p.awards || []).forEach(a => { const m = /^(\d+)시즌 (.+)$/.exec(a); if(m) (by[m[1]] ||= { ach:[], aw:[] }).aw.push(m[2]); });
+  const seasons = Object.keys(by).map(Number).sort((a, b) => b - a);
+  const rows = [];
+  seasons.forEach(sn => {
+    const b = by[sn];
+    rows.push(`<div class="pg-r tl-h"><b>${sn}시즌</b>${b.aw.map(a => `<span class="tl-aw">${awardIco(awardIdx(a) < 0 ? 1 : awardIdx(a))}${esc(a)}</span>`).join('')}</div>`);
+    b.ach.slice().reverse().forEach(a => { const i = /명예의 전당/.test(a.text) ? 6 : /우승/.test(a.text) ? 0 : -1; rows.push(`<div class="pg-r tl-i">${i >= 0 ? awardIco(i) : '<span class="tl-dot"></span>'}<span><small>${a.day}일째</small>${esc(a.text)}</span></div>`); });
+  });
+  if(!rows.length) rows.push('<div class="pg-r tl-i"><span class="tl-dot"></span><span>아직 기록이 없습니다.</span></div>');
+  return `<div class="pg panel tl">${rows.join('')}${pgNav()}</div>
+    <div class="minors">${(S.opts || []).filter(o => !o.hide).map(o => `<button type="button" class="mn" data-sk="opt" data-n="${o.n}"><span>${esc(o.t)}</span></button>`).join('')}</div>`;
+}
+
+const CAREER_SK = { 'cr-talk':crTalk, 'cr-game':crGame, 'cr-log':crLogSkin, 'cr-home':crHome, 'cr-visit':crVisit, 'cr-shop':crShop, 'cr-bag':crBag, 'cr-train':crTrain, 'cr-info':crInfo, 'cr-face':crFacePick };
 function careerSkin(S){
   const f = S && S.kind && CAREER_SK[S.kind];
   if(!f) return null;

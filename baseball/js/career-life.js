@@ -92,7 +92,7 @@ function offerText(o, L){ return `${teamInfo(o.team).name}: 연봉 ${won(o.salar
 function contractScreen(){
   const L = CR(), c = life(L), p = myP(L), o = c.offer, can = faEligible(L, p);
   const take = v => { signContract(L, o); saveLeague(); go(careerHome, v, [`계약했습니다. 연봉 ${won(c.salary)}, ${c.contract.years}년.${o.bonus ? ` 계약금 ${won(o.bonus)}을 받았습니다.` : ''}`]); };
-  return { q:'계약을 정할 시간입니다. 어떻게 할까요?', note:[offerText(o, L), can ? 'FA 자격이 있습니다.' : 'FA 자격은 1군에서 3시즌을 뛴 뒤 생깁니다.'], opts:[
+  return { kind:'cr-talk', who:'gm', text:`${p.name} 선수, 다음 계약 이야기를 해 봅시다. 구단 제시는 이렇습니다.`, q:'계약을 정할 시간입니다. 어떻게 할까요?', note:[offerText(o, L), can ? 'FA 자격이 있습니다.' : 'FA 자격은 1군에서 3시즌을 뛴 뒤 생깁니다.'], opts:[
     { n:1, t:'제시를 받아들이기', act: take },
     { n:2, t:'올려 불러 보기', hide: !!o.pushed, s:'성공하면 연봉이 오르지만, 실패하면 제시가 낮아지고 다시 올려 부를 수 없습니다.', act: v => {
         const pr = clamp(0.35 + (c.fame || 0) / 200 + ((isPit(p) ? ratingPit(p) : ratingBat(p)) - 55) / 200, 0.15, 0.75), ok = rnd(L) < pr;
@@ -104,9 +104,9 @@ function contractScreen(){
 function faScreen(){
   const L = CR(), c = life(L), list = c.fa || [];
   const sign = (o, v) => { delete c.fa; signContract(L, o); saveLeague(); go(careerHome, v, [`${teamInfo(o.team).name}${o.team === L.my ? '에 남기로' : '로 이적하기로'} 했습니다. 연봉 ${won(c.salary)}, ${c.contract.years}년.`]); };
-  return { q:'FA 시장입니다. 어느 구단과 계약할까요?', back: v => go(contractScreen, v), opts:[
-    ...list.map((o, i) => ({ n: i + 1, t: teamInfo(o.team).name, s: offerText(o, L).replace(/^[^:]+: /, '') + ` 순위 ${o.rank}위.`, act: v => sign(o, v) })),
-    { n:9, t:`원래 팀(${teamInfo(L.my).name}) 제시 받기`, s: offerText(c.offer, L), act: v => { delete c.fa; signContract(L, c.offer); saveLeague(); go(careerHome, v, [`원래 팀과 계약했습니다. 연봉 ${won(c.salary)}.`]); } },
+  return { kind:'cr-talk', who:'agent', text:'FA 시장에 나왔습니다. 여러 구단에서 제시가 왔어요. 어디로 갈까요?', q:'FA 시장입니다. 어느 구단과 계약할까요?', back: v => go(contractScreen, v), opts:[
+    ...list.map((o, i) => ({ n: i + 1, team: o.team, t: teamInfo(o.team).name, s: offerText(o, L).replace(/^[^:]+: /, '') + ` 순위 ${o.rank}위.`, act: v => sign(o, v) })),
+    { n:9, team: L.my, t:`원래 팀(${teamInfo(L.my).name}) 제시 받기`, s: offerText(c.offer, L), act: v => { delete c.fa; signContract(L, c.offer); saveLeague(); go(careerHome, v, [`원래 팀과 계약했습니다. 연봉 ${won(c.salary)}.`]); } },
   ] };
 }
 
@@ -297,6 +297,8 @@ const EVENTS = [
     ['"걱정 마세요, 잘 지내요!"', (L, c, p) => { p.cond = Math.min(2, p.cond + 1); return [`목소리를 들으니 힘이 납니다. 컨디션 ${COND[p.cond]}.`]; }],
     ['용돈을 보내 드리기 (100만 원)', (L, c, p) => { c.money = Math.max(0, c.money - 100); c.fame += 2; p.cond = Math.min(2, p.cond + 1); return ['효자라는 소문이 났습니다. 인기 2 오르고 마음도 뿌듯합니다.']; }]] },
 ];
+// 이벤트마다 말을 거는 사람 (화면 보며 하기의 대화 창 그림: cr-people2)
+const EV_WHO = { senior:'mate', fan:'fan', sponsor:'agent', press:'press', cold:'me', rival:'rival', coach:'legend', birthday:'mate', family:'me' };
 function rollEvent(L){
   const c = life(L);
   if(c.event || c.retired || rnd(L) > 0.22) return;
@@ -306,13 +308,13 @@ function rollEvent(L){
 function eventScreen(){
   const L = CR(), c = life(L), p = myP(L), e = EVENTS.find(x => x.id === c.event);
   if(!e){ delete c.event; return careerHome(); }
-  return { q:`이벤트! ${e.q(L, p)} 어떻게 할까요?`, scene:{ kind:'ev-' + e.id, title:'이벤트!', color: teamInfo(L.my).color }, opts: e.opts.map(([t, fn], i) => ({ n: i + 1, t, act: v => { delete c.event; const say = fn(L, c, p); saveLeague(); go(careerHome, v, say); } })) };
+  return { kind:'cr-talk', who: EV_WHO[e.id] || 'me', text: e.q(L, p), q:`이벤트! ${e.q(L, p)} 어떻게 할까요?`, scene:{ kind:'ev-' + e.id, title:'이벤트!', color: teamInfo(L.my).color }, opts: e.opts.map(([t, fn], i) => ({ n: i + 1, t, act: v => { delete c.event; const say = fn(L, c, p); saveLeague(); go(careerHome, v, say); } })) };
 }
 
 /* ---------- 경기 방식 고르기 ---------- */
 function careerGameChoice(minor){
   const where = minor ? '퓨처스리그(2군)' : '1군';
-  return { q:`오늘 ${where} 경기를 어떻게 할까요?`, back: v => go(careerHome, v), opts:[
+  return { kind:'cr-game', minor, q:`오늘 ${where} 경기를 어떻게 할까요?`, back: v => go(careerHome, v), opts:[
     { n:1, t:'내 차례만 직접 하기', s:'내 타석(투수라면 내가 던질 때)만 직접 고르고, 나머지는 빠르게 진행합니다.', act: v => minor ? careerMinorPlay(v) : careerPlay(v) },
     { n:2, t:'내 차례도 맡기고 내 결과 듣기', s:'컴퓨터가 내 선수도 대신 하고, 내 타석(투구) 결과를 하나씩 알려 줍니다.', act: v => minor ? careerMinorDay(v, true) : careerSimDay(v, true) },
     { n:3, t:'경기 건너뛰기', s:'최종 점수와 오늘 내 기록만 봅니다.', act: v => minor ? careerMinorDay(v) : careerSimDay(v) },
