@@ -180,7 +180,8 @@ function goLive(){
   RD.live = true;
   if(RS.view === 'list'){
     render();
-    if(RD.liveEl) focusLine(RD.liveEl); else $('#rList').focus();
+    const last = $('#rList').lastElementChild;
+    if(last) focusLine(last); else $('#rList').focus();
     paintFollow();
     return;
   }
@@ -200,11 +201,6 @@ function applyReaderLook(){
   if(RS.ro) ta.setAttribute('readonly', ''); else ta.removeAttribute('readonly');
   const list = RS.view === 'list';
   ta.hidden = list; $('#rList').hidden = !list;
-  const pb = $('[data-r="pause"]'); if(pb) pb.hidden = list && !RS.move;
-  $('#rHelp').textContent = list
-    ? (RS.move ? '위아래 방향키로 한 줄씩 읽습니다. 맨 끝 줄에 있으면 새 줄로 따라가고, 앞줄을 읽는 동안에는 움직이지 않습니다. Enter를 누르면 지금 치는 곳으로 갑니다.'
-               : '통역 내용은 이 페이지의 맨 끝에 있습니다. 위아래 방향키로 한 줄씩 읽고, 마지막 줄에서 더 내려가지지 않으면 거기가 끝입니다. 새 줄이 오면 아래 방향키로 이어 읽으세요. 지금 치는 곳으로 버튼은 이 안내 바로 위에 있습니다.')
-    : '통역 내용 칸에서 Enter를 누르면 지금 치는 곳으로 갑니다. 커서를 움직이거나 Space를 누르면 멈추고, 멈춘 동안에는 새 글이 와도 화면이 그대로 있습니다.';
 }
 
 async function readerJoin(code){
@@ -279,8 +275,11 @@ function readerSave(){
 }
 function readerSettings(){
   const sizeName = i => ['아주 작게', '작게', '조금 작게', '보통', '조금 크게', '크게', '아주 크게', '가장 크게'][i] || '';
-  const box = openSheet(`<h2 tabindex="-1">읽기 설정</h2>
-    <p class="muted small">지금 통역 방식: ${MODE_NAME[RD.mode]} (통역하는 분이 정합니다)</p>
+  const st = $('#rState').textContent;
+  const box = openSheet(`<h2 tabindex="-1">설정</h2>
+    <p class="small">${esc(($('#rTitle').textContent || ''))} · ${DB && DB.st.connected ? '연결됨' : '연결 끊김'} · 통역 방식: ${MODE_NAME[RD.mode]}${st ? '<br>' + esc(st) : ''}</p>
+    <div class="row"><button class="btn primary" data-golive>맨 끝 줄로 가기</button><button class="btn" data-save>내용을 파일로 저장</button><button class="btn" data-leave>방에서 나가기</button></div>
+    <p class="muted small">통역 내용에서 Enter를 눌러도 맨 끝 줄로 갑니다.</p>
     <fieldset class="fs"><legend>읽는 모양</legend>
       <label class="chk srow"><input type="radio" name="rView" value="list" ${RS.view === 'list' ? 'checked' : ''}> 줄마다 따로 <small class="muted">위아래로 한 줄씩 옮기고, 벗어났다 돌아와도 읽던 줄로 돌아옵니다</small></label>
       <label class="chk srow"><input type="radio" name="rView" value="box" ${RS.view !== 'list' ? 'checked' : ''}> 한 칸에 모두 <small class="muted">편집 칸 하나에서 커서로 읽습니다</small></label>
@@ -293,13 +292,14 @@ function readerSettings(){
     <div class="row"><span>글자 크기: <b id="szName">${sizeName(RS.size)}</b></span><button class="btn" data-sz="-1">작게</button><button class="btn" data-sz="1">크게</button></div>
     <label class="field"><span>색</span><select id="rTheme">${Object.entries(THEMES).map(([k, v]) => `<option value="${k}" ${RS.theme === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
     <label class="chk srow"><input type="checkbox" id="rRo" ${RS.ro ? 'checked' : ''}> 통역 내용 칸을 읽기 전용으로 <small class="muted">점자 단말기에서 커서 이동이 잘 안 되면 켜 보세요</small></label>
-    <div class="row"><button class="btn" data-save>내용을 파일로 저장</button></div>
     ${pwaSettingsHtml()}
     <div class="row"><div class="sp"></div><button class="btn primary" data-close>닫기</button></div>`, e => {
       if(pwaSettingsBind(box, e)) return;
       const sz = e.target.closest('[data-sz]');
       if(sz){ RS.size = Math.max(0, Math.min(SIZES.length - 1, RS.size + Number(sz.dataset.sz))); saveRS(); applyReaderLook(); $('#szName').textContent = sizeName(RS.size); }
       if(e.target.closest('[data-save]')) readerSave();
+      if(e.target.closest('[data-golive]')){ closeSheet(); setTimeout(goLive, 30); }
+      if(e.target.closest('[data-leave]')){ closeSheet(); setTimeout(() => readerLeave(), 30); }
     });
   pwaSettingsBind(box);
   $$('input[name=rGran]', box).forEach(r => r.addEventListener('change', () => { RS.gran = r.value; saveRS(); scheduleRender(); }));

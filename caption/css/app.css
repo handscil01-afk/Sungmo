@@ -157,3 +157,4 @@ a.btn{text-decoration:none;color:inherit}
   .tpre{gap:6px}
 }
 .rtitle{order:0} .rlist,.rtext{order:1} .rempty{order:1} .rbar{order:2}
+.rmenu{align-self:flex-end;margin:6px max(12px,env(safe-area-inset-right,0px)) 0 0;min-height:36px;padding:0 14px;font-size:15px;opacity:.9}
