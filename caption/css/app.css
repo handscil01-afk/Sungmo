@@ -156,3 +156,4 @@ a.btn{text-decoration:none;color:inherit}
   .seg .btn{padding:0 8px}
   .tpre{gap:6px}
 }
+.rtitle{order:0} .rlist,.rtext{order:1} .rempty{order:1} .rbar{order:2}

@@ -33,13 +33,14 @@ function holdTail(t, c){
   // (글과 커서 위치가 따로 도착해도 깜빡이지 않게 커서가 조금 뒤처져 있어도 같은 낱말이면 기다림)
   return c >= v.length ? v : t;
 }
-// 긴 줄은 문장마다(너무 긴 문장은 80자 안쪽에서 띄어쓰기마다) 따로 된 항목으로
+// 긴 줄은 문장마다(너무 긴 문장은 40자 안쪽에서 띄어쓰기마다) 따로 된 항목으로
 function sentences(t){
   if(!t.trim()) return [''];
   const out = [], re = /[^.?!…。]*(?:[.?!…。]+["'”’)\]]*|$)\s*/g; let m;
   while((m = re.exec(t)) && m[0]){
     let x = m[0];
-    while(x.length > 80){ let cut = x.lastIndexOf(' ', 80); if(cut < 20) cut = 80; out.push(x.slice(0, cut).trim()); x = x.slice(cut).replace(/^\s+/, ''); }
+    // 한소네 6 점자 칸(32칸)에서 한 항목을 짧게 읽고 넘어가도록 40자 안쪽에서 띄어쓰기마다 나눔
+    while(x.length > 40){ let cut = x.lastIndexOf(' ', 40); if(cut < 12) cut = 40; out.push(x.slice(0, cut).trim()); x = x.slice(cut).replace(/^\s+/, ''); }
     if(x.trim()) out.push(x.trim());
   }
   return out.length ? out : [t];
@@ -202,7 +203,7 @@ function applyReaderLook(){
   const pb = $('[data-r="pause"]'); if(pb) pb.hidden = list && !RS.move;
   $('#rHelp').textContent = list
     ? (RS.move ? '위아래 방향키로 한 줄씩 읽습니다. 맨 끝 줄에 있으면 새 줄로 따라가고, 앞줄을 읽는 동안에는 움직이지 않습니다. Enter를 누르면 지금 치는 곳으로 갑니다.'
-               : '센스리더 가상 커서나 위아래 방향키로 한 줄씩 읽습니다. 새 줄은 맨 아래에 붙고 읽던 자리는 움직이지 않으니, 맨 끝 줄에서 아래 방향키를 누르면 새 줄을 읽습니다. 지금 치는 곳으로 버튼을 누르면 맨 끝 줄로 갑니다.')
+               : '통역 내용은 이 페이지의 맨 끝에 있습니다. 위아래 방향키로 한 줄씩 읽고, 마지막 줄에서 더 내려가지지 않으면 거기가 끝입니다. 새 줄이 오면 아래 방향키로 이어 읽으세요. 지금 치는 곳으로 버튼은 이 안내 바로 위에 있습니다.')
     : '통역 내용 칸에서 Enter를 누르면 지금 치는 곳으로 갑니다. 커서를 움직이거나 Space를 누르면 멈추고, 멈춘 동안에는 새 글이 와도 화면이 그대로 있습니다.';
 }
 
