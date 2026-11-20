@@ -422,6 +422,11 @@ function typistInfo(){
     <p>읽는 분은 <b>${esc(APP_ADDR)}</b>에 들어가서 방을 고르거나 방 번호를 넣으면 됩니다. 아래 주소로 열면 방 번호 없이 바로 들어갑니다.</p>
     <p class="addr">${esc(link)}</p>
     <div class="row"><button class="btn" data-copy>주소 복사</button><button class="btn" data-open>읽는 화면 열어 보기</button></div>
+    <details class="card"><summary><b>넷플릭스 자막을 이 방으로 보내기</b></summary>
+      <p class="small">넷플릭스를 트는 PC 크롬에 템퍼몽키를 설치한 뒤 아래 주소를 열어 스크립트를 설치합니다. 넷플릭스에서 자막을 <b>한국어(CC)</b>로 켜고, 오른쪽 위 '문자통역 자막' 패널에 이 방 번호와 교대 비밀번호를 넣으면 자막이 바뀔 때마다 한 줄씩 들어옵니다. '화면에서 자막 숨기기'로 프로젝터에서는 자막을 감출 수 있습니다.</p>
+      <p class="addr">https://${esc(APP_ADDR)}netflix-caption.user.js</p>
+      <div class="row"><a class="btn" href="netflix-caption.user.js" target="_blank" rel="noopener">스크립트 설치하기</a></div>
+    </details>
     ${TP.host ? `<p>교대 입력 비밀번호: <b class="pin">${esc(TP.pin || '불러오는 중')}</b> <small class="muted">다른 노트북에서 '교대 입력자로 들어가기'에 넣습니다.</small></p>` : '<p class="muted">교대 입력자로 들어와 있어요.</p>'}
     <div class="row"><div class="sp"></div><button class="btn primary" data-close>닫기</button></div>`, async e => {
       if(e.target.closest('[data-copy]')){ try{ await navigator.clipboard.writeText(link); toast('주소를 복사했어요'); }catch(err){ toast('복사하지 못했어요. 주소를 직접 적어 주세요'); } }
