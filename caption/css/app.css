@@ -131,3 +131,4 @@ button.ln:hover{background:var(--panel)}
 .rl.now{border-left-color:var(--ok)}
 .rl:focus{outline:3px solid var(--acc);outline-offset:-2px}
 #vRead[data-theme="light"] .rl:focus{outline-color:#c00}
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}

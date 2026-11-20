@@ -24,7 +24,7 @@ else if(/Android/i.test(u)&&/NAVER\(inapp|Instagram|FBAN|FBAV|everytimeApp|BAND\
 <link rel="modulepreload" href="vendor/firebase-app.js">
 <link rel="modulepreload" href="vendor/firebase-auth.js">
 <link rel="modulepreload" href="vendor/firebase-database.js">
-<link rel="stylesheet" href="css/app.css?v=6">
+<link rel="stylesheet" href="css/app.css?v=7">
 </head>
 <body>
 
@@ -62,7 +62,8 @@ else if(/Android/i.test(u)&&/NAVER\(inapp|Instagram|FBAN|FBAV|everytimeApp|BAND\
 <!-- ============ 읽기 화면 ============ -->
 <section id="vRead" class="view" hidden>
   <h1 id="rTitle" class="rtitle">문자통역</h1>
-  <div id="rList" class="rlist" tabindex="0" role="region" aria-label="통역 내용"></div>
+  <div id="rList" class="rlist" tabindex="-1"></div>
+  <div id="rAnn" class="sr-only" aria-live="polite"></div>
   <textarea id="rText" class="rtext" aria-label="통역 내용" inputmode="none" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off"></textarea>
   <p id="rEmpty" class="rempty" hidden aria-hidden="true">통역이 시작되면 여기에 글이 나옵니다.</p>
   <div class="rbar">
@@ -132,12 +133,12 @@ else if(/Android/i.test(u)&&/NAVER\(inapp|Instagram|FBAN|FBAV|everytimeApp|BAND\
 <div id="sheet" hidden><div id="sheetBox" class="sheet-box" role="dialog" aria-modal="true"></div></div>
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script src="js/config.js?v=6"></script>
-<script src="js/util.js?v=6"></script>
-<script src="js/store.js?v=6"></script>
-<script src="js/pwa.js?v=6"></script>
-<script src="js/reader.js?v=6"></script>
-<script src="js/typist.js?v=6"></script>
-<script src="js/app.js?v=6"></script>
+<script src="js/config.js?v=7"></script>
+<script src="js/util.js?v=7"></script>
+<script src="js/store.js?v=7"></script>
+<script src="js/pwa.js?v=7"></script>
+<script src="js/reader.js?v=7"></script>
+<script src="js/typist.js?v=7"></script>
+<script src="js/app.js?v=7"></script>
 </body>
 </html>

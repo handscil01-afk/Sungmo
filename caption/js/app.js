@@ -67,7 +67,7 @@ async function checkUpdate(){
   const view = ($$('.view').find(x => !x.hidden) || {}).id;
   if(view === 'vStart' && $('#sheet').hidden){ location.reload(); return; }
   if(view === 'vRead'){
-    const following = RD.live && (RS.view === 'box' || document.activeElement === RD.liveEl || document.activeElement === $('#rList') || !document.activeElement || document.activeElement === document.body);
+    const following = RD.live && (RS.view === 'box' || (RS.move && (document.activeElement === RD.liveEl || document.activeElement === $('#rList') || !document.activeElement || document.activeElement === document.body)));
     if(following){ location.reload(); return; }
     if(!UPDATE.told){ UPDATE.told = true; rSay('새 판이 나왔어요. Enter를 누르면 새 판으로 바뀌고 지금 치는 곳으로 갑니다.'); }
     return;
