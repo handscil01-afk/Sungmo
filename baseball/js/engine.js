@@ -135,7 +135,19 @@ function makeBench(G, S, b, bias){
     aggr: clamp(Math.round(50 + gauss(G) * 14 + S.aggr), 5, 95), cond: condRoll(G), seen: false,
     st: { pa:0, ab:0, h:0, hr:0, rbi:0, bb:0, k:0, r:0, sb:0 } };
 }
+// 우리 센터 팀 선수: 사용자가 정한 이름·별명·자리·능력치로 만듦 (구종과 성향은 컴퓨터가 정함)
+// 체력(sta)은 1~99로 정하고, 선발은 60~115, 불펜은 18~46 투구 체력으로 바꿈
+const centerSta = (v, starter) => starter ? Math.round(60 + v * 0.56) : Math.round(18 + v * 0.28);
+function centerBatter(G, S, c, slot){
+  const b = makeBatter(G, S, slot, 0);
+  return { ...b, name: c.name || b.name, nick: c.nick || '', pos: c.pos || b.pos, hand: c.hand || b.hand, con: c.con ?? b.con, pow: c.pow ?? b.pow, eye: c.eye ?? b.eye, spd: c.spd ?? b.spd, def: c.def ?? b.def };
+}
+function centerPitcher(G, S, c, starter){
+  const p = makePitcher(G, S, starter, 0);
+  return { ...p, name: c.name || p.name, nick: c.nick || '', hand: c.hand || p.hand, vel: c.vel ?? p.vel, ctl: c.ctl ?? p.ctl, stf: c.stf ?? p.stf, sta: c.sta != null ? centerSta(c.sta, starter) : p.sta };
+}
 function makeTeam(G, key, bias){
+  if(key === 'center' && CENTER) return makeCenterTeam(G);
   const info = teamInfo(key), S = STYLES[info.style];
   const T = { key, name: info.name, short: info.short, style: info.style, color: info.color,
     bat: [], pit: [], pi: 0, bi: 0, align: { inf:1, of:1 }, R: [], H: 0, E: 0, BB: 0, guess: null, lastSel: null };
@@ -150,6 +162,22 @@ function makeTeam(G, key, bias){
   return T;
 }
 
+function makeCenterTeam(G){
+  const info = centerInfo(), S = STYLES[info.style];
+  const T = { key:'center', name: info.name, short: info.short, style: info.style, color: info.color,
+    bat: [], pit: [], pi: 0, bi: 0, align: { inf:1, of:1 }, R: [], H: 0, E: 0, BB: 0, guess: null, lastSel: null };
+  for(let i = 0; i < 9; i++) T.bat.push(centerBatter(G, S, CENTER.bat[i] || {}, i));
+  // 선발로 정한 첫 투수가 선발, 나머지는 불펜 (마무리로 정한 투수를 마무리 자리에)
+  const ps = (CENTER.pit || []).slice(0, 5), sp = ps.find(p => p.role === '선발') || ps[0] || {}, rest = ps.filter(p => p !== sp);
+  const cl = rest.find(p => p.role === '마무리');
+  const order = cl ? [cl, ...rest.filter(p => p !== cl)] : rest;
+  T.pit.push(centerPitcher(G, S, sp, true));
+  for(let i = 0; i < 4; i++) T.pit.push(centerPitcher(G, S, order[i] || {}, false));
+  T.pit[1].role = '마무리';
+  T.bench = BENCH_ROLES.map(b => makeBench(G, S, b, 0));
+  T.gone = []; T.rev = 2; T.def = teamDef(T);
+  return T;
+}
 // 리그 명단으로 경기용 팀 만들기: R = { key, bat:[9], bench:[], pit:[오늘 선발, 쉬는 날이 아닌 불펜…] }
 const freshBat = () => ({ pa:0, ab:0, h:0, hr:0, rbi:0, bb:0, k:0, r:0, sb:0 });
 function rosterTeam(G, R){

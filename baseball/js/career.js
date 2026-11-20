@@ -309,7 +309,7 @@ function promote(L){
 // 2군 날: 퓨처스리그 경기(컴퓨터가 진행, 리그 기록에는 넣지 않음) 뒤 1군 리그 하루 진행
 // 퓨처스리그 경기 설정: 내 선수를 넣은 2군 명단 (투수는 선발 차례·불펜 대기)
 function minorGameOpts(L, mode){
-  const p = myP(L), opp = TEAMS.map(t => t.key).filter(k => k !== L.my)[Math.floor(rnd(L) * 9)];
+  const p = myP(L), opp = Object.keys(L.teams).filter(k => k !== L.my)[Math.floor(rnd(L) * 9)];
   const R = gameRoster(L, L.my), O = gameRoster(L, opp);
   if(isPit(p)){ if(p.role === '선발' && rnd(L) < 0.25) R.pit = [p, ...R.pit.slice(1)]; else if(p.role !== '선발') R.pit = [R.pit[0], p, ...R.pit.slice(1)]; else R.pit = [R.pit[0], ...R.pit.slice(1), p]; }
   else { const bat = R.bat.slice(), i = bat.findIndex(b => b.pos === p.pos); bat[i >= 0 ? i : 4] = p; R.bat = bat; }

@@ -125,6 +125,34 @@ const PORT = 8767;
     console.log(`${tag}: 라커룸·마을·용품점·가방·훈련·선수 카드·얼굴·이벤트·대진·업적 확인`);
     await ctx.close();
   }
+  // 우리 센터 팀: 소리와 글로 하기에서 번호 키와 명령 칸만으로 팀 이름·선수 이름을 정해 저장하고, 팀 고르기에서 골라 경기를 끝까지
+  {
+    const ctx = await browser.newContext({ viewport:{ width:390, height:844 } });
+    const page = await ctx.newPage(), tag = '우리 센터 팀(소리와 글)';
+    page.on('pageerror', e => errors.push(`${tag}: ${e.message}`));
+    await page.goto(`http://localhost:${PORT}/baseball/`); await page.waitForSelector('#opts .opt'); await page.keyboard.press('2');
+    const q = () => page.$eval('#q', e => e.textContent), type = async t => { await page.fill('#cmd', t); await page.press('#cmd', 'Enter'); };
+    await page.evaluate(() => go(() => centerEdit(v => go(homeScreen, v)), 'click'));
+    await page.keyboard.press('1'); await type('손잡다 센터');
+    await page.keyboard.press('7'); await page.keyboard.press('1'); await page.keyboard.press('1'); await type('김민수');
+    await page.keyboard.press('2'); await type('번개');
+    await page.keyboard.press('5'); await type('80'); await page.keyboard.press('9');
+    await page.keyboard.press('.'); await page.keyboard.press('.');
+    if(!/우리 센터 팀을 만듭니다/.test(await q())) errors.push(`${tag}: 팀 첫 화면으로 돌아오지 않음: ${await q()}`);
+    await page.keyboard.press('9');
+    const saved = await page.evaluate(() => CENTER && [CENTER.name, CENTER.bat[0].name, CENTER.bat[0].nick, CENTER.bat[0].con]);
+    if(!saved || saved.join() !== '손잡다 센터,김민수,번개,80') errors.push(`${tag}: 저장된 값이 다름 ${JSON.stringify(saved)}`);
+    await page.evaluate(() => { NEW.kind = '1p'; NEW.mode = 'simple'; NEW.unit = 'pa'; go(() => teamScreen(0), 'click'); });
+    const first = await page.$eval('#opts .opt', e => e.textContent);
+    if(!/손잡다 센터/.test(first)) errors.push(`${tag}: 팀 고르기 첫째에 우리 팀이 없음: ${first.slice(0, 30)}`);
+    await page.keyboard.press('1'); await page.keyboard.press('1');
+    for(const k of ['1', '1', '2', '1']) await page.keyboard.press(k);
+    for(let i = 0; i < 400 && !(await page.evaluate(() => G && G.over)); i++) await page.keyboard.press(String(1 + Math.floor(Math.random() * 3)));
+    const fin = await page.evaluate(() => G && [G.over, G.teams.find(T => T.key === 'center')?.bat[0].name]);
+    if(!fin || !fin[0] || fin[1] !== '김민수') errors.push(`${tag}: 우리 팀 경기를 끝내지 못함 ${JSON.stringify(fin)}`);
+    console.log(`${tag}: 만들기·저장·팀 고르기·경기 끝까지`);
+    await ctx.close();
+  }
   await browser.close(); srv.kill();
   if(errors.length){ console.log('오류:\n' + [...new Set(errors)].join('\n')); process.exit(1); }
   console.log('오류 없음');

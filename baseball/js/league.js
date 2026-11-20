@@ -19,6 +19,7 @@ function leagueFix(L){ Object.values(L.teams).forEach(T => allPlayers(T).forEach
 // 처음 만든 리그의 선수 나이: 21~34세
 function giveAge(L, p){ if(!p.age) p.age = 21 + Math.floor(rnd(L) * 14); }
 function leagueTeam(L, key){
+  if(key === 'center' && CENTER) return leagueCenterTeam(L);
   const S = STYLES[teamInfo(key).style];
   const bat = bestOrder([...Array(9)].map((_, i) => leaguePlayer(makeBatter(L, S, i, 0))));
   const bench = BENCH_ROLES.map(b => leaguePlayer(makeBench(L, S, b, 0)));
@@ -28,17 +29,35 @@ function leagueTeam(L, key){
   allPlayers(T).forEach(p => giveAge(L, p));
   return T;
 }
+// 우리 센터 팀의 리그 명단: 사용자가 만든 9명·투수 5명에, 모자라는 선발·불펜·벤치는 컴퓨터가 채움
+function leagueCenterTeam(L){
+  const S = STYLES[centerInfo().style], ps = (CENTER.pit || []).slice(0, 5);
+  const bat = CENTER.bat.slice(0, 9).map((c, i) => leaguePlayer(centerBatter(L, S, c, i)));
+  const bench = BENCH_ROLES.map(b => leaguePlayer(makeBench(L, S, b, 0)));
+  const spC = ps.filter(p => p.role === '선발'), rpC = ps.filter(p => p.role !== '선발');
+  const sp = [...spC.map(c => leaguePlayer(centerPitcher(L, S, c, true), '선발'))];
+  while(sp.length < 5) sp.push(leaguePlayer(makePitcher(L, S, true, 0), '선발'));
+  rpC.sort((a, b) => (b.role === '마무리') - (a.role === '마무리'));
+  const rp = rpC.map((c, i) => leaguePlayer(centerPitcher(L, S, c, false), i === 0 && c.role === '마무리' ? '마무리' : '불펜'));
+  while(rp.length < 6) rp.push(leaguePlayer(makePitcher(L, S, false, 0), '불펜'));
+  if(!rp.some(p => p.role === '마무리')) rp[0].role = '마무리';
+  const T = { key:'center', bat, bench, sp: sp.slice(0, 5), rp: rp.slice(0, 6), rot:0, w:0, l:0, d:0, rs:0, ra:0, last:[] };
+  allPlayers(T).forEach(p => giveAge(L, p));
+  return T;
+}
+// 리그에 드는 팀: 우리 센터 팀으로 하면 손잡다 핸즈 자리에 들어감
+const leagueKeys = my => TEAMS.map(t => t.key === 'star' && my === 'center' ? 'center' : t.key);
 // o: { my:내 팀, len:팀당 경기 수, mode, unit, inn:이닝, seed }
 function leagueNew(o){
   const L = { v:1, rng: (o.seed >>> 0) || 1, names:[], season:1, my:o.my, len:o.len, mode:o.mode, unit:o.unit || 'pitch', inn:o.inn || 9,
     day:0, phase:'season', teams:{}, sched:[], post:null, awards:null, champ:null, news:[] };
-  TEAMS.forEach(t => { L.teams[t.key] = leagueTeam(L, t.key); });
+  leagueKeys(o.my).forEach(k => { L.teams[k] = leagueTeam(L, k); });
   L.sched = makeSchedule(L);
   return L;
 }
 // 원형 일정: 9일이면 모든 팀이 서로 한 번씩. 한 바퀴마다 홈·원정을 바꿈
 function makeSchedule(L){
-  const keys = TEAMS.map(t => t.key), n = keys.length, rounds = [];
+  const keys = Object.keys(L.teams), n = keys.length, rounds = [];
   let arr = keys.slice();
   for(let r = 0; r < n - 1; r++){
     const day = [];

@@ -74,8 +74,13 @@ const PARKS = {
   beacon:  { name:'비컨스 필드', desc:'오른쪽 담장이 가까워 왼손 타자의 홈런이 잘 나옵니다.', fence:[100, 120, 92], hr:1.1 },
   windy:   { name:'윈디스 오름구장', desc:'바람이 세고 방향이 자주 바뀝니다.', wind:{ none:2, out:30, in:30, lr:19, rl:19 }, spd:[4, 10], change:0.55 },
 };
-const parkInfo = key => ({ key, ...PARK_BASE, ...(PARKS[key] || PARKS.star) });
-const teamInfo = key => TEAMS.find(t => t.key === key) || TEAMS[0];
+// 우리 센터 팀(key 'center'): 사용자가 만든 팀. 브라우저에서는 center.js가 이 기기 저장(bb_center)을 읽어 CENTER에 넣음
+// { name, short, color, emblem(0~9 또는 null), style, park(빌려 쓸 구장 key), bat:[9명], pit:[5명] }
+let CENTER = null;
+const CENTER_FALLBACK = { key:'center', name:'우리 팀', short:'우리', style:'balance', color:'#ec4899' };
+const centerInfo = () => CENTER ? { key:'center', name: CENTER.name, short: CENTER.short, style: CENTER.style || 'balance', color: CENTER.color, emblem: CENTER.emblem } : CENTER_FALLBACK;
+const parkInfo = key => key === 'center' ? parkInfo((CENTER && CENTER.park) || 'star') : ({ key, ...PARK_BASE, ...(PARKS[key] || PARKS.star) });
+const teamInfo = key => key === 'center' ? centerInfo() : TEAMS.find(t => t.key === key) || TEAMS[0];
 
 const POS = { P:'투수', C:'포수', '1B':'1루수', '2B':'2루수', '3B':'3루수', SS:'유격수', LF:'좌익수', CF:'중견수', RF:'우익수', DH:'지명타자' };
 // 타순별 수비 위치 (1번 중견수 … 9번 유격수)

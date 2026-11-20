@@ -233,7 +233,29 @@ function crLogSkin(S){
     <div class="minors">${(S.opts || []).filter(o => !o.hide).map(o => `<button type="button" class="mn" data-sk="opt" data-n="${o.n}"><span>${esc(o.t)}</span></button>`).join('')}</div>`;
 }
 
-const CAREER_SK = { 'cr-talk':crTalk, 'cr-game':crGame, 'cr-log':crLogSkin, 'cr-home':crHome, 'cr-visit':crVisit, 'cr-shop':crShop, 'cr-bag':crBag, 'cr-train':crTrain, 'cr-info':crInfo, 'cr-face':crFacePick };
+/* ---------- 우리 센터 팀 만들기 (center.js) ---------- */
+function ctHome(S){
+  const c = CE.c; if(!c) return null;
+  const T = { key:'center', short: c.short, color: c.color }, saved = CENTER;
+  CENTER = { ...(CENTER || {}), emblem: c.emblem, short: c.short };   // 미리보기 엠블럼
+  const e = emb(T, 'big'); CENTER = saved;
+  return `<div class="ctp" style="--tc:${c.color}">${e}<div class="ctp-tx"><b>${esc(c.name)}</b><small>${esc(c.short)} · ${esc(STYLES[c.style].name)} · ${esc(parkInfo(c.park).name)}</small>
+    <span class="ctp-pl">${c.bat.slice(0, 5).map(p => `<i>${esc(p.nick || p.name)}</i>`).join('')}…</span></div></div>` + menuOpts(S);
+}
+function ctNum(S){
+  const pct = (S.val - S.lo) / (S.hi - S.lo) * 100, gr = grade(S.stat === 'vel' ? clamp((S.val - 120) * 2.5, 0, 100) : S.val);
+  const b = n => (S.opts || []).find(o => o.n === n);
+  const btn = (n, cls) => { const o = b(n); return o ? `<button type="button" class="ctn-b ${cls}" data-sk="opt" data-n="${o.n}">${esc(o.t.replace(' 올리기', '').replace(' 내리기', ''))}</button>` : ''; };
+  return `<p class="msub">${esc(skClean(S.q).split('. ')[0])}</p>
+    <div class="ctn panel"><b class="ctn-v">${S.val}<small>${S.stat === 'vel' ? 'km' : ''}</small></b><span class="g g-${gr}">${gr}</span>
+      <span class="ctn-bar"><i style="width:${pct}%"></i></span><span class="ctn-r"><small>${S.lo}</small><small>${S.hi}</small></span></div>
+    <div class="ctn-row"><span>내리기</span>${btn(6, 'dn')}${btn(5, 'dn')}${btn(4, 'dn')}</div>
+    <div class="ctn-row"><span>올리기</span>${btn(3, 'up')}${btn(2, 'up')}${btn(1, 'up')}</div>
+    <form id="skForm" class="sk-form" autocomplete="off"><input id="skIn" type="text" inputmode="numeric" maxlength="3" placeholder="숫자로 적기" enterkeyhint="done"><button type="submit" class="gb b">적용</button></form>
+    ${(() => { const o = b(9); return o ? `<button type="button" class="crplay" data-sk="opt" data-n="${o.n}"><span class="pp">✓</span><span><b>${esc(o.t)}</b></span></button>` : ''; })()}`;
+}
+
+const CAREER_SK = { 'ct-home':ctHome, 'ct-num':ctNum, 'cr-talk':crTalk, 'cr-game':crGame, 'cr-log':crLogSkin, 'cr-home':crHome, 'cr-visit':crVisit, 'cr-shop':crShop, 'cr-bag':crBag, 'cr-train':crTrain, 'cr-info':crInfo, 'cr-face':crFacePick };
 function careerSkin(S){
   const f = S && S.kind && CAREER_SK[S.kind];
   if(!f) return null;

@@ -43,7 +43,8 @@ function teamScreen(which, page = 0){
           : NEW.kind === '2p' ? (which ? '둘째 사람의 팀을 고르세요.' : '첫째 사람의 팀을 고르세요.')
           : (which ? '홈 팀을 고르세요.' : '원정 팀을 고르세요.');
   const taken = which ? NEW.a : null;
-  const list = TEAMS.filter(t => t.key !== taken);
+  // 우리 센터 팀(만들었으면)은 맨 앞에. 온라인 대전은 상대 기기에 팀 자료가 없어서 빼고, 리그·육성에서는 손잡다 핸즈 자리에 들어감
+  const list = [...(CENTER && NEW.kind !== 'online' ? [centerInfo()] : []), ...TEAMS].filter(t => t.key !== taken);
   const set = (k, v) => {
     if(which){ NEW.b = k; go(NEW.kind === 'watch' ? inningsScreen : sideScreen, v); }
     else { NEW.a = k; go(NEW.kind === 'league' ? leagueLenScreen : NEW.kind === 'career' ? careerLenScreen : () => teamScreen(1), v); }
@@ -54,6 +55,7 @@ function teamScreen(which, page = 0){
   if(VIEW.gfx){
     const opts = list.map((t, i) => ({ n: i + 1, t: t.name, s: desc(t), act: v => set(t.key, v) }));
     opts.push({ n: list.length + 1, t:'아무 팀이나', s:'무작위로 고릅니다.', act: v => set(list[Math.floor(Math.random() * list.length)].key, v) });
+    if(NEW.kind !== 'online' && !which) opts.push({ n: list.length + 2, t: CENTER ? '우리 팀 고치기' : '우리 센터 팀 만들기', s:'이용자 이름과 별명으로 팀과 선수를 만들고 능력치를 정합니다.', act: v => go(() => centerEdit(w => go(() => teamScreen(which), w)), v) });
     return { q, opts, back: v => go(which ? () => teamScreen(0) : NEW.kind === 'career' ? careerTypeScreen : NEW.mode === 'simple' ? unitScreen : modeScreen, v) };
   }
   const shown = page ? list.slice(8) : list.slice(0, 8);
@@ -158,6 +160,7 @@ function settingsScreen(backTo, tab){
       { t:`세밀하게 고르기: 구속 ${onOff(picks().pow9)} · 스윙 ${onOff(picks().swing9)} · 노려 치기 ${onOff(picks().aim)}`, s:'구속 9단계, 스윙 세기 9단계, 노려 치기를 켜고 끕니다.', act: v => go(() => picksFine(w => go(() => settingsScreen(backTo), w), null, true), v) },
       { t:`타이밍 맞춰 치기: ${onOff(!!SET.timing)}`, hide: !VIEW.gfx, s:'정밀 모드에서 치기를 고르면 공이 들어오는 순간에 맞춰 한 번 더 누릅니다. 타이밍이 좋으면 잘 맞고, 빠르거나 늦으면 빗맞습니다. 끝까지 누르지 않으면 지켜봅니다. 온라인 대전에서는 쓰지 않습니다.', act: ch(() => { SET.timing = !SET.timing; }, () => `타이밍 맞춰 치기 ${onOff(!!SET.timing)}`) },
       { t:`송구 고르기: ${SET.pickThrow === false ? '끔' : '켬'}`, s:'정밀 모드에서 내가 수비할 때, 땅볼을 잡은 뒤 던질 베이스를 직접 고릅니다. 끄면 컴퓨터가 정합니다.', act: ch(() => { SET.pickThrow = SET.pickThrow === false; }, () => `송구 고르기 ${SET.pickThrow === false ? '끔' : '켬'}`) },
+      { t: CENTER ? `우리 센터 팀 고치기 (${CENTER.name})` : '우리 센터 팀 만들기', s:'이용자 이름과 별명으로 팀과 선수를 만들고 능력치를 정합니다. 혼자·둘이 하기, 관전, 리그, 선수 육성에서 고를 수 있습니다.', act: v => go(() => centerEdit(w => go(() => settingsScreen(backTo), w)), v) },
       { t:`관전 자동 재생 간격: ${SET.watch}초`, act: ch(() => { SET.watch = cycle([2, 4, 6, 8, 12], SET.watch); }, () => `자동 재생 ${SET.watch}초`) },
     ],
     // 규칙

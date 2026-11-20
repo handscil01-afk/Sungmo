@@ -643,3 +643,21 @@ html.skin .sk-body.f2 .tk-o small, html.skin .sk-body.f2 .gm-o small, html.skin 
   html.skin .k-cr-game > .crres, html.skin .k-cr-talk > .crres, html.skin .k-cr-talk > .crmsg{ grid-column:1 / -1; }
   html.skin .k-cr-game > .gm-opts{ max-height:none; } html.skin .tk-opts.teams{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
 }
+/* 우리 센터 팀 만들기 */
+html.skin .ctp{ display:flex; align-items:center; gap:10px; padding:10px; border-radius:16px; border:3px solid color-mix(in srgb, var(--tc) 60%, #000);
+  background:linear-gradient(160deg, color-mix(in srgb, var(--tc) 70%, #fff), var(--tc)); box-shadow:0 3px 0 color-mix(in srgb, var(--tc) 50%, #000); color:#fff; text-shadow:0 1px 0 rgba(0,0,0,.5); }
+html.skin .ctp .emb.big{ width:3.6rem; height:3.6rem; font-size:1.5rem; }
+html.skin .ctp-tx{ display:grid; min-width:0; } html.skin .ctp-tx b{ font-size:1.15rem; font-weight:900; } html.skin .ctp-tx small{ font-size:.72rem; font-weight:800; opacity:.95; }
+html.skin .ctp-pl{ display:flex; flex-wrap:wrap; gap:3px; margin-top:3px; } html.skin .ctp-pl i{ font-style:normal; font-size:.62rem; font-weight:800; background:rgba(0,0,0,.25); padding:0 6px; border-radius:999px; }
+html.skin .ctn{ display:grid; grid-template-columns:1fr auto; align-items:center; gap:6px 10px; padding:12px 14px; }
+html.skin .ctn-v{ font-size:2.6rem; font-weight:900; line-height:1; color:var(--ink); } html.skin .ctn-v small{ font-size:1rem; margin-left:2px; }
+html.skin .ctn .g{ font-style:normal; font-size:1rem; font-weight:900; width:2rem; height:2rem; border-radius:8px; display:grid; place-items:center; color:#fff; }
+html.skin .ctn-bar{ grid-column:1 / -1; height:14px; border-radius:7px; background:#c5ddf7; overflow:hidden; border:2px solid var(--line); } html.skin .ctn-bar i{ display:block; height:100%; background:linear-gradient(90deg, #5bbaff, #1f6fe0); }
+html.skin .ctn-r{ grid-column:1 / -1; display:flex; justify-content:space-between; font-size:.66rem; color:var(--ink2); font-weight:800; }
+html.skin .ctn-row{ display:grid; grid-template-columns:3.4rem repeat(3, minmax(0, 1fr)); gap:6px; align-items:center; }
+html.skin .ctn-row > span{ font-size:.8rem; font-weight:900; color:#fff; text-shadow:0 1px 0 #0b3a8c; }
+html.skin .ctn-b{ min-height:3rem; border-radius:14px; font-size:1.1rem; font-weight:900; border:3px solid; color:#fff; text-shadow:0 1px 0 rgba(0,0,0,.4); }
+html.skin .ctn-b.up{ background:linear-gradient(180deg, #6fe08a, #1fa64a); border-color:#0f6b2e; box-shadow:0 3px 0 #0f6b2e; }
+html.skin .ctn-b.dn{ background:linear-gradient(180deg, #ff8a8a, #e0353f); border-color:#8c1d27; box-shadow:0 3px 0 #8c1d27; }
+html.skin .ctn-b:active{ transform:translateY(2px); }
+html.skin .np .nick{ font-style:normal; font-size:.62rem; font-weight:800; color:#c25a00; }
