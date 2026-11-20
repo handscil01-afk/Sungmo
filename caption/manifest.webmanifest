@@ -1,0 +1,16 @@
+{
+ "name": "실시간 문자통역",
+ "short_name": "문자통역",
+ "description": "한 사람이 치는 문자통역을 여러 시청각장애인이 한소네·점자 단말기·태블릿으로 동시에 읽는 도구",
+ "scope": "./",
+ "display": "fullscreen",
+ "display_override": ["fullscreen", "standalone"],
+ "background_color": "#000000",
+ "theme_color": "#000000",
+ "lang": "ko",
+ "icons": [
+  { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+  { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+  { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+ ]
+}

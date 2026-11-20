@@ -259,6 +259,60 @@
         ".read": "auth != null",
         ".write": false
       }
+    },
+    "caption1": {
+      "lobby": {
+        ".read": "auth != null",
+        "$code": {
+          ".write": "auth != null && (root.child('caption1/rooms/' + $code + '/meta/host').val() === auth.uid || root.child('caption1/rooms/' + $code + '/typers/' + auth.uid).exists() || (data.exists() && now - data.child('at').val() > 172800000))",
+          ".validate": "!newData.exists() || (newData.child('title').isString() && newData.child('title').val().length <= 40 && newData.child('at').isNumber())"
+        }
+      },
+      "rooms": {
+        "$code": {
+          ".write": "auth != null && (!data.child('meta').exists() || data.child('meta/host').val() === auth.uid || now - data.child('meta/at').val() > 172800000)",
+          ".validate": "$code.matches(/^[0-9]{4}$/) && newData.child('meta/host').isString()",
+          "meta": {
+            ".read": "auth != null",
+            ".validate": "newData.child('host').val() === auth.uid && newData.child('title').isString() && newData.child('title').val().length <= 40 && newData.child('at').isNumber()"
+          },
+          "secret": {
+            ".read": "auth != null && root.child('caption1/rooms/' + $code + '/meta/host').val() === auth.uid",
+            "pin": {
+              ".validate": "newData.isString() && newData.val().matches(/^[0-9]{4}$/)"
+            }
+          },
+          "typers": {
+            ".read": "auth != null && (root.child('caption1/rooms/' + $code + '/meta/host').val() === auth.uid || root.child('caption1/rooms/' + $code + '/typers/' + auth.uid).exists())",
+            "$uid": {
+              ".read": "auth != null && auth.uid === $uid",
+              ".write": "auth != null && auth.uid === $uid && (!newData.exists() || newData.child('pin').val() === root.child('caption1/rooms/' + $code + '/secret/pin').val())",
+              ".validate": "!newData.exists() || (newData.child('name').isString() && newData.child('name').val().length <= 20)"
+            }
+          },
+          "lines": {
+            ".read": "auth != null",
+            "$id": {
+              ".write": "auth != null && root.child('caption1/rooms/' + $code + '/typers/' + auth.uid).exists()",
+              ".validate": "!newData.exists() || (newData.child('t').isString() && newData.child('t').val().length <= 2000)"
+            }
+          },
+          "drafts": {
+            ".read": "auth != null",
+            "$uid": {
+              ".write": "auth != null && auth.uid === $uid && root.child('caption1/rooms/' + $code + '/typers/' + auth.uid).exists()",
+              ".validate": "!newData.exists() || (newData.child('t').isString() && newData.child('t').val().length <= 2000)"
+            }
+          },
+          "readers": {
+            ".read": "auth != null",
+            "$uid": {
+              ".write": "auth != null && auth.uid === $uid",
+              ".validate": "!newData.exists() || newData.child('at').isNumber()"
+            }
+          }
+        }
+      }
     }
   }
 }
