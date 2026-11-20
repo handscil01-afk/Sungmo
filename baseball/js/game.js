@@ -199,7 +199,7 @@ function runSteps(stop){
 }
 // side: 'def' | 'off'
 function submit(side, choice, via){
-  GS.sel = null;
+  GS.sel = null; GS.tm = null;
   // 온라인 손님: 방장에게 보내고 결과를 기다림
   if(NET.on && NET.role === 'guest'){ NET.sent = true; netSendAct({ k:'choice', role:side, c:choice }); gameNext(via, null); return; }
   GS.pend[side] = choice;
@@ -338,7 +338,7 @@ function defMain(){
   opts.push({ n:7, t:'수비 위치 바꾸기', s:`지금 내야 ${ALIGN_IN[T.align.inf]}, 외야 ${ALIGN_OUT[T.align.of]}`, act: v => go(alignScreen, v) });
   opts.push({ n:8, t: G.bases.some(x => x != null) ? '작전: 견제 · 고의 볼넷 · 투수 교체' : '작전: 고의 볼넷 · 투수 교체', s:`투수 ${P.name} 투구 수 ${P.n}개, 체력 ${Math.round(clamp(1 - P.load / P.sta, 0, 1) * 100)}퍼센트`, act: v => go(tacticScreen, v) });
   opts.push({ n:9, t:'더 보기', s:'점수판, 선수 정보, 맡기기, 설정', act: v => go(moreScreen, v) });
-  return { board:true, q:`${whoLabel(ti)}수비. 타자 ${B.name}, 제${G.pitchNo + 1}구 ${countText(G)}. 어떤 공을 던질까요?`, opts };
+  return { board:true, kind:'pitch', side:'def', q:`${whoLabel(ti)}수비. 타자 ${B.name}, 제${G.pitchNo + 1}구 ${countText(G)}. 어떤 공을 던질까요?`, opts };
 }
 // 코스 번호: 전화기식(1 2 3이 위) · 컴퓨터 숫자판식(7 8 9가 위)
 const zoneNum = (r, c) => SET.pad === 'pc' ? (2 - r) * 3 + c + 1 : r * 3 + c + 1;
@@ -452,9 +452,10 @@ function offMain(){
   const runners = bs.some(x => x != null);
   // 히트 앤드 런: 1루 주자만 있고(2루가 빔) 뛸 수 있을 때. 이번 공 한 번에만 걸리고, 스윙 종류는 그대로 고름
   const hrAble = bs[0] != null && bs[1] == null && canSteal(G), hrOn = hrAble && GS.hrKey === `${G.pa}:${G.pitchNo}`;
-  const bat = (k, s) => v => submit('off', { k, g, d: dr, hr: hrOn && ['swing', 'power', 'contact'].includes(k), ...(s != null ? { s } : {}), aim: GS.aim || null }, v), p = picks();
+  // tm: 화면 보며 하기의 '타이밍 맞춰 치기'에서 잰 타이밍(-1 빠름 ~ 0 딱 맞음 ~ 1 늦음). 혼자·둘이 하기에서만 (온라인 방장은 손님 선택에서 뺌)
+  const bat = (k, s) => v => submit('off', { k, g, d: dr, hr: hrOn && ['swing', 'power', 'contact'].includes(k), ...(s != null ? { s } : {}), aim: GS.aim || null, ...(GS.tm != null && !NET.on ? { tm: GS.tm } : {}) }, v), p = picks();
   GS.batFn = bat;
-  return { board:true, q:`${whoLabel(ti)}공격. 타자 ${B.name}, 제${G.pitchNo + 1}구 ${countText(G)}. 어떻게 할까요?`, opts:[
+  return { board:true, kind:'bat', side:'off', q:`${whoLabel(ti)}공격. 타자 ${B.name}, 제${G.pitchNo + 1}구 ${countText(G)}. 어떻게 할까요?`, opts:[
     { n:1, t:'치기', s:'스트라이크면 치고, 볼은 골라냅니다.', act: bat('swing') },
     { n:2, t: p.swing9 ? '스윙 세기 고르기 (1~9)' : '강하게 치기', s: p.swing9 ? '1은 가장 짧게 맞히기, 5는 보통, 9는 풀스윙입니다. 세게 칠수록 장타가 늘지만 헛스윙과 속는 공도 늘어납니다.' : '장타를 노립니다. 헛스윙이 늘고 볼에 잘 속습니다.', hide: p.bat === 'simple', act: p.swing9 ? (v => go(swingScreen, v)) : bat('power') },
     { n:3, t:'맞히기', s:'짧게 맞힙니다. 공을 더 잘 보지만 타구 힘은 약합니다.', hide: p.bat === 'simple' || p.swing9, act: bat('contact') },

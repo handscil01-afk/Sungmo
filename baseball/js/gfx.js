@@ -144,6 +144,7 @@ function bgPitch(){
 function mulberry(a){ return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 // 위쪽 점수판 (볼·스트라이크·아웃 등과 주자 미니 다이아몬드)
 function scoreBar(G){
+  if(GX.hud) return;   // 화면 보며 하기 새 화면(skin.js)은 점수판을 그림 밖(HTML)에 따로 둠
   const [A, H] = G.teams;
   R(0, 0, 256, 31, '#000'); R(0, 31, 256, 1, '#3c3c64');
   // 왼쪽: 두 팀 점수 (공격 중인 팀 앞에 ▶)
@@ -725,7 +726,7 @@ function gfxSize(){
 // render()가 부름: 화면 모드일 때 상황판 자리에 그림판을 두고, 새 투구·플레이가 있으면 움직임을 시작
 function gfxRender(G, fx, lines, evs){
   GX.scene = null;
-  const bs = $('#boardSec');
+  const bs = GX.host || $('#boardSec');
   let wrap = bs.querySelector('.gfxwrap');
   if(!wrap){
     wrap = document.createElement('div'); wrap.className = 'gfxwrap'; wrap.setAttribute('aria-hidden', 'true');
@@ -754,8 +755,8 @@ if(typeof SET !== 'undefined' && VIEW.gfx) gfxLoad();
 
 /* ---------- 지금 타자·투수 능력치 게이지 (화면 보며 하기, 선택지 아래 빈자리) ----------
    우리 팀은 숫자와 길이 그대로, 상대 팀은 등급(5단계)만 보이게 해서 글로 듣는 정보와 같은 만큼만 알려 줌 */
-function gstatRender(G){
-  let box = $('#gstat');
+function gstatRender(G, host){
+  let box = host || $('#gstat');
   if(!box){ box = document.createElement('div'); box.id = 'gstat'; box.setAttribute('aria-hidden', 'true'); $('#opts').after(box); }
   if(!G || G.over || G.pre){ box.hidden = true; return; }
   const bi = G.top ? 0 : 1, fi = 1 - bi, B = curBatter(G), P = curPitcher(G);

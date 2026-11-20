@@ -156,6 +156,7 @@ function settingsScreen(backTo, tab){
       { t:`타격 난이도: ${EASY_NAME[SET.easy ?? 1]}`, s:'쉬움일수록 잘 맞히고 안타·볼넷·진루가 많아집니다. 다음 경기부터 적용합니다. (리그의 다른 팀 경기는 늘 현실)', act: ch(() => { SET.easy = cycle([1, 2, 0], SET.easy ?? 1); }, () => `타격 난이도 ${EASY_NAME[SET.easy]}`) },
       { t:`정밀 모드에서 직접 고를 것: ${pickName()}`, s:'구종만 · 구종과 코스 · 전부 · 내 맘대로', act: v => go(() => picksScreen(w => go(() => settingsScreen(backTo), w)), v) },
       { t:`세밀하게 고르기: 구속 ${onOff(picks().pow9)} · 스윙 ${onOff(picks().swing9)} · 노려 치기 ${onOff(picks().aim)}`, s:'구속 9단계, 스윙 세기 9단계, 노려 치기를 켜고 끕니다.', act: v => go(() => picksFine(w => go(() => settingsScreen(backTo), w), null, true), v) },
+      { t:`타이밍 맞춰 치기: ${onOff(!!SET.timing)}`, hide: !VIEW.gfx, s:'정밀 모드에서 치기를 고르면 공이 들어오는 순간에 맞춰 한 번 더 누릅니다. 타이밍이 좋으면 잘 맞고, 빠르거나 늦으면 빗맞습니다. 끝까지 누르지 않으면 지켜봅니다. 온라인 대전에서는 쓰지 않습니다.', act: ch(() => { SET.timing = !SET.timing; }, () => `타이밍 맞춰 치기 ${onOff(!!SET.timing)}`) },
       { t:`송구 고르기: ${SET.pickThrow === false ? '끔' : '켬'}`, s:'정밀 모드에서 내가 수비할 때, 땅볼을 잡은 뒤 던질 베이스를 직접 고릅니다. 끄면 컴퓨터가 정합니다.', act: ch(() => { SET.pickThrow = SET.pickThrow === false; }, () => `송구 고르기 ${SET.pickThrow === false ? '끔' : '켬'}`) },
       { t:`관전 자동 재생 간격: ${SET.watch}초`, act: ch(() => { SET.watch = cycle([2, 4, 6, 8, 12], SET.watch); }, () => `자동 재생 ${SET.watch}초`) },
     ],

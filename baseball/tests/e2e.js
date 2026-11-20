@@ -16,12 +16,29 @@ const PORT = 8766;
   const shot = async (page, name) => { if(shots) await page.screenshot({ path: path.join(shots, name + '.png'), fullPage:false }); };
   const q = page => page.$eval('#q', e => e.textContent);
   const opts = page => page.$$eval('#opts .opt', els => els.map(e => ({ n: e.dataset.n, t: e.querySelector('b').textContent })));
+  // 선택지 누르기: 화면 보며 하기(새 화면)는 새 단추를, 정밀 수비 한 화면은 코스 칸을 누르고 던지기
+  const clickOpt = async (page, n) => {
+    const skin = await page.evaluate(() => document.documentElement.classList.contains('skin'));
+    if(!skin) return page.click(`#opts .opt[data-n="${n}"]`);
+    if(await page.isVisible('#skSheet .sk-btn')) await page.click('#skSheet .sk-btn');
+    const sel = `#sk [data-sk="opt"][data-n="${n}"]`;
+    if(await page.$(sel) && await page.isVisible(sel)) return page.click(sel);
+    if(await page.$('#sk [data-sk="throw"]') && Math.random() < 0.7){
+      const zs = await page.$$('#sk [data-sk="z"]');
+      if(zs.length) await zs[Math.floor(Math.random() * zs.length)].click();
+      const pts = await page.$$('#sk [data-sk="pt"]'); if(pts.length) await pts[Math.floor(Math.random() * pts.length)].click();
+      return page.click('#sk [data-sk="throw"]');
+    }
+    return page.keyboard.press(String(n));
+  };
   const noOverflow = async (page, where) => {
     const w = await page.evaluate(() => [document.documentElement.scrollWidth, innerWidth]);
     if(w[0] > w[1] + 1) errors.push(`${where}: 가로로 넘침 ${w[0]} > ${w[1]}`);
     // 화면 보며 하기의 경기 화면은 세로로도 넘치면 안 됨 (한 화면에서 다 고름)
     const v = await page.evaluate(() => [document.documentElement.classList.contains('gfxgame'), document.documentElement.scrollHeight, innerHeight, (() => { const o = [...document.querySelectorAll('#opts .opt')].pop(); return o ? Math.round(o.getBoundingClientRect().bottom) : 0; })()]);
     if(v[0] && (v[1] > v[2] + 1 || v[3] > v[2] + 1)) errors.push(`${where}: 그림 모드 경기 화면이 한 화면을 넘침 ${v[1]}/${v[3]} > ${v[2]}`);
+    const sk = await page.evaluate(() => document.documentElement.classList.contains('skin') ? [document.documentElement.scrollHeight, innerHeight, document.documentElement.scrollWidth, innerWidth] : null);
+    if(sk && (sk[0] > sk[1] + 1 || sk[2] > sk[3] + 1)) errors.push(`${where}: 화면 보며 하기 화면이 한 화면을 넘침 ${sk.join('/')}`);
   };
   // 경기 화면에서 무작위로 골라 끝까지 진행 (메뉴 빠져나가기·그만하기는 피함)
   async function playToEnd(page, tag, useClick){
@@ -33,7 +50,7 @@ const PORT = 8766;
       if(qq.includes('관전 중')) os = os.filter(o => o.n === '2');
       if(!os.length){ await page.keyboard.press('.'); continue; }
       const o = os[Math.floor(Math.random() * os.length)];
-      if(useClick && Math.random() < 0.5) await page.click(`#opts .opt[data-n="${o.n}"]`);
+      if(useClick && Math.random() < 0.5) await clickOpt(page, o.n);
       else await page.keyboard.press(o.n);
     }
     errors.push(`${tag}: 4000번 안에 끝나지 않음`);
@@ -54,7 +71,7 @@ const PORT = 8766;
     for(const k of ['1', '2', '2', '1', '1', '1', '1', '1', '2']) await page.keyboard.press(k);
     await shot(page, `${name}-ready`);
     await page.keyboard.press('1');
-    await page.waitForFunction(() => document.querySelector('#boardSec') && !document.querySelector('#boardSec').hidden);
+    await page.waitForFunction(() => UI.S && UI.S.board && G);
     await shot(page, `${name}-game`); await noOverflow(page, name + ' 경기');
     // 수비라면 코스 판까지 가서 찍어 둠
     const qq = await q(page);
@@ -66,7 +83,7 @@ const PORT = 8766;
     console.log(`${name}: 정밀 1이닝 ${steps}번 만에 끝`);
     // 처음 화면 → 둘이 하기, 간단 모드, 3이닝 (명령 칸으로 입력)
     await page.keyboard.press('4');
-    for(const k of ['2', '1', '1', '2', '3', '2', '2', '1']){ await page.fill('#cmd', ''); await page.type('#cmd', k); }
+    for(const k of ['2', '1', '1', '2', '3', '2', '2', '1']){ if(await page.isVisible('#cmd')){ await page.fill('#cmd', ''); await page.type('#cmd', k); } else await page.keyboard.press(k); }
     const s2 = await playToEnd(page, name + ' 간단 둘이', false);
     console.log(`${name}: 간단 둘이 3이닝 ${s2}번 만에 끝`);
     // 관전: 정밀 3이닝, 경기 끝까지
@@ -160,7 +177,7 @@ const PORT = 8766;
       await page.keyboard.press('.');
       await page.keyboard.press('5'); await page.keyboard.press('1');
       await page.waitForFunction(() => document.querySelector('#q').textContent.includes('선수 이름'));
-      await page.fill('#cmd', '홍길동'); await page.press('#cmd', 'Enter');
+      { const f = await page.isVisible('#cmd') ? '#cmd' : '#skIn'; await page.fill(f, '홍길동'); await page.press(f, 'Enter'); }
       for(const k of ['1', '5', '1', '1', '4', '1']) await page.keyboard.press(k);
       if(!(await q(page)).includes('오늘은 무엇을')) errors.push('육성 첫 화면이 아님: ' + await q(page));
       await shot(page, `${name}-career`);
@@ -439,7 +456,7 @@ const PORT = 8766;
     if(!(await page.evaluate(() => !!loadSaved()))){ errors.push('옛 경기 저장: 저장한 경기를 불러올 수 없음'); }
     else {
       await page.evaluate(() => resumeGame('click'));
-      await page.waitForFunction(() => document.querySelector('#boardSec') && !document.querySelector('#boardSec').hidden);
+      await page.waitForFunction(() => UI.S && UI.S.board && G);
       const n = await playToEnd(page, '옛 경기 저장', false);
       const sum = await page.evaluate(() => ({ log: (G.inningLog || []).length, runs: G.teams.map(runsOf).join('-') }));
       if(!sum.log) errors.push('옛 경기 저장: 이어 한 경기에 이닝 기록이 쌓이지 않음');
@@ -484,6 +501,13 @@ const PORT = 8766;
         try{ await page.evaluate(f => { window.__susp = true; SET.picks = { ...picks(), swing9:true, aim:true }; eval(f); }, sc); }catch(e){ continue; }
         await page.waitForTimeout(80);
         const bad = await page.evaluate(() => {
+          // 화면 보며 하기(새 화면): 고르는 단추마다 보이는 이름이 있고, 같은 번호가 화면 정의에 있어야 함
+          if(document.documentElement.classList.contains('skin')){
+            const out = [], want = new Set((UI.S.opts || []).filter(o => !o.hide).map(o => String(o.n)));
+            document.querySelectorAll('#sk [data-sk="opt"]').forEach(b => { if(!b.textContent.trim()) out.push('이름 없는 단추'); if(!want.has(b.dataset.n)) out.push('화면 정의에 없는 번호 ' + b.dataset.n); if(b.tagName !== 'BUTTON') out.push('단추가 아님'); });
+            document.querySelectorAll('#sk button').forEach(b => { if(!b.textContent.trim() && !b.getAttribute('aria-label')) out.push('이름 없는 아이콘 단추'); });
+            return out;
+          }
           const out = [], opts = [...document.querySelectorAll('#opts .opt')], seen = new Set();
           opts.forEach(o => { const t = o.textContent.replace(/\s+/g, ' ').trim(), num = o.dataset.n;
             if(!new RegExp('^' + num + '번\\. ').test(t)) out.push(`선택지 이름이 "${num}번. "으로 시작하지 않음: ${t.slice(0, 30)}`);

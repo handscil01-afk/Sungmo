@@ -797,7 +797,11 @@ function playPitch(G, Psel, Bsel){
   const guess = Bsel.g ? (Bsel.g === 'fast') === pt.fast ? 9 : -7 : 0;
   const aimBonus = aimAdj(Bsel.aim, x, y, B.eye);
   if(aimBonus) emit(G, `판정 노려 치기: 노린 칸과 공의 거리에 따른 보정 ${aimBonus > 0 ? '+' : ''}${Math.round(aimBonus * 10) / 10}.`, 'd');
-  const bq = soft(B.con, 0.7) + B.cond * 4 + SP.bq + guess + timing + aimBonus;
+  // 타이밍 맞춰 치기(화면 보며 하기, 혼자·둘이 하기): 누른 때가 공이 들어오는 순간과 가까울수록 잘 맞음. 안 쓰면 영향 없음
+  const tmQ = Bsel.tm != null && Number.isFinite(Bsel.tm) ? 1 - Math.min(1, Math.abs(Bsel.tm)) : null;
+  const tmAdj = tmQ == null ? 0 : (tmQ - 0.55) * 22;
+  if(tmQ != null) emit(G, `판정 타이밍: ${Bsel.tm < -0.12 ? '빠름' : Bsel.tm > 0.12 ? '늦음' : '딱 맞음'}, 보정 ${tmAdj > 0 ? '+' : ''}${Math.round(tmAdj)}.`, 'd');
+  const bq = soft(B.con, 0.7) + B.cond * 4 + SP.bq + guess + timing + aimBonus + tmAdj;
   const cen = clamp(1 - zd, 0, 1);
   const pCon = 0.84 + EZ(G, [0, 0.01, 0.04]) + (bq - pq) / 110 - (inZone ? 0.12 * (1 - cen) : 0.14 + (zd - 1) * 1.0);
   const kk = sw <= 4 ? 'contact' : sw >= 7 ? 'power' : 'swing';
@@ -847,7 +851,7 @@ function playPitch(G, Psel, Bsel){
   // 방향 노리기: 바깥쪽 공을 밀어치거나 몸쪽 공을 당겨치면 잘 맞고, 반대면 빗맞기 쉬움
   const dirFit = !Bsel.d ? 0 : (Bsel.d === 'oppo' ? x : -x) > 0.25 ? 0.08 : (Bsel.d === 'oppo' ? x : -x) < -0.25 ? -0.08 : 0;
   if(dirFit) emit(G, dirFit > 0 ? '노린 방향으로 칠 수 있는 공입니다.' : '노린 방향과 반대쪽 공입니다.', 'd');
-  const q = clamp(rnd(G) * 0.75 + 0.08 + dirFit + EZ(G, [0, 0.015, 0.05]) + (bq - pq) / 220 + (inZone ? 0.18 * cen : -0.12), 0, 1);
+  const q = clamp(rnd(G) * 0.75 + 0.08 + dirFit + (tmQ == null ? 0 : (tmQ - 0.55) * 0.14) + EZ(G, [0, 0.015, 0.05]) + (bq - pq) / 220 + (inZone ? 0.18 * cen : -0.12), 0, 1);
   const ev = clamp(0.45 * q + 0.45 * soft(B.pow + B.cond * 4, 0.5) / 100 + SP.ev + (pt.fast && vel >= 153 ? 0.02 : 0) + gauss(G) * 0.035, 0, 1.08);
   emit(G, `판정 타구: 정확도 ${Math.round(q * 100)}, 힘 ${Math.round(ev * 100)}.`, 'd');
   fx(G, q > 0.75 ? 'batBig' : 'bat'); G.anim.res = 'inplay';

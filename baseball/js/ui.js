@@ -86,6 +86,19 @@ function stay(msg){ rerender(); speak(msg); }
 function render(){
   const S = UI.S, hadFocus = $('#opts').contains(document.activeElement);
   applySet();
+  // 화면 보며 하기: 같은 화면 정의(S)를 새 게임 화면(js/skin.js)으로 그림. 고르는 길(choose)은 두 방식이 같음
+  const skin = VIEW.gfx && typeof skinRender === 'function';
+  document.documentElement.classList.toggle('skin', skin);
+  if(skin){
+    ['gfxgame', 'gfxui', 'gfxinput', 'hashero'].forEach(c => document.documentElement.classList.remove(c));
+    skinRender(S);
+    syncHidden(S);
+    if(typeof renderChat === 'function') renderChat(true);
+    if(typeof voiceUI === 'function') voiceUI();
+    if(typeof crowdSync === 'function') crowdSync();
+    return;
+  }
+  if(typeof GX !== 'undefined'){ GX.host = null; GX.hud = false; }
   // 화면 보며 하기의 경기 화면: 그림 + 짧은 결과 한 줄 + 선택지만 한 화면에 (머리줄·글 상황판·기록은 숨김)
   const gg = VIEW.game(S);
   document.documentElement.classList.toggle('gfxgame', gg);
@@ -131,6 +144,14 @@ function render(){
   if(typeof voiceUI === 'function') voiceUI();
   if(typeof crowdSync === 'function') crowdSync();
   if(hadFocus && !$('#opts').contains(document.activeElement)) $('#q').focus();
+}
+// 화면 보며 하기일 때도 숨은 글 화면(#app)의 질문·결과·선택지는 같은 내용으로 맞춰 둠 (화면 방식을 바꾸거나 자동 시험이 읽을 때)
+function syncHidden(S){
+  $('#q').textContent = S.q || '';
+  $('#say').innerHTML = (S.say || []).map(l => `<p>${esc(l.s || l)}</p>`).join(''); $('#say').hidden = !(S.say || []).length;
+  const nl = S.note || UI.note || []; $('#note').innerHTML = nl.map(l => `<p>${esc(l)}</p>`).join(''); $('#note').hidden = !nl.length;
+  renderOpts(S);
+  $('#extra').innerHTML = S.back ? '<button type="button" class="btn back" id="backBtn">뒤로<span class="kh" aria-hidden="true"> (점 키)</span></button>' : '';
 }
 function renderOpts(S){
   const box = $('#opts');
@@ -212,6 +233,7 @@ function back(via){
 // 메모: 상황·점수판 같은 정보를 결과 글 아래에 보여 주고 읽어 줌
 function note(lines, via){
   UI.note = lines;
+  if(VIEW.gfx && typeof skinNote === 'function'){ skinNote(lines); if(via !== 'click') speak(lines.join(' ')); else if(SET.voice === 'tts') ttsSay(lines.join(' ')); return; }
   const nt = $('#note');
   nt.innerHTML = lines.map(l => `<p>${esc(l)}</p>`).join(''); nt.hidden = false;
   if(via === 'click'){ setTimeout(() => nt.focus(), 40); if(SET.voice === 'tts') ttsSay(lines.join(' ')); }
