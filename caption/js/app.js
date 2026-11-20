@@ -28,6 +28,7 @@ document.addEventListener('click', e => {
   const act = a.dataset.act;
   if(act === 'fs') FS.toggle();
   else if(act === 'install') installSheet();
+  else if(act === 'external'){ try{ window.openExternal(); }catch(e){} }
   else if(act === 'installLater'){ UIP.installDismissed = true; saveUIP(); paintInstall(); }
   else if(act === 'typist'){ if(!DB){ toast('서버에 연결하는 중이에요'); return; } typistStartSheet(); }
   else if(act === 'resume'){ const h = ls.get('host'); if(h && DB) typistResume({ code:h.code, host:true }).then(ok => { if(!ok){ ls.del('host'); showStart(); toast('그 방이 없어졌어요. 새 방을 만들어 주세요'); } }); }
@@ -77,5 +78,6 @@ async function checkUpdate(){
 setInterval(checkUpdate, 3 * 60 * 1000);
 document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') checkUpdate(); });
 $$('.appver').forEach(e => { e.textContent = APP_VER; });
+if(window.inAppName){ const n = $('#inAppNote'); n.querySelector('span').textContent = window.inAppName + ' 안에서 열렸어요. 이대로 쓰셔도 됩니다.'; n.hidden = false; }
 boot();
 setTimeout(checkUpdate, 5000);
