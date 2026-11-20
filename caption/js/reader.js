@@ -150,6 +150,7 @@ function paintFollow(md){
 function paintEmpty(){ const e = $('#rEmpty'); if(e) e.hidden = !!RD.text || !RD.gotLines; }
 function rSay(msg){ const s = $('#rState'); if(s) s.textContent = msg; }
 function goLive(){
+  if(UPDATE.ready){ location.reload(); return; }   // 새 판이 나와 있으면 Enter를 누를 때 바꿈
   RD.live = true;
   if(RS.view === 'list'){
     render();
@@ -215,7 +216,7 @@ async function readerJoin(code){
     RD.lines = v || {}; RD.gotLines = true; scheduleRender();
     const n = Object.keys(RD.lines).length;
     if(first){
-      rSay(RD.meta && RD.meta.open === false ? '통역이 끝난 방이에요. 지금까지 ' + n + '줄을 읽을 수 있어요.' : n ? '지금까지 ' + n + '줄이 있어요. ' + (RS.view === 'list' ? '맨 끝 줄에 있습니다.' : '커서가 지금 치는 곳에 있습니다.') : '통역 시작을 기다리는 중이에요.');
+      rSay(RD.meta && RD.meta.open === false ? '통역이 끝난 방이에요. 지금까지 ' + n + '줄을 읽을 수 있어요.' : n ? '지금까지 ' + n + '줄. ' + (RS.view === 'list' ? '맨 끝 줄에서 시작해요.' : '커서가 지금 치는 곳에 있어요.') : '통역 시작을 기다리는 중이에요.');
       RD.waiting = !n;
     } else if(!had && n && RD.waiting){ RD.waiting = false; rSay('통역이 시작됐어요.'); }
   }, e => { if(isDenied(e)) rSay('서버 규칙이 아직 게시되지 않았어요. 통역하는 분께 알려 주세요.'); }));
