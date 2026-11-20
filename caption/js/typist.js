@@ -146,7 +146,7 @@ function typistEnter(code, host, pin){
     gotLines = true;
   }, writeErr));
   TP.unsub.push(DB.on(b + 'mode', v => setMode(v === 'live' ? 'live' : 'line')));
-  TP.unsub.push(DB.on(b + 'readers', v => { TP.readers = v || {}; $('#tReaders').textContent = '접속 중인 읽기 화면 ' + Object.keys(TP.readers).length + '대'; }));
+  TP.unsub.push(DB.on(b + 'readers', v => { TP.readers = v || {}; $('#tReaders').innerHTML = '<span class="wide">접속 중인 </span>읽기 화면 ' + Object.keys(TP.readers).length + '대'; }));
   DB.discRemove(b + 'cursors/' + DB.uid);
   const beat = () => {
     if(!TP.code || !TP.meta) return;
@@ -464,6 +464,7 @@ function typistSettings(){
       <label class="chk srow"><input type="radio" name="sttTo" value="send" ${TS.sttTo !== 'input' ? 'checked' : ''}> 바로 보내기 <small class="muted">말 한 마디가 끝나면 한 줄로 바로</small></label>
       <label class="chk srow"><input type="radio" name="sttTo" value="input" ${TS.sttTo === 'input' ? 'checked' : ''}> 입력 칸에 넣기 <small class="muted">확인하고 고친 뒤 Enter로 보냄</small></label>
       <p class="muted small">메모장·회의록 방식에서는 메모장 맨 끝에 새 줄로 붙입니다.</p>
+      <label class="chk srow"><input type="checkbox" id="stLive" ${TS.sttLive !== false ? 'checked' : ''}> 메모장·회의록: 인식 중인 말도 바로 써 넣기 <small class="muted">말하는 도중부터 읽는 분께 보이고, 확정되면 바로잡힘</small></label>
       ${STT_MOBILE ? '<p class="muted small">휴대폰·태블릿에서는 마이크를 음성인식만 쓰도록 소리 막대를 보여 주지 않습니다.</p>' : `<label class="chk srow"><input type="checkbox" id="stMeter" ${TS.sttMeter !== false ? 'checked' : ''}> 소리 막대 보기 <small class="muted">음성인식이 글을 받아 적지 못하면 꺼 보세요</small></label>`}
     </fieldset>
     ${pwaSettingsHtml()}
@@ -473,6 +474,7 @@ function typistSettings(){
       if(sz){ TS.size = Math.max(0, Math.min(TSIZES.length - 1, TS.size + Number(sz.dataset.sz))); saveTS(); applyTypistLook(); }
     });
   pwaSettingsBind(box);
+  $('#stLive', box).addEventListener('change', e => { TS.sttLive = e.target.checked; saveTS(); });
   if($('#stMeter', box)) $('#stMeter', box).addEventListener('change', e => { TS.sttMeter = e.target.checked; saveTS(); if(STT.on){ if(TS.sttMeter) sttMeterStart(); else sttMeterStop(); } });
   $$('input[name=sttTo]', box).forEach(r => r.addEventListener('change', () => { TS.sttTo = r.value; saveTS(); paintStt(); }));
   $('#stName', box).addEventListener('input', e => { TS.name = e.target.value.trim().slice(0, 20); saveTS(); });

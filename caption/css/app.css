@@ -145,3 +145,14 @@ a.btn{text-decoration:none;color:inherit}
 @media (max-width:1500px){ #vType .brand{display:none} #vType .ttitle{max-width:12ch} }
 .sttdiag{color:#a3adba;font-size:12.5px}
 .stthint{margin:0;padding:6px 10px;border-radius:8px;background:#3a2a00;color:#ffe08f;border:1px solid #ffd54a;font-size:14px}
+.sttbar .row{flex-wrap:nowrap}
+.sttstate{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sttmore summary{cursor:pointer;color:var(--faint);font-size:12.5px}
+@media (max-width:640px){ .sttbar .btn.ghost{display:none} .meter{width:60px} }
+@media (max-width:640px){
+  #vType .bar{gap:6px;padding:6px 10px}
+  #tCount,.wide,.seg .btn small,.tpre .btn small{display:none}
+  #vType .bar .btn.sm{padding:0 9px;min-height:32px}
+  .seg .btn{padding:0 8px}
+  .tpre{gap:6px}
+}

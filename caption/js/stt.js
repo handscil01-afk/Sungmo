@@ -7,7 +7,7 @@
    인식 중인 말(중간 결과)은 입력 화면 위쪽 띠에만 보이고 보내지 않음.
    크롬은 1분쯤 지나거나 조용하면 인식을 끝내므로, 켜져 있는 동안은 저절로 다시 시작함 */
 const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-const STT = { speechSince:0, lastFinal:'', lastFinalAt:0, on:false, rec:null, interim:'', restartT:0, errs:0, note:'', queue:[], stream:null, ac:null, raf:0, dev:'',
+const STT = { prov:'', speechSince:0, lastFinal:'', lastFinalAt:0, on:false, rec:null, interim:'', restartT:0, errs:0, note:'', queue:[], stream:null, ac:null, raf:0, dev:'',
   diag:'', lastErr:'', results:0, restarts:0, gotAudio:false, gotSound:false, loudMs:0, lastTick:0, hint:'', meterT:0, checkT:0 };
 // 휴대폰·태블릿: 마이크를 한 번에 한 앱만 쓸 수 있어서, 소리 막대를 열면 구글 음성인식이 소리를 못 받음 → 막대를 열지 않음
 const STT_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
@@ -46,6 +46,7 @@ function sttRun(){
       if(r.isFinal) sttFinal(t); else interim += t;
     }
     STT.interim = interim.trim(); STT.errs = 0; STT.note = '';
+    sttProvisional(STT.interim);
     paintStt();
   };
   rec.onerror = e => {
@@ -67,6 +68,7 @@ function sttRun(){
   try{ rec.start(); }catch(e){ STT.rec = null; STT.restartT = setTimeout(sttRun, 600); }
 }
 function sttStop(){
+  STT.prov = '';
   STT.on = false; clearTimeout(STT.restartT); clearTimeout(STT.meterT); clearInterval(STT.checkT);
   // stop()은 하던 말을 마저 최종 결과로 넘겨 줌
   if(STT.rec){ try{ STT.rec.stop(); }catch(e){} }
@@ -93,14 +95,29 @@ function sttFinal(t){
     inp.value = (inp.value.trim() ? inp.value.replace(/\s*$/, ' ') : '') + t;
   } else appendLine(t);
 }
-function sttToPad(t){
-  if(TP.composing){ STT.queue.push(t); return; }   // 한글을 치는 중이면 조합이 끝난 뒤에 붙임
+// 메모장 맨 끝을 바꿔 씀: 먼저 써 둔 '인식 중인 말'(STT.prov)이 그대로 끝에 있으면 그 자리를, 없으면 새 줄로
+function sttPadTail(text, provisional){
   const pad = $('#tPad'), v = pad.value;
   const atEnd = pad.selectionStart === v.length && pad.selectionEnd === v.length;
-  const add = (v && !/\n$/.test(v) ? '\n' : '') + t;
-  pad.setRangeText(add, v.length, v.length, atEnd ? 'end' : 'preserve');
+  let base = v.length;
+  if(STT.prov && v.endsWith(STT.prov)) base = v.length - STT.prov.length;
+  const head = v.slice(0, base);
+  const add = text ? (head && !/\n$/.test(head) ? '\n' : '') + text : '';
+  if(add === v.slice(base)){ STT.prov = provisional ? add : ''; return; }
+  pad.setRangeText(add, base, v.length, atEnd ? 'end' : 'preserve');
   if(atEnd) pad.scrollTop = pad.scrollHeight;
+  STT.prov = provisional ? add : '';
   TP.dirty = true; kickFlush();
+}
+function sttToPad(t){
+  if(TP.composing){ STT.queue.push(t); return; }   // 한글을 치는 중이면 조합이 끝난 뒤에 붙임
+  sttPadTail(t, false);
+}
+// 메모장·회의록: 인식 중인 말도 바로 메모장 끝에 써 두고(읽는 분이 말하는 도중부터 봄), 확정되면 바꿔 씀
+function sttProvisional(t){
+  if(TP.mode !== 'live' || TS.sttLive === false || TP.composing) return;
+  if(!t && !STT.prov) return;
+  sttPadTail(t, true);
 }
 function sttFlushQueue(){ while(STT.queue.length && !TP.composing) sttToPad(STT.queue.shift()); }
 
@@ -138,8 +155,8 @@ function sttMeterStop(){
 
 // 소리는 들어오는데 10초 넘게 받아 적은 것이 없으면 원인별 확인 방법을 띄움
 function sttCheckStuck(){
-  if(!STT.on) return;
-  const stuck = STT_MOBILE ? (STT.speechSince && Date.now() - STT.speechSince > 15000) : STT.loudMs >= 10000;
+  if(!STT.on || STT.results > 0) return;   // 한 번이라도 받아 적었으면 잘 되고 있는 것
+  const stuck = STT_MOBILE ? (STT.speechSince && Date.now() - STT.speechSince > 20000) : STT.loudMs >= 10000;
   if(!stuck) return;
   let h;
   if(STT_BAD_BROWSER) h = STT_BAD_BROWSER + ' 브라우저는 음성인식이 되지 않아요. 크롬이나 엣지에서 이 주소를 열어 주세요.';
@@ -155,7 +172,7 @@ function paintStt(){
   bar.hidden = !STT.on;
   if(!STT.on) return;
   const where = TP.mode === 'live' ? '메모장 끝에 붙임' : TS.sttTo === 'input' ? '입력 칸에 넣음' : '한 줄씩 바로 보냄';
-  $('#sttState').textContent = '● 듣는 중 · ' + where + (STT_MOBILE ? '' : STT.dev ? ' · 소리 입력: ' + STT.dev : '') + (STT.note ? ' · ' + STT.note : '');
+  $('#sttState').innerHTML = '● 듣는 중<span class="wide"> · ' + esc(where) + (STT_MOBILE ? '' : STT.dev ? ' · 소리 입력: ' + esc(STT.dev) : '') + '</span>' + (STT.note ? ' · ' + esc(STT.note) : '');
   const mt = bar.querySelector('.meter'); if(mt) mt.hidden = STT_MOBILE || TS.sttMeter === false;
   $('#sttInterim').textContent = STT.interim || '(말을 기다리는 중)';
   $('#sttDiag').textContent = '음성인식 상태: ' + (STT.diag || '-') + ' · 받아 적은 말 ' + STT.results + '번 · 다시 시작 ' + STT.restarts + '번' + (STT.lastErr ? ' · 마지막 오류: ' + (STT_ERR[STT.lastErr] || STT.lastErr) : '');
