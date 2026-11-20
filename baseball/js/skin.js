@@ -100,6 +100,7 @@ function skinRender(S){
   }
   let ov = $('#skOv'); if(!ov){ ov = document.createElement('div'); ov.id = 'skOv'; ov.className = 'sk-ov'; } if(ov.parentNode !== st) st.appendChild(ov);
   ov.innerHTML = game ? hudHTML() + plateHTML() : '';
+  if(game) playBallFlash();
   $('#skTop').innerHTML = game ? '' : topHTML(S);
   $('#skTop').hidden = game;
   const tk = $('#skTick'); tk.hidden = !game; tk.innerHTML = game ? tickHTML(S) : '';
@@ -230,7 +231,7 @@ function deckHTML(S){
   if(S.kind === 'bat' && !G.over) return deckHead(S, true) + batDeck(S);
   if(S.kind === 'roster') return deckHead(S) + rosterHTML(S.ti) + optsHTML(S, true);
   if(S.kind === 'log') return deckHead(S) + listHTML(S.say || [], 'log') + optsHTML(S, true);
-  return deckHead(S, !G.over && !G.pre && !S.sub) + (G.over ? lineScoreHTML() : '') + notes + (S.grid ? gridHTML(S) : optsHTML(S, true));
+  return deckHead(S, !G.over && !G.pre && !S.sub) + (G.over ? resultBanner() + lineScoreHTML() : '') + notes + (S.grid ? gridHTML(S) : optsHTML(S, true));
 }
 // 명단: 타자(오늘 기록)와 투수
 function rosterHTML(ti){
@@ -249,6 +250,9 @@ function optIcon(o){
     : /^치기|보통 치기|스윙|타자에게|적극|대타/.test(t) ? 'swing' : /노림수|노려/.test(t) ? 'target' : /사인대로|포수/.test(t) ? 'sign' : /수비 위치/.test(t) ? 'field' : /작전|고의|견제|교체/.test(t) ? 'flag'
     : /지난 공/.test(t) ? 'repeat' : /더 보기/.test(t) ? 'more' : /상황/.test(t) ? 'info' : /승부|유인구|던지|공을/.test(t) ? 'ball' : /자동 재생 멈/.test(t) ? 'pause' : /자동 재생/.test(t) ? 'play' : /^다음|끝까지/.test(t) ? 'next'
     : /채팅|음성/.test(t) ? 'chat' : /점수판|기록/.test(t) ? 'list' : /처음 화면|그만하기|나가기/.test(t) ? 'home' : /명단|타자와 투수/.test(t) ? 'list' : '';
+  // 도트 조작 아이콘(img/icons-play.png 4칸 × 3줄): 치기·강하게·맞히기·지켜보기 / 번트·도루·노림수·포수 사인 / 수비 위치·작전·투수 교체·비디오 판독
+  const pi = /투수 교체|불펜/.test(t) ? 10 : /판독/.test(t) ? 11 : ({ swing:0, power:1, contact:2, take:3, bunt:4, run:5, target:6, sign:7, field:8, flag:9 })[k];
+  if(pi != null) return `<span class="pico" style="background-position:${(pi % 4) * 100 / 3}% ${Math.floor(pi / 4) * 50}%" aria-hidden="true"></span>`;
   return k ? skIco(k) : '';
 }
 // 확률(헛스윙 20% 파울 37% …)을 막대로
@@ -443,7 +447,7 @@ function menuTitle(S){
 }
 function menuHTML(S){
   const out = [], q = { sub: menuTitle(S).sub };
-  if(S.hero) out.push(`<div class="hero"><div class="hero-art" aria-hidden="true"></div><div class="hero-tx"><span class="kick">듣고 보고 고르는 확률 야구</span><h1>손잡다 야구</h1></div></div>`);
+  if(S.hero) out.push(`<div class="hero"><div class="hero-art" aria-hidden="true"></div><div class="hero-tx"><div class="logo" aria-hidden="true"><span>손잡다 야구</span></div><h1 class="sr-only">손잡다 야구</h1><span class="kick">듣고 보고 고르는 확률 야구</span></div></div>`);
   if(S.top) out.push(`<div class="mtop">${S.top}</div>`);
   // 질문의 설명 부분(제목 아래 작은 글)
   if(!S.hero && !S.onTab && q.sub) out.push(`<p class="msub">${esc(q.sub)}</p>`);
@@ -481,8 +485,11 @@ function menuOpts(S){
       const v = m[2], on = /^(켬|켜짐)$/.test(v), off = /^(끔|꺼짐|읽지 않음)$/.test(v);
       return `<button type="button" class="card row" data-sk="opt" data-n="${o.n}"><span class="tx"><b>${esc(m[1])}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</span><span class="val${on ? ' on' : off ? ' off' : ''}">${on || off ? `<i class="sw${on ? ' on' : ''}"></i>` : esc(v)}</span></button>`;
     }
-    const g = uiGlyph(o.t);
-    return `<button type="button" class="card${S.hero ? ' hero-c' : ''}${S.hero && /이어하기/.test(o.t) ? ' wide pri' : ''}" data-sk="opt" data-n="${o.n}">${g ? `<span class="gico g-${g[0]}" aria-hidden="true">${g[1]}</span>` : ''}<span class="tx"><b>${esc(o.t)}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</span></button>`;
+    const g = uiGlyph(o.t), mi = menuIcon(o.t), it = itemIcon(o.t);
+    const ico = mi >= 0 ? `<span class="mico" style="background-position:${(mi % 3) * 50}% ${Math.floor(mi / 3) * 50}%" aria-hidden="true"></span>`
+      : it >= 0 ? `<span class="iico" style="background-position:${(it % 5) * 25}% ${Math.floor(it / 5) * 100 / 3}%" aria-hidden="true"></span>`
+      : g ? `<span class="gico g-${g[0]}" aria-hidden="true">${g[1]}</span>` : '';
+    return `<button type="button" class="card${S.hero ? ' hero-c' : ''}${S.hero && /이어하기/.test(o.t) ? ' wide pri' : ''}" data-sk="opt" data-n="${o.n}">${ico}<span class="tx"><b>${esc(o.t)}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</span></button>`;
   }).join('');
   const many = want.length > 6 ? ' many' : '';
   return `<div class="cards${S.hero ? ' home' : ''}${teams ? ' teams' : ''}${setList ? ' sets' : ''}${many}">${cards}</div>`;
@@ -543,3 +550,37 @@ function skinClick(e){
 }
 // 타이밍을 재는 동안에는 그림판을 눌러도 스윙
 document.addEventListener('pointerdown', e => { if(SK.tm && e.target.closest && e.target.closest('#skStage')){ e.preventDefault(); timingTap(); } });
+
+/* ---------- 도트 그림 아이콘 ---------- */
+// 처음 화면 메뉴 아이콘(img/icons-menu.png 3칸 × 3줄): 혼자·둘이·온라인 / 리그·육성·관전 / 이어하기·설정·설치
+function menuIcon(t){
+  const L = [/^혼자 하기/, /^둘이 하기/, /^온라인/, /^리그$|^리그 /, /^선수 육성/, /관전/, /^이어하기|^이어 하기|^지금 경기 이어/, /^설정/, /설치/];
+  return L.findIndex(re => re.test(t));
+}
+// 용품점·가방 아이콘(img/items.png 5칸 × 4줄, 마지막은 돈 주머니)
+const ITEM_NAMES = ['연습용 나무 배트', '단풍나무 배트', '프로 모델 배트', '황금 배트', '가죽 글러브', '명품 수제 글러브', '투수용 글러브', '명품 투수 글러브', '가벼운 스파이크', '탄소 스파이크', '투수용 스파이크', '손목 아대', '손목 보호대', '타격 장갑', '어깨 보호 슬리브', '행운의 목걸이', '에너지 음료', '테이핑과 찜질 세트', '보약'];
+function itemIcon(t){
+  // 긴 이름부터 맞춰 봄('명품 투수 글러브'가 '투수용 글러브'로 잡히지 않게)
+  let best = -1, len = 0;
+  ITEM_NAMES.forEach((n, i) => { if(t.includes(n) && n.length > len){ best = i; len = n.length; } });
+  return best;
+}
+// 큰 글씨 배너(img/banners3.png 한 줄에 하나): 경기 시작!·승리!·패배·무승부·MVP·신기록!·우승!·플레이 볼!
+const BAN3 = { start:0, win:1, lose:2, draw:3, mvp:4, record:5, champ:6, playball:7 };
+const ban3 = (k, cls = '') => `<span class="ban3 ${cls}" style="background-position:0 ${BAN3[k] * 100 / 7}%" role="img" aria-label="${esc(['경기 시작', '승리', '패배', '무승부', 'MVP', '신기록', '우승', '플레이 볼'][BAN3[k]])}"></span>`;
+// 경기 끝: 내 팀(혼자 하기·온라인·리그·육성)이 이겼으면 승리!, 졌으면 패배. 내 팀이 없으면(둘이·관전) 이긴 팀 엠블럼과 승리!
+function resultBanner(){
+  const r = G.teams.map(runsOf), mine = typeof NET !== 'undefined' && NET.on ? NET.side : G.focusTeam != null ? G.focusTeam : myTeam();
+  if(r[0] === r[1]) return `<div class="res">${ban3('draw')}</div>`;
+  const win = r[0] > r[1] ? 0 : 1;
+  if(mine >= 0) return `<div class="res">${emb(G.teams[mine], 'big')}${ban3(mine === win ? 'win' : 'lose')}</div>`;
+  return `<div class="res">${emb(G.teams[win], 'big')}${ban3('win')}<b>${esc(G.teams[win].short)}</b></div>`;
+}
+// 경기 시작: 그림 위에 '플레이 볼!'을 잠깐 띄움 (경기마다 한 번)
+function playBallFlash(){
+  if(!G || G.over || G.pa > 0 || G.pitchNo > 0 || SK.pbAt === G.at) return;
+  SK.pbAt = G.at;
+  const st = $('#skStage'); if(!st) return;
+  const el = document.createElement('div'); el.className = 'pb-flash'; el.innerHTML = ban3('playball');
+  st.appendChild(el); setTimeout(() => el.remove(), 1700);
+}

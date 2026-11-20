@@ -429,3 +429,28 @@ html.skin .emb.img{ background:url(../img/emblems.png) 0 0 / 500% 200% no-repeat
 html.skin .emb.img.sm{ width:1.35rem; height:1.35rem; }
 html.skin .emb.img.big{ width:3rem; height:3rem; }
 html.skin .sk-body.f2 .emb.img.big{ width:2.2rem; height:2.2rem; }
+
+/* ===== 도트 그림 아이콘·배너·처음 화면 그림 ===== */
+html.skin .pico{ display:block; flex:none; width:1.9em; height:1.9em; background:url(../img/icons-play.png) 0 0 / 400% 300% no-repeat; image-rendering:pixelated; filter:drop-shadow(0 1px 0 rgba(0,0,0,.45)); }
+html.skin .bt .pico{ grid-row:1 / 3; width:2.4em; height:2.4em; }
+html.skin .mn .pico, html.skin .mid .pico{ width:1.5em; height:1.5em; }
+html.skin .mico{ display:block; flex:none; width:2.7rem; height:2.7rem; background:url(../img/icons-menu.png) 0 0 / 300% 300% no-repeat; image-rendering:pixelated; filter:drop-shadow(0 2px 0 rgba(0,0,0,.3)); }
+html.skin .iico{ display:block; flex:none; width:2.5rem; height:2.5rem; border-radius:10px; background:#fff url(../img/items.png) 0 0 / 500% 400% no-repeat; image-rendering:pixelated; border:2px solid rgba(255,255,255,.85); box-shadow:0 2px 0 rgba(0,0,0,.25); }
+html.skin .sk-body.f2 .mico, html.skin .sk-body.f2 .iico{ width:2.1rem; height:2.1rem; }
+html.skin .sk-body.f3 .mico, html.skin .sk-body.f3 .iico{ display:none; }
+html.skin .ban3{ display:block; width:15rem; max-width:100%; aspect-ratio:256 / 44; background:url(../img/banners3.png) 0 0 / 100% 800% no-repeat; image-rendering:pixelated; }
+html.skin .res{ display:flex; align-items:center; justify-content:center; gap:8px; }
+html.skin .res .ban3{ width:12rem; }
+html.skin .res b{ font-size:1.1rem; font-weight:900; color:#fff; text-shadow:0 2px 0 #0b3a8c; }
+html.skin .pb-flash{ position:absolute; inset:0; display:grid; place-items:center; pointer-events:none; z-index:3; animation:pbIn 1.7s ease-out forwards; }
+html.skin .pb-flash .ban3{ width:80%; filter:drop-shadow(0 4px 0 rgba(0,0,0,.4)); }
+@keyframes pbIn{ 0%{ transform:scale(.3); opacity:0; } 15%{ transform:scale(1.12); opacity:1; } 25%{ transform:scale(1); } 80%{ opacity:1; } 100%{ opacity:0; transform:scale(1.05); } }
+html.skin .hero-art{ background:url(../img/hero.png) center 40% / cover no-repeat !important; transform:none !important; }
+html.skin .hero::after{ background:linear-gradient(180deg, rgba(42,130,226,0) 40%, rgba(10,40,100,.45)) !important; }
+html.skin .hero-tx{ bottom:8px !important; display:grid; justify-items:center; gap:0; }
+html.skin .logo{ position:relative; width:min(16rem, 64%); aspect-ratio:3 / 1; background:url(../img/logo.png) center / contain no-repeat; image-rendering:pixelated; filter:drop-shadow(0 3px 0 rgba(0,0,0,.35)); }
+html.skin .logo span{ position:absolute; left:0; right:0; top:61%; transform:translateY(-50%); text-align:center; font-size:1.2rem; font-weight:900; letter-spacing:-.02em; color:#fff36b;
+  text-shadow:0 2px 0 #7a1f00, 2px 0 0 #7a1f00, -2px 0 0 #7a1f00, 0 -2px 0 #7a1f00, 2px 2px 0 #7a1f00, -2px 2px 0 #7a1f00; }
+html.skin .hero .kick{ margin-top:-4px; }
+html.skin .sk-body.f1 .logo{ width:min(14rem, 70%); } html.skin .sk-body.f1 .logo span{ font-size:1.1rem; }
+@media (prefers-reduced-motion:reduce){ html.skin .pb-flash{ animation-duration:.01s; } }
