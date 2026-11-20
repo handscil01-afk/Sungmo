@@ -89,6 +89,35 @@ const PORT = 8767;
     console.log(`${tag}: ${steps}번 만에 끝, 던지기 ${throws}번, 타이밍 스윙 ${swings}번(딱 맞음 기록 ${perfect})`);
     await ctx.close();
   }
+  // 선수 육성 화면: 라커룸 → 마을 지도(장소 누르기) → 용품점에서 사기 → 가방에서 장착 → 훈련 → 선수 카드, 화면마다 한 화면에 들어가는지
+  for(const [name, w, h] of [['휴대폰', 390, 844], ['작은 휴대폰', 375, 667], ['가로', 844, 390], ['태블릿', 820, 1180]]){
+    const ctx = await browser.newContext({ viewport:{ width:w, height:h }, hasTouch:true });
+    const page = await ctx.newPage(), tag = `육성 화면(${name})`;
+    page.on('pageerror', e => errors.push(`${tag}: ${e.message}`));
+    page.on('console', m => { if(m.type() === 'error' || m.type() === 'warning') errors.push(`${tag} console: ${m.text()}`); });
+    await page.goto(`http://localhost:${PORT}/baseball/`); await page.waitForSelector('#opts .opt'); await page.keyboard.press('1');
+    await page.evaluate(() => { LSRC = 'career'; NEWC.name = '시험'; NEWC.pit = false; NEWC.pos = 'SS'; NEWC.type = BAT_TYPES[0].key; NEWC.face = 3; NEW.a = TEAMS[1].key; NEW.len = 36; NEW.mode = 'detail'; NEWC.team = NEW.a; setLG(careerNew()); leagueNews(LG()); const L = LG(); L.career.money = 5000; L.career.event = null; saveLeague(); go(careerHome, 'click'); });
+    const fit = async where => { await page.waitForTimeout(250); const o = await page.evaluate(() => { const b = document.querySelector('#skBody'); return [b.className, b.scrollHeight > b.clientHeight + 1, document.documentElement.scrollWidth > innerWidth + 1]; }); if(o[1] || o[2] || /scroll/.test(o[0])) errors.push(`${tag} ${where}: 한 화면을 넘침 ${o[0]}`); };
+    const need = async (sel, where) => { if(!(await page.$(sel))) errors.push(`${tag} ${where}: ${sel} 없음 (${await page.evaluate(() => UI.S.q)})`); };
+    await need('.lock .pcard', '라커룸'); await need('.crplay', '라커룸'); await fit('라커룸');
+    await page.click('.crtiles .ct:nth-child(2)'); await need('.town .spot', '마을'); await fit('마을');
+    await page.click('[data-spot="shop"]'); await need('.shopc', '용품점'); await fit('용품점');
+    await page.click('.shopc:nth-child(2)'); await page.waitForSelector('#dlg.open'); await page.click('#dlg [data-dlg="1"]');
+    const owned = await page.evaluate(() => CR().career.owned.slice());
+    if(!owned.length) errors.push(`${tag}: 용품점에서 산 물건이 없음`);
+    await page.evaluate(() => go(careerHome, 'click')); await page.click('.crtiles .ct:nth-child(3)'); await need('.bag', '가방'); await fit('가방');
+    await page.click('.inv'); const eq = await page.evaluate(() => Object.values(CR().career.equip));
+    if(!eq.length) errors.push(`${tag}: 가방에서 장착이 안 됨`);
+    await page.evaluate(() => go(careerHome, 'click')); await page.click('.crtiles .ct:nth-child(1)'); await need('.trt', '훈련'); await fit('훈련');
+    await page.click('.trt'); if(!(await page.evaluate(() => /훈련/.test(UI.S.q)))) errors.push(`${tag}: 훈련 장면으로 가지 않음`);
+    await page.evaluate(() => go(visitScreen, 'click')); await page.click('[data-spot="house"]'); await page.waitForSelector('#skSheet .card'); await page.click('#skSheet .card');
+    if(!(await page.evaluate(() => UI.S.kind === 'cr-bag'))) errors.push(`${tag}: 내 집에서 가방으로 가지 않음`);
+    await page.evaluate(() => go(careerInfoScreen, 'click')); await need('.lock.info', '선수 카드'); await fit('선수 카드');
+    await page.evaluate(() => go(() => careerFaceScreen(careerInfoScreen), 'click')); await page.click('.facec:nth-child(5)');
+    if(await page.evaluate(() => CR().career.face) !== 4) errors.push(`${tag}: 얼굴 바꾸기가 안 됨`);
+    console.log(`${tag}: 라커룸·마을·용품점·가방·훈련·선수 카드·얼굴 확인`);
+    await ctx.close();
+  }
   await browser.close(); srv.kill();
   if(errors.length){ console.log('오류:\n' + [...new Set(errors)].join('\n')); process.exit(1); }
   console.log('오류 없음');

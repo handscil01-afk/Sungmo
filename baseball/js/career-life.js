@@ -115,16 +115,16 @@ function shopScreen(msg){
   const L = CR(), c = life(L), p = myP(L);
   const list = ITEMS.filter(it => fits(it, p));
   const pageItems = list.slice(0, 6);
-  return { q:`스포츠 용품점입니다. 가진 돈 ${won(c.money)}. 무엇을 살까요?`, say: msg, scene:{ kind:'shop', title:'스포츠 용품점', color: teamInfo(L.my).color }, back: v => go(visitScreen, v), opts:[
-    ...pageItems.map((it, i) => ({ n: i + 1, icon:['icons', ITEMS.indexOf(it)], t:`${it.name} ${won(it.price)}${c.owned.includes(it.id) ? ' (가지고 있음)' : ''}`, s:`${GRADE_NAME[gearGrade(it)]} ${SLOT_NAME[it.slot]} · ${fxText(it, p)}${(GEAR_COST[it.id] ? ', ' + Object.entries(GEAR_COST[it.id]).map(([k, v]) => `${ABIL_NAME[k]} ${v}`).join(', ') : '')}`, act: v => buyItem(it, v) })),
-    { n:7, t:'장비 더 보기', hide: list.length <= 6, s:`${list.slice(6).map(x => x.name).join(', ')}`, act: v => go(() => shopMore(), v) },
-    { n:8, t:'소모품 (음료·테이핑·보약)', act: v => go(goodsShop, v) },
-    { n:9, t:'내 가방 (장착·사용)', act: v => go(bagScreen, v) },
+  return { kind:'cr-shop', q:`스포츠 용품점입니다. 가진 돈 ${won(c.money)}. 무엇을 살까요?`, say: msg, scene:{ kind:'shop', title:'스포츠 용품점', color: teamInfo(L.my).color }, back: v => go(visitScreen, v), opts:[
+    ...pageItems.map((it, i) => ({ n: i + 1, item: it.id, price: it.price, owned: c.owned.includes(it.id), icon:['icons', ITEMS.indexOf(it)], t:`${it.name} ${won(it.price)}${c.owned.includes(it.id) ? ' (가지고 있음)' : ''}`, s:`${GRADE_NAME[gearGrade(it)]} ${SLOT_NAME[it.slot]} · ${fxText(it, p)}${(GEAR_COST[it.id] ? ', ' + Object.entries(GEAR_COST[it.id]).map(([k, v]) => `${ABIL_NAME[k]} ${v}`).join(', ') : '')}`, act: v => buyItem(it, v) })),
+    { n:7, key:'more', t:'장비 더 보기', hide: list.length <= 6, s:`${list.slice(6).map(x => x.name).join(', ')}`, act: v => go(() => shopMore(), v) },
+    { n:8, key:'goods', t:'소모품 (음료·테이핑·보약)', act: v => go(goodsShop, v) },
+    { n:9, key:'bag', t:'내 가방 (장착·사용)', act: v => go(bagScreen, v) },
   ] };
 }
 function shopMore(){
   const L = CR(), c = life(L), p = myP(L), list = ITEMS.filter(it => fits(it, p)).slice(6);
-  return { q:`장비 더 보기. 가진 돈 ${won(c.money)}.`, back: v => go(shopScreen, v), opts: list.slice(0, 8).map((it, i) => ({ n: i + 1, icon:['icons', ITEMS.indexOf(it)], t:`${it.name} ${won(it.price)}${c.owned.includes(it.id) ? ' (가지고 있음)' : ''}`, s:`${GRADE_NAME[gearGrade(it)]} ${SLOT_NAME[it.slot]} · ${fxText(it, p)}${(GEAR_COST[it.id] ? ', ' + Object.entries(GEAR_COST[it.id]).map(([k, v]) => `${ABIL_NAME[k]} ${v}`).join(', ') : '')}`, act: v => buyItem(it, v) })) };
+  return { kind:'cr-shop', q:`장비 더 보기. 가진 돈 ${won(c.money)}.`, back: v => go(shopScreen, v), opts: list.slice(0, 8).map((it, i) => ({ n: i + 1, item: it.id, price: it.price, owned: c.owned.includes(it.id), icon:['icons', ITEMS.indexOf(it)], t:`${it.name} ${won(it.price)}${c.owned.includes(it.id) ? ' (가지고 있음)' : ''}`, s:`${GRADE_NAME[gearGrade(it)]} ${SLOT_NAME[it.slot]} · ${fxText(it, p)}${(GEAR_COST[it.id] ? ', ' + Object.entries(GEAR_COST[it.id]).map(([k, v]) => `${ABIL_NAME[k]} ${v}`).join(', ') : '')}`, act: v => buyItem(it, v) })) };
 }
 function buyItem(it, via){
   const L = CR(), c = life(L), p = myP(L);
@@ -149,7 +149,7 @@ function unequip(L, slot){
 }
 function goodsShop(){
   const L = CR(), c = life(L);
-  return { q:`소모품입니다. 가진 돈 ${won(c.money)}.`, back: v => go(shopScreen, v), opts: GOODS.map((g, i) => ({ n: i + 1, icon:['icons2', i], t:`${g.name} ${won(g.price)} (가진 것 ${c.goods[g.id] || 0}개)`, s: g.desc, act: () => {
+  return { kind:'cr-shop', q:`소모품입니다. 가진 돈 ${won(c.money)}.`, back: v => go(shopScreen, v), opts: GOODS.map((g, i) => ({ n: i + 1, goods: g.id, price: g.price, have: c.goods[g.id] || 0, icon:['icons2', i], t:`${g.name} ${won(g.price)} (가진 것 ${c.goods[g.id] || 0}개)`, s: g.desc, act: () => {
     if(c.money < g.price){ stay('돈이 모자랍니다.'); return; }
     c.money -= g.price; c.goods[g.id] = (c.goods[g.id] || 0) + 1; saveLeague(); stay(`${g.name}을 샀습니다. 가진 돈 ${won(c.money)}.`);
   } })) };
@@ -159,12 +159,12 @@ function bagScreen(msg){
   const owned = c.owned.map(itemOf).filter(Boolean);
   owned.slice(0, 7).forEach((it, i) => {
     const on = c.equip[it.slot] === it.id;
-    opts.push({ n: i + 1, icon:['icons', ITEMS.indexOf(it)], t:`${on ? '장착 중: ' : ''}${it.name}`, s:`${SLOT_NAME[it.slot]} · ${fxText(it, p)}. 고르면 ${on ? '벗습니다' : '장착합니다'}.`,
+    opts.push({ n: i + 1, item: it.id, on, icon:['icons', ITEMS.indexOf(it)], t:`${on ? '장착 중: ' : ''}${it.name}`, s:`${SLOT_NAME[it.slot]} · ${fxText(it, p)}. 고르면 ${on ? '벗습니다' : '장착합니다'}.`,
       act: v => { const say = on ? unequip(L, it.slot) : equip(L, it); saveLeague(); go(bagScreen, v, say); } });
   });
-  opts.push({ n:8, t:'소모품 쓰기', s: GOODS.map(g => `${g.name} ${c.goods[g.id] || 0}개`).join(', '), act: v => go(useGoods, v) });
-  opts.push({ n:9, t:'장비 수리·강화', s:'닳은 장비를 고치고 +1~+3까지 강화합니다.', act: v => go(gearScreen, v) });
-  return { q:`내 가방입니다. 장비: ${equipText(L)}.`, say: msg || (owned.length ? null : ['아직 산 장비가 없습니다. 용품점에서 사세요.']), back: v => go(careerHome, v), opts };
+  opts.push({ n:8, key:'use', t:'소모품 쓰기', s: GOODS.map(g => `${g.name} ${c.goods[g.id] || 0}개`).join(', '), act: v => go(useGoods, v) });
+  opts.push({ n:9, key:'gear', t:'장비 수리·강화', s:'닳은 장비를 고치고 +1~+3까지 강화합니다.', act: v => go(gearScreen, v) });
+  return { kind:'cr-bag', q:`내 가방입니다. 장비: ${equipText(L)}.`, say: msg || (owned.length ? null : ['아직 산 장비가 없습니다. 용품점에서 사세요.']), back: v => go(careerHome, v), opts };
 }
 // 장비 수리·강화: 끼고 있거나 가진 장비 하나를 골라 고치거나 강화함
 function gearScreen(msg){
@@ -192,18 +192,30 @@ const dayKey = L => `${L.season}-${L.phase}-${L.day}`;
 function visitScreen(msg){
   const L = CR(), c = life(L), p = myP(L), done = c.visited === dayKey(L), list = statKeys(p);
   const lock = done ? '오늘은 이미 다녀왔습니다.' : '';
-  return { q:`어디에 갈까요? 가진 돈 ${won(c.money)}.`, say: msg, back: v => go(careerHome, v), opts:[
-    { n:1, t:'스포츠 용품점', s:'배트·글러브·신발 같은 장비와 소모품을 삽니다.', act: v => go(shopScreen, v) },
-    { n:2, t:'내 가방', s:`장비: ${equipText(L)}`, act: v => go(bagScreen, v) },
-    { n:3, t:'팬 사인회', s: lock || '인기와 용돈이 오릅니다. 가끔 피곤해집니다.', act: v => done ? stay(lock) : fanMeet(v) },
-    { n:4, t:'특별 코치 레슨 (300만 원)', s: lock || '유명 코치에게 하루 집중 지도를 받아 성장 점수가 크게 오릅니다.', act: v => done ? stay(lock) : go(coachScreen, v) },
-    { n:9, t:`집 구하기 (지금 ${HOMES[c.home || 0][0]})`, s:'큰돈을 들여 더 좋은 집으로 옮기면 날마다 피로가 더 풀립니다.', act: v => go(homeScreen2, v) },
-    { n:7, t: c.coach === L.season ? '개인 코치 계약 끝내기' : `개인 코치 고용 (시즌 동안 연봉의 25%, 약 ${won(Math.round(c.salary * 0.25))})`, s: c.coach === L.season ? '더 이상 비용을 내지 않습니다.' : '이번 시즌 동안 훈련 성장 효과가 1.25배가 됩니다. 비용은 날마다 나눠 나갑니다.', act: () => { if(c.coach === L.season){ delete c.coach; saveLeague(); stay('개인 코치 계약을 끝냈습니다.'); } else { c.coach = L.season; saveLeague(); stay('개인 코치를 고용했습니다. 이번 시즌 훈련 효과가 1.25배가 됩니다.'); } } },
-    { n:8, t:`기부하기 (연봉의 10%, ${won(Math.round(c.salary * 0.1))})`, s: c.donated === L.season ? '이번 시즌에는 이미 했습니다.' : '인기가 4 오릅니다. 시즌에 한 번.', act: () => { const cost = Math.round(c.salary * 0.1); if(c.donated === L.season){ stay('이번 시즌에는 이미 기부했습니다.'); return; } if(c.money < cost){ stay('돈이 모자랍니다.'); return; } c.money -= cost; c.donated = L.season; c.fame += 4; saveLeague(); stay(`기부했습니다. 인기 4 올라 ${c.fame}.`); } },
-    { n:6, t:'휴가 (150만 원)', s: lock || '하루를 통째로 쉽니다. 피로가 크게 풀리고 컨디션이 좋아집니다.', act: v => done ? stay(lock) : vacation(v) },
-    { n:5, t: c.hurt > 0 ? '재활 센터 (100만 원)' : '마사지 숍 (50만 원)', s: lock || (c.hurt > 0 ? '부상이 2일 빨리 낫습니다.' : '컨디션이 한 단계 좋아집니다.'), act: v => done ? stay(lock) : clinic(v) },
+  return { kind:'cr-visit', done, q:`어디에 갈까요? 가진 돈 ${won(c.money)}.`, say: msg, back: v => go(careerHome, v), opts:[
+    { n:1, key:'shop', t:'스포츠 용품점', s:'배트·글러브·신발 같은 장비와 소모품을 삽니다.', act: v => go(shopScreen, v) },
+    { n:2, key:'bag', t:'내 가방', s:`장비: ${equipText(L)}`, act: v => go(bagScreen, v) },
+    { n:3, key:'fans', day:true, t:'팬 사인회', s: lock || '인기와 용돈이 오릅니다. 가끔 피곤해집니다.', act: v => done ? stay(lock) : fanMeet(v) },
+    { n:4, key:'coach', day:true, t:'특별 코치 레슨 (300만 원)', s: lock || '유명 코치에게 하루 집중 지도를 받아 성장 점수가 크게 오릅니다.', act: v => done ? stay(lock) : go(coachScreen, v) },
+    { n:9, key:'house', t:`집 구하기 (지금 ${HOMES[c.home || 0][0]})`, s:'큰돈을 들여 더 좋은 집으로 옮기면 날마다 피로가 더 풀립니다.', act: v => go(homeScreen2, v) },
+    { n:7, key:'pcoach', t: c.coach === L.season ? '개인 코치 계약 끝내기' : `개인 코치 고용 (시즌 동안 연봉의 25%, 약 ${won(Math.round(c.salary * 0.25))})`, s: c.coach === L.season ? '더 이상 비용을 내지 않습니다.' : '이번 시즌 동안 훈련 성장 효과가 1.25배가 됩니다. 비용은 날마다 나눠 나갑니다.', act: () => { if(c.coach === L.season){ delete c.coach; saveLeague(); stay('개인 코치 계약을 끝냈습니다.'); } else { c.coach = L.season; saveLeague(); stay('개인 코치를 고용했습니다. 이번 시즌 훈련 효과가 1.25배가 됩니다.'); } } },
+    { n:8, key:'donate', t:`기부하기 (연봉의 10%, ${won(Math.round(c.salary * 0.1))})`, s: c.donated === L.season ? '이번 시즌에는 이미 했습니다.' : '인기가 4 오릅니다. 시즌에 한 번.', act: () => { const cost = Math.round(c.salary * 0.1); if(c.donated === L.season){ stay('이번 시즌에는 이미 기부했습니다.'); return; } if(c.money < cost){ stay('돈이 모자랍니다.'); return; } c.money -= cost; c.donated = L.season; c.fame += 4; saveLeague(); stay(`기부했습니다. 인기 4 올라 ${c.fame}.`); } },
+    { n:6, key:'vac', day:true, t:'휴가 (150만 원)', s: lock || '하루를 통째로 쉽니다. 피로가 크게 풀리고 컨디션이 좋아집니다.', act: v => done ? stay(lock) : vacation(v) },
+    { n:5, key:'clinic', day:true, t: c.hurt > 0 ? '재활 센터 (100만 원)' : '마사지 숍 (50만 원)', s: lock || (c.hurt > 0 ? '부상이 2일 빨리 낫습니다.' : '컨디션이 한 단계 좋아집니다.'), act: v => done ? stay(lock) : clinic(v) },
   ] };
 }
+// 마을 지도(화면 보며 하기)의 장소 → 할 수 있는 일. 야구장·훈련장은 첫 화면의 경기·훈련으로 감
+const TOWN = [
+  { id:'office', name:'구단 사무실', desc:'기부 · 개인 코치', keys:['donate', 'pcoach'], at:[6, 16, 22, 16] },
+  { id:'stadium', name:'야구장', desc:'오늘 경기', home:'play', at:[34, 9, 33, 23] },
+  { id:'field', name:'훈련장', desc:'하루 한 번 훈련', home:'train', at:[71, 16, 27, 17] },
+  { id:'shop', name:'스포츠 용품점', desc:'장비 · 소모품', keys:['shop'], at:[3, 38, 27, 17] },
+  { id:'plaza', name:'광장', desc:'팬 사인회', keys:['fans'], at:[34, 36, 32, 20] },
+  { id:'academy', name:'코치 아카데미', desc:'특별 코치 레슨', keys:['coach'], at:[70, 38, 27, 17] },
+  { id:'hospital', name:'병원', desc:'마사지 · 재활', keys:['clinic'], at:[2, 61, 28, 20] },
+  { id:'house', name:'내 집', desc:'가방 · 집 구하기', keys:['bag', 'house'], at:[35, 62, 30, 20] },
+  { id:'airport', name:'공항', desc:'휴가', keys:['vac'], at:[70, 59, 29, 23] },
+];
 function vacation(via){
   const L = CR(), c = life(L), p = myP(L);
   if(c.money < 150){ stay('돈이 모자랍니다.'); return; }

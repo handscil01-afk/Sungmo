@@ -114,7 +114,7 @@ function skinBody(){
   const key = String(UI.make && UI.make.name) + '|' + skClean(S.q) + '|' + (S.ti ?? '');
   if(key !== SK.pgKey){ SK.pgKey = key; SK.pgi = S.kind === 'log' ? 1e9 : 0; }
   const body = $('#skBody');
-  body.className = 'sk-body ' + (game ? 'deck' + (S.kind ? ' k-' + S.kind : '') + (S.sub ? ' sub' : '') : 'menu');
+  body.className = 'sk-body ' + (game ? 'deck' + (S.kind ? ' k-' + S.kind : '') + (S.sub ? ' sub' : '') : 'menu' + (S.kind ? ' k-' + S.kind : ''));
   body.innerHTML = game ? deckHTML(S) : menuHTML(S);
   if(SK.tm && SK.tm.pad && !SK.tm.done) body.appendChild(SK.tm.pad);   // 타이밍을 재는 중에 다시 그려도 스윙 단추는 그대로
   skFit(); requestAnimationFrame(() => skFit());   // 그림판·글꼴 크기가 자리 잡은 뒤 한 번 더 맞춤
@@ -432,7 +432,8 @@ function timingEnd(tm){
 /* ---------- 메뉴 화면 ---------- */
 function topHTML(S){
   const fsOn = typeof FS !== 'undefined' && FS.on(), canFs = typeof isStandalone === 'function' && !isStandalone();
-  const title = S.hero ? '' : S.onTab ? '설정' : menuTitle(S).title;
+  const CRT = { 'cr-home':'라커룸', 'cr-visit':'마을', 'cr-train':'훈련', 'cr-bag':'내 가방', 'cr-info':'내 선수', 'cr-face':'얼굴 고르기', 'cr-log':'업적과 경력' };
+  const title = S.hero ? '' : S.onTab ? '설정' : CRT[S.kind] || menuTitle(S).title;
   return `<div class="bar">${S.back ? `<button type="button" class="rb" data-sk="back" aria-label="뒤로">${skIco('back')}</button>` : ''}
     <b class="ttl">${esc(title)}</b>
     ${canFs ? `<button type="button" class="rb b" data-sk="fs" aria-label="${fsOn ? '전체화면 끄기' : '전체화면 켜기'}">${skIco(fsOn ? 'fsx' : 'fs')}</button>` : ''}
@@ -446,6 +447,8 @@ function menuTitle(S){
   return { title: qs[qs.length - 1] || '손잡다 야구', sub: qs.slice(0, -1).join(' ') };
 }
 function menuHTML(S){
+  const cs = typeof careerSkin === 'function' ? careerSkin(S) : null;   // 선수 육성 화면(skin-career.js)
+  if(cs != null) return cs;
   const out = [], q = { sub: menuTitle(S).sub };
   if(S.hero) out.push(`<div class="hero"><div class="hero-art" aria-hidden="true"></div><div class="hero-tx"><div class="logo" aria-hidden="true"><span>손잡다 야구</span></div><h1 class="sr-only">손잡다 야구</h1><span class="kick">듣고 보고 고르는 확률 야구</span></div></div>`);
   if(S.top) out.push(`<div class="mtop">${S.top}</div>`);
@@ -527,7 +530,8 @@ function skinClick(e){
   const a = b.dataset.sk;
   if(a === 'tswing'){ timingTap(); return; }
   if(SK.tm) return;
-  if(a === 'opt'){ GS.tm = null; choose(b.dataset.n, 'click'); }
+  if(a === 'opt'){ GS.tm = null; if(b.closest('#skSheet')) skinSheetClose(true); choose(b.dataset.n, 'click'); }
+  else if(a === 'spot' && typeof crSpot === 'function') crSpot(b.dataset.spot);
   else if(a === 'back') back('click');
   else if(a === 'menu'){ stopAutoPlay(); openMenu('click'); }
   else if(a === 'talk' && typeof talkScreen === 'function') go(talkScreen, 'click');

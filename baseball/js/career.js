@@ -48,13 +48,23 @@ function careerNew(){
   if(!NEWC.pit) p.trait = { glove:['range'], speed:['quick'], power:['arm'], contact:[] }[NEWC.type] || [];   // 유형에 맞는 포지션 특기
   ensureGrowth(L, p);
   L.mv = 2;   // 새 저장 형식 (성장 유형·피로·계약·장비 상태가 처음부터 있음)
-  L.career = { v:CAREER_V, id:p.id, p, where:'minor', pit:NEWC.pit, type:NEWC.type, pts:{}, fame:0, trained:-1, minor:{}, ach:[], hurt:0, slump:0, money:300, salary:3000, equip:{}, goods:{ drink:1 }, owned:[], fatigue:0, gs:{}, applied:{}, contract:{ years:1, salary:3000, bonus:0, until:L.season, team:L.my } };
+  L.career = { v:CAREER_V, face: NEWC.face ?? faceOf(p.name), num: numOf(p.name), id:p.id, p, where:'minor', pit:NEWC.pit, type:NEWC.type, pts:{}, fame:0, trained:-1, minor:{}, ach:[], hurt:0, slump:0, money:300, salary:3000, equip:{}, goods:{ drink:1 }, owned:[], fatigue:0, gs:{}, applied:{}, contract:{ years:1, salary:3000, bonus:0, until:L.season, team:L.my } };
   crLog(L, `${p.name}, ${teamInfo(NEWC.team).name}에 입단했습니다! 퓨처스리그(2군)에서 시작합니다.`);
   return L;
 }
 function careerNameScreen(){
   return { q:'선수 이름을 명령 칸에 적고 입력을 누르세요.', focusCmd:true, back: v => go(careerHome, v),
-    onText: t => { t = t.trim().slice(0, 10); if(!t) return; NEWC.name = t; go(careerKindScreen, 'click'); }, opts:[] };
+    onText: t => { t = t.trim().slice(0, 10); if(!t) return; NEWC.name = t; NEWC.face = null; go(VIEW.gfx ? () => careerFaceScreen(null) : careerKindScreen, 'click'); }, opts:[] };
+}
+// 얼굴(img/faces.png 12가지)과 등번호: 화면 보며 하기의 선수 카드에 씀. 옛 저장은 이름으로 정함
+const hashName = n => { let h = 7; for(const ch of String(n)) h = (h * 31 + ch.charCodeAt(0)) | 0; return Math.abs(h); };
+const faceOf = n => hashName(n) % 12;
+const numOf = n => 1 + hashName(n + '#') % 99;
+// 얼굴 고르기 (화면 보며 하기만): back이 있으면 정보 화면에서 바꾸는 것
+function careerFaceScreen(back){
+  const pick = (i, v) => { if(back){ const L = CR(); C(L).face = i; saveLeague(); go(back, v, ['얼굴을 바꿨습니다.']); } else { NEWC.face = i; go(careerKindScreen, v); } };
+  return { kind:'cr-face', q:'얼굴을 고르세요.', back: v => go(back || careerNameScreen, v),
+    opts: Array.from({ length:12 }, (_, i) => ({ n: i + 1, face: i, t:`얼굴 ${i + 1}`, act: v => pick(i, v) })) };
 }
 function careerKindScreen(){
   return { q:`${NEWC.name} 선수는 타자인가요, 투수인가요?`, back: v => go(careerNameScreen, v), opts:[
@@ -126,19 +136,19 @@ function careerHome(){
   // 선발 투수는 로테이션 차례가 아닌 날엔 경기를 지켜봄
   const offDay = first && g && isPit(p) && p.role === '선발' && T0().sp[T0().rot % T0().sp.length].id !== c.id;
   function T0(){ return L.teams[L.my]; }
-  return { top: careerTop(L), q: done ? '시즌이 끝났습니다. 다음 시즌을 시작할까요?' : '오늘은 무엇을 할까요?', back: v => go(homeScreen, v), note: careerStatus(L), opts:[
-    done ? { n:1, t:'다음 시즌 시작', s:'한 살 더 먹고, 나이에 따라 능력치가 바뀝니다.', act: v => careerNextSeason(v) }
-      : { n:1, t: saved ? '진행 중인 경기 이어하기' : c.hurt > 0 ? '쉬면서 회복하기' : offDay ? '오늘 경기 보기 (등판 차례 아님)' : first ? (g ? '오늘 1군 경기 하기' : '포스트시즌 결과 보기') : '퓨처스리그(2군) 경기 하기',
+  return { kind:'cr-home', top: careerTop(L), q: done ? '시즌이 끝났습니다. 다음 시즌을 시작할까요?' : '오늘은 무엇을 할까요?', back: v => go(homeScreen, v), note: careerStatus(L), trained, offDay, opts:[
+    done ? { n:1, key:'play', t:'다음 시즌 시작', s:'한 살 더 먹고, 나이에 따라 능력치가 바뀝니다.', act: v => careerNextSeason(v) }
+      : { n:1, key:'play', t: saved ? '진행 중인 경기 이어하기' : c.hurt > 0 ? '쉬면서 회복하기' : offDay ? '오늘 경기 보기 (등판 차례 아님)' : first ? (g ? '오늘 1군 경기 하기' : '포스트시즌 결과 보기') : '퓨처스리그(2군) 경기 하기',
           s: saved ? situation(saved.G) : offDay ? '선발 로테이션 차례가 아니라 결과만 봅니다.' : c.hurt > 0 ? '' : '직접 하기 · 맡기고 결과 듣기 · 건너뛰기 가운데 고릅니다.',
           act: v => saved ? resumeGame(v) : c.hurt > 0 ? careerRest(v) : offDay ? careerSimDay(v) : first && g ? go(() => careerGameChoice(false), v) : L.phase === 'season' ? go(() => careerGameChoice(true), v) : careerMinorDay(v) },
-    { n:2, t: trained ? '오늘 훈련은 마쳤습니다' : '훈련하기', hide: done || c.hurt > 0, s:'경기 전에 하루 한 번 훈련합니다.', act: v => trained ? speak('오늘 훈련은 이미 했습니다.') : go(trainScreen, v) },
-    { n:3, t:'어디 가기', s:`용품점, 내 가방, 팬 사인회, 특별 코치, ${c.hurt > 0 ? '재활 센터' : '마사지 숍'}. 가진 돈 ${won(c.money || 0)}`, act: v => go(visitScreen, v) },
-    { n:4, t:'내 선수 정보', act: v => go(careerInfoScreen, v) },
-    { n:5, t:'팀 순위', act: v => go(standScreen, v) },
-    { n:6, t:'기록 순위', act: v => go(() => leadersScreen(null), v) },
-    { n:7, t:'업적과 경력', act: v => go(careerLogScreen, v) },
-    { n:8, t:'기록실과 명예의 전당', act: v => go(archiveScreen, v) },
-    { n:9, t:'은퇴하기와 설정', act: v => go(careerSet, v) },
+    { n:2, key:'train', t: trained ? '오늘 훈련은 마쳤습니다' : '훈련하기', hide: done || c.hurt > 0, s:'경기 전에 하루 한 번 훈련합니다.', act: v => trained ? speak('오늘 훈련은 이미 했습니다.') : go(trainScreen, v) },
+    { n:3, key:'visit', t:'어디 가기', s:`용품점, 내 가방, 팬 사인회, 특별 코치, ${c.hurt > 0 ? '재활 센터' : '마사지 숍'}. 가진 돈 ${won(c.money || 0)}`, act: v => go(visitScreen, v) },
+    { n:4, key:'bag', t:'내 가방', s:`장비: ${equipText(L)}`, act: v => go(bagScreen, v) },
+    { n:5, key:'stand', t:'팀 순위', act: v => go(standScreen, v) },
+    { n:6, key:'lead', t:'기록 순위', act: v => go(() => leadersScreen(null), v) },
+    { n:7, key:'info', t:'내 선수 정보와 업적', act: v => go(careerInfoScreen, v) },
+    { n:8, key:'arch', t:'기록실과 명예의 전당', act: v => go(archiveScreen, v) },
+    { n:9, key:'set', t:'은퇴하기와 설정', act: v => go(careerSet, v) },
   ] };
 }
 
@@ -146,9 +156,9 @@ function careerHome(){
 function trainScreen(){
   const L = CR(), p = myP(L), list = isPit(p) ? PIT_TRAIN : BAT_TRAIN, c = C(L);
   ensureGrowth(L, p);
-  const opts = list.map(([k, t, nm], i) => ({ n: i + 1, t, s:`${nm} ${p[k]}, 성장 점수 ${Math.round(c.pts[k] || 0)}/10${(p.pot[k] ?? 99) - p[k] <= 0 ? ', 한계에 닿음' : (p.pot[k] ?? 99) - p[k] < 5 ? ', 한계에 가까워 느림' : ''}`, act: v => doTrain(k, nm, v) }));
-  opts.push({ n:9, t:'푹 쉬기', s:'컨디션이 좋아지고 피로가 풀립니다.', act: v => doTrain(null, null, v) });
-  return { q:`어떤 훈련을 할까요? 피로 ${fatigueWord(c)}${(c.fatigue || 0) > 70 ? '. 쉬지 않으면 효과가 크게 줄고 다치기 쉽습니다' : ''}.`, back: v => go(careerHome, v), opts };
+  const opts = list.map(([k, t, nm], i) => ({ n: i + 1, key: k, stat: k, t, s:`${nm} ${p[k]}, 성장 점수 ${Math.round(c.pts[k] || 0)}/10${(p.pot[k] ?? 99) - p[k] <= 0 ? ', 한계에 닿음' : (p.pot[k] ?? 99) - p[k] < 5 ? ', 한계에 가까워 느림' : ''}`, act: v => doTrain(k, nm, v) }));
+  opts.push({ n:9, key:'rest', t:'푹 쉬기', s:'컨디션이 좋아지고 피로가 풀립니다.', act: v => doTrain(null, null, v) });
+  return { kind:'cr-train', q:`어떤 훈련을 할까요? 피로 ${fatigueWord(c)}${(c.fatigue || 0) > 70 ? '. 쉬지 않으면 효과가 크게 줄고 다치기 쉽습니다' : ''}.`, back: v => go(careerHome, v), opts };
 }
 function grow(L, k, amt){
   const c = C(L), p = myP(L), out = [];
@@ -404,12 +414,12 @@ function careerInfoScreen(){
   if(isPit(p)) say.push('구종: ' + (p.pitches || []).map(x => `${PITCH[x.t].name} ${x.g}`).join(', ') + '.');
   say.push(`통산(지난 시즌까지): ${careerText({ pit:isPit(p), cs:p.cs || {} })}.`);
   if((p.awards || []).length) say.push(`수상: ${p.awards.join(', ')}.`);
-  return { q:'내 선수 정보입니다.', say, back: v => go(careerHome, v), opts:[{ n:1, t:'돌아가기', act: v => go(careerHome, v) }] };
+  return { kind:'cr-info', q:'내 선수 정보입니다.', say, back: v => go(careerHome, v), opts:[{ n:1, t:'돌아가기', act: v => go(careerHome, v) }, { n:2, key:'log', t:'업적과 경력', act: v => go(careerLogScreen, v) }, { n:3, key:'face', t:'얼굴 바꾸기', hide: !VIEW.gfx, act: v => go(() => careerFaceScreen(careerInfoScreen), v) }] };
 }
 function careerLogScreen(){
   const L = CR(), c = C(L);
   const say = (c.ach || []).slice(-40).map(a => `${a.season}시즌 ${a.day}일째: ${a.text}`);
-  return { q:'업적과 경력입니다.', say: say.length ? say : ['아직 기록이 없습니다.'], back: v => go(careerHome, v), opts:[{ n:1, t:'돌아가기', act: v => go(careerHome, v) }] };
+  return { kind:'cr-log', q:'업적과 경력입니다.', say: say.length ? say : ['아직 기록이 없습니다.'], back: v => go(careerInfoScreen, v), opts:[{ n:1, t:'돌아가기', act: v => go(careerInfoScreen, v) }] };
 }
 function careerSet(){
   const L = CR();

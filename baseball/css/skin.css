@@ -454,3 +454,141 @@ html.skin .logo span{ position:absolute; left:0; right:0; top:61%; transform:tra
 html.skin .hero .kick{ margin-top:-4px; }
 html.skin .sk-body.f1 .logo{ width:min(14rem, 70%); } html.skin .sk-body.f1 .logo span{ font-size:1.1rem; }
 @media (prefers-reduced-motion:reduce){ html.skin .pb-flash{ animation-duration:.01s; } }
+
+/* ===== 선수 육성 (skin-career.js) ===== */
+html.skin .crf{ display:block; flex:none; width:3rem; height:3rem; background-size:400% 300%; background-repeat:no-repeat; image-rendering:pixelated; }
+html.skin .crf.big{ width:6.2rem; height:6.2rem; filter:drop-shadow(0 3px 0 rgba(0,0,0,.35)); }
+html.skin .crf.mid{ width:4.2rem; height:4.2rem; }
+html.skin .crf.sm{ width:2.3rem; height:2.3rem; }
+html.skin .crres{ display:flex; align-items:center; gap:6px; padding:5px 8px; border-radius:14px; border:3px solid var(--line); background:linear-gradient(180deg, #1d4f9e, #123a7c); color:#fff; box-shadow:0 3px 0 var(--line2); }
+html.skin .crres .rs{ display:inline-flex; align-items:center; gap:4px; font-size:.82rem; font-weight:900; white-space:nowrap; text-shadow:0 1px 0 #000; }
+html.skin .crres .ri{ display:inline-grid; place-items:center; width:1.4rem; height:1.4rem; border-radius:50%; font-style:normal; font-size:.85rem; }
+html.skin .crres .ri.money{ background:#2ec463 url(../img/items.png) 100% 100% / 500% 400% no-repeat; image-rendering:pixelated; border:2px solid #fff; }
+html.skin .crres .ri.fame{ background:#ff4d7a; color:#fff; border:2px solid #fff; }
+html.skin .crres .ri.cond{ background:#ffe94d; border:2px solid #fff; font-size:.8rem; }
+html.skin .crres .fat{ margin-left:auto; flex:1 1 auto; max-width:6.5rem; display:grid; gap:1px; }
+html.skin .crres .fat small{ font-size:.6rem; color:#cfe0ff; }
+html.skin .fb{ display:block; height:7px; border-radius:4px; background:#0a2a63; overflow:hidden; } html.skin .fb i{ display:block; height:100%; }
+html.skin .lock{ position:relative; display:grid; grid-template-columns:auto minmax(0, 1fr); gap:8px; align-items:center; padding:10px; border-radius:16px; border:3px solid var(--line);
+  background:#4a3d6b center / cover no-repeat; image-rendering:pixelated; box-shadow:inset 0 0 0 2px rgba(255,255,255,.35), 0 3px 0 var(--line2); }
+html.skin .lock::before{ content:''; position:absolute; inset:0; border-radius:13px; background:linear-gradient(90deg, rgba(8,20,50,.15), rgba(8,20,50,.55)); }
+html.skin .lock > *{ position:relative; }
+html.skin .pcard{ display:grid; justify-items:center; gap:2px; width:7.6rem; padding:6px 4px; border-radius:14px; background:rgba(255,255,255,.88); border:2px solid #fff; box-shadow:0 2px 0 rgba(0,0,0,.25); }
+html.skin .pc-num{ position:absolute; top:4px; right:6px; font-size:1.05rem; font-weight:900; color:var(--tc); -webkit-text-stroke:1px #0b2a66; }
+html.skin .pc-nm{ display:grid; justify-items:center; line-height:1.15; } html.skin .pc-nm b{ font-size:1rem; font-weight:900; color:var(--ink); } html.skin .pc-nm small{ font-size:.66rem; color:var(--ink2); font-weight:700; }
+html.skin .pc-tm{ display:flex; align-items:center; gap:3px; font-size:.62rem; font-weight:800; color:#c25a00; text-align:center; line-height:1.15; }
+html.skin .pstats{ display:grid; gap:4px; padding:7px 8px; border-radius:12px; background:rgba(8,20,50,.72); border:2px solid rgba(255,255,255,.4); }
+html.skin .cs{ display:grid; grid-template-columns:2.9rem minmax(0, 1fr) 1.8rem 1.1rem; align-items:center; gap:4px; color:#fff; font-size:.74rem; font-weight:800; position:relative; }
+html.skin .cs-n{ white-space:nowrap; } html.skin .cs b{ text-align:right; font-variant-numeric:tabular-nums; font-size:.86rem; }
+html.skin .cs-b{ position:relative; height:10px; border-radius:5px; background:#0a2a63; overflow:hidden; border:1px solid #000; }
+html.skin .cs-b i{ position:absolute; left:0; top:0; bottom:3px; background:linear-gradient(180deg, #8fd0ff, #2f8cf0); }
+html.skin .cs-b em{ position:absolute; left:0; bottom:0; height:3px; background:#ffe94d; }
+html.skin .cs .g{ font-style:normal; font-size:.6rem; font-weight:900; width:1.05rem; height:1.05rem; border-radius:4px; display:grid; place-items:center; color:#fff; }
+html.skin .cs-l{ position:absolute; right:-2px; top:-7px; font-size:.5rem; font-style:normal; font-weight:900; background:#ff3d7f; color:#fff; padding:0 3px; border-radius:4px; }
+html.skin .crday{ margin:0; text-align:center; font-size:.76rem; font-weight:800; color:#fff; text-shadow:0 1px 0 #0b3a8c; }
+html.skin .crplay{ display:flex; align-items:center; gap:12px; width:100%; min-height:3.6rem; padding:.5rem 1rem; border-radius:18px; text-align:left; border:3px solid #a86c00; color:#4a2a00;
+  background:linear-gradient(180deg, #fff27e, #ffc21a 55%, #ffad00); box-shadow:inset 0 2px 0 rgba(255,255,255,.6), 0 4px 0 #a86c00; }
+html.skin .crplay .pp{ display:grid; place-items:center; width:2.4rem; height:2.4rem; border-radius:50%; background:#e2501a; color:#fff; font-size:1rem; border:2px solid #fff; flex:none; }
+html.skin .crplay span:last-child{ display:grid; } html.skin .crplay b{ font-size:1.1rem; font-weight:900; } html.skin .crplay small{ font-size:.72rem; font-weight:700; opacity:.8; }
+html.skin .crtiles{ display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:7px; flex:1 1 auto !important; min-height:5rem !important; max-height:8rem; }
+html.skin .ct{ position:relative; display:grid; place-content:center; justify-items:center; gap:4px; border-radius:16px; border:3px solid var(--line); color:#fff; text-shadow:0 1px 0 #0b3a8c;
+  background:linear-gradient(180deg, #4aa9ff, #1a62c9); box-shadow:inset 0 2px 0 rgba(255,255,255,.45), 0 3px 0 var(--line2); overflow:hidden; }
+html.skin .ct b{ font-size:.86rem; font-weight:900; }
+html.skin .ct.done{ filter:saturate(.6); }
+html.skin .ct .tico, html.skin .ct .iico{ width:2.6rem; height:2.6rem; }
+html.skin .tico{ display:block; flex:none; width:2.6rem; height:2.6rem; background:url(../img/icons-train.png) 0 0 / 500% 200% no-repeat; image-rendering:pixelated; }
+html.skin .mapico{ display:block; width:2.6rem; height:2.6rem; border-radius:10px; background:url(../img/cr-town.png) 50% 45% / 300% auto no-repeat; image-rendering:pixelated; border:2px solid #fff; box-shadow:0 2px 0 rgba(0,0,0,.25); }
+html.skin .stamp{ position:absolute; top:6px; right:-18px; transform:rotate(30deg); font-style:normal; font-size:.56rem; font-weight:900; background:#ff3d7f; color:#fff; padding:1px 20px; box-shadow:0 1px 0 rgba(0,0,0,.3); text-shadow:none; white-space:nowrap; }
+html.skin .crmsg{ padding:6px 10px; border-radius:12px; background:#fff6c2; border:2px solid #a86c00; color:#4a2a00; font-size:.8rem; font-weight:700; }
+html.skin .crmsg p{ margin:1px 0; }
+/* 마을 지도 */
+html.skin .townw{ flex:1 1 auto !important; min-height:12rem !important; display:flex; justify-content:center; align-items:flex-start; }
+html.skin .town{ position:relative; height:100%; max-width:100%; aspect-ratio:2 / 3; border-radius:16px; border:3px solid var(--line); overflow:hidden;
+  background:url(../img/cr-town.png) center / 100% 100% no-repeat; image-rendering:pixelated; box-shadow:0 3px 0 var(--line2); }
+html.skin .spot{ position:absolute; border:0; padding:0; background:transparent; border-radius:12px; overflow:visible; }
+html.skin .spot:hover, html.skin .spot:focus-visible{ background:rgba(255,255,255,.18); outline:3px solid #ffe94d; }
+html.skin .sign{ position:absolute; left:50%; top:-2px; transform:translateX(-50%); display:grid; justify-items:center; padding:2px 7px; border-radius:8px; white-space:nowrap;
+  background:linear-gradient(180deg, #23417e, #142b5c); border:2px solid #fff; color:#fff; box-shadow:0 2px 0 rgba(0,0,0,.4); line-height:1.1; pointer-events:none; }
+html.skin .sign b{ font-size:.7rem; font-weight:900; } html.skin .sign small{ font-size:.52rem; color:#ffe94d; font-weight:800; }
+html.skin .spot.off{ filter:grayscale(.2) brightness(.85); } html.skin .spot.off .stamp{ top:40%; right:auto; left:50%; transform:translateX(-50%) rotate(-12deg); }
+html.skin .spot.hurt .sign{ animation:hurtB 1s infinite; background:linear-gradient(180deg, #e0353f, #8c1d27); }
+@keyframes hurtB{ 50%{ transform:translateX(-50%) scale(1.1); } }
+html.skin .spotm{ display:grid; gap:8px; }
+/* 용품점 */
+html.skin .shopg{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:7px; }
+html.skin .shopc{ position:relative; display:flex; align-items:center; gap:8px; padding:.45rem .55rem; border-radius:14px; text-align:left; overflow:hidden; border:3px solid var(--line); background:var(--pan); color:var(--ink); box-shadow:inset 0 0 0 2px #fff, 0 3px 0 var(--line2); }
+html.skin .shopc .tx{ display:grid; min-width:0; line-height:1.2; }
+html.skin .shopc b{ font-size:.86rem; font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+html.skin .shopc .pr{ font-size:.8rem; font-weight:900; color:#c25a00; white-space:nowrap; }
+html.skin .shopc .pr .own{ font-style:normal; font-size:.6rem; background:#16893f; color:#fff; padding:0 5px; border-radius:999px; vertical-align:1px; }
+html.skin .shopc small{ font-size:.62rem; color:var(--ink2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+html.skin .shopc.poor .pr{ color:#d33447; } html.skin .shopc.poor{ opacity:.75; }
+html.skin .shopc.own{ background:#e3f6e9; }
+html.skin .shopc .cnt{ position:absolute; top:4px; right:6px; font-style:normal; font-size:.62rem; font-weight:900; background:var(--line); color:#fff; padding:0 6px; border-radius:999px; }
+html.skin .shopc .iico{ width:2.6rem; height:2.6rem; }
+/* 가방 */
+html.skin .bag{ display:grid; grid-template-columns:minmax(0, .9fr) minmax(0, 1.1fr); gap:7px; flex:1 1 auto !important; min-height:14rem !important; }
+html.skin .bag-me, html.skin .bag-inv{ border-radius:16px; border:3px solid var(--line); background:var(--pan); box-shadow:inset 0 0 0 2px #fff, 0 3px 0 var(--line2); padding:7px; min-height:0; }
+html.skin .bag-me{ display:flex; flex-direction:column; align-items:center; gap:5px; }
+html.skin .slots{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:5px; width:100%; }
+html.skin .slot{ position:relative; display:grid; justify-items:center; gap:2px; padding:4px; border-radius:10px; border:2px dashed #9cc8f5; background:#fff; color:var(--ink); min-height:4rem; }
+html.skin .slot.on{ border-style:solid; border-color:var(--line); background:#fff6c2; }
+html.skin .slot small{ font-size:.6rem; font-weight:900; color:var(--ink2); } html.skin .slot .iico{ width:2rem; height:2rem; }
+html.skin .slot .empty{ font-size:.58rem; color:var(--ink3); align-self:center; }
+html.skin .slot em{ position:absolute; top:2px; right:4px; font-style:normal; font-size:.6rem; font-weight:900; color:#c25a00; }
+html.skin .dur{ width:80%; height:4px; border-radius:2px; background:#c5ddf7; overflow:hidden; } html.skin .dur i{ display:block; height:100%; background:#2ec463; }
+html.skin .slots .slot:last-child{ grid-column:1 / -1; }
+html.skin .bag-sum{ font-size:.62rem; color:var(--ink2); font-weight:700; }
+html.skin .bag-inv{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:5px; align-content:start; overflow:hidden; }
+html.skin .inv{ display:grid; justify-items:center; gap:1px; padding:5px 3px; border-radius:10px; border:2px solid #9cc8f5; background:#fff; color:var(--ink); text-align:center; }
+html.skin .inv.on{ border-color:#16893f; background:#e3f6e9; }
+html.skin .inv b{ font-size:.64rem; font-weight:900; line-height:1.15; } html.skin .inv small{ font-size:.56rem; color:var(--ink2); }
+html.skin .inv .iico{ width:2.2rem; height:2.2rem; }
+html.skin .bag-empty{ grid-column:1 / -1; margin:auto; text-align:center; font-size:.78rem; color:var(--ink2); }
+/* 훈련 */
+html.skin .trg{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:7px; flex:1 1 auto !important; grid-auto-rows:minmax(0, 1fr); min-height:12rem !important; max-height:26rem; }
+html.skin .trt{ position:relative; display:grid; grid-template-columns:auto minmax(0, 1fr); grid-template-rows:auto auto auto; column-gap:8px; align-content:center; align-items:center; padding:.45rem .6rem; border-radius:16px; text-align:left;
+  border:3px solid var(--line); background:var(--pan); color:var(--ink); box-shadow:inset 0 0 0 2px #fff, 0 3px 0 var(--line2); }
+html.skin .trt .tico{ grid-row:1 / 4; width:3rem; height:3rem; }
+html.skin .trt b{ font-size:.92rem; font-weight:900; } html.skin .tv{ font-size:.72rem; color:var(--ink2); font-weight:800; } html.skin .tv em{ font-style:normal; color:var(--ink); font-size:.86rem; }
+html.skin .tv .cs-l{ position:static; }
+html.skin .tp{ height:6px; border-radius:3px; background:#c5ddf7; overflow:hidden; } html.skin .tp i{ display:block; height:100%; background:#ffb800; }
+html.skin .trt.rest{ background:#eef1f7; }
+html.skin .warn{ padding:6px 10px; border-radius:12px; background:#ffe3e6; border:2px solid #d33447; color:#8c1d27; font-size:.8rem; font-weight:900; }
+/* 선수 카드·얼굴 */
+html.skin .lock.info{ flex:none; }
+html.skin .faceg{ display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:7px; }
+html.skin .facec{ display:grid; place-items:center; padding:4px; border-radius:14px; border:3px solid var(--line); background:var(--pan); box-shadow:0 3px 0 var(--line2); }
+html.skin .facec .crf{ width:100%; height:auto; aspect-ratio:1; }
+html.skin .sk-body.f1 .crday, html.skin .sk-body.f1 .crplay small{ display:none; }
+html.skin .sk-body.f2 .crf.big{ width:4.6rem; height:4.6rem; } html.skin .sk-body.f2 .pcard{ width:6.4rem; } html.skin .sk-body.f2 .cs{ font-size:.66rem; } html.skin .sk-body.f2 .shopc small{ display:none; }
+html.skin .sk-body.f3 .pc-tm{ display:none; } html.skin .sk-body.f3 .ct .tico, html.skin .sk-body.f3 .ct .iico, html.skin .sk-body.f3 .ct .mapico, html.skin .sk-body.f3 .ct .crf{ width:2rem; height:2rem; }
+@media (orientation:landscape) and (max-height:620px){
+  html.skin .k-cr-visit .townw{ min-height:0 !important; }
+  html.skin .shopg{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
+  html.skin .trg{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
+}
+/* 가로 화면: 육성 화면은 두 칸 (왼쪽 선수 카드, 오른쪽 단추) */
+@media (orientation:landscape) and (max-height:620px){
+  html.skin .sk-body.k-cr-home, html.skin .sk-body.k-cr-info{ display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); grid-auto-rows:min-content; align-content:start; column-gap:8px; row-gap:6px; }
+  html.skin .k-cr-home > .crres{ grid-column:1 / -1; }
+  html.skin .k-cr-home > .lock{ grid-column:1; grid-row:2 / span 4; align-self:stretch; }
+  html.skin .k-cr-home > :not(.crres):not(.lock){ grid-column:2; }
+  html.skin .k-cr-home .crtiles{ min-height:4.6rem !important; max-height:5.5rem; }
+  html.skin .k-cr-home .crplay{ min-height:3rem; }
+  html.skin .k-cr-home .minors, html.skin .k-cr-info .minors{ flex-wrap:wrap; }
+  html.skin .k-cr-info > .lock{ grid-column:1; grid-row:1 / span 2; align-self:start; }
+  html.skin .k-cr-info > .pg{ grid-column:2; min-height:0 !important; max-height:calc(100svh - 9rem); }
+  html.skin .k-cr-info > .minors{ grid-column:2; }
+  html.skin .lock{ grid-template-columns:auto minmax(0, 1fr); padding:6px; }
+  html.skin .crf.big{ width:4.4rem; height:4.4rem; } html.skin .pcard{ width:6.2rem; }
+  html.skin .cs{ font-size:.66rem; } html.skin .pstats{ gap:2px; padding:5px 6px; }
+  html.skin .bag{ min-height:0 !important; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); }
+  html.skin .bag-me{ flex-direction:row; align-items:flex-start; } html.skin .bag-me .crf, html.skin .bag-sum{ display:none; }
+  html.skin .slots{ grid-template-columns:repeat(3, minmax(0, 1fr)); } html.skin .slots .slot:last-child{ grid-column:auto; }
+  html.skin .slot{ min-height:3.2rem; } html.skin .bag-inv{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
+}
+@media (orientation:landscape) and (max-height:620px){
+  html.skin .sign{ padding:1px 4px; } html.skin .sign b{ font-size:.5rem; } html.skin .sign small{ display:none; }
+  html.skin .faceg{ grid-template-columns:repeat(6, minmax(0, 1fr)); max-width:28rem; margin:0 auto; }
+}

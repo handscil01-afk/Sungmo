@@ -1,0 +1,185 @@
+'use strict';
+/* ===================== 화면 보며 하기: 선수 육성 화면 =====================
+   육성 계산과 화면 정의(career.js·career-life.js)는 그대로 쓰고, 화면 정의의 kind(cr-home 등)와 선택지의 key·item·stat을 보고 그림 화면으로 그림.
+   누르면 늘 choose(번호)로 진행해서 소리와 글로 하기와 결과가 같음.
+   - cr-home 라커룸(선수 카드·능력치·오늘 경기·훈련·마을·가방) · cr-visit 마을 지도(장소를 눌러 들어감) · cr-shop 용품점
+   - cr-bag 가방(장비 칸 5개와 가진 물건) · cr-train 훈련 타일 · cr-info 선수 카드 · cr-face 얼굴 고르기 */
+
+/* ---------- 팀 색 칠하기: 그림의 자홍색(#FF00FF와 그 어두운 색)을 팀 색으로 (밝기는 그대로) ---------- */
+const SKT = { cache:{}, wait:{} };
+function skTint(name, color){
+  const k = name + color;
+  if(SKT.cache[k]) return SKT.cache[k];
+  if(!SKT.wait[k]){
+    SKT.wait[k] = true;
+    const im = new Image();
+    im.onload = () => {
+      const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
+      const x = c.getContext('2d'); x.drawImage(im, 0, 0);
+      const d = x.getImageData(0, 0, c.width, c.height), p = d.data;
+      const T = [parseInt(color.slice(1, 3), 16), parseInt(color.slice(3, 5), 16), parseInt(color.slice(5, 7), 16)];
+      for(let i = 0; i < p.length; i += 4){
+        const r = p[i], g = p[i + 1], b = p[i + 2];
+        if(p[i + 3] && r > 90 && b > 80 && g < 0.6 * Math.min(r, b) && Math.abs(r - b) < 80){
+          const v = Math.max(r, b) / 255;
+          p[i] = Math.round(T[0] * v); p[i + 1] = Math.round(T[1] * v); p[i + 2] = Math.round(T[2] * v);
+        }
+      }
+      x.putImageData(d, 0, 0);
+      SKT.cache[k] = c.toDataURL();
+      if(UI.S && /^cr-/.test(UI.S.kind || '')) skinBody();
+    };
+    im.src = `img/${name}.png`;
+  }
+  return `img/${name}.png`;
+}
+const crL = () => (typeof LG === 'function' && LSRC === 'career') ? LG() : null;
+const crColor = L => L ? teamInfo(L.my).color : '#3b82f6';
+// 얼굴 그림(faces.png 4칸 × 3줄)
+function crFace(i, color, cls = ''){
+  return `<span class="crf ${cls}" style="background-image:url(${skTint('faces', color)});background-position:${(i % 4) * 100 / 3}% ${Math.floor(i / 4) * 50}%" aria-hidden="true"></span>`;
+}
+const crFaceOf = (L, c, p) => c.face ?? faceOf(p.name);
+const crNumOf = (c, p) => c.num ?? numOf(p.name);
+// 능력치 막대 한 줄: 값, 등급, 성장 점수(작은 막대)
+function crStat(p, c, k){
+  const v = p[k], pct = k === 'vel' ? clamp((v - 120) / 40, 0, 1) * 100 : clamp(v, 0, 100);
+  const gr = k === 'vel' ? grade(clamp((v - 120) * 2.5, 0, 100)) : grade(v);
+  const pts = clamp((c.pts && c.pts[k]) || 0, 0, 10) * 10, lim = p.pot && (p.pot[k] ?? 99) - v <= 0;
+  return `<div class="cs"><span class="cs-n">${esc(ABIL_NAME[k])}</span><span class="cs-b"><i style="width:${pct}%"></i><em style="width:${pts}%"></em></span><b>${v}${k === 'vel' ? '' : ''}</b><span class="g g-${gr}">${gr}</span>${lim ? '<span class="cs-l">MAX</span>' : ''}</div>`;
+}
+// 위쪽 자원 줄: 돈·인기·컨디션·피로
+function crRes(L){
+  const c = L.career, p = myP(L), f = clamp(c.fatigue || 0, 0, 100);
+  const face = ['😫', '😟', '🙂', '😀', '😆'][(p.cond ?? 0) + 2];
+  return `<div class="crres"><span class="rs"><i class="ri money"></i><b>${esc(won(c.money || 0))}</b></span><span class="rs"><i class="ri fame">♥</i><b>${c.fame || 0}</b></span>
+    <span class="rs"><i class="ri cond">${face}</i><b>${esc(COND[p.cond ?? 0])}</b></span><span class="rs fat"><small>피로</small><span class="fb"><i style="width:${f}%;background:${f > 70 ? '#ff4d5e' : f > 40 ? '#ffb800' : '#2ec463'}"></i></span></span></div>`;
+}
+const crOpt = (S, key) => (S.opts || []).find(o => !o.hide && o.key === key);
+const crBtn = (o, cls, inner) => o ? `<button type="button" class="${cls}" data-sk="opt" data-n="${o.n}">${inner}</button>` : '';
+const trainIco = i => `<span class="tico" style="background-position:${(i % 5) * 25}% ${Math.floor(i / 5) * 100}%" aria-hidden="true"></span>`;
+const TRAIN_IDX = { con:0, pow:1, eye:2, spd:3, def:4, vel:5, ctl:6, stf:7, sta:8, rest:9 };
+const itemIco = i => `<span class="iico" style="background-position:${(i % 5) * 25}% ${Math.floor(i / 5) * 100 / 3}%" aria-hidden="true"></span>`;
+
+/* ---------- 라커룸 (육성 첫 화면) ---------- */
+function crHome(S){
+  const L = crL(); if(!L || !L.career || L.career.retired) return null;
+  const c = L.career, p = myP(L), col = crColor(L), T = L.teams[L.my], r = myRank(L);
+  const where = c.hurt > 0 ? `부상 · ${c.hurt}일 뒤 복귀` : c.where === 'minor' ? '퓨처스리그(2군)' : isPit(p) ? `1군 ${p.role}` : `1군 주전 ${T.bat.indexOf(p) + 1}번`;
+  const play = crOpt(S, 'play'), train = crOpt(S, 'train'), visit = crOpt(S, 'visit'), bag = crOpt(S, 'bag'), info = crOpt(S, 'info');
+  const day = L.phase === 'season' ? `${L.season}시즌 ${L.day + 1}일째 · 팀 ${r.rank}위 (${T.w}승 ${T.l}패)` : L.phase === 'post' ? `${L.season}시즌 포스트시즌` : `${L.season}시즌 끝`;
+  const L2 = L.career.visited === dayKey(L);
+  return `${crRes(L)}
+  <div class="lock" style="background-image:url(${skTint('cr-locker', col)})">
+    <div class="pcard">${crFace(crFaceOf(L, c, p), col, 'big')}<div class="pc-num" style="--tc:${col}">${crNumOf(c, p)}</div>
+      <div class="pc-nm"><b>${esc(p.name)}</b><small>${p.age}세 · ${esc(isPit(p) ? '투수' : POS[p.pos])}</small></div>
+      <div class="pc-tm">${emb(T, 'sm')}<span>${esc(where)}</span></div></div>
+    <div class="pstats">${statKeys(p).map(k => crStat(p, c, k)).join('')}</div>
+  </div>
+  <p class="crday">${esc(day)}</p>
+  ${play ? `<button type="button" class="crplay" data-sk="opt" data-n="${play.n}"><span class="pp">▶</span><span><b>${esc(play.t)}</b>${play.s ? `<small>${esc(play.s)}</small>` : ''}</span></button>` : ''}
+  <div class="crtiles">
+    ${train ? `<button type="button" class="ct${S.trained ? ' done' : ''}" data-sk="opt" data-n="${train.n}">${trainIco(isPit(p) ? 5 : 0)}<b>훈련</b>${S.trained ? '<em class="stamp">완료</em>' : ''}</button>` : ''}
+    ${crBtn(visit, 'ct' + (L2 ? ' done' : ''), `<span class="mapico" aria-hidden="true"></span><b>마을</b>${L2 ? '<em class="stamp">다녀옴</em>' : ''}`)}
+    ${crBtn(bag, 'ct', `${itemIco(c.equip && c.equip.bat ? ITEMS.indexOf(itemOf(c.equip.bat)) : 19)}<b>가방</b>`)}
+    ${crBtn(info, 'ct', `${crFace(crFaceOf(L, c, p), col, 'sm')}<b>내 선수</b>`)}
+  </div>
+  <div class="minors">${['stand', 'lead', 'arch', 'set'].map(k => crOpt(S, k)).filter(Boolean).map(o => `<button type="button" class="mn" data-sk="opt" data-n="${o.n}"><span>${esc(o.t.replace('기록실과 명예의 전당', '명예의 전당').replace('은퇴하기와 설정', '설정'))}</span></button>`).join('')}</div>`;
+}
+
+/* ---------- 마을 지도 ---------- */
+function crVisit(S){
+  const L = crL(); if(!L || !L.career) return null;
+  const c = L.career, done = !!S.done;
+  const spots = TOWN.map(t => {
+    const os = (t.keys || []).map(k => crOpt(S, k)).filter(Boolean);
+    const dayOnly = os.length && os.every(o => o.day);
+    const off = done && dayOnly, hurt = t.id === 'hospital' && c.hurt > 0;
+    return `<button type="button" class="spot${off ? ' off' : ''}${hurt ? ' hurt' : ''}" data-sk="spot" data-spot="${t.id}" style="left:${t.at[0]}%;top:${t.at[1]}%;width:${t.at[2]}%;height:${t.at[3]}%">
+      <span class="sign"><b>${esc(t.name)}</b><small>${esc(off ? '오늘은 끝' : t.desc)}</small></span>${off ? '<em class="stamp">오늘은 끝</em>' : ''}</button>`;
+  }).join('');
+  return `${crRes(L)}${(S.say || []).length ? `<div class="crmsg">${S.say.map(l => `<p>${esc(l.s || l)}</p>`).join('')}</div>` : ''}<div class="townw"><div class="town">${spots}</div></div>`;
+}
+function crSpot(id){
+  const t = TOWN.find(x => x.id === id); if(!t) return;
+  if(t.home){
+    go(careerHome, 'click');
+    const o = crOpt(UI.S, t.home); if(o) choose(o.n, 'click');
+    return;
+  }
+  const os = t.keys.map(k => crOpt(UI.S, k)).filter(Boolean);
+  if(os.length === 1){ choose(os[0].n, 'click'); return; }
+  skinNote(null, `<div class="spotm">${os.map(o => `<button type="button" class="card" data-sk="opt" data-n="${o.n}"><span class="tx"><b>${esc(o.t)}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</span></button>`).join('')}</div>`, t.name);
+}
+
+/* ---------- 용품점 ---------- */
+function crShop(S){
+  const L = crL(); if(!L || !L.career) return null;
+  const c = L.career, money = c.money || 0;
+  const goods = (S.opts || []).filter(o => !o.hide && (o.item || o.goods));
+  const other = (S.opts || []).filter(o => !o.hide && !o.item && !o.goods);
+  const card = o => {
+    const it = o.item ? itemOf(o.item) : GOODS.find(g => g.id === o.goods), idx = o.item ? ITEMS.indexOf(it) : ITEMS.length + GOODS.indexOf(it);
+    const poor = !o.owned && money < o.price;
+    return `<button type="button" class="shopc${o.owned ? ' own' : ''}${poor ? ' poor' : ''}" data-sk="opt" data-n="${o.n}">${itemIco(idx)}<span class="tx"><b>${esc(it.name)}</b><span class="pr">${esc(won(o.price))}${o.owned ? ' <i class="own">보유</i>' : ''}</span><small>${esc(o.item ? (o.s || '').replace(/^[^·]*· /, '') : it.desc)}</small></span>${o.goods ? `<em class="cnt">${o.have}개</em>` : ''}</button>`;
+  };
+  return `${crRes(L)}${(S.say || []).length ? `<div class="crmsg">${S.say.map(l => `<p>${esc(l.s || l)}</p>`).join('')}</div>` : ''}
+    <div class="shopg">${goods.map(card).join('')}</div>
+    ${other.length ? `<div class="minors">${other.map(o => `<button type="button" class="mn" data-sk="opt" data-n="${o.n}"><span>${esc(o.t.replace(/ \(.*\)$/, ''))}</span></button>`).join('')}</div>` : ''}`;
+}
+
+/* ---------- 가방 ---------- */
+function crBag(S){
+  const L = crL(); if(!L || !L.career) return null;
+  const c = L.career, p = myP(L), col = crColor(L);
+  const items = (S.opts || []).filter(o => !o.hide && o.item), other = (S.opts || []).filter(o => !o.hide && !o.item);
+  const slot = sl => {
+    const id = c.equip && c.equip[sl], it = id && itemOf(id), o = it && items.find(x => x.item === id), st = it ? gearState(c, id) : null;
+    return `<${o ? 'button type="button" data-sk="opt" data-n="' + o.n + '"' : 'div'} class="slot${it ? ' on' : ''}"><small>${esc(SLOT_NAME[sl])}</small>${it ? itemIco(ITEMS.indexOf(it)) + `<span class="dur"><i style="width:${st.dur}%"></i></span>${st.lv ? `<em>+${st.lv}</em>` : ''}` : '<span class="empty">비어 있음</span>'}</${o ? 'button' : 'div'}>`;
+  };
+  const sum = Object.values(c.equip || {}).length;
+  return `${crRes(L)}${(S.say || []).length ? `<div class="crmsg">${S.say.map(l => `<p>${esc(l.s || l)}</p>`).join('')}</div>` : ''}
+    <div class="bag">
+      <div class="bag-me">${crFace(crFaceOf(L, c, p), col, 'mid')}<div class="slots">${['bat', 'glove', 'shoes', 'wrist', 'acc'].map(slot).join('')}</div><small class="bag-sum">장착 ${sum}개 · 누르면 벗기</small></div>
+      <div class="bag-inv">${items.length ? items.map(o => { const it = itemOf(o.item); return `<button type="button" class="inv${o.on ? ' on' : ''}" data-sk="opt" data-n="${o.n}">${itemIco(ITEMS.indexOf(it))}<b>${esc(it.name)}</b><small>${o.on ? '장착 중' : '눌러서 장착'}</small></button>`; }).join('') : '<p class="bag-empty">아직 산 장비가 없습니다.<br>마을의 스포츠 용품점에서 사세요.</p>'}</div>
+    </div>
+    <div class="minors">${other.map(o => `<button type="button" class="mn" data-sk="opt" data-n="${o.n}"><span>${esc(o.t)}</span></button>`).join('')}</div>`;
+}
+
+/* ---------- 훈련 ---------- */
+function crTrain(S){
+  const L = crL(); if(!L || !L.career) return null;
+  const c = L.career, p = myP(L), f = c.fatigue || 0;
+  const tiles = (S.opts || []).filter(o => !o.hide).map(o => {
+    const k = o.stat || o.key, pts = o.stat ? clamp((c.pts && c.pts[k]) || 0, 0, 10) * 10 : 0;
+    const lim = o.stat && p.pot && (p.pot[k] ?? 99) - p[k] <= 0;
+    return `<button type="button" class="trt${o.key === 'rest' ? ' rest' : ''}" data-sk="opt" data-n="${o.n}">${trainIco(TRAIN_IDX[k] ?? 9)}<b>${esc(o.t)}</b>${o.stat ? `<span class="tv">${esc(ABIL_NAME[k])} <em>${p[k]}</em>${lim ? ' <i class="cs-l">MAX</i>' : ''}</span><span class="tp"><i style="width:${pts}%"></i></span>` : `<span class="tv">피로 풀기</span>`}</button>`;
+  }).join('');
+  return `${crRes(L)}${f > 70 ? '<div class="warn">많이 피곤합니다. 쉬지 않으면 효과가 크게 줄고 다치기 쉽습니다.</div>' : ''}<div class="trg">${tiles}</div><p class="crday">성장 점수(아래 막대)가 10이 되면 능력치가 1 오릅니다.</p>`;
+}
+
+/* ---------- 선수 카드 ---------- */
+function crInfo(S){
+  const L = crL(); if(!L || !L.career) return null;
+  const c = L.career, p = myP(L), col = crColor(L), T = L.teams[L.my];
+  const lines = (S.say || []).slice(2);
+  return `<div class="lock info" style="background-image:url(${skTint('cr-locker', col)})">
+      <div class="pcard">${crFace(crFaceOf(L, c, p), col, 'big')}<div class="pc-num" style="--tc:${col}">${crNumOf(c, p)}</div>
+        <div class="pc-nm"><b>${esc(p.name)}</b><small>${p.age}세 · ${esc(isPit(p) ? '투수' : POS[p.pos])}</small></div><div class="pc-tm">${emb(T, 'sm')}<span>${esc(teamInfo(L.my).short)}</span></div></div>
+      <div class="pstats">${statKeys(p).map(k => crStat(p, c, k)).join('')}</div></div>
+    ${listHTML(lines)}
+    <div class="minors">${(S.opts || []).filter(o => !o.hide).map(o => `<button type="button" class="mn" data-sk="opt" data-n="${o.n}"><span>${esc(o.t)}</span></button>`).join('')}</div>`;
+}
+
+/* ---------- 얼굴 고르기 ---------- */
+function crFacePick(S){
+  const L = crL(), col = L && L.career ? crColor(L) : '#2f7de0';
+  return `<div class="faceg">${(S.opts || []).filter(o => !o.hide).map(o => `<button type="button" class="facec" data-sk="opt" data-n="${o.n}" aria-label="${esc(o.t)}">${crFace(o.face, col, 'mid')}</button>`).join('')}</div>`;
+}
+
+const CAREER_SK = { 'cr-home':crHome, 'cr-visit':crVisit, 'cr-shop':crShop, 'cr-bag':crBag, 'cr-train':crTrain, 'cr-info':crInfo, 'cr-face':crFacePick };
+function careerSkin(S){
+  const f = S && S.kind && CAREER_SK[S.kind];
+  if(!f) return null;
+  try{ return f(S); }catch(e){ console.warn('육성 화면 그리기 실패', e); return null; }
+}
