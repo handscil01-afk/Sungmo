@@ -642,16 +642,18 @@
 
 ## 자동으로 만들기 (Gemini API, 붙여 넣기 없이)
 
-AI Studio에 하나씩 붙여 넣는 대신, Gemini API 키로 17개 묶음을 차례대로 만들 수 있습니다.
+AI Studio에 하나씩 붙여 넣는 대신, Gemini API 키로 대본을 한 줄씩 차례대로 만들 수 있습니다.
 
-1. https://aistudio.google.com/apikey 에서 API 키를 만듭니다(무료).
-2. 저장소 폴더 `baseball`에서 아래처럼 실행합니다. 목소리 이름은 AI Studio의 Voice 목록에 있는 영어 이름(예: Puck, Charon)을 이전 녹음과 같게 적습니다.
+1. https://aistudio.google.com/apikey 에서 API 키를 만듭니다.
+2. 저장소 폴더 `baseball`에서 실행합니다(ffmpeg, numpy 필요).
    ```
-   GEMINI_API_KEY=내키 python3 tools/voice3_gemini.py --caster 캐스터목소리 --analyst 해설목소리 --cut
+   GEMINI_API_KEY=내키 python3 tools/voice3_gemini.py --caster Puck --analyst Charon
    ```
-3. 만든 소리는 `voice/raw3/`에 묶음마다 wav로 저장되고, `--cut`을 붙이면 바로 문장마다 잘라 `voice/`에 넣습니다.
-4. 무료 사용량은 하루 요청 횟수가 적어서(2026년 기준 약 15번) 하루에 다 못 만들 수 있습니다. 멈추면 다음 날 같은 명령을 다시 실행하면 이미 만든 묶음은 건너뛰고 이어서 만듭니다.
-5. 잘리지 않은 묶음(문장 수가 다름)은 `voice/raw3/`에서 그 wav를 지우고 다시 실행하면 그 묶음만 새로 만듭니다.
+3. 줄마다 요청을 하나씩 보내고, 받은 소리의 앞뒤 무음을 자르고 소리 크기를 맞춰 `voice/아이디.mp3`로 넣은 뒤 `voice/index.json`에 적습니다. 자르기 단계는 따로 없습니다.
+   - 묶음을 한꺼번에 읽히면 문장 사이 쉬는 길이가 0.3~1.6초로 들쭉날쭉해서 자를 수 없었습니다.
+   - 한국어로 말투만 적으면 모델이 해설을 지어내 덧붙였습니다. 그래서 영어로 "글자 그대로 읽고 덧붙이지 말 것"을 지시합니다.
+   - 글 길이에 비해 너무 긴 소리는 넣지 않고 알려 줍니다. `--redo 아이디,아이디`로 그 줄만 다시 만듭니다.
+4. 무료 사용량은 모델마다 하루 10번입니다(2026-11 확인, `gemini-3.8-flash-tts`). 한도에 걸리면 멈추고, 다음 날 같은 명령을 다시 실행하면 이미 만든 줄은 건너뛰고 이어서 만듭니다. 받은 소리 원본은 `voice/raw3/`에 남습니다(저장소에는 올리지 않음).
 
 ## 코드에 이미 연결된 것과 아닌 것
 - 연결됨: `a_inn_*`(이닝 끝), `pos_*_c`(누가 잡았는지), `thr_0~3`(송구), `pos_*_to`와 `pos_*_at`(타구 방향), `thr_ask`와 `thr_none`, `c_hitrun*`와 `a_hitrun*`, 신나게 말투(`hype/`).
