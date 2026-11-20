@@ -54,4 +54,28 @@ async function boot(){
   if(lr && Date.now() - lr.at < 12 * 3600 * 1000){ readerJoin(lr.code); return; }
   showStart();
 }
+/* 새 판 알아채기: 3분마다·화면이 다시 보일 때 version.json 을 확인
+   첫 화면과 따라가기 중인 읽기 화면은 바로 새로 고침(같은 방으로 돌아옴), 앞줄을 읽는 중이면 다음에 Enter를 누를 때,
+   입력 화면은 알림만 (치던 글이 사라지지 않게) */
+const UPDATE = { ready:false, told:false };
+async function checkUpdate(){
+  if(location.protocol === 'file:') return;
+  let v = null;
+  try{ const r = await fetch('version.json?t=' + Date.now(), { cache:'no-store' }); if(r.ok) v = (await r.json()).v; }catch(e){ return; }
+  if(!v || String(v) === APP_VER) return;
+  UPDATE.ready = true;
+  const view = ($$('.view').find(x => !x.hidden) || {}).id;
+  if(view === 'vStart' && $('#sheet').hidden){ location.reload(); return; }
+  if(view === 'vRead'){
+    const following = RD.live && (RS.view === 'box' || document.activeElement === RD.liveEl || document.activeElement === $('#rList') || !document.activeElement || document.activeElement === document.body);
+    if(following){ location.reload(); return; }
+    if(!UPDATE.told){ UPDATE.told = true; rSay('새 판이 나왔어요. Enter를 누르면 새 판으로 바뀌고 지금 치는 곳으로 갑니다.'); }
+    return;
+  }
+  if(view === 'vType' && !UPDATE.told){ UPDATE.told = true; toast('새 판이 나왔어요. 줄을 다 보낸 뒤 새로고침하면 바뀝니다'); }
+}
+setInterval(checkUpdate, 3 * 60 * 1000);
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') checkUpdate(); });
+$$('.appver').forEach(e => { e.textContent = APP_VER; });
 boot();
+setTimeout(checkUpdate, 5000);

@@ -294,14 +294,7 @@
             ".read": "auth != null",
             "$id": {
               ".write": "auth != null && root.child('caption1/rooms/' + $code + '/typers/' + auth.uid).exists()",
-              ".validate": "!newData.exists() || (newData.child('t').isString() && newData.child('t').val().length <= 2000)"
-            }
-          },
-          "drafts": {
-            ".read": "auth != null",
-            "$uid": {
-              ".write": "auth != null && auth.uid === $uid && root.child('caption1/rooms/' + $code + '/typers/' + auth.uid).exists()",
-              ".validate": "!newData.exists() || (newData.child('t').isString() && newData.child('t').val().length <= 2000)"
+              ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 5000)"
             }
           },
           "readers": {
@@ -309,6 +302,18 @@
             "$uid": {
               ".write": "auth != null && auth.uid === $uid",
               ".validate": "!newData.exists() || newData.child('at').isNumber()"
+            }
+          },
+          "mode": {
+            ".read": "auth != null",
+            ".write": "auth != null && root.child('caption1/rooms/' + $code + '/typers/' + auth.uid).exists()",
+            ".validate": "newData.val() === 'line' || newData.val() === 'live'"
+          },
+          "cursors": {
+            ".read": "auth != null",
+            "$uid": {
+              ".write": "auth != null && auth.uid === $uid && root.child('caption1/rooms/' + $code + '/typers/' + auth.uid).exists()",
+              ".validate": "!newData.exists() || (newData.child('k').isString() && newData.child('k').val().length <= 200 && newData.child('c').isNumber() && newData.child('at').isNumber())"
             }
           }
         }

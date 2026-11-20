@@ -1,64 +1,171 @@
 'use strict';
 /* ===================== 읽기 화면 (한소네·센스리더 노트북·태블릿) =====================
-   통역 내용 칸 하나에 다 친 줄이 한 줄씩 쌓이고, 맨 끝 줄은 지금 치는 글.
-   - 커서가 맨 끝 줄에 있으면(따라가기) 새 글이 올 때 커서도 끝으로 감
-   - 앞부분을 읽는 중이면 커서를 그대로 둠 (앞 줄이 고쳐져도 커서 위치를 지킴)
-   - Enter(또는 Ctrl+End): 지금 치는 곳으로 */
-const RS = { mode:'live', size:3, theme:'dark', ro:false, ...ls.get('rd', {}) };
+   읽는 모양 두 가지 (설정에서 고름)
+   - 줄마다 따로(list, 기본): 줄 하나하나가 따로 된 항목. 위아래로 한 줄씩 옮기고, 목록을 벗어났다 돌아와도
+     읽던 줄로 돌아옴. 맨 끝 줄(지금 치는 줄)에 있을 때만 새 줄로 따라가고, 앞줄을 읽는 동안에는 움직이지 않음
+   - 한 칸에 모두(box): 편집 칸 하나에 줄이 쌓임. 두 가지 상태:
+   - 따라가기: 새 글이 오면 바로 넣고 커서를 지금 치는 곳(한 줄씩: 맨 끝, 바로바로: 통역하는 분의 커서)으로 옮김
+   - 멈춤: 읽는 분이 커서를 직접 움직이거나 Space를 누르면 멈춤. 새 글이 와도 칸을 전혀 건드리지 않음
+     (점자 줄이 튕기지 않게). Enter를 누르면 모아 둔 새 글을 넣고 다시 따라가기 */
+const RS = { size:3, theme:'dark', ro:false, view:'list', gran:'word', ...ls.get('rd', {}) };
+const GRAN = { word:'낱말마다 (띄어쓰기하거나 잠깐 멈추면)', sent:'문장이 끝나면 (점자 줄이 가장 덜 바뀜)', char:'글자마다 (치는 대로 바로)' };
+const WORD_IDLE = 800, SENT_IDLE = 2500;
 const saveRS = () => ls.set('rd', RS);
 const SIZES = [18, 22, 26, 32, 40, 50, 62, 76];
 const THEMES = { dark:'흰 글씨 · 검은 바탕', yellow:'노란 글씨 · 검은 바탕', light:'검은 글씨 · 흰 바탕' };
-const RD = { code:null, meta:null, lines:{}, drafts:{}, text:'', unsub:[], stopPres:null, renderT:0, wasConnected:true, gotLines:false };
+const MODE_NAME = { line:'한 줄씩 보내기', live:'바로바로 보내기' };
+const RD = { lastEdit:0, holdT:0, liveEl:null, lastLine:null, code:null, meta:null, mode:'line', lines:{}, cursors:{}, text:'', follow:0, live:true, unsub:[], stopPres:null, renderT:0, wasConnected:true, gotLines:false, waiting:false, setting:false };
 
-const lastLineStart = v => v.lastIndexOf('\n') + 1;
-const sortedVals = o => Object.keys(o || {}).sort().map(k => o[k]).filter(Boolean);
-
-function readerText(){
-  const out = sortedVals(RD.lines).map(l => String(l.t || ''));
-  if(RS.mode === 'live') sortedVals(RD.drafts).forEach(d => { if(d.t) out.push(String(d.t)); });
-  return out.join('\n');
+// 메모장 방식에서 지금 치고 있는 줄의 끝부분은 낱말·문장이 끝날 때까지 잠깐 기다렸다가 보여 줌 (점자 줄이 덜 깜빡이게)
+function holdTail(t, c){
+  if(RS.gran === 'char') return t;
+  const idle = Date.now() - RD.lastEdit;
+  let m;
+  if(RS.gran === 'sent'){
+    if(idle >= SENT_IDLE || /[.?!…。]["'”’)\]]*\s*$/.test(t)) return t;
+    m = t.match(/^[\s\S]*[.?!…。]["'”’)\]]*\s*/);
+  } else {
+    if(idle >= WORD_IDLE || /[\s.,?!…。]$/.test(t)) return t;
+    m = t.match(/^[\s\S]*[\s.,?!…。]/);
+  }
+  const v = m ? m[0] : '';
+  // 통역하는 분 커서가 마지막 낱말(문장) 안에 있을 때만 기다림. 앞부분을 고치는 중이면 다 보여 줌
+  // (글과 커서 위치가 따로 도착해도 깜빡이지 않게 커서가 조금 뒤처져 있어도 같은 낱말이면 기다림)
+  return c >= v.length ? v : t;
 }
-
-// 바뀐 부분만 바꿔 넣어서 커서 위치를 지킴
-function applyText(ta, nv){
-  const ov = ta.value;
-  if(ov === nv){ RD.text = nv; return; }
-  const follow = !ov || ta.selectionStart >= lastLineStart(ov);
-  const m = Math.min(ov.length, nv.length);
-  let p = 0; while(p < m && ov.charCodeAt(p) === nv.charCodeAt(p)) p++;
-  let q = 0; while(q < m - p && ov.charCodeAt(ov.length - 1 - q) === nv.charCodeAt(nv.length - 1 - q)) q++;
-  RD.text = nv;
-  // 바뀐 부분 안에 있던 커서는 그 안에서 같은 칸 수만큼 떨어진 곳에 둠 (고친 줄을 읽던 분이 줄 맨 앞으로 밀리지 않게)
-  const oe = ov.length - q, ne = nv.length - q;
-  const move = c => c <= p ? c : c >= oe ? c + nv.length - ov.length : p + Math.min(c - p, ne - p);
-  const s = move(ta.selectionStart), en = move(ta.selectionEnd);
-  try{ ta.setRangeText(nv.slice(p, ne), p, oe, 'preserve'); }
-  catch(e){ ta.value = nv; }
-  if(follow){ const L = nv.length; ta.setSelectionRange(L, L); ta.scrollTop = ta.scrollHeight; }
-  else ta.setSelectionRange(s, en);
-  paintFollow();
+// 긴 줄은 문장마다(너무 긴 문장은 80자 안쪽에서 띄어쓰기마다) 따로 된 항목으로
+function sentences(t){
+  if(!t.trim()) return [''];
+  const out = [], re = /[^.?!…。]*(?:[.?!…。]+["'”’)\]]*|$)\s*/g; let m;
+  while((m = re.exec(t)) && m[0]){
+    let x = m[0];
+    while(x.length > 80){ let cut = x.lastIndexOf(' ', 80); if(cut < 20) cut = 80; out.push(x.slice(0, cut).trim()); x = x.slice(cut).replace(/^\s+/, ''); }
+    if(x.trim()) out.push(x.trim());
+  }
+  return out.length ? out : [t];
+}
+// 지금 서버에 있는 내용과 따라갈 위치
+function readerModel(){
+  const keys = Object.keys(RD.lines).sort();
+  const raw = keys.map(k => lineText(RD.lines[k]));
+  let curIdx = keys.length - 1, curCol = curIdx >= 0 ? raw[curIdx].length : 0;
+  if(RD.mode === 'live'){
+    let best = null;
+    Object.values(RD.cursors || {}).forEach(c => { if(c && typeof c.k === 'string' && RD.lines[c.k] != null && (!best || (c.at || 0) > (best.at || 0))) best = c; });
+    if(best){ const i = keys.indexOf(best.k); if(i >= 0){ curIdx = i; curCol = Math.min(Number(best.c) || 0, raw[i].length); } }
+  }
+  const texts = raw.slice();
+  if(RD.mode === 'live' && curIdx >= 0){
+    const v = holdTail(raw[curIdx], curCol);
+    if(v !== raw[curIdx]){
+      texts[curIdx] = v; curCol = v.length;
+      // 마지막으로 글이 바뀐 때부터 기다린 시간을 재서, 다 기다리면 다시 그림
+      clearTimeout(RD.holdT);
+      RD.holdT = setTimeout(() => { RD.holdT = 0; scheduleRender(); }, Math.max(30, (RS.gran === 'sent' ? SENT_IDLE : WORD_IDLE) - (Date.now() - RD.lastEdit) + 30));
+    }
+  }
+  let pos = 0;
+  for(let i = 0; i < curIdx; i++) pos += texts[i].length + 1;
+  pos = curIdx >= 0 ? pos + curCol : 0;
+  const items = []; let curItem = -1;
+  texts.forEach((t, i) => {
+    let off = 0;
+    sentences(t).forEach((ch, j) => {
+      const at = ch ? t.indexOf(ch, off) : off; const st = at < 0 ? off : at; off = st + ch.length;
+      items.push({ k:keys[i] + '.' + j, t:ch });
+      if(i === curIdx && curItem < 0 && curCol <= off) curItem = items.length - 1;
+    });
+    if(i === curIdx && curItem < 0) curItem = items.length - 1;
+  });
+  return { keys, texts, text:texts.join('\n'), full:raw.join('\n'), pos, curIdx, items, curItem };
+}
+function setCaret(ta, pos){
+  RD.setting = true;
+  ta.setSelectionRange(pos, pos);
+  if(pos >= ta.value.length) ta.scrollTop = ta.scrollHeight;
+  setTimeout(() => { RD.setting = false; }, 0);
+}
+/* 줄마다 따로 보기 */
+const RL = new Map();   // 줄 열쇠 → 줄 항목
+function renderList(md){
+  const box = $('#rList'), act = document.activeElement;
+  const wasLive = act === box || (!!RD.liveEl && act === RD.liveEl);
+  const near = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  const keep = new Set(md.items.map(x => x.k));
+  let lostFocus = false;
+  for(const [k, el] of RL) if(!keep.has(k)){ if(el === act) lostFocus = true; el.remove(); RL.delete(k); }
+  let prev = null;
+  md.items.forEach(({ k, t:tx }) => {
+    let el = RL.get(k);
+    if(!el){ el = document.createElement('p'); el.className = 'rl'; el.tabIndex = -1; el.dataset.k = k; RL.set(k, el); }
+    const t = tx || '\u00a0';
+    if(el.textContent !== t) el.textContent = t;
+    const ref = prev ? prev.nextSibling : box.firstChild;
+    if(ref !== el) box.insertBefore(el, ref);
+    prev = el;
+  });
+  RD.text = md.text;
+  const liveEl = md.curItem >= 0 ? RL.get(md.items[md.curItem].k) || null : null;
+  if(RD.liveEl && RD.liveEl !== liveEl) RD.liveEl.classList.remove('now');
+  if(liveEl) liveEl.classList.add('now');
+  // 맨 끝 줄(지금 치는 줄)에 있던 분만 새 줄로 옮김. 앞줄을 읽는 중이면 그대로
+  if(liveEl && liveEl !== act && ((RD.live && wasLive) || lostFocus)) (RD.live ? liveEl : box).focus({ preventScroll:true });
+  else if(lostFocus) box.focus({ preventScroll:true });
+  RD.liveEl = liveEl;
+  if(RD.live && (wasLive || near)){ if(liveEl) liveEl.scrollIntoView({ block:'nearest' }); else box.scrollTop = box.scrollHeight; }
+}
+function render(){
+  const ta = $('#rText');
+  const md = readerModel();
+  if(RS.view === 'list') renderList(md);
+  else if(RD.live){
+    RD.setting = true;
+    spliceText(ta, md.text);
+    RD.text = md.text; RD.follow = md.pos;
+    setCaret(ta, md.pos);
+  }
+  paintFollow(md); paintEmpty();
 }
 function scheduleRender(){
   if(RD.renderT) return;
-  RD.renderT = setTimeout(() => { RD.renderT = 0; if(RD.code) applyText($('#rText'), readerText()); paintEmpty(); }, 0);
+  RD.renderT = setTimeout(() => { RD.renderT = 0; if(RD.code) render(); }, 20);   // 글과 커서 위치를 모아서 한 번에 그림
 }
-function isFollowing(){ const ta = $('#rText'); return !ta.value || ta.selectionStart >= lastLineStart(ta.value); }
-function paintFollow(){
+function paintFollow(md){
   const f = $('#rFollow'); if(!f) return;
-  const on = isFollowing();
-  f.textContent = on ? '● 실시간으로 따라가는 중' : '앞부분을 읽는 중 · Enter를 누르면 지금 치는 곳으로';
-  f.classList.toggle('back', !on);
+  const pb = $('[data-r="pause"]'); if(pb) pb.textContent = RD.live ? '멈춤' : '다시 따라가기';
+  if(RS.view === 'list'){
+    const act = document.activeElement, onLine = act && act.classList && act.classList.contains('rl');
+    let t, back = false;
+    if(!RD.live){ t = '멈춤 · 새 줄이 와도 옮기지 않아요 · Enter: 지금 치는 곳으로'; back = true; }
+    else if(act === RD.liveEl || act === $('#rList')) t = '● 맨 끝 줄 · 새 줄이 오면 따라갑니다';
+    else if(onLine){ t = '앞줄을 읽는 중 · Enter: 지금 치는 곳으로'; back = true; }
+    else t = '● 따라가기 켬 · 맨 끝 줄에 있으면 새 줄로 따라갑니다';
+    f.textContent = t; f.classList.toggle('back', back); return;
+  }
+  if(RD.live){ f.textContent = '● 실시간으로 따라가는 중 · Space: 멈춤'; f.classList.remove('back'); return; }
+  md = md || readerModel();
+  f.textContent = '멈춤' + (md.text !== RD.text ? ' · 새 글이 있어요' : '') + ' · Enter: 지금 치는 곳으로';
+  f.classList.add('back');
 }
-function paintEmpty(){
-  const e = $('#rEmpty'); if(e) e.hidden = !!RD.text || !RD.gotLines;
-}
+function paintEmpty(){ const e = $('#rEmpty'); if(e) e.hidden = !!RD.text || !RD.gotLines; }
 function rSay(msg){ const s = $('#rState'); if(s) s.textContent = msg; }
-
 function goLive(){
-  const ta = $('#rText');
-  ta.focus();
-  const L = ta.value.length; ta.setSelectionRange(L, L); ta.scrollTop = ta.scrollHeight;
-  paintFollow();
+  if(UPDATE.ready){ location.reload(); return; }   // 새 판이 나와 있으면 Enter를 누를 때 바꿈
+  RD.live = true;
+  if(RS.view === 'list'){
+    render();
+    const el = RD.liveEl || $('#rList');
+    el.focus({ preventScroll:true }); el.scrollIntoView({ block:'nearest' });
+    paintFollow();
+    return;
+  }
+  $('#rText').focus();
+  render();
+}
+function pause(say){
+  if(!RD.live) return;
+  RD.live = false; paintFollow();
+  if(say) rSay('멈췄어요. 새 글이 와도 화면은 그대로 있어요. Enter를 누르면 지금 치는 곳으로 갑니다.');
 }
 
 function applyReaderLook(){
@@ -66,6 +173,11 @@ function applyReaderLook(){
   document.documentElement.style.setProperty('--rsize', SIZES[Math.max(0, Math.min(SIZES.length - 1, RS.size))] + 'px');
   $('#vRead').dataset.theme = RS.theme;
   if(RS.ro) ta.setAttribute('readonly', ''); else ta.removeAttribute('readonly');
+  const list = RS.view === 'list';
+  ta.hidden = list; $('#rList').hidden = !list;
+  $('#rHelp').textContent = list
+    ? '위아래 방향키로 한 줄씩 읽습니다. 맨 끝 줄에 있으면 새 줄로 따라가고, 앞줄을 읽는 동안에는 움직이지 않습니다. Enter를 누르면 지금 치는 곳으로 갑니다.'
+    : '통역 내용 칸에서 Enter를 누르면 지금 치는 곳으로 갑니다. 커서를 움직이거나 Space를 누르면 멈추고, 멈춘 동안에는 새 글이 와도 화면이 그대로 있습니다.';
 }
 
 async function readerJoin(code){
@@ -76,7 +188,8 @@ async function readerJoin(code){
   catch(e){ startMsg(isDenied(e) ? '서버 규칙이 아직 게시되지 않았어요. 통역하는 분께 알려 주세요.' : '방을 불러오지 못했어요. 인터넷 연결을 확인해 주세요.'); return; }
   if(!meta){ startMsg('방 번호 ' + code + '인 방이 없어요. 번호를 다시 확인해 주세요.'); ls.del('lastRead'); return; }
   readerLeave(true);
-  Object.assign(RD, { code, meta, lines:{}, drafts:{}, text:'', gotLines:false, waiting:false });
+  RL.forEach(el => el.remove()); RL.clear();
+  Object.assign(RD, { liveEl:null, lastLine:null, code, meta, mode:'line', lines:{}, cursors:{}, text:'', follow:0, live:true, gotLines:false, waiting:false });
   ls.set('lastRead', { code, at:Date.now() });
   const ta = $('#rText'); ta.value = '';
   applyReaderLook();
@@ -91,19 +204,27 @@ async function readerJoin(code){
     if(was && was.open !== false && v.open === false) rSay('통역이 끝났어요. 지금까지 내용은 계속 읽을 수 있어요.');
     else if(was && was.open === false && v.open !== false) rSay('통역이 다시 시작됐어요.');
   }));
+  RD.unsub.push(DB.on(base + 'mode', v => {
+    const m = v === 'live' ? 'live' : 'line';
+    if(m !== RD.mode && RD.gotLines) rSay('통역 방식이 ' + MODE_NAME[m] + '로 바뀌었어요.');
+    RD.mode = m; scheduleRender();
+  }));
   RD.unsub.push(DB.on(base + 'lines', v => {
+    RD.lastEdit = Date.now();
     if(!v && !RD.meta && RD.text) return;   // 방이 지워져도 읽던 내용은 남겨 둠
     const first = !RD.gotLines, had = Object.keys(RD.lines).length;
     RD.lines = v || {}; RD.gotLines = true; scheduleRender();
-    if(!first && !had && Object.keys(RD.lines).length) started();
-    if(first){ const n = Object.keys(RD.lines).length; rSay(RD.meta && RD.meta.open === false ? '통역이 끝난 방이에요. 지금까지 ' + n + '줄을 읽을 수 있어요.' : n ? '지금까지 ' + n + '줄이 있어요. 커서가 맨 끝에 있습니다.' : '통역 시작을 기다리는 중이에요.'); RD.waiting = !n; }
+    const n = Object.keys(RD.lines).length;
+    if(first){
+      rSay(RD.meta && RD.meta.open === false ? '통역이 끝난 방이에요. 지금까지 ' + n + '줄을 읽을 수 있어요.' : n ? '지금까지 ' + n + '줄. ' + (RS.view === 'list' ? '맨 끝 줄에서 시작해요.' : '커서가 지금 치는 곳에 있어요.') : '통역 시작을 기다리는 중이에요.');
+      RD.waiting = !n;
+    } else if(!had && n && RD.waiting){ RD.waiting = false; rSay('통역이 시작됐어요.'); }
   }, e => { if(isDenied(e)) rSay('서버 규칙이 아직 게시되지 않았어요. 통역하는 분께 알려 주세요.'); }));
-  RD.unsub.push(DB.on(base + 'drafts', v => { RD.drafts = v || {}; if(RS.mode === 'live') scheduleRender(); if(RD.gotLines && sortedVals(RD.drafts).some(d => d.t)) started(); }));
+  RD.unsub.push(DB.on(base + 'cursors', v => { RD.lastEdit = Date.now(); RD.cursors = v || {}; if(RD.mode === 'live') scheduleRender(); }));
   RD.stopPres = DB.presence(base + 'readers/' + DB.uid, () => ({ at:DB.ts() }));
   WAKE.on();
-  setTimeout(() => ta.focus(), 50);
+  setTimeout(() => { if(RS.view === 'list') $('#rList').focus(); else { ta.focus(); setCaret(ta, RD.follow); } }, 50);
 }
-function started(){ if(RD.waiting){ RD.waiting = false; rSay('통역이 시작됐어요.'); } }
 function paintRoomTitle(){
   const m = RD.meta;
   const t = (m && m.title) || '문자통역';
@@ -124,17 +245,21 @@ function readerNet(c){
   RD.wasConnected = c;
 }
 function readerSave(){
-  const t = sortedVals(RD.lines).map(l => String(l.t || '')).join('\n');
+  const t = readerModel().full;
   if(!t){ toast('아직 저장할 내용이 없어요'); return; }
-  downloadText('문자통역_' + RD.code + '_' + ymd() + '.txt', t + '\n');
+  downloadText('문자통역_' + fileStamp() + '.txt', t + '\n');
   rSay('내용을 파일로 저장했어요.');
 }
 function readerSettings(){
   const sizeName = i => ['아주 작게', '작게', '조금 작게', '보통', '조금 크게', '크게', '아주 크게', '가장 크게'][i] || '';
   const box = openSheet(`<h2 tabindex="-1">읽기 설정</h2>
-    <fieldset class="fs"><legend>보기 방식</legend>
-      <label class="chk srow"><input type="radio" name="rmode" value="live" ${RS.mode === 'live' ? 'checked' : ''}> 치는 대로 바로 보기</label>
-      <label class="chk srow"><input type="radio" name="rmode" value="line" ${RS.mode === 'line' ? 'checked' : ''}> 한 줄을 다 친 뒤에 보기 <small class="muted">점자 줄이 덜 바뀝니다</small></label>
+    <p class="muted small">지금 통역 방식: ${MODE_NAME[RD.mode]} (통역하는 분이 정합니다)</p>
+    <fieldset class="fs"><legend>읽는 모양</legend>
+      <label class="chk srow"><input type="radio" name="rView" value="list" ${RS.view === 'list' ? 'checked' : ''}> 줄마다 따로 <small class="muted">위아래로 한 줄씩 옮기고, 벗어났다 돌아와도 읽던 줄로 돌아옵니다</small></label>
+      <label class="chk srow"><input type="radio" name="rView" value="box" ${RS.view !== 'list' ? 'checked' : ''}> 한 칸에 모두 <small class="muted">편집 칸 하나에서 커서로 읽습니다</small></label>
+    </fieldset>
+    <fieldset class="fs"><legend>메모장·회의록 방식에서 치는 중인 글 보이기</legend>
+      ${Object.entries(GRAN).map(([k, v]) => `<label class="chk srow"><input type="radio" name="rGran" value="${k}" ${RS.gran === k ? 'checked' : ''}> ${v}</label>`).join('')}
     </fieldset>
     <div class="row"><span>글자 크기: <b id="szName">${sizeName(RS.size)}</b></span><button class="btn" data-sz="-1">작게</button><button class="btn" data-sz="1">크게</button></div>
     <label class="field"><span>색</span><select id="rTheme">${Object.entries(THEMES).map(([k, v]) => `<option value="${k}" ${RS.theme === k ? 'selected' : ''}>${v}</option>`).join('')}</select></label>
@@ -148,7 +273,8 @@ function readerSettings(){
       if(e.target.closest('[data-save]')) readerSave();
     });
   pwaSettingsBind(box);
-  $$('input[name=rmode]', box).forEach(r => r.addEventListener('change', () => { RS.mode = r.value; saveRS(); scheduleRender(); }));
+  $$('input[name=rGran]', box).forEach(r => r.addEventListener('change', () => { RS.gran = r.value; saveRS(); scheduleRender(); }));
+  $$('input[name=rView]', box).forEach(r => r.addEventListener('change', () => { RS.view = r.value; saveRS(); applyReaderLook(); RD.live = true; render(); paintFollow(); }));
   $('#rTheme', box).addEventListener('change', e => { RS.theme = e.target.value; saveRS(); applyReaderLook(); });
   $('#rRo', box).addEventListener('change', e => { RS.ro = e.target.checked; saveRS(); applyReaderLook(); });
 }
@@ -162,14 +288,42 @@ function readerInit(){
   ta.addEventListener('compositionend', () => setTimeout(restore, 0));
   ['paste', 'cut', 'drop'].forEach(t => ta.addEventListener(t, e => e.preventDefault()));
   ta.addEventListener('keydown', e => {
-    if(e.key === 'Enter' && !e.altKey && !e.ctrlKey && !e.metaKey){ e.preventDefault(); goLive(); }
+    if(e.ctrlKey && e.key === 'End'){ e.preventDefault(); goLive(); return; }
+    if(e.altKey || e.ctrlKey || e.metaKey) return;
+    if(e.key === 'Enter'){ e.preventDefault(); goLive(); }
+    else if(e.key === ' ' || e.code === 'Space'){ e.preventDefault(); if(RD.live) pause(true); else goLive(); }
   });
-  ['keyup', 'click', 'focus', 'select'].forEach(t => ta.addEventListener(t, paintFollow));
-  document.addEventListener('selectionchange', () => { if(document.activeElement === ta) paintFollow(); });
+  // 읽는 분이 커서를 직접 움직이면 멈춤 (이 앱이 옮긴 커서는 제외)
+  const check = () => { if(RS.view === 'box' && RD.live && !RD.setting && document.activeElement === ta && (ta.selectionStart !== RD.follow || ta.selectionEnd !== RD.follow)) pause(false); };
+  document.addEventListener('selectionchange', check);
+  ['keyup', 'mouseup', 'touchend'].forEach(t => ta.addEventListener(t, () => setTimeout(check, 0)));
+  // 줄마다 따로: 방향키로 줄 옮기기(목록 끝에서 벗어나지 않음), 목록에 다시 들어오면 읽던 줄로
+  const list = $('#rList');
+  list.addEventListener('keydown', e => {
+    if(e.ctrlKey && e.key === 'End'){ e.preventDefault(); goLive(); return; }
+    if(e.altKey || e.ctrlKey || e.metaKey) return;
+    if(e.key === 'Enter'){ e.preventDefault(); goLive(); return; }
+    if(e.key === ' ' || e.code === 'Space'){ e.preventDefault(); if(RD.live) pause(true); else goLive(); return; }
+    const cur = e.target.closest('.rl');
+    if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){
+      e.preventDefault();
+      const to = cur ? (e.key === 'ArrowDown' ? cur.nextElementSibling : cur.previousElementSibling) : (RD.liveEl || list.lastElementChild);
+      if(to){ to.focus({ preventScroll:true }); to.scrollIntoView({ block:'nearest' }); }
+    }
+    if(e.key === 'Home' || e.key === 'End'){ e.preventDefault(); const to = e.key === 'Home' ? list.firstElementChild : list.lastElementChild; if(to){ to.focus({ preventScroll:true }); to.scrollIntoView({ block:'nearest' }); } }
+  });
+  list.addEventListener('focusin', e => {
+    const ln = e.target.closest('.rl');
+    if(ln){ RD.lastLine = ln.dataset.k; paintFollow(); return; }
+    if(e.target === list){ const back = (RD.lastLine && RL.get(RD.lastLine)) || RD.liveEl; if(back){ back.focus({ preventScroll:true }); back.scrollIntoView({ block:'nearest' }); } }
+    paintFollow();
+  });
+  list.addEventListener('click', e => { const ln = e.target.closest('.rl'); if(ln) ln.focus(); });
   $('#vRead').addEventListener('click', e => {
     const b = e.target.closest('[data-r]'); if(!b) return;
     const a = b.dataset.r;
     if(a === 'live') goLive();
+    else if(a === 'pause'){ if(RD.live) pause(true); else goLive(); }
     else if(a === 'settings') readerSettings();
     else if(a === 'save') readerSave();
     else if(a === 'leave') readerLeave();

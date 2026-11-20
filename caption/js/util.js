@@ -50,6 +50,47 @@ function arm(btn, key, label){
   return false;
 }
 
+/* 글 칸의 내용을 바뀐 부분만 바꿔 넣음. 커서는 같은 글자 옆에 그대로 둠
+   (바뀐 부분 안에 있던 커서는 그 안에서 같은 칸 수만큼 떨어진 곳에 둠) */
+function spliceText(ta, nv){
+  const ov = ta.value; if(ov === nv) return;
+  const m = Math.min(ov.length, nv.length);
+  let p = 0; while(p < m && ov.charCodeAt(p) === nv.charCodeAt(p)) p++;
+  let q = 0; while(q < m - p && ov.charCodeAt(ov.length - 1 - q) === nv.charCodeAt(nv.length - 1 - q)) q++;
+  const oe = ov.length - q, ne = nv.length - q;
+  const move = c => c <= p ? c : c >= oe ? c + nv.length - ov.length : p + Math.min(c - p, ne - p);
+  const s = move(ta.selectionStart), e = move(ta.selectionEnd);
+  try{ ta.setRangeText(nv.slice(p, ne), p, oe, 'preserve'); }catch(err){ ta.value = nv; }
+  ta.setSelectionRange(s, e);
+}
+
+/* 줄 순서 열쇠: 글자 순서로 정렬되고, 어떤 두 열쇠 사이에도 새 열쇠를 만들 수 있음
+   (메모장 방식에서 줄 사이에 줄을 넣어도 다른 줄의 열쇠는 그대로) */
+const FD = '0123456789abcdefghijklmnopqrstuvwxyz';
+const FSTEP = 36 ** 4, FMAX = 36 ** 8;
+function fracMid(a, b){   // a < 결과 < b (a는 '' 가능, b는 null 가능)
+  let res = '';
+  for(let i = 0; i < 60; i++){
+    const ca = i < a.length ? FD.indexOf(a[i]) : 0;
+    const cb = b == null ? 36 : i < b.length ? FD.indexOf(b[i]) : 0;
+    if(ca === cb){ res += FD[ca]; continue; }
+    const mid = Math.floor((ca + cb) / 2);
+    if(mid > ca) return res + FD[mid];
+    res += FD[ca]; b = null;
+  }
+  return res + 'i';
+}
+function lineKeyBetween(prev, next){   // 'k'로 시작하는 줄 열쇠
+  const a = prev ? prev.slice(1) : '', b = next ? next.slice(1) : null;
+  if(b == null){
+    if(!a) return 'k' + (36 ** 7).toString(36);
+    const n = parseInt((a + '00000000').slice(0, 8), 36) + FSTEP;
+    if(n < FMAX) return 'k' + n.toString(36).padStart(8, '0');
+  }
+  return 'k' + fracMid(a, b);
+}
+const lineText = v => v == null ? '' : typeof v === 'object' ? String(v.t || '') : String(v);
+
 /* 화면 꺼짐 막기 (실패해도 조용히 넘어감) */
 const WAKE = {
   want:false, lock:null,
@@ -69,4 +110,7 @@ function downloadText(name, text){
   }catch(e){ toast('파일을 저장하지 못했어요'); }
 }
 const ymd = (d = new Date()) => d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+const p2 = n => String(n).padStart(2, '0');
+const fileStamp = (d = new Date()) => d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + '_' + p2(d.getHours()) + p2(d.getMinutes());
+const longDate = (d = new Date()) => d.getFullYear() + '년 ' + (d.getMonth() + 1) + '월 ' + d.getDate() + '일 (' + '일월화수목금토'[d.getDay()] + ') ' + p2(d.getHours()) + ':' + p2(d.getMinutes());
 const hm = t => { const d = new Date(t); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
