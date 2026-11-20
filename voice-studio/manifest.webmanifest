@@ -1,0 +1,16 @@
+{
+ "name": "중계 녹음실",
+ "short_name": "녹음실",
+ "description": "야구 앱의 중계 음성을 Gemini로 녹음하고 문장마다 잘라 받는 도구",
+ "scope": "./",
+ "display": "fullscreen",
+ "display_override": ["fullscreen", "standalone"],
+ "background_color": "#f3f5f9",
+ "theme_color": "#14213d",
+ "lang": "ko",
+ "icons": [
+  { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+  { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+  { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+ ]
+}
