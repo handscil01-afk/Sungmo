@@ -83,7 +83,7 @@
 - 9-1b (완료, 사용자 의견) 스크롤 없이 한 화면(skFit 단계 f1~f3, 쪽 넘기기 .pg), 게임빌 프로야구 같은 밝은 모습, 그림 위 점수판·선수 상자, 정보 창을 그림으로(note의 kind: score·who·status·recent), 순위표·기록 순위·내 팀 선수·명단을 표(S.table)로, 설정 목록 줄 모양 통일, 팀 엠블럼, 밤 야구장(G.night, SET.night).
 - 9-1c (완료) 선수 육성 화면 개편 1차(docs/CAREER-UI.md의 1~3단계): 라커룸·마을 지도·용품점·가방·훈련·선수 카드·얼굴 고르기. 이어서 대화 창(이벤트·계약·FA), 경기 대진 카드, 업적 연표까지 완료(4단계).
 - 9-2 (완료) 우리 센터 팀 만들기: js/center.js(편집 화면, 저장 bb_center), data.js의 CENTER·centerInfo(key 'center'), engine.js의 makeCenterTeam, league.js의 leagueCenterTeam·leagueKeys(리그에서는 star 자리). 온라인은 제외. 시험 tests/center.js, tests/skin.js(키보드만으로 만들기→경기).
-- 9-3 육성 이야기 강화: 라이벌, 주전 경쟁, 감독·동료와의 관계, 스프링캠프, 은퇴 뒤 코치·감독.
+- 9-3 (완료) 육성 이야기: js/career-story.js. 라이벌(c.rival, 시즌 점수 seasonScore로 견줌), 2군 승격 경쟁(promoteGap, 승격 규칙은 promote 그대로), 스프링캠프(c.camp 사흘, campScreen), 은퇴 뒤 감독(becomeManager: 리그를 bb_league로 복사). 남은 후보: 감독·동료와의 관계(신뢰도), 1군 부진 때 2군 강등.
 - 9-4 구단 운영: 트레이드, FA, 신인 드래프트, 연봉 총액, 2군 육성.
 - 9-5 올스타전·홈런 더비.
 

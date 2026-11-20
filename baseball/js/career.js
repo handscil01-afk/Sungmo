@@ -110,6 +110,7 @@ function careerStatus(L){
   const where = c.hurt > 0 ? `부상 중, ${c.hurt}일 뒤 돌아옴` : c.where === 'minor' ? '퓨처스리그(2군)' : isPit(p) ? `1군 ${p.role}` : `1군 주전 ${T.bat.indexOf(p) + 1}번 타자`;
   out.push(`${p.name}, ${p.age}세, ${teamInfo(L.my).name} ${isPit(p) ? '투수' : POS[p.pos]}. ${where}. 인기 ${c.fame}.`);
   if(!isPit(p)) out.push(`특기: ${traitText(p)}.`);
+  if(typeof promoteGap === 'function'){ const g = promoteGap(L); if(g) out.push(g.text); const r = rivalLine(L); if(r) out.push(r.text); }
   out.push(isPit(p) ? `능력치: 구속 ${p.vel}, 제구 ${p.ctl}, 구위 ${p.stf}, 체력 ${p.sta}. 컨디션 ${COND[p.cond]}.` : `능력치: 컨택 ${p.con}, 파워 ${p.pow}, 선구안 ${p.eye}, 스피드 ${p.spd}, 수비 ${p.def}. 컨디션 ${COND[p.cond]}.`);
   const s = p.ss || {}, m = c.minor || {};
   if(c.where !== 'minor') out.push(isPit(p) ? `이번 시즌 1군: ${pitLine(p).replace(/^[^:]+: /, '')}` : `이번 시즌 1군: ${batLine(p).replace(/^[^:]+: /, '')}`);
@@ -127,9 +128,9 @@ function careerHome(){
     note:['내 선수 한 명을 만들어 신인으로 입단합니다. 2군에서 훈련하며 실력을 키워 1군 주전이 되고, 타이틀과 우승, 명예의 전당을 노립니다.', '1군 경기에서는 내 선수의 타석(투수라면 내 선수가 던지는 동안)만 직접 하고, 나머지는 빠르게 진행합니다.'],
     opts:[{ n:1, t:'새 선수 만들기', act: v => go(careerNameScreen, v) }] };
   const c = C(L), p = myP(L), done = L.phase === 'done', g = myGameToday(L);
-  if(!c.retired){ life(L); if(c.offer) return contractScreen(); if(c.event) return eventScreen(); }
+  if(!c.retired){ life(L); if(c.offer) return contractScreen(); if(c.event) return eventScreen(); if(c.camp > 0) return campScreen(); }
   if(c.retired) return { q:'은퇴한 선수입니다. 새 선수를 만들까요?', back: v => go(homeScreen, v), note: c.final || [], opts:[
-    { n:1, t:'새 선수 만들기', act: v => go(careerNameScreen, v) }, { n:7, t:'업적과 경력', act: v => go(careerLogScreen, v) }, { n:8, t:'기록실과 명예의 전당', act: v => go(archiveScreen, v) }] };
+    { n:1, t:'새 선수 만들기', act: v => go(careerNameScreen, v) }, { n:2, t:'감독으로 새 출발', s:'이 리그를 리그 모드로 옮겨, 선수 시절 팀의 감독이 되어 이어 갑니다.', act: v => becomeManager(v) }, { n:7, t:'업적과 경력', act: v => go(careerLogScreen, v) }, { n:8, t:'기록실과 명예의 전당', act: v => go(archiveScreen, v) }] };
   const saved = (() => { const s = loadSaved(); return s && s.G.career && s.G.career.day === L.day && s.G.career.phase === L.phase && s.G.career.season === L.season ? s : null; })();
   const first = c.where !== 'minor' && c.hurt <= 0;
   const trained = c.trained === `${L.season}-${L.phase}-${L.day}`;
@@ -380,9 +381,10 @@ function careerSimDay(via, listen){
 function nextSeasonCore(L){
   const c = C(L);
   if(c.where === 'minor'){ const p = c.p; p.cs = sumStats(p.cs, p.ss); p.ss = {}; p.seasons = (p.seasons || 0) + 1; p.age++; p.rookie = false; develop(L, p); }
+  const rv = typeof rivalSeasonEnd === 'function' ? rivalSeasonEnd(L) : [];
   leagueNextSeason(L);
-  c.minor = {}; c.fatigue = 0;
-  const p = myP(L), out = leagueNews(L);
+  c.minor = {}; c.fatigue = 0; c.camp = typeof CAMP_DAYS !== 'undefined' ? CAMP_DAYS : 0;   // 새 시즌 개막 전 스프링캠프
+  const p = myP(L), out = [...rv, ...leagueNews(L)];
   out.unshift(`${L.season}시즌이 시작됩니다. ${p.name}, ${p.age}세가 되었습니다. 잠재력: ${CURVES[p.curve || 'normal'].name}.`, ...negotiate(L));
   if(c.gs) refreshGear(L);   // 나이에 따라 능력치가 바뀐 뒤 장비 효과를 다시 계산
   return { out, retire: p.age >= 40 ? '마흔 살이 되어 은퇴합니다.' : null };

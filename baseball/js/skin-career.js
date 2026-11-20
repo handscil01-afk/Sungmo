@@ -76,7 +76,7 @@ function crHome(S){
       <div class="pc-tm">${emb(T, 'sm')}<span>${esc(where)}</span></div></div>
     <div class="pstats">${statKeys(p).map(k => crStat(p, c, k)).join('')}</div>
   </div>
-  <p class="crday">${esc(day)}</p>
+  <p class="crday">${esc(day)}</p>${crStory(L)}
   ${play ? `<button type="button" class="crplay" data-sk="opt" data-n="${play.n}"><span class="pp">▶</span><span><b>${esc(play.t)}</b>${play.s ? `<small>${esc(play.s)}</small>` : ''}</span></button>` : ''}
   <div class="crtiles">
     ${train ? `<button type="button" class="ct${S.trained ? ' done' : ''}" data-sk="opt" data-n="${train.n}">${trainIco(isPit(p) ? 5 : 0)}<b>훈련</b>${S.trained ? '<em class="stamp">완료</em>' : ''}</button>` : ''}
@@ -87,6 +87,25 @@ function crHome(S){
   <div class="minors">${['stand', 'lead', 'arch', 'set'].map(k => crOpt(S, k)).filter(Boolean).map(o => `<button type="button" class="mn" data-sk="opt" data-n="${o.n}"><span>${esc(o.t.replace('기록실과 명예의 전당', '명예의 전당').replace('은퇴하기와 설정', '설정'))}</span></button>`).join('')}</div>`;
 }
 
+// 승격 경쟁 막대(2군일 때)와 라이벌 카드
+function crStory(L){
+  const g = typeof promoteGap === 'function' ? promoteGap(L) : null, r = typeof rivalLine === 'function' ? rivalLine(L) : null;
+  if(!g && !r) return '';
+  const gp = g ? `<div class="st-g"><small>1군 승격 경쟁 <b>${g.mine}</b> / ${g.need}</small><span class="fb big"><i style="width:${g.pct}%;background:${g.pct >= 100 ? '#2ec463' : '#ffb800'}"></i></span><small>${esc(g.name)}${g.gap ? ` · ${g.gap} 모자람` : ' · 곧 승격!'}</small></div>` : '';
+  const rv = r ? `<div class="st-r">${emb(teamInfo(r.team), 'sm')}<span><small>라이벌</small><b>${esc(r.name)}</b></span><em class="${r.lead > 0 ? 'up' : r.lead < 0 ? 'dn' : ''}">${r.lead > 0 ? '앞섬' : r.lead < 0 ? '뒤짐' : '팽팽'}</em></div>` : '';
+  return `<div class="story">${gp}${rv}</div>`;
+}
+/* ---------- 스프링캠프 ---------- */
+function crCamp(S){
+  const L = crL(); if(!L || !L.career) return null;
+  const c = L.career, p = myP(L);
+  const tiles = (S.opts || []).filter(o => !o.hide && o.stat).map(o => `<button type="button" class="trt" data-sk="opt" data-n="${o.n}">${trainIco(TRAIN_IDX[o.stat])}<b>${esc(ABIL_NAME[o.stat])} 집중</b><span class="tv">지금 <em>${p[o.stat]}</em></span><span class="tp"><i style="width:${clamp((c.pts && c.pts[o.stat]) || 0, 0, 10) * 10}%"></i></span></button>`).join('');
+  const SHORT = { scrim:'연습 경기', rest:'쉬기', skip:'남은 날 건너뛰기' };
+  const others = (S.opts || []).filter(o => !o.hide && !o.stat).map(o => `<button type="button" class="mn" data-sk="opt" data-n="${o.n}"><span>${esc(SHORT[o.key] || o.t)}</span></button>`).join('');
+  return `${crRes(L)}${(S.say || []).length ? `<div class="crmsg">${S.say.map(l => `<p>${esc(l.s || l)}</p>`).join('')}</div>` : ''}
+    <div class="camp"><b>스프링캠프 ${S.day}일째</b><small>개막까지 ${c.camp}일 · 하루에 하나를 고릅니다</small><span class="camp-d">${[1, 2, 3].map(d => `<i class="${d < S.day ? 'done' : d === S.day ? 'now' : ''}"></i>`).join('')}</span></div>
+    <div class="trg">${tiles}</div><div class="minors">${others}</div>`;
+}
 /* ---------- 마을 지도 ---------- */
 function crVisit(S){
   const L = crL(); if(!L || !L.career) return null;
@@ -206,7 +225,7 @@ function crGame(S){
   const ICON = ['swing', 'take', 'next'];
   const opts = (S.opts || []).filter(o => !o.hide).map((o, i) => `<button type="button" class="gm-o${i === 0 ? ' pri' : ''}" data-sk="opt" data-n="${o.n}">${skIco(ICON[i] || 'next')}<span class="tx"><b>${esc(o.t)}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</span></button>`).join('');
   return `${crRes(L)}<div class="vs">
-      <div class="vs-h">${S.minor ? '퓨처스리그(2군)' : `${L.season}시즌 ${L.day + 1}일째`}${park ? ` · ${esc(park.name)}` : ''}</div>
+      <div class="vs-h">${S.minor ? '퓨처스리그(2군)' : `${L.season}시즌 ${L.day + 1}일째`}${park ? ` · ${esc(park.name)}` : ''}</div>${(S.note || []).length ? `<div class="vs-rv">🔥 ${esc(S.note[0])}</div>` : ''}
       <div class="vs-row">${side(me, home ? '홈' : '원정')}<span class="vs-x">VS</span>${side(opp, home ? '원정' : '홈')}</div>
       <div class="vs-me">${crFace(crFaceOf(L, c, p), col, 'sm')}<span><b>${esc(p.name)}</b> · ${esc(role)}${p.cond ? ` · 컨디션 ${esc(COND[p.cond])}` : ''}</span></div>
     </div><div class="gm-opts">${opts}</div>`;
@@ -255,7 +274,7 @@ function ctNum(S){
     ${(() => { const o = b(9); return o ? `<button type="button" class="crplay" data-sk="opt" data-n="${o.n}"><span class="pp">✓</span><span><b>${esc(o.t)}</b></span></button>` : ''; })()}`;
 }
 
-const CAREER_SK = { 'ct-home':ctHome, 'ct-num':ctNum, 'cr-talk':crTalk, 'cr-game':crGame, 'cr-log':crLogSkin, 'cr-home':crHome, 'cr-visit':crVisit, 'cr-shop':crShop, 'cr-bag':crBag, 'cr-train':crTrain, 'cr-info':crInfo, 'cr-face':crFacePick };
+const CAREER_SK = { 'cr-camp':crCamp, 'ct-home':ctHome, 'ct-num':ctNum, 'cr-talk':crTalk, 'cr-game':crGame, 'cr-log':crLogSkin, 'cr-home':crHome, 'cr-visit':crVisit, 'cr-shop':crShop, 'cr-bag':crBag, 'cr-train':crTrain, 'cr-info':crInfo, 'cr-face':crFacePick };
 function careerSkin(S){
   const f = S && S.kind && CAREER_SK[S.kind];
   if(!f) return null;

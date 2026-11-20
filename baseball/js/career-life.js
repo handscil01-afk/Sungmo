@@ -314,7 +314,8 @@ function eventScreen(){
 /* ---------- 경기 방식 고르기 ---------- */
 function careerGameChoice(minor){
   const where = minor ? '퓨처스리그(2군)' : '1군';
-  return { kind:'cr-game', minor, q:`오늘 ${where} 경기를 어떻게 할까요?`, back: v => go(careerHome, v), opts:[
+  const rv = typeof rivalToday === 'function' ? rivalToday(CR()) : null;
+  return { kind:'cr-game', minor, note: rv ? [rv] : null, q:`오늘 ${where} 경기를 어떻게 할까요?`, back: v => go(careerHome, v), opts:[
     { n:1, t:'내 차례만 직접 하기', s:'내 타석(투수라면 내가 던질 때)만 직접 고르고, 나머지는 빠르게 진행합니다.', act: v => minor ? careerMinorPlay(v) : careerPlay(v) },
     { n:2, t:'내 차례도 맡기고 내 결과 듣기', s:'컴퓨터가 내 선수도 대신 하고, 내 타석(투구) 결과를 하나씩 알려 줍니다.', act: v => minor ? careerMinorDay(v, true) : careerSimDay(v, true) },
     { n:3, t:'경기 건너뛰기', s:'최종 점수와 오늘 내 기록만 봅니다.', act: v => minor ? careerMinorDay(v) : careerSimDay(v) },

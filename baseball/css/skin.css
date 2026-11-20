@@ -661,3 +661,24 @@ html.skin .ctn-b.up{ background:linear-gradient(180deg, #6fe08a, #1fa64a); borde
 html.skin .ctn-b.dn{ background:linear-gradient(180deg, #ff8a8a, #e0353f); border-color:#8c1d27; box-shadow:0 3px 0 #8c1d27; }
 html.skin .ctn-b:active{ transform:translateY(2px); }
 html.skin .np .nick{ font-style:normal; font-size:.62rem; font-weight:800; color:#c25a00; }
+/* 육성 이야기: 승격 경쟁·라이벌·스프링캠프 */
+html.skin .story{ display:grid; grid-template-columns:repeat(auto-fit, minmax(0, 1fr)); gap:6px; }
+html.skin .st-g, html.skin .st-r{ border-radius:12px; border:2px solid var(--line); background:var(--pan); padding:5px 8px; color:var(--ink); min-width:0; }
+html.skin .st-g{ display:grid; gap:2px; } html.skin .st-g small{ font-size:.62rem; font-weight:800; color:var(--ink2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } html.skin .st-g small b{ color:var(--ink); font-size:.75rem; }
+html.skin .fb.big{ height:9px; background:#c5ddf7; }
+html.skin .st-r{ display:flex; align-items:center; gap:6px; } html.skin .st-r span{ display:grid; min-width:0; line-height:1.15; } html.skin .st-r small{ font-size:.58rem; color:#d33447; font-weight:900; } html.skin .st-r b{ font-size:.82rem; font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+html.skin .st-r em{ margin-left:auto; font-style:normal; font-size:.66rem; font-weight:900; padding:1px 7px; border-radius:999px; background:#94a3b8; color:#fff; white-space:nowrap; }
+html.skin .st-r em.up{ background:#16893f; } html.skin .st-r em.dn{ background:#d33447; }
+html.skin .camp{ position:relative; display:grid; gap:2px; padding:14px 12px; border-radius:16px; border:3px solid var(--line); color:#fff; text-shadow:0 2px 0 #0b3a8c, 1px 0 0 #0b3a8c, -1px 0 0 #0b3a8c;
+  background:url(../img/cr-camp.png) center 60% / cover no-repeat; image-rendering:pixelated; box-shadow:0 3px 0 var(--line2); min-height:6.5rem; align-content:end; }
+html.skin .camp b{ font-size:1.25rem; font-weight:900; } html.skin .camp small{ font-size:.74rem; font-weight:800; }
+html.skin .camp-d{ position:absolute; top:8px; right:10px; display:flex; gap:4px; } html.skin .camp-d i{ width:.9rem; height:.9rem; border-radius:50%; background:rgba(255,255,255,.6); border:2px solid #fff; }
+html.skin .camp-d i.done{ background:#2ec463; } html.skin .camp-d i.now{ background:#ffe94d; box-shadow:0 0 6px #ffe94d; }
+html.skin .vs-rv{ text-align:center; font-size:.76rem; font-weight:900; color:#ffe94d; background:rgba(211,52,71,.55); border-radius:10px; padding:3px 8px; }
+html.skin .sk-body.f2 .story{ display:none; }
+@media (orientation:landscape) and (max-height:620px){
+  html.skin .camp{ min-height:3.4rem; padding:6px 10px; } html.skin .camp b{ font-size:1rem; }
+  html.skin .k-cr-camp .trg{ grid-template-columns:repeat(5, minmax(0, 1fr)); min-height:0 !important; }
+  html.skin .k-cr-camp .trt{ grid-template-columns:1fr; justify-items:center; text-align:center; padding:.3rem; } html.skin .k-cr-camp .trt .tico{ grid-row:auto; width:2.2rem; height:2.2rem; }
+  html.skin .story{ grid-template-columns:1fr 1fr; }
+}

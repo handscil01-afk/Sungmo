@@ -122,7 +122,16 @@ const PORT = 8767;
     if(await page.evaluate(() => CR().career.fame) <= fame0) errors.push(`${tag}: 이벤트 고르기 결과가 반영되지 않음`);
     await page.evaluate(() => go(() => careerGameChoice(true), 'click')); await need('.vs .vs-row', '대진 카드'); await fit('대진 카드');
     await page.evaluate(() => go(careerLogScreen, 'click')); await need('.tl .tl-h', '업적 연표'); await fit('업적 연표');
-    console.log(`${tag}: 라커룸·마을·용품점·가방·훈련·선수 카드·얼굴·이벤트·대진·업적 확인`);
+    // 스프링캠프: 타일을 누르면 하루가 지나고, 사흘 뒤 라커룸으로
+    await page.evaluate(() => { const L = CR(); L.career.camp = 3; L.career.event = null; saveLeague(); go(careerHome, 'click'); });
+    await need('.camp', '스프링캠프'); await fit('스프링캠프');
+    for(let i = 0; i < 3; i++) await page.click('.trg .trt');
+    if(!(await page.evaluate(() => UI.S.kind === 'cr-home' && !CR().career.camp))) errors.push(`${tag}: 캠프 사흘 뒤 라커룸으로 돌아오지 않음`);
+    await need('.story', '라커룸 승격 경쟁·라이벌');
+    // 은퇴 뒤 감독: 리그 모드로 옮겨 감
+    await page.evaluate(() => { const L = CR(); L.career.retired = true; saveLeague(); localStorage.removeItem('bb_league'); LSTORE.league.L = null; becomeManager('click'); });
+    if(!(await page.evaluate(() => LSRC === 'league' && LG() && !LG().career && LG().mode === 'manager'))) errors.push(`${tag}: 감독으로 새 출발이 리그 모드로 옮겨지지 않음`);
+    console.log(`${tag}: 라커룸·마을·용품점·가방·훈련·선수 카드·얼굴·이벤트·대진·업적·캠프·감독 확인`);
     await ctx.close();
   }
   // 우리 센터 팀: 소리와 글로 하기에서 번호 키와 명령 칸만으로 팀 이름·선수 이름을 정해 저장하고, 팀 고르기에서 골라 경기를 끝까지

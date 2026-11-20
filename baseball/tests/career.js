@@ -12,8 +12,9 @@ var LSRC = 'career', STORE = { L:null }, NEW = { len:18, mode:'simple', kind:'ca
 function LG(){ return STORE.L; } function setLG(L){ STORE.L = L; } function saveLeague(){}
 function leagueNews(L){ const n = L.newsRead || 0; L.newsRead = L.news.length; return L.news.slice(n); }
 function go(){} function stay(){} function playFx(){} function speak(){} function openDlg(){} function note(){}
+const myRank = L => standings(L).find(x => x.T.key === L.my); function loadSaved(){ return null; }
 `);
-['career-grow.js', 'career.js', 'career-life.js'].forEach(f => vm.runInThisContext(fs.readFileSync(path.join(dir, f), 'utf8'), { filename: f }));
+['career-grow.js', 'career.js', 'career-life.js', 'career-story.js'].forEach(f => vm.runInThisContext(fs.readFileSync(path.join(dir, f), 'utf8'), { filename: f }));
 
 const SEASONS = +process.argv[2] || 10, SEED = +process.argv[3] || 5;
 const errs = [], log = [];
@@ -99,6 +100,25 @@ run(false, SEED, SEASONS); run(true, SEED + 1, SEASONS);
   let rs = 9; const rndk = () => { rs = (rs * 1664525 + 1013904223) >>> 0; return rs / 4294967296; }, s0 = L.season;
   for(let d = 0; d < 3000 && L.season === s0; d++){ if(playDay(L, rndk) === 'season') break; check(L, `옛 저장 ${d}일`); }
   log.push('  옛 저장: 불러온 뒤 한 시즌 진행 통과');
+}
+// 이야기: 라이벌·승격 경쟁·스프링캠프·감독 이어 가기
+{
+  const L = newCareer(false, 77), c = C(L);
+  const r = rival(L);
+  if(!r || r.T.key === L.my || !!r.p.vel !== isPit(myP(L))) fail('이야기: 라이벌이 다른 팀의 같은 종류 선수가 아님');
+  const g = promoteGap(L); if(!g || !(g.need > 0)) fail('이야기: 2군 승격 경쟁 값이 없음');
+  if(!careerStatus(L).some(l => /라이벌/.test(l)) || !careerStatus(L).some(l => /승격 경쟁/.test(l))) fail('이야기: 상태 글에 라이벌·승격 경쟁이 없음');
+  while(L.phase !== 'done'){ leagueAdvance(L, null); }
+  const out = nextSeasonCore(L).out;
+  if(!out.some(l => /라이벌/.test(l))) fail('이야기: 시즌 끝에 라이벌 결과가 없음');
+  if(c.camp !== CAMP_DAYS) fail('이야기: 새 시즌에 스프링캠프가 시작되지 않음');
+  delete c.offer; delete c.event;
+  let S = careerHome(); if(S.kind !== 'cr-camp') fail('이야기: 캠프 중인데 첫 화면이 캠프가 아님 ' + S.kind);
+  const f0 = c.fame; S.opts.find(o => o.key === 'scrim').act('key'); if(!(c.fame > f0)) fail('이야기: 연습 경기 뒤 인기가 오르지 않음');
+  for(let i = 0; i < 5 && c.camp > 0; i++) careerHome().opts.find(o => o.key === 'rest').act('key');
+  if(c.camp) fail('이야기: 캠프가 끝나지 않음');
+  if(careerHome().kind !== 'cr-home') fail('이야기: 캠프 뒤 라커룸으로 돌아오지 않음');
+  log.push(`  이야기: 라이벌 ${r && r.p.name}(${r && r.T.key}), ${out.find(l => /라이벌/.test(l))}, 캠프 ${CAMP_DAYS}일 통과`);
 }
 console.log(`[육성] ${SEASONS}시즌 자동 진행 (타자·투수)\n` + log.join('\n'));
 if(errs.length){ console.log('육성 시험 오류:\n  ' + errs.join('\n  ')); process.exit(1); }
