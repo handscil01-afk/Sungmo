@@ -143,3 +143,5 @@ a.btn{text-decoration:none;color:inherit}
 .sttinterim{color:#ffd2d2;font-size:calc(var(--tsize) - 2px);min-height:1.4em}
 .sheet-box ul{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:6px}
 @media (max-width:1500px){ #vType .brand{display:none} #vType .ttitle{max-width:12ch} }
+.sttdiag{color:#a3adba;font-size:12.5px}
+.stthint{margin:0;padding:6px 10px;border-radius:8px;background:#3a2a00;color:#ffe08f;border:1px solid #ffd54a;font-size:14px}
