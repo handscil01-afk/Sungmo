@@ -130,7 +130,7 @@ function leagueInnScreen(){
 function leaguePlay(via){
   const L = LG(), g = myGameToday(L); if(!g) return;
   const ctrl = g.a === L.my ? ['human', 'cpu'] : ['cpu', 'human'];
-  G = newGame({ ...leagueGameOpts(L, g.a, g.h, ctrl, L.mode, L.unit), easy: SET.easy ?? 1 });
+  G = newGame({ ...leagueGameOpts(L, g.a, g.h, ctrl, L.mode, L.unit), easy: SET.easy ?? 1 }); G.night = nightPick();
   G.league = { season: L.season, day: L.day, phase: L.phase, n: postN(L), label: g.label || `정규 시즌 ${L.day + 1}일째` };
   saveLeague();
   GS.opts = null; GS.pend = { def:null, off:null }; GS.auto = null; GS.holder = -1; GS.sel = null; UI.logG = null;
@@ -191,7 +191,10 @@ function standScreen(){
   const L = LG();
   const say = standings(L).map(x => `${x.rank}위 ${teamName(x.T.key)}${x.T.key === L.my ? '(우리 팀)' : ''}: ${x.T.w}승 ${x.T.l}패${x.T.d ? ` ${x.T.d}무` : ''}, 승률 ${pctText(x.T)}, ${gbText(x.gb)}${x.T.last.length ? `, ${recentText(x.T)}, ${streakText(x.T)}` : ''}.`);
   if(L.phase === 'season') say.push('5위까지 포스트시즌에 나갑니다.');
-  return { q:'순위표입니다. 위 글을 한 줄씩 읽어 보세요.', say, back: v => go(lhome(), v), opts:[{ n:1, t:'돌아가기', act: v => go(lhome(), v) }] };
+  // table: 화면 보며 하기에서 표로 보여 줌 (글은 say 그대로)
+  const table = [{ cols:['', '팀', '승', '패', '무', '승률', '차', '최근 10'], hiTeam: L.my, foot: L.phase === 'season' ? '5위까지 포스트시즌' : '',
+    rows: standings(L).map(x => { const r = x.T.last.slice(-10); return { team: x.T.key, cells:[x.rank, teamName(x.T.key), x.T.w, x.T.l, x.T.d || 0, pctText(x.T), x.gb === 0 ? '-' : x.gb, r.length ? `${r.filter(y => y === 'W').length}-${r.filter(y => y === 'L').length}` : '-'] }; }) }];
+  return { q:'순위표입니다. 위 글을 한 줄씩 읽어 보세요.', say, table, back: v => go(lhome(), v), opts:[{ n:1, t:'돌아가기', act: v => go(lhome(), v) }] };
 }
 const LEAD_MENU = [['avg', '타율'], ['hr', '홈런'], ['rbi', '타점'], ['h', '안타'], ['sb', '도루'], ['era', '평균자책점'], ['w', '승리'], ['svhd', '세이브와 홀드'], ['k', '탈삼진']];
 function leadersScreen(stat){
@@ -201,7 +204,10 @@ function leadersScreen(stat){
   if(stat === 'svhd') say = ['세이브 순위.', ...list('sv'), '홀드 순위.', ...list('hd')];
   else if(stat) say = list(stat);
   if(stat && !say.length) say = ['아직 기록이 없습니다. 타율은 규정 타석, 평균자책점은 규정 이닝을 채운 선수만 나옵니다.'];
-  return { q: stat ? `${(LEAD_MENU.find(x => x[0] === stat) || [, ''])[1]} 순위입니다. 다른 기록을 고르세요.` : '어떤 기록 순위를 볼까요?', say, back: v => go(lhome(), v),
+  const tv = (st, v) => st === 'avg' ? v.toFixed(3).replace(/^0/, '') : statVal(st, v);
+  const tab = (st, title) => ({ title, cols:['', '선수', '팀', title || '기록'], hiTeam: L.my, rows: leaders(L, st, 10).map((x, i) => ({ team: x.T.key, cells:[i + 1, x.p.name, teamName(x.T.key), tv(st, x.v)] })) });
+  const table = !stat ? null : stat === 'svhd' ? [tab('sv', '세이브'), tab('hd', '홀드')] : [tab(stat, (LEAD_MENU.find(x => x[0] === stat) || [, ''])[1])];
+  return { table, q: stat ? `${(LEAD_MENU.find(x => x[0] === stat) || [, ''])[1]} 순위입니다. 다른 기록을 고르세요.` : '어떤 기록 순위를 볼까요?', say, back: v => go(lhome(), v),
     opts: LEAD_MENU.map(([k, t], i) => ({ n: i + 1, t, act: v => go(() => leadersScreen(k), v) })) };
 }
 function batLine(p){ const s = p.ss || {}; return `${p.name}(${POS[p.pos] || p.role}, ${p.age}세${p.rookie ? ', 신인' : ''}): 타율 ${avgText(avgOf(s))}, 홈런 ${s.hr || 0}, 타점 ${s.rbi || 0}, 안타 ${s.h || 0}, 도루 ${s.sb || 0}, ${s.pa || 0}타석.`; }
@@ -209,7 +215,11 @@ function pitLine(p){ const s = p.ss || {}; return `${p.role} ${p.name}(${p.age}�
 function myTeamScreen(){
   const L = LG(), T = L.teams[L.my];
   const say = ['타순.', ...T.bat.map((p, i) => `${i + 1}번 ${batLine(p)}`), '벤치.', ...T.bench.map(batLine), '투수.', ...T.sp.map(pitLine), ...T.rp.map(pitLine)];
-  return { q:`${teamInfo(L.my).name} 선수 기록입니다.`, say, back: v => go(lhome(), v), opts:[
+  const bt = (p, i) => { const s = p.ss || {}; return { cells:[i == null ? '벤치' : i + 1, p.name, POS[p.pos] || p.role, avgOf(s).toFixed(3).replace(/^0/, ''), s.hr || 0, s.rbi || 0, s.sb || 0] }; };
+  const pt = p => { const s = p.ss || {}; return { cells:[p.role, p.name, `${s.w || 0}-${s.l || 0}`, s.sv || 0, s.hd || 0, s.out ? eraOf(s).toFixed(2) : '-', s.k || 0] }; };
+  const table = [{ title:'타자', cols:['', '선수', '자리', '타율', '홈런', '타점', '도루'], rows:[...T.bat.map((p, i) => bt(p, i)), ...T.bench.map(p => bt(p))] },
+    { title:'투수', cols:['', '선수', '승-패', '세', '홀', '자책', '삼진'], rows:[...T.sp, ...T.rp].map(pt) }];
+  return { q:`${teamInfo(L.my).name} 선수 기록입니다.`, say, table, back: v => go(lhome(), v), opts:[
     { n:1, t:'돌아가기', act: v => go(lhome(), v) },
     { n:2, t:'추천 타순으로 바꾸기', s:'감독 모드에서는 경기 전 준비에서 직접 바꿀 수 있고, 바꾼 타순이 다음 경기에도 이어집니다.', act: v => { T.bat = bestOrder(T.bat); saveLeague(); go(myTeamScreen, v, ['추천 타순으로 바꿨습니다.']); } },
   ] };

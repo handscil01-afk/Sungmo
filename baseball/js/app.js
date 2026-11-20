@@ -181,7 +181,8 @@ function settingsScreen(backTo, tab){
     // 화면
     [
       { t:`글자 크기: ${FS_NAMES[SET.fs]}`, act: ch(() => { SET.fs = (SET.fs + 1) % FS_NAMES.length; }, () => `글자 크기 ${FS_NAMES[SET.fs]}`) },
-      { t:`화면 색: ${THEMES[SET.theme]}`, act: ch(() => { SET.theme = cycle(Object.keys(THEMES), SET.theme); }, () => `화면 색 ${THEMES[SET.theme]}`) },
+      { t:`야구장 시간: ${({ auto:'자동 (저녁 6시부터 밤)', day:'낮', night:'밤' })[SET.night || 'auto']}`, hide: !VIEW.gfx, s:'밤에는 조명탑이 켜진 밤 야구장 그림으로 경기합니다. 다음 경기부터 바뀝니다.', act: ch(() => { SET.night = cycle(['auto', 'day', 'night'], SET.night || 'auto'); }, () => `야구장 시간 ${({ auto:'자동', day:'낮', night:'밤' })[SET.night]}`) },
+      { t:`화면 색: ${THEMES[SET.theme]}`, hide: VIEW.gfx, act: ch(() => { SET.theme = cycle(Object.keys(THEMES), SET.theme); }, () => `화면 색 ${THEMES[SET.theme]}`) },
       { t: FS.on() ? '전체화면 끄기' : '전체화면 켜기', hide: isStandalone(), s: FS.supported() ? '' : '이 기기에서는 홈 화면에 설치하면 넓게 쓸 수 있습니다.', act: () => FS.toggle() },
       { t:`자동 전체화면: ${onOff(SET.autoFS)}`, hide: isStandalone(), s:'켜면 화면을 처음 누를 때 전체화면으로 바뀝니다.', act: ch(() => { SET.autoFS = !SET.autoFS; FS.userExit = false; }, () => `자동 전체화면 ${onOff(SET.autoFS)}`) },
       { t:'홈 화면에 설치하기', hide: !canInstall(), act: () => doInstall() },

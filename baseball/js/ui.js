@@ -79,7 +79,7 @@ function rerender(){ if(!UI.make) return; UI.S = UI.make(); if(UI.say.length || 
 // 경기 화면에는 언제나 "지금 상황 확인" 단추(0번)를 둠: 아웃·볼카운트·주자·점수를 한 번에 들음
 function addStatusOpt(S){
   if(!S.board || typeof G === 'undefined' || !G || S.input) return;
-  S.opts = [...(S.opts || []), { n:0, key:'status', t:'지금 상황 확인', s:'점수, 아웃, 볼카운트, 주자 위치, 타자와 투수를 알려 줍니다. 0번 키와 같습니다.', act: v => note(gameStatus(), v) }];
+  S.opts = [...(S.opts || []), { n:0, key:'status', t:'지금 상황 확인', s:'점수, 아웃, 볼카운트, 주자 위치, 타자와 투수를 알려 줍니다. 0번 키와 같습니다.', act: v => note(gameStatus(), v, 'status') }];
 }
 function stay(msg){ rerender(); speak(msg); }
 
@@ -231,9 +231,10 @@ function back(via){
   else speak('뒤로 갈 곳이 없습니다.');
 }
 // 메모: 상황·점수판 같은 정보를 결과 글 아래에 보여 주고 읽어 줌
-function note(lines, via){
+// kind: 화면 보며 하기에서 정보를 그림으로 보여 줄 때 쓰는 종류 (score 점수판 · who 타자와 투수 · status 지금 상황 · recent 최근 기록)
+function note(lines, via, kind){
   UI.note = lines;
-  if(VIEW.gfx && typeof skinNote === 'function'){ skinNote(lines); if(via !== 'click') speak(lines.join(' ')); else if(SET.voice === 'tts') ttsSay(lines.join(' ')); return; }
+  if(VIEW.gfx && typeof skinNote === 'function'){ skinNote(lines, null, null, kind); if(via !== 'click') speak(lines.join(' ')); else if(SET.voice === 'tts') ttsSay(lines.join(' ')); return; }
   const nt = $('#note');
   nt.innerHTML = lines.map(l => `<p>${esc(l)}</p>`).join(''); nt.hidden = false;
   if(via === 'click'){ setTimeout(() => nt.focus(), 40); if(SET.voice === 'tts') ttsSay(lines.join(' ')); }
@@ -275,12 +276,12 @@ function keyCmd(k, via){
   if(/^[1-9]$/.test(k)) return digitKey(k, via);
   if(k === '0' && UI.digit){ return digitKey('0', via); }
   if(k === '.') return back(via);
-  if(k === '0') return note(typeof gameStatus === 'function' && G && UI.S.board ? gameStatus() : [`${UI.S.q || ''}`, optionsText() + '.'], via);
+  if(k === '0') return typeof gameStatus === 'function' && G && UI.S.board ? note(gameStatus(), via, 'status') : note([`${UI.S.q || ''}`, optionsText() + '.'], via);
   if(k === '*') return note(KEY_HELP, via);
   if(G && UI.S.board){
-    if(k === '+') return note(scoreboard(G), via);
-    if(k === '-') return note(whoInfo(), via);
-    if(k === '/') return note(recentLines(8), via);
+    if(k === '+') return note(scoreboard(G), via, 'score');
+    if(k === '-') return note(whoInfo(), via, 'who');
+    if(k === '/') return note(recentLines(8), via, 'recent');
   } else if('+-/'.includes(k)) return note(['경기 중에만 쓰는 키입니다.'], via);
 }
 const WORDS = { '상황':'0', '점수':'+', '점수판':'+', '선수':'-', '정보':'-', '도움':'*', '도움말':'*', '키':'*', '?':'*', '기록':'/', '뒤로':'.', '취소':'.' };

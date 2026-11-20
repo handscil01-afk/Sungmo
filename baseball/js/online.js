@@ -176,7 +176,7 @@ function waitScreen(){
     note: NET.peerOn ? [] : [`${who}의 연결이 끊겼습니다. 다시 들어오기를 기다립니다.`],
     opts:[
       { n:1, t:'채팅과 음성 대화', s: voiceLabel(), act: v => go(talkScreen, v) },
-      { n:2, t:'점수판', act: v => note(scoreboard(G), v) },
+      { n:2, t:'점수판', act: v => note(scoreboard(G), v, 'score') },
       { n:3, t:'맡기기 그만', hide: !GS.auto, act: v => { GS.auto = null; gameNext(v, null); } },
       { n:9, t:'더 보기', act: v => go(moreScreen, v) },
     ] };

@@ -85,7 +85,7 @@ function mgrDef(){
     { n:4, t:'고의 볼넷', act: order('ibb') },
     { n:5, t:'투수 교체', s: bench.length ? `불펜 ${bench.length}명` : '바꿀 투수가 없습니다.', hide: !bench.length, act: v => go(bullpenScreen, v) },
     { n:6, t:'수비 위치', s:`지금 내야 ${ALIGN_IN[T.align.inf]}, 외야 ${ALIGN_OUT[T.align.of]}`, act: v => go(alignScreen, v) },
-    { n:7, t:'투수 상태 듣기', act: v => note([pitcherInfo(G, T, T.pi, true)], v) },
+    { n:7, t:'투수 상태 듣기', act: v => note([pitcherInfo(G, T, T.pi, true)], v, 'who') },
     pickOpt(8),
     { n:9, t:'더 보기', s:'점수판, 선수 정보, 묻는 때, 설정', act: v => go(moreScreen, v) },
   ] };

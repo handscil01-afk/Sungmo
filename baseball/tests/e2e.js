@@ -20,7 +20,7 @@ const PORT = 8766;
   const clickOpt = async (page, n) => {
     const skin = await page.evaluate(() => document.documentElement.classList.contains('skin'));
     if(!skin) return page.click(`#opts .opt[data-n="${n}"]`);
-    if(await page.isVisible('#skSheet .sk-btn')) await page.click('#skSheet .sk-btn');
+    if(await page.isVisible('#skSheet .gb')) await page.click('#skSheet .gb');
     const sel = `#sk [data-sk="opt"][data-n="${n}"]`;
     if(await page.$(sel) && await page.isVisible(sel)) return page.click(sel);
     if(await page.$('#sk [data-sk="throw"]') && Math.random() < 0.7){

@@ -8,7 +8,7 @@
 const GX = { W:256, H:224, cv:null, ctx:null, key:'', anim:null, queue:[], raf:0, img:{}, tinted:{}, meta:{}, cam:{ x:0, y:0 }, lastAnimN:null, lastPlayN:null };
 const PAL = { sky:'#5c94fc', stand:'#3c3c64', fence:'#00682c', grass:'#38a838', grass2:'#4cbc4c', dirt:'#c88850', dirt2:'#b87840', line:'#fcfcfc',
   skin:'#f8b878', white:'#fcfcfc', black:'#000000', glove:'#a85010', bat:'#e4a050', ball:'#fcfcfc', ink:'#fcfc54', red:'#f83800' };
-const GX_FILES = ['bg-pitch', 'bg-field', 'pitcher', 'batter', 'catcher', 'fielder', 'banners', 'banners2', 'umpire', 'umpire-s', 'runner', 'tv', 'fielder2', 'runner-s', 'fielder-set', 'run-g', 'run-b', 'slide', 'run-f', 'run-k', 'cr-cage', 'cr-gym', 'cr-bullpen', 'cr-track', 'cr-room', 'cr-shop', 'cr-fansign', 'cr-rehab', 'cr-train', 'cr-life', 'cr-people', 'cr-props'];
+const GX_FILES = ['bg-pitch', 'bg-field', 'bg-pitch-n', 'bg-field-n', 'pitcher', 'batter', 'catcher', 'fielder', 'banners', 'banners2', 'umpire', 'umpire-s', 'runner', 'tv', 'fielder2', 'runner-s', 'fielder-set', 'run-g', 'run-b', 'slide', 'run-f', 'run-k', 'cr-cage', 'cr-gym', 'cr-bullpen', 'cr-track', 'cr-room', 'cr-shop', 'cr-fansign', 'cr-rehab', 'cr-train', 'cr-life', 'cr-people', 'cr-props'];
 // 결과 글씨 (banners.png를 쓸 때는 이 순서로 한 줄에 하나씩, 128×32)
 const BANNERS = ['스트라이크!', '볼', '헛스윙!', '파울', '안타!', '2루타!', '3루타!', '홈런!', '아웃!', '삼진!', '볼넷', '세이프!', '몸에 맞는 공'];
 const BANNERS2 = ['비디오 판독', '판정 번복!', '원심 유지', '견제!', '도루!', '병살!', '끝내기!', '게임 셋!'];
@@ -123,11 +123,15 @@ function armSlot(P){ let h = 7; for(const c of String(P.name) + P.id) h = (h * 3
 // 화면 배치: 그림 파일 배경과 코드로 그린 배경의 자리가 다름
 const LAY_IMG = { pitcher:[128, 121], batR:[76, 214], batL:[180, 214], catcher:[128, 244], zone:[128, 160, 12, 11], release:[[121, 88], [114, 96], [118, 108]] };
 const LAY_CODE = { pitcher:[128, 102], batR:[106, 202], batL:[150, 202], catcher:[128, 218], zone:[128, 186, 10, 9], release:[[130, 92], [126, 96], [128, 100]] };
-const lay = () => GX.img['bg-pitch'] && GX.meta.pitcher ? LAY_IMG : LAY_CODE;
+// 밤 경기(G.night): 밤 야구장 그림(bg-pitch-n)은 마운드가 9점 위에 있어서 투수만 올림
+const LAY_NIGHT = { ...LAY_IMG, pitcher:[128, 112], release: LAY_IMG.release.map(([x, y]) => [x, y - 9]) };
+const nightOn = () => typeof G !== 'undefined' && !!G && !!G.night;
+const lay = () => GX.img['bg-pitch'] && GX.meta.pitcher ? (nightOn() && GX.img['bg-pitch-n'] ? LAY_NIGHT : LAY_IMG) : LAY_CODE;
 
 /* ---------- 투구 화면 ---------- */
 function bgPitch(){
-  if(GX.img['bg-pitch']){ GX.ctx.drawImage(GX.img['bg-pitch'], 0, 0); return; }
+  const bgp = nightOn() && GX.img['bg-pitch-n'] ? GX.img['bg-pitch-n'] : GX.img['bg-pitch'];
+  if(bgp){ GX.ctx.drawImage(bgp, 0, 0); return; }
   R(0, 0, 256, 34, PAL.sky);
   R(0, 34, 256, 30, PAL.stand);
   const rnd = mulberry(7);   // 관중: 매번 같은 자리에 같은 색
@@ -236,10 +240,14 @@ function ball(x, y, s){
    그림 배경(512×512)은 외야가 실제보다 눌려 있어서, 베이스까지는 그대로 줄이고 그 너머는 그 구장의 담장 거리가 그림의 담장에 오도록 맞춤 */
 const HOME = { x:128, y:210 }, PXM = 1.3;   // 코드로 그린 배경: 1미터 = 1.3픽셀
 const FIELD_ANG = [-0.55, 0, 0.55];
-const FW = { home:[256, 400], b1:[346, 302], b2:[256, 231], b3:[166, 302], gC:1.95, gS:2.38 };
+// 위에서 본 야구장 그림의 자리 맞춤: 홈·1루·2루·3루(그림 좌표)와 담장 배율(가운데 gC·양옆 gS). 밤 그림(bg-field-n)은 따로 잼
+const FW_DAY = { home:[256, 400], b1:[346, 302], b2:[256, 231], b3:[166, 302], gC:1.95, gS:2.38 };
+const FW_NIGHT = { home:[255.5, 436.6], b1:[363.9, 327.6], b2:[255.8, 264.4], b3:[149, 328.5], gC:1.95, gS:2.35 };
+const fieldNight = () => nightOn() && !!GX.img['bg-field-n'];
 const wide = () => !!(GX.img['bg-field'] && GX.meta['bg-field'] && GX.meta['bg-field'].w >= 512);
 const worldW = () => wide() ? GX.meta['bg-field'].w : 256, worldH = () => wide() ? GX.meta['bg-field'].h : 224;
 function fm(ang, m){
+  const FW = fieldNight() ? FW_NIGHT : FW_DAY;
   if(!wide()) return { x: HOME.x + Math.sin(ang) * m * PXM, y: HOME.y - Math.cos(ang) * m * PXM };
   const a = Math.max(-0.785, Math.min(0.785, ang)), t = Math.abs(a) / 0.785, side = a < 0 ? FW.b3 : FW.b1;
   const ring = [FW.b2[0] + (side[0] - FW.b2[0]) * t, FW.b2[1] + (side[1] - FW.b2[1]) * t];
@@ -470,6 +478,7 @@ const PARK_LOOK = {
   windy:   { name:'오름구장', bg:['#2c6c2c', '#5cac3c'], kind:'hill', icon:'mill' },
 };
 function parkBg(G){
+  if(fieldNight()) return GX.img['bg-field-n'];   // 밤 그림은 구장 색을 바꾸지 않고 그대로
   const key = (G.park && G.park.key) || 'star', k = 'park:' + key;
   if(GX.tinted[k]) return GX.tinted[k];
   const im = GX.img['bg-field'], L = PARK_LOOK[key] || PARK_LOOK.star;
@@ -498,7 +507,8 @@ function parkBg(G){
 // 구장 특징 표시: 전광판 이름, 돔 지붕, 높은 왼쪽 담장, 구석 그림
 function parkExtra(G){
   const key = (G.park && G.park.key) || 'star', L = PARK_LOOK[key] || PARK_LOOK.star, pk = G.park || {}, ctx = GX.ctx;
-  pxText(L.name, 256, 22, PAL.ink, 7, true, false);   // 가운데 담장 뒤 전광판
+  pxText(L.name, 256, fieldNight() ? 50 : 22, PAL.ink, 7, true, false);   // 가운데 담장 뒤 전광판
+  if(fieldNight()){ if(pk.wall && pk.wall[0] > 4) for(let a = -0.78; a < -0.3; a += 0.02){ const q = fm(a, fenceAt(G, a) + 1); R(q.x - 3, q.y - 4, 6, 7, '#0c4c1c'); R(q.x - 3, q.y - 4, 6, 1, '#8cd88c'); } return; }   // 밤 그림은 구석 그림·파울 지역 표시 없이
   if(pk.dome){   // 돔: 경기장 위로 반투명한 지붕 테두리와 살
     ctx.strokeStyle = 'rgba(220,220,235,0.55)'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.arc(256, 330, 300, Math.PI * 1.08, Math.PI * 1.92); ctx.stroke();

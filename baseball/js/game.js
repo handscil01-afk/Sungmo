@@ -26,8 +26,11 @@ const myTeam = () => isHuman(0) && !isHuman(1) ? 0 : isHuman(1) && !isHuman(0) ?
 function saveGame(){ if(G && !NET.on) ls.set('bb_game', { G, opts: GS.opts, holder: GS.holder }); }
 function loadSaved(){ const s = ls.get('bb_game', null); if(s && s.G) migrate('game', s.G); return s && s.G && !s.G.over && s.G.v === 1 ? s : null; }
 
+// 밤 경기(화면 보며 하기의 밤 야구장 그림): 설정의 '야구장 시간'(자동은 저녁 6시~새벽 6시). 경기 계산에는 영향 없음
+const nightPick = () => SET.night === 'night' || (SET.night !== 'day' && ((h => h >= 18 || h < 6)(new Date().getHours())));
 function startGame(opts, via){
   G = newGame(opts);
+  G.night = nightPick();
   GS.opts = opts; GS.pend = { def:null, off:null }; GS.auto = null; GS.holder = -1; GS.sel = null;
   UI.logG = null;
   const r = flush(G);
@@ -574,11 +577,11 @@ function moreScreen(){
   const playing = needs(0) || needs(1);
   const [A, H] = G.teams;
   return { board:true, sub:true, q:'더 보기', back: v => gameNext(v, null), opts:[
-    { n:1, t:'점수판', act: v => note(scoreboard(G), v) },
-    { n:2, t:'지금 타자와 투수', act: v => note(whoInfo(), v) },
+    { n:1, t:'점수판', act: v => note(scoreboard(G), v, 'score') },
+    { n:2, t:'지금 타자와 투수', act: v => note(whoInfo(), v, 'who') },
     { n:3, t:`${A.short} 명단`, act: v => go(() => rosterScreen(0), v) },
     { n:4, t:`${H.short} 명단`, act: v => go(() => rosterScreen(1), v) },
-    { n:5, t: NET.on ? '채팅과 음성 대화' : '최근 기록', s: NET.on ? voiceLabel() : '최근 12줄', act: v => NET.on ? go(talkScreen, v) : note(recentLines(12), v) },
+    { n:5, t: NET.on ? '채팅과 음성 대화' : '최근 기록', s: NET.on ? voiceLabel() : '최근 12줄', act: v => NET.on ? go(talkScreen, v) : note(recentLines(12), v, 'recent') },
     { n:6, t:`작전을 묻는 때: ${SET.mgrAsk === 'every' ? '매 타석' : '중요한 순간만'}`, hide: G.mode !== 'manager' || (NET.on && NET.role === 'guest'),
       s:'중요한 순간: 득점권에 주자가 있을 때, 무사 1루, 경기 후반 접전, 투수가 지쳤을 때.' + (NET.on ? ' 온라인에서는 두 사람 모두에게 적용됩니다.' : ''),
       act: () => { SET.mgrAsk = SET.mgrAsk === 'every' ? 'key' : 'every'; saveSet(); stay(`작전을 묻는 때: ${SET.mgrAsk === 'every' ? '매 타석' : '중요한 순간만'}`); } },
@@ -603,7 +606,7 @@ function rosterScreen(ti){
     T.bat.forEach((b, i) => say.push(`${i + 1}번 ${POS[b.pos]} ${b.name}, 오늘 ${batterLine(b)}.`));
     say.push(`투수 ${T.pit[T.pi].name}.`);
   }
-  return { board:true, sub:true, q:`${T.short} 명단입니다. 위 글을 한 줄씩 읽어 보세요.`, back: v => go(moreScreen, v), say,
+  return { board:true, sub:true, kind:'roster', ti, q:`${T.short} 명단입니다. 위 글을 한 줄씩 읽어 보세요.`, back: v => go(moreScreen, v), say,
     opts:[{ n:1, t:'돌아가기', act: v => go(moreScreen, v) }] };
 }
 // 위쪽 메뉴 단추
@@ -650,31 +653,31 @@ function endScreen(){
   const o = GS.opts;
   if(G.career) return { board:true, q:'경기가 끝났습니다. 무엇을 할까요?', opts:[
     { n:1, t:'육성 화면으로', act: v => { G = null; go(careerHome, v); } },
-    { n:2, t:'점수판', act: v => note(scoreboard(G), v) },
+    { n:2, t:'점수판', act: v => note(scoreboard(G), v, 'score') },
     { n:3, t:'경기 기록 전체', act: v => go(() => logScreen(), v) },
   ] };
   if(G.league) return { board:true, q:'경기가 끝났습니다. 무엇을 할까요?', opts:[
     { n:1, t:'리그 화면으로', act: v => { G = null; go(leagueHome, v); } },
-    { n:2, t:'점수판', act: v => note(scoreboard(G), v) },
+    { n:2, t:'점수판', act: v => note(scoreboard(G), v, 'score') },
     { n:3, t:'경기 기록 전체', act: v => go(() => logScreen(), v) },
   ] };
   if(NET.on) return { board:true, q: NET.role === 'host' ? '경기가 끝났습니다. 한 판 더 할까요?' : '경기가 끝났습니다. 방장이 한 판 더를 고르면 새 경기가 시작됩니다.', opts:[
     { n:1, t:'한 판 더', hide: NET.role !== 'host', s:'같은 팀으로 새 경기를 시작합니다. 선수 능력치와 날씨는 새로 정해집니다.', act: v => netStartGame(v) },
-    { n:2, t:'점수판', act: v => note(scoreboard(G), v) },
+    { n:2, t:'점수판', act: v => note(scoreboard(G), v, 'score') },
     { n:3, t:'경기 기록 전체', act: v => go(() => logScreen(), v) },
     { n:4, t:'채팅과 음성 대화', act: v => go(talkScreen, v) },
     { n:9, t:'방에서 나가기', act: () => leaveRoomAsk() },
   ] };
   return { board:true, q:'경기가 끝났습니다. 무엇을 할까요?', opts:[
     { n:1, t:'같은 설정으로 다시 하기', s:'선수 능력치와 날씨는 새로 정해집니다.', act: v => startGame({ ...o, seed: (Date.now() >>> 0) }, v) },
-    { n:2, t:'점수판', act: v => note(scoreboard(G), v) },
+    { n:2, t:'점수판', act: v => note(scoreboard(G), v, 'score') },
     { n:3, t:'경기 기록 전체', s:'처음부터 끝까지 한 줄씩 읽을 수 있습니다.', act: v => go(() => logScreen(), v) },
     { n:4, t:'처음 화면으로', act: v => { G = null; go(homeScreen, v); } },
   ] };
 }
 function logScreen(){
   const say = G.log.filter(l => l.k !== 'd' || SET.dice).slice(-300);
-  return { board:true, sub:true, q:'경기 기록입니다. 위 글을 한 줄씩 읽어 보세요.', say, back: v => go(G.over ? endScreen : moreScreen, v),
+  return { board:true, sub:true, kind:'log', q:'경기 기록입니다. 위 글을 한 줄씩 읽어 보세요.', say, back: v => go(G.over ? endScreen : moreScreen, v),
     opts:[{ n:1, t:'돌아가기', act: v => go(G.over ? endScreen : moreScreen, v) }] };
 }
 

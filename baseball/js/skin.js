@@ -4,12 +4,14 @@
    - 선택지를 누르면 choose(번호)를 불러서 두 방식이 같은 길로 진행함 (숫자 키도 그대로 됨)
    - 정밀 모드 수비는 구종·코스·붙이는 정도·세기를 한 화면에서 고르고 '던지기'로 같은 선택(GS.sel → fillPitch → submit)을 만듦
    - 정밀 모드 공격은 큰 단추로 치는 방법을 고름. 설정의 '타이밍 맞춰 치기'를 켜면 공이 들어오는 순간에 한 번 더 누름(혼자·둘이 하기만)
-   - 화면: 위 점수판(HTML) · 도트 그림판(gfx.js) · 결과 한 줄 · 아래 조작판. 가로 화면은 그림 왼쪽, 조작판 오른쪽 */
-const SK = { el:null, pc:null, tm:null, sheet:null, sheetMake:null };
+   - 모든 화면은 스크롤 없이 한 화면에 들어감(skFit): 넘치면 설명을 줄이고, 칸을 좁히고, 열을 늘림. 긴 표·글 목록은 쪽 넘기기(◀ ▶)
+   - 경기 화면: 도트 그림판 위에 점수판·투수·타자 상자(게임 중계처럼), 아래 결과 한 줄과 조작판. 가로 화면은 그림 왼쪽, 조작판 오른쪽 */
+const SK = { el:null, pc:null, tm:null, sheet:null, sheetMake:null, pgKey:'', pgi:0 };
 
 const SK_ICON = {
   menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',
   back:'<path d="M15 5l-7 7 7 7"/>',
+  next1:'<path d="M9 5l7 7-7 7"/>',
   fs:'<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>',
   fsx:'<path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/>',
   swing:'<path d="M4 20 15.5 8.5a2.4 2.4 0 0 1 3.4 3.4L7.5 23"/><circle cx="18" cy="5" r="2"/>',
@@ -32,13 +34,22 @@ const SK_ICON = {
   next:'<path d="M5 5v14l9-7zM16 5h3v14h-3z"/>',
   check:'<path d="M4.5 12.5 9.5 17.5 19.5 6.5"/>',
   swap:'<path d="M4 8h14l-3-3M20 16H6l3 3"/>',
+  list:'<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
+  home:'<path d="M4 11 12 4l8 7M6 9.5V20h12V9.5"/>',
+  x:'<path d="M6 6l12 12M18 6 6 18"/>',
 };
-const skIco = (k, cls = '') => `<svg class="ico ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SK_ICON[k] || ''}</svg>`;
+const skIco = (k, cls = '') => `<svg class="ico ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SK_ICON[k] || ''}</svg>`;
 const grade = v => v >= 80 ? 'A' : v >= 65 ? 'B' : v >= 45 ? 'C' : v >= 32 ? 'D' : 'E';
-// 질문을 '공격·수비 띠 + 가장 중요한 질문 + 나머지 설명'으로 나눔
+// 팀 엠블럼: img/emblems.png(5칸 × 2줄, TEAMS 순서). 없는 팀이면 팀 색 동그라미에 첫 글자
+function emb(T, cls = ''){
+  const i = typeof TEAMS !== 'undefined' ? TEAMS.findIndex(x => x.key === T.key || x.short === T.short) : -1;
+  if(i >= 0 && i < 10) return `<span class="emb img ${cls}" style="--tc:${T.color};background-position:${(i % 5) * 25}% ${Math.floor(i / 5) * 100}%" aria-hidden="true"></span>`;
+  return `<span class="emb ${cls}" style="--tc:${T.color}" aria-hidden="true">${esc(T.short[0])}</span>`;
+}
 // 화면 보며 하기에서는 키보드·명령 칸 안내 문장을 빼고 보여 줌 (소리와 글로 하기 화면 정의는 그대로)
-const KEY_HINT = /점\(\.\)|\d번은 다음|번 키|숫자 키|\d+번째 탭|탭 \d+개 중/;
+const KEY_HINT = /점\(\.\)|\d번은 다음|번 키|숫자 키|\d+번째 탭|탭 \d+개 중|위 글을 한 줄씩|\d번을 누르세요/;
 const skClean = q => String(q || '').replace(/명령 칸에 적고 입력을/g, '아래 칸에 적고 확인을').split(/(?<=[.?!])\s+/).filter(x => x && !KEY_HINT.test(x)).join(' ');
+// 질문을 '공격·수비 띠 + 가장 중요한 질문 + 나머지 설명'으로 나눔
 function skQ(q){
   const qs = skClean(q).split(/(?<=[.?!])\s+/).filter(Boolean);
   if(qs.length < 2) return { chip:'', main: qs[0] || '', sub:'' };
@@ -46,6 +57,7 @@ function skQ(q){
   if(side || f.length <= 14) return { chip: f, side, main: qs[qs.length - 1], sub: qs.slice(1, -1).join(' ') };
   return { chip:'', main: qs[qs.length - 1], sub: qs.slice(0, -1).join(' ') };
 }
+const isGame = S => !!(S && S.board && typeof G !== 'undefined' && G);
 
 /* ---------- 틀 ---------- */
 function skinInit(){
@@ -68,10 +80,13 @@ function skinInit(){
     if(e.key === ' ' || e.key === 'Enter'){ e.preventDefault(); e.stopPropagation(); timingTap(); }
     else if(/^[0-9.]$/.test(e.key) || e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); }   // 타이밍을 재는 동안 다른 키는 받지 않음
   }, true);
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if(VIEW.gfx) skFit(); });
+  // 화면 크기가 바뀌면 다시 맞춤
+  let rt = 0; window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if(VIEW.gfx) skFit(); }, 80); });
 }
 function skinRender(S){
   skinInit();
-  const root = document.documentElement, game = !!(S.board && typeof G !== 'undefined' && G);
+  const root = document.documentElement, game = isGame(S);
   root.classList.toggle('sk-game', game);
   root.classList.toggle('sk-menu', !game);
   root.classList.toggle('sk-scene', !game && !!S.scene);
@@ -84,41 +99,102 @@ function skinRender(S){
     else { st.hidden = true; GX.scene = null; }
   }
   let ov = $('#skOv'); if(!ov){ ov = document.createElement('div'); ov.id = 'skOv'; ov.className = 'sk-ov'; } if(ov.parentNode !== st) st.appendChild(ov);
-  ov.innerHTML = game ? plateHTML() : '';
-  $('#skTop').innerHTML = game ? hudHTML() : topHTML(S);
+  ov.innerHTML = game ? hudHTML() + plateHTML() : '';
+  $('#skTop').innerHTML = game ? '' : topHTML(S);
+  $('#skTop').hidden = game;
   const tk = $('#skTick'); tk.hidden = !game; tk.innerHTML = game ? tickHTML(S) : '';
-  if(game) tk.scrollTop = tk.scrollHeight;
   skinBody();
   // 다른 화면으로 가면 열어 둔 창(메모·점수표)은 닫음
   if(SK.sheet && (SK.sheetMake !== UI.make || (SK.sheet === 'note' && !UI.note))) skinSheetClose(true);
 }
 function skinBody(){
   const S = UI.S; if(!S || !SK.el) return;
-  const game = !!(S.board && typeof G !== 'undefined' && G);
+  const game = isGame(S);
+  const key = String(UI.make && UI.make.name) + '|' + skClean(S.q) + '|' + (S.ti ?? '');
+  if(key !== SK.pgKey){ SK.pgKey = key; SK.pgi = S.kind === 'log' ? 1e9 : 0; }
   const body = $('#skBody');
-  body.className = 'sk-body ' + (game ? 'deck' + (S.kind ? ' k-' + S.kind : '') : 'menu');
+  body.className = 'sk-body ' + (game ? 'deck' + (S.kind ? ' k-' + S.kind : '') + (S.sub ? ' sub' : '') : 'menu');
   body.innerHTML = game ? deckHTML(S) : menuHTML(S);
   if(SK.tm && SK.tm.pad && !SK.tm.done) body.appendChild(SK.tm.pad);   // 타이밍을 재는 중에 다시 그려도 스윙 단추는 그대로
+  skFit(); requestAnimationFrame(() => skFit());   // 그림판·글꼴 크기가 자리 잡은 뒤 한 번 더 맞춤
   if(!game && (S.focusCmd || (S.onText && !S.input)) && !('ontouchstart' in window)) setTimeout(() => { const i = $('#skIn'); if(i) i.focus(); }, 30);
 }
 
-/* ---------- 점수판 (경기 화면 위) ---------- */
+/* ---------- 한 화면에 맞추기 ----------
+   조작판·메뉴가 넘치면 단계(f1 설명 줄이기 → f2 칸 좁히기 → f3 열 늘리기·더 작게)를 차례로 붙이고,
+   쪽 넘기기 상자(.pg)는 남은 높이에 들어가는 줄만 보여 줌 */
+function skFit(){
+  const body = $('#skBody'); if(!body || !VIEW.gfx) return;
+  // 넘침: 본문이 넘치거나, 칸 안의 글이 잘림
+  const over = () => body.scrollHeight > body.clientHeight + 1 || [...body.querySelectorAll('.tile, .bt, .card, .gc')].some(e => e.scrollHeight > e.clientHeight + 8);   // 안쪽 여백만큼 겹치는 것은 괜찮음
+  ['f1', 'f2', 'f3'].forEach(c => body.classList.remove(c));
+  body.classList.add('fitting');   // 쪽 넘기기 상자는 잠깐 가장 작게 (다른 것들이 들어가는지 먼저 봄)
+  for(const c of ['f1', 'f2', 'f3']){ if(!over()) break; body.classList.add(c); }
+  body.classList.remove('fitting');
+  body.querySelectorAll('.pg').forEach(paginate);
+  body.classList.toggle('scroll', over());   // 그래도 넘치면(아주 작은 화면) 마지막 수단으로 스크롤
+}
+function paginate(pg){
+  const rows = [...pg.querySelectorAll('.pg-r')], nav = pg.querySelector('.pg-nav');
+  rows.forEach(r => { r.hidden = false; }); if(nav) nav.hidden = true;
+  if(!rows.length) return;
+  const top = pg.getBoundingClientRect().top, H = pg.clientHeight;
+  const last = rows[rows.length - 1].getBoundingClientRect();
+  if(last.bottom - top <= H + 1){ SK.pgn = 1; return; }
+  if(nav) nav.hidden = false;
+  const avail = H - (nav ? nav.offsetHeight + 6 : 0), head = rows[0].getBoundingClientRect().top - top;
+  const pages = []; let start = 0, base = rows[0].getBoundingClientRect().top;
+  rows.forEach((r, i) => { const b = r.getBoundingClientRect(); if(i > start && b.bottom - base + head > avail){ pages.push([start, i]); start = i; base = b.top; } });
+  pages.push([start, rows.length]);
+  const p = clamp(SK.pgi, 0, pages.length - 1); SK.pgi = p; SK.pgn = pages.length;
+  rows.forEach((r, i) => { r.hidden = i < pages[p][0] || i >= pages[p][1]; });
+  if(nav) nav.querySelector('.pg-no').textContent = `${p + 1} / ${pages.length}`;
+  if(nav){ nav.querySelector('[data-d="-1"]').disabled = p === 0; nav.querySelector('[data-d="1"]').disabled = p === pages.length - 1; }
+}
+const pgNav = () => `<div class="pg-nav" hidden><button type="button" class="pg-b" data-sk="pg" data-d="-1" aria-label="앞 쪽">${skIco('back')}</button><span class="pg-no"></span><button type="button" class="pg-b" data-sk="pg" data-d="1" aria-label="다음 쪽">${skIco('next1')}</button></div>`;
+// 표: [{ title, cols, rows:[{ cells, team }], hiTeam, foot }]
+function tableHTML(tabs){
+  const out = [];
+  tabs.forEach(t => {
+    if(t.title && tabs.length > 1) out.push(`<tr class="pg-r sec"><th colspan="${t.cols.length}">${esc(t.title)}</th></tr>`);
+    out.push(`<tr class="pg-r hd">${t.cols.map((c, i) => `<th class="c${i}">${esc(c)}</th>`).join('')}</tr>`);
+    t.rows.forEach(r => {
+      const T = r.team && typeof teamInfo === 'function' ? teamInfo(r.team) : null;
+      out.push(`<tr class="pg-r${T && r.team === t.hiTeam ? ' mine' : ''}">${r.cells.map((c, i) => `<td class="c${i}">${i === 1 && T ? emb(T, 'sm') : ''}${esc(c)}</td>`).join('')}</tr>`);
+    });
+    if(t.foot) out.push(`<tr class="pg-r ft"><td colspan="${t.cols.length}">${esc(t.foot)}</td></tr>`);
+  });
+  return `<div class="pg panel tbl"><table class="st">${out.join('')}</table>${pgNav()}</div>`;
+}
+// 글 목록(쪽 넘기기)
+function listHTML(lines, cls = ''){
+  return `<div class="pg panel lst ${cls}"><div class="lst-in">${lines.map(l => { const s = l.s || l; return `<p class="pg-r${l.k ? ' k-' + l.k : ''}${/^\S+\.$/.test(s) && s.length < 10 ? ' sec' : ''}">${esc(s)}</p>`; }).join('')}</div>${pgNav()}</div>`;
+}
+
+/* ---------- 경기 화면: 그림 위 점수판·선수 상자 ---------- */
 function hudHTML(){
   const [A, H] = G.teams, b = G.bases;
   const lamp = (n, max, c) => Array.from({ length:max }, (_, i) => `<i class="${i < n ? 'on ' + c : ''}"></i>`).join('');
-  const tm = (T, i) => `<div class="hud-tm${!G.over && (i === 0) === G.top ? ' bat' : ''}" style="--tc:${T.color}"><span class="emb">${esc(T.short[0])}</span><span class="nm">${esc(T.short)}</span><b>${runsOf(T)}</b></div>`;
-  const base = (x, y, on) => `<rect x="${x - 6}" y="${y - 6}" width="12" height="12" transform="rotate(45 ${x} ${y})" class="${on ? 'on' : ''}"/>`;
-  return `<button type="button" class="hud" data-sk="box" aria-label="점수표 보기">
-      <div class="hud-score">${tm(A, 0)}${tm(H, 1)}</div>
-      <div class="hud-inn">${G.over ? '<b class="end">경기<br>끝</b>' : `<b>${G.inning}</b><span class="${G.top ? 'up' : 'dn'}">${G.top ? '초' : '말'}</span>`}</div>
-      <svg class="hud-dia" viewBox="0 0 48 40" aria-hidden="true">${base(36, 22, b[0] != null)}${base(24, 10, b[1] != null)}${base(12, 22, b[2] != null)}<path d="M21 32h6v3l-3 3-3-3z" class="hp"/></svg>
-      <div class="hud-cnt"><div><span>B</span>${lamp(G.balls, 3, 'g')}</div><div><span>S</span>${lamp(G.strikes, 2, 'y')}</div><div><span>O</span>${lamp(G.outs, 2, 'r')}</div></div>
-    </button>
-    <div class="hud-btns">${typeof NET !== 'undefined' && NET.on ? `<button type="button" class="sk-ib" data-sk="talk" aria-label="채팅과 음성 대화">${skIco('chat')}</button>` : ''}<button type="button" class="sk-ib" data-sk="menu" aria-label="메뉴">${skIco('menu')}</button></div>`;
+  const tm = (T, i) => `<span class="sb-t${!G.over && (i === 0) === G.top ? ' bat' : ''}">${emb(T)}<b>${runsOf(T)}</b></span>`;
+  const base = (x, y, on) => `<rect x="${x - 5.5}" y="${y - 5.5}" width="11" height="11" transform="rotate(45 ${x} ${y})" class="${on ? 'on' : ''}"/>`;
+  return `<div class="sb"><button type="button" class="sb-main" data-sk="box" aria-label="점수표 보기">
+      ${tm(A, 0)}<span class="sb-inn">${G.over ? '끝' : `${G.inning}<small>${G.top ? '▲' : '▼'}</small>`}</span>${tm(H, 1)}
+      <svg class="sb-dia" viewBox="0 0 44 34" aria-hidden="true">${base(32, 18, b[0] != null)}${base(22, 8, b[1] != null)}${base(12, 18, b[2] != null)}</svg>
+      <span class="sb-cnt"><span><em>B</em>${lamp(G.balls, 3, 'g')}</span><span><em>S</em>${lamp(G.strikes, 2, 'y')}</span><span><em>O</em>${lamp(G.outs, 2, 'r')}</span></span>
+    </button>${typeof NET !== 'undefined' && NET.on ? `<button type="button" class="sb-btn" data-sk="talk" aria-label="채팅과 음성 대화">${skIco('chat')}</button>` : ''}<button type="button" class="sb-btn" data-sk="menu" aria-label="메뉴">${skIco('menu')}</button></div>`;
+}
+// 투수 상자(왼쪽 위)·타자 상자(오른쪽 아래). 누르면 능력치와 공 자취
+function plateHTML(){
+  if(!G || G.over || G.pre) return '';
+  const B = curBatter(G), P = curPitcher(G), bi = batIdx(G), fi = 1 - bi, s = B.st;
+  const left = Math.round(clamp(1 - P.load / P.sta, 0, 1) * 100), col = left > 60 ? 'g' : left > 30 ? 'y' : 'r';
+  const ownB = ownTeam(bi);
+  return `<button type="button" class="np np-p" data-sk="stats" aria-label="투수 ${esc(P.name)} 능력치 보기">${emb(G.teams[fi], 'sm')}<span class="np-tx"><small>투수 · ${P.hand === 'L' ? '좌' : '우'} · ${P.n}구</small><b>${esc(P.name)}</b><span class="sta ${col}"><i style="width:${Math.max(4, left)}%"></i></span></span></button>
+    <button type="button" class="np np-b" data-sk="stats" aria-label="타자 ${esc(B.name)} 능력치 보기">${emb(G.teams[bi], 'sm')}<span class="np-tx"><small>${batTeam(G).bi + 1}번 · ${B.hand === 'L' ? '좌타' : '우타'}${B.cond && (ownB || B.seen) ? ` <em class="${B.cond > 0 ? 'up' : 'dn'}">${B.cond > 0 ? '▲' : '▼'}</em>` : ''}</small><b>${esc(B.name)}</b><span class="np-st">${s.ab}타수 ${s.h}안타${s.hr ? ` · ${s.hr}홈런` : ''}</span></span></button>`;
 }
 // 결과 한 줄: 뜸 들이는 동안은 앞부분(투구 설명)만
 function tickHTML(S){
-  const L = (S.say || []).filter(l => l.k !== 'd' || SET.dice).slice(-2);
+  const L = (S.kind === 'roster' || S.kind === 'log' ? [] : (S.say || [])).filter(l => l.k !== 'd' || SET.dice).slice(-2);
   if(!L.length) return `<p class="dim">${esc(G.over ? situation(G) : `${halfName(G)} · ${batTeam(G).short} 공격`)}</p>`;
   return L.map(l => `<p class="${l.k ? 'k-' + l.k : ''}${l.after ? ' after' : ''}${l.tail ? ' cur' : ''}">${esc(l.s || l)}${l.tail ? `<span class="tail"> ${esc(l.tail)}</span>` : ''}</p>`).join('');
 }
@@ -127,69 +203,81 @@ function lineScoreHTML(){
   const n = Math.max(G.innings, G.inning, ...G.teams.map(T => T.R.length));
   const cols = Array.from({ length:n }, (_, i) => i);
   const played = ti => ti === 0 ? G.inning : (G.top && !G.over ? G.inning - 1 : G.inning);
-  const row = (T, ti) => `<tr><th style="--tc:${T.color}"><span class="emb">${esc(T.short[0])}</span>${esc(T.short)}</th>${cols.map(i => `<td>${i < played(ti) ? (T.R[i] || 0) : ''}</td>`).join('')}<td class="r">${runsOf(T)}</td><td>${T.H}</td><td>${T.E}</td></tr>`;
+  const row = (T, ti) => `<tr><th>${emb(T, 'sm')}${esc(T.short)}</th>${cols.map(i => `<td>${i < played(ti) ? (T.R[i] || 0) : ''}</td>`).join('')}<td class="r">${runsOf(T)}</td><td>${T.H}</td><td>${T.E}</td></tr>`;
   return `<div class="ls-wrap"><table class="ls"><thead><tr><th></th>${cols.map(i => `<th>${i + 1}</th>`).join('')}<th class="r">R</th><th>H</th><th>E</th></tr></thead><tbody>${G.teams.map(row).join('')}</tbody></table></div>`;
+}
+// 지금 상황: 다이아몬드 위 주자 이름, 볼카운트, 아웃, 타자·투수
+function situationHTML(){
+  const T = batTeam(G), b = G.bases, B = curBatter(G), P = curPitcher(G);
+  const rn = k => b[k] != null ? `<span class="rn on">${esc(T.bat[b[k]].name)}</span>` : '<span class="rn">비어 있음</span>';
+  const lamp = (n, max, c) => Array.from({ length:max }, (_, i) => `<i class="${i < n ? 'on ' + c : ''}"></i>`).join('');
+  return `<div class="situ"><div class="situ-dia"><div class="b2">2루 ${rn(1)}</div><div class="b3">3루 ${rn(2)}</div><div class="b1">1루 ${rn(0)}</div>
+      <svg viewBox="0 0 100 100" aria-hidden="true"><path d="M50 88 88 50 50 12 12 50Z" fill="#2e9b3e" stroke="#fff" stroke-width="2"/>${[[88, 50, 0], [50, 12, 1], [12, 50, 2]].map(([x, y, k]) => `<rect x="${x - 7}" y="${y - 7}" width="14" height="14" transform="rotate(45 ${x} ${y})" fill="${b[k] != null ? '#ffcf33' : '#fff'}" stroke="#0d3f8f" stroke-width="2"/>`).join('')}<path d="M44 84h12v6l-6 6-6-6z" fill="#fff"/></svg></div>
+    <div class="situ-cnt"><span><em>B</em>${lamp(G.balls, 3, 'g')}</span><span><em>S</em>${lamp(G.strikes, 2, 'y')}</span><span><em>O</em>${lamp(G.outs, 2, 'r')}</span></div>
+    <div class="situ-vs"><span>${emb(T, 'sm')}<small>타자</small><b>${esc(B.name)}</b><em>${esc(batterLine(B))}</em></span><span>${emb(fieldTeam(G), 'sm')}<small>투수</small><b>${esc(P.name)}</b><em>${P.n}구</em></span></div></div>`;
 }
 
 /* ---------- 조작판 (경기 화면 아래) ---------- */
 const MINOR = /더 보기|지금 상황|맡기기|노림수|사인대로|수비 위치|투수 상태|작전:|지난 공 그대로|돌아가기/;
-function deckHead(S, extra = '', noSub = false){
+function deckHead(S, noSub = false){
   const q = skQ(S.q); if(noSub) q.sub = '';
-  return `<div class="dk-head">${S.back ? `<button type="button" class="sk-ib sm" data-sk="back" aria-label="뒤로">${skIco('back')}</button>` : ''}
-    ${q.chip ? `<span class="chip ${q.side || ''}">${esc(q.chip)}</span>` : ''}<div class="dk-q"><b>${esc(q.main)}</b>${q.sub ? `<small>${esc(q.sub)}</small>` : ''}</div>${extra}</div>`;
+  return `<div class="dk-head">${S.back ? `<button type="button" class="rb" data-sk="back" aria-label="뒤로">${skIco('back')}</button>` : ''}
+    ${q.chip ? `<span class="chip ${q.side || ''}">${esc(q.chip)}</span>` : ''}<div class="dk-q"><b>${esc(q.main)}</b>${q.sub ? `<small>${esc(q.sub)}</small>` : ''}</div></div>`;
 }
 function deckHTML(S){
   const notes = S.note ? `<div class="dk-note">${S.note.map(l => `<p>${esc(l)}</p>`).join('')}</div>` : '';
-  if(S.kind === 'pitch' && !G.over) return deckHead(S, '', true) + pitchDeck(S);
-  if(S.kind === 'bat' && !G.over) return deckHead(S, '', true) + batDeck(S);
-  return deckHead(S, '', !G.over && !G.pre && !S.sub) + (G.over ? lineScoreHTML() : '') + notes + (S.grid ? gridHTML(S) : optsHTML(S, true));
+  if(S.kind === 'pitch' && !G.over) return deckHead(S, true) + pitchDeck(S);
+  if(S.kind === 'bat' && !G.over) return deckHead(S, true) + batDeck(S);
+  if(S.kind === 'roster') return deckHead(S) + rosterHTML(S.ti) + optsHTML(S, true);
+  if(S.kind === 'log') return deckHead(S) + listHTML(S.say || [], 'log') + optsHTML(S, true);
+  return deckHead(S, !G.over && !G.pre && !S.sub) + (G.over ? lineScoreHTML() : '') + notes + (S.grid ? gridHTML(S) : optsHTML(S, true));
 }
-// 지금 타자 대 투수 (누르면 능력치와 공 자취)
-// 그림 위 이름표 (TV 중계처럼): 타자는 왼쪽 아래, 투수는 오른쪽 위. 누르면 능력치와 공 자취
-function plateHTML(){
-  if(!G || G.over || G.pre) return '';
-  const B = curBatter(G), P = curPitcher(G), bi = batIdx(G), fi = 1 - bi;
-  const left = Math.round(clamp(1 - P.load / P.sta, 0, 1) * 100), col = left > 60 ? 'g' : left > 30 ? 'y' : 'r';
-  const ownB = ownTeam(bi);
-  return `<button type="button" class="np np-b" data-sk="stats" style="--tc:${G.teams[bi].color}" aria-label="타자 ${esc(B.name)} 능력치 보기"><small>${batTeam(G).bi + 1}번 · ${B.hand === 'L' ? '좌타' : '우타'}${B.cond && (ownB || B.seen) ? ` <em class="${B.cond > 0 ? 'up' : 'dn'}">${B.cond > 0 ? '▲' : '▼'}</em>` : ''}</small><b>${esc(B.name)}</b><em>${esc(batterLine(B))}</em></button>
-    <button type="button" class="np np-p" data-sk="stats" style="--tc:${G.teams[fi].color}" aria-label="투수 ${esc(P.name)} 능력치 보기"><small>${P.hand === 'L' ? '좌투' : '우투'} · ${P.n}구</small><b>${esc(P.name)}</b><span class="sta ${col}"><i style="width:${Math.max(4, left)}%"></i></span></button>`;
+// 명단: 타자(오늘 기록)와 투수
+function rosterHTML(ti){
+  const T = G.teams[ti], own = ownTeam(ti), d = detailed(G);
+  const g = v => own ? v : grade(v);
+  const rows = T.bat.map((b, i) => ({ cells: d ? [i + 1, b.name, POS[b.pos], `${b.st.ab}-${b.st.h}`, g(b.con), g(b.pow), g(b.spd)] : [i + 1, b.name, POS[b.pos], `${b.st.ab}-${b.st.h}`, b.st.hr || 0, b.st.rbi || 0, b.st.bb || 0] }));
+  const prow = T.pit.map((p, i) => ({ cells:[i === T.pi ? '지금' : p.used ? '던짐' : '', p.name, p.hand === 'L' ? '좌' : '우', `${p.n || 0}구`, g(p.ctl), g(p.stf), g(p.sta)] }));
+  const tabs = [{ title:'타자', cols: d ? ['', '타자', '자리', '타수-안타', '컨택', '파워', '주력'] : ['', '타자', '자리', '타수-안타', '홈런', '타점', '볼넷'], rows }];
+  if(d) tabs.push({ title:'투수', cols:['', '투수', '손', '투구', '제구', '구위', '체력'], rows: prow });
+  return tableHTML(tabs);
 }
-// 선택지 단추 (경기 화면): 중요한 것은 큰 칸, 메뉴 성격은 아래 작은 단추
+// 선택지 아이콘
 function optIcon(o){
   const t = o.t;
   const k = /^강하게|풀스윙/.test(t) ? 'power' : /^맞히기/.test(t) ? 'contact' : /^지켜보기|^지켜/.test(t) ? 'take' : /번트/.test(t) ? 'bunt' : /도루|대주자|히트 앤드 런/.test(t) ? 'run'
     : /^치기|보통 치기|스윙|타자에게|적극|대타/.test(t) ? 'swing' : /노림수|노려/.test(t) ? 'target' : /사인대로|포수/.test(t) ? 'sign' : /수비 위치/.test(t) ? 'field' : /작전|고의|견제|교체/.test(t) ? 'flag'
-    : /지난 공/.test(t) ? 'repeat' : /더 보기/.test(t) ? 'more' : /상황/.test(t) ? 'info' : /승부|유인구|던지|공을/.test(t) ? 'ball' : /자동 재생 멈/.test(t) ? 'pause' : /자동 재생/.test(t) ? 'play' : /^다음|끝까지/.test(t) ? 'next' : /채팅|음성/.test(t) ? 'chat' : '';
+    : /지난 공/.test(t) ? 'repeat' : /더 보기/.test(t) ? 'more' : /상황/.test(t) ? 'info' : /승부|유인구|던지|공을/.test(t) ? 'ball' : /자동 재생 멈/.test(t) ? 'pause' : /자동 재생/.test(t) ? 'play' : /^다음|끝까지/.test(t) ? 'next'
+    : /채팅|음성/.test(t) ? 'chat' : /점수판|기록/.test(t) ? 'list' : /처음 화면|그만하기|나가기/.test(t) ? 'home' : /명단|타자와 투수/.test(t) ? 'list' : '';
   return k ? skIco(k) : '';
 }
+// 확률(헛스윙 20% 파울 37% …)을 막대로
 function pctChips(s){
   const out = []; const re = /([가-힣A-Za-z ]{1,10}?)\s?(\d{1,3})%/g; let m;
   while((m = re.exec(s || '')) && out.length < 4) out.push([m[1].replace(/^(의|은|는|이|가)\s/, '').trim().replace(/^.*\s(\S+)$/, '$1'), Number(m[2])]);
   if(out.length < 2) return '';
-  const sum = out.reduce((a, x) => a + x[1], 0), COL = ['#ff5d6c', '#ffcf33', '#3ddc84', '#3fa9ff'];
-  return `<span class="pct">${out.map(([n, v]) => `${esc(n)} <b>${v}%</b>`).join(' · ')}${sum >= 95 && sum <= 105 ? `<span class="pbar">${out.map(([, v], i) => `<i style="width:${v}%;background:${COL[i]}"></i>`).join('')}</span>` : ''}</span>`;
+  const COL = ['#ff5d6c', '#ffb800', '#22b35a', '#2f8cf0'];
+  return `<span class="pct">${out.map(([n, v], i) => `<span class="pr"><span class="pn">${esc(n)}</span><span class="pb"><i style="width:${Math.min(100, v)}%;background:${COL[i]}"></i></span><b>${v}%</b></span>`).join('')}</span>`;
 }
+const TONE = t => /^강하게|풀스윙|정면 승부|스트라이크로/.test(t) ? 'r' : /^맞히기|유인구/.test(t) ? 'b' : /^지켜|고의|신청하지|받아들이/.test(t) ? 's' : /번트|도루|히트/.test(t) ? 'g' : 'o';
 function optsHTML(S, game){
   const want = (S.opts || []).filter(o => !o.hide);
   const minor = game ? want.filter(o => o.key === 'status' || MINOR.test(o.t)) : [];
   const major = want.filter(o => !minor.includes(o));
-  const list = major.length > 6 || major.some(o => (o.s || '').length > 60 || /\d+%.*\d+%/.test(o.s || '')) || !game;
+  const n = major.length, cols = n <= 1 ? 1 : n <= 8 ? 2 : 3;
   const tile = o => {
     const pc = game ? pctChips(o.s) : '';
-    return `<button type="button" class="tile${o.cls === 'z' ? ' z' : ''}" data-sk="opt" data-n="${o.n}"><span class="num">${o.n}</span>${optIcon(o)}<span class="tx"><b>${esc(o.t)}</b>${pc || (o.s ? `<small>${esc(o.s)}</small>` : '')}</span></button>`;
+    return `<button type="button" class="tile t-${TONE(o.t)}" data-sk="opt" data-n="${o.n}">${optIcon(o)}<span class="tx"><b>${esc(o.t)}</b>${pc || (o.s ? `<small>${esc(o.s)}</small>` : '')}</span></button>`;
   };
-  return `<div class="tiles${list ? ' list' : ''}${major.length === 1 ? ' one' : ''}">${major.map(tile).join('')}</div>`
-    + (minor.length ? `<div class="minors">${minor.map(o => `<button type="button" class="mn" data-sk="opt" data-n="${o.n}">${optIcon(o)}<span>${esc(o.t.replace(/^작전: /, '작전 · '))}</span></button>`).join('')}</div>` : '');
+  return (n ? `<div class="tiles c${cols}" style="--rows:${Math.ceil(n / cols)}">${major.map(tile).join('')}</div>` : '')
+    + (minor.length ? `<div class="minors${minor.length >= 4 ? ' stk' : ''}">${minor.map(o => `<button type="button" class="mn" data-sk="opt" data-n="${o.n}">${optIcon(o)}<span>${esc(o.t.replace(/^작전: /, '작전 · '))}</span></button>`).join('')}</div>` : '');
 }
-// 정해진 자리에 놓는 선택지(코스·높이·붙이기·방 코드 숫자판)
+// 정해진 자리에 놓는 선택지(코스·높이·붙이기)
 function gridHTML(S){
   const want = (S.opts || []).filter(o => !o.hide), placed = want.filter(o => o.pos), rest = want.filter(o => !o.pos);
   const rows = placed.length ? Math.max(...placed.map(o => o.pos[0])) + 1 : 0;
   const cells = placed.map(o => `<button type="button" class="gc" style="grid-row:${o.pos[0] + 1};grid-column:${o.pos[1] + 1}" data-sk="opt" data-n="${o.n}"><b>${esc(o.t)}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</button>`).join('');
-  const noPos = !placed.length ? want.filter(o => o.cls === 'z') : [];
-  const pad = noPos.map(o => `<button type="button" class="gc key" data-sk="opt" data-n="${o.n}"><b>${esc(o.t)}</b></button>`).join('');
-  const others = (placed.length ? rest : want.filter(o => o.cls !== 'z'));
-  return `<div class="gridz${placed.length ? '' : ' pad'}" style="${rows ? `grid-template-rows:repeat(${rows}, minmax(0, 1fr))` : ''}">${cells}${pad}</div>${others.length ? optsHTML({ opts: others }, true) : ''}`;
+  return `<div class="gridz" style="${rows ? `grid-template-rows:repeat(${rows}, minmax(0, 1fr))` : ''}">${cells}</div>${rest.length ? optsHTML({ opts: rest }, true) : ''}`;
 }
 
 /* ---------- 정밀 모드 수비: 한 화면에서 고르고 던지기 ---------- */
@@ -247,8 +335,8 @@ function pitchDeck(S){
   const opt = n => (S.opts || []).find(o => !o.hide && String(o.n) === String(n));
   const util = [5, 6, 7, 8, 9, 0].map(opt).filter(Boolean);
   return `<div class="pc">${pts}${zone}<div class="pc-side">${edgeSeg}${powUI}</div></div>
-    <button type="button" class="sk-go def" data-sk="throw"${ready ? '' : ' disabled'}>${skIco('ball')}<span><b>던지기</b><small>${esc(sum)}</small></span></button>
-    <div class="minors">${util.map(o => `<button type="button" class="mn" data-sk="opt" data-n="${o.n}">${optIcon(o)}<span>${esc(o.t.replace(/^작전: /, '작전 · ').replace('포수 사인대로 던지기', '포수 사인대로'))}</span></button>`).join('')}</div>`;
+    <button type="button" class="sk-go" data-sk="throw"${ready ? '' : ' disabled'}>${skIco('ball')}<span><b>던지기</b><small>${esc(sum)}</small></span></button>
+    <div class="minors${util.length >= 4 ? ' stk' : ''}">${util.map(o => `<button type="button" class="mn" data-sk="opt" data-n="${o.n}">${optIcon(o)}<span>${esc(o.t.replace(/^작전: .*/, '작전').replace('포수 사인대로 던지기', '포수 사인').replace('수비 위치 바꾸기', '수비 위치').replace('지금 상황 확인', '상황').replace('지난 공 그대로', '지난 공'))}</span></button>`).join('')}</div>`;
 }
 function pitchThrow(){
   const s = SK.pc, p = picks(); if(!s) return;
@@ -271,7 +359,8 @@ function batDeck(S){
   const tmg = timingOn();
   const big = o => {
     const swing = /^(치기|강하게 치기|맞히기)$/.test(o.t);
-    return `<button type="button" class="bt bt-${optIcon(o) ? (o.t === '치기' ? 'swing' : /강하게/.test(o.t) ? 'power' : /맞히기/.test(o.t) ? 'contact' : /지켜/.test(o.t) ? 'take' : 'swing') : 'swing'}" data-sk="${tmg && swing ? 'bat' : 'opt'}" data-n="${o.n}">${optIcon(o)}<b>${esc(o.t)}</b>${tmg && swing ? '<em class="tmb">타이밍</em>' : ''}<small>${esc(o.s || '')}</small></button>`;
+    const cls = o.t === '치기' ? 'swing' : /강하게|스윙 세기/.test(o.t) ? 'power' : /맞히기/.test(o.t) ? 'contact' : /지켜/.test(o.t) ? 'take' : 'swing';
+    return `<button type="button" class="bt bt-${cls}" data-sk="${tmg && swing ? 'bat' : 'opt'}" data-n="${o.n}">${optIcon(o)}<b>${esc(o.t)}</b>${tmg && swing ? '<em class="tmb">타이밍</em>' : ''}<small>${esc(o.s || '')}</small></button>`;
   };
   return `<div class="bt-grid n${main.length}">${main.map(big).join('')}</div>
     ${mid.length ? `<div class="bt-mid">${mid.map(o => `<button type="button" class="mid${/걸었음/.test(o.t) ? ' on' : ''}" data-sk="opt" data-n="${o.n}">${optIcon(o)}<span>${esc(o.t.replace('노림수: ', '노림수 · ').replace('히트 앤드 런: 걸었음', '히트 앤드 런 ✓'))}</span></button>`).join('')}</div>` : ''}
@@ -305,7 +394,7 @@ function timingStart(n){
       msg.textContent = '';
       const kk = Math.min(k, 1.4), drop = S2.brk ? S2.brk * Math.pow(Math.max(0, kk - 0.55), 2) * 40 : 0;
       ball.style.opacity = '1';
-      ball.style.top = `${30 + kk * 52 + drop}%`;
+      ball.style.top = `${36 + kk * 46 + drop}%`;
       ball.style.left = `${50 + S2.side * kk * 6 + (S2.brk ? S2.side * drop * 0.2 : 0)}%`;
       ball.style.transform = `translate(-50%, -50%) scale(${0.35 + kk * 1.1})`;
       ring.classList.toggle('hot', Math.abs(k - 1) < 0.12);
@@ -339,19 +428,28 @@ function timingEnd(tm){
 /* ---------- 메뉴 화면 ---------- */
 function topHTML(S){
   const fsOn = typeof FS !== 'undefined' && FS.on(), canFs = typeof isStandalone === 'function' && !isStandalone();
-  return `<div class="bar">${S.back ? `<button type="button" class="sk-ib" data-sk="back" aria-label="뒤로">${skIco('back')}</button>` : '<span class="logo-s" aria-hidden="true">⚾</span>'}
-    <b class="ttl">손잡다 야구</b>
-    ${canFs ? `<button type="button" class="sk-ib" data-sk="fs" aria-label="${fsOn ? '전체화면 끄기' : '전체화면 켜기'}">${skIco(fsOn ? 'fsx' : 'fs')}</button>` : ''}
-    ${S.hero ? `<button type="button" class="sk-ib" data-sk="menu" aria-label="설정">${uiGlyph('설정')[1]}</button>` : ''}</div>`;
+  const title = S.hero ? '' : S.onTab ? '설정' : menuTitle(S).title;
+  return `<div class="bar">${S.back ? `<button type="button" class="rb" data-sk="back" aria-label="뒤로">${skIco('back')}</button>` : ''}
+    <b class="ttl">${esc(title)}</b>
+    ${canFs ? `<button type="button" class="rb b" data-sk="fs" aria-label="${fsOn ? '전체화면 끄기' : '전체화면 켜기'}">${skIco(fsOn ? 'fsx' : 'fs')}</button>` : ''}
+    ${S.hero ? `<button type="button" class="rb b" data-sk="menu" aria-label="설정">${uiGlyph('설정')[1]}</button>` : ''}</div>`;
+}
+// 메뉴 화면 제목: '…입니다.'로 끝나는 첫 문장이 있으면 그것(예: 순위표, 홈런 순위), 없으면 마지막 질문. 나머지 문장은 제목 아래 작은 글
+function menuTitle(S){
+  const qs = skClean(S.q).split(/(?<=[.?!])\s+/).filter(Boolean);
+  const i = qs.findIndex(x => /입니다\.$/.test(x) && x.length <= 24);
+  if(i >= 0) return { title: qs[i].replace(/(이)?입니다\.$/, ''), sub: qs.filter((_, j) => j !== i && !/고르세요|읽어 보세요/.test(qs[j])).join(' ') };
+  return { title: qs[qs.length - 1] || '손잡다 야구', sub: qs.slice(0, -1).join(' ') };
 }
 function menuHTML(S){
-  const out = [];
-  if(S.hero) out.push(`<div class="hero"><div class="hero-art" aria-hidden="true"></div><div class="hero-tx"><span class="kick">듣고 보고 고르는 확률 야구</span><h1>손잡다<br>야구</h1></div></div>`);
+  const out = [], q = { sub: menuTitle(S).sub };
+  if(S.hero) out.push(`<div class="hero"><div class="hero-art" aria-hidden="true"></div><div class="hero-tx"><span class="kick">듣고 보고 고르는 확률 야구</span><h1>손잡다 야구</h1></div></div>`);
   if(S.top) out.push(`<div class="mtop">${S.top}</div>`);
-  if(S.say && S.say.length) out.push(`<div class="say">${S.say.map(l => `<p class="${l.k ? 'k-' + l.k : ''}">${esc(l.s || l)}</p>`).join('')}</div>`);
+  // 질문의 설명 부분(제목 아래 작은 글)
+  if(!S.hero && !S.onTab && q.sub) out.push(`<p class="msub">${esc(q.sub)}</p>`);
+  if(S.table && S.table.length) out.push(tableHTML(S.table));
+  else if(S.say && S.say.length) out.push(S.say.length > 3 || S.say.join('').length > 160 ? listHTML(S.say) : `<div class="say panel">${S.say.map(l => `<p class="${l.k ? 'k-' + l.k : ''}">${esc(l.s || l)}</p>`).join('')}</div>`);
   if(S.note && !S.hero) out.push(`<div class="mnote">${S.note.map(l => `<p>${esc(l)}</p>`).join('')}</div>`);
-  const q = skQ(S.q);
-  if(!S.hero) out.push(`<h2 class="mq">${S.onTab ? '설정' : `${q.sub ? `<small>${esc(q.sub)}</small>` : ''}${esc(q.main || q.chip)}`}</h2>`);
   if(S.input){
     const buf = UI.codeBuf || '';
     out.push(`<div class="code">${[0, 1, 2, 3].map(i => `<span class="${buf[i] ? 'on' : ''}">${esc(buf[i] || '')}</span>`).join('')}</div>`);
@@ -359,7 +457,7 @@ function menuHTML(S){
     out.push(`<div class="keypad">${keys.map(o => `<button type="button" class="key" data-sk="opt" data-n="${o.n}">${esc(o.t)}</button>`).join('')}<button type="button" class="key del" data-sk="back">지우기</button></div>`);
     return out.join('');
   }
-  if(S.focusCmd || S.onText) out.push(`<form id="skForm" class="sk-form" autocomplete="off"><input id="skIn" type="text" maxlength="40" placeholder="여기에 적으세요" enterkeyhint="done" autocapitalize="off" spellcheck="false"><button type="submit" class="sk-btn pri">확인</button></form>`);
+  if(S.focusCmd || S.onText) out.push(`<form id="skForm" class="sk-form" autocomplete="off"><input id="skIn" type="text" maxlength="40" placeholder="여기에 적으세요" enterkeyhint="done" autocapitalize="off" spellcheck="false"><button type="submit" class="gb y">확인</button></form>`);
   if(S.grid) out.push(gridHTML(S));
   else out.push(menuOpts(S));
   return out.join('');
@@ -368,43 +466,50 @@ function menuOpts(S){
   const want = (S.opts || []).filter(o => !o.hide && !(S.onTab && /^다음 탭:/.test(o.t)));   // 설정 탭은 위 탭 줄로 옮김
   if(!want.length) return '';
   const sets = want.filter(o => /^([^:]{2,24}):\s*(.+)$/.test(o.t)).length;
-  const setList = sets * 2 >= want.length && sets > 0;
+  const setList = (sets * 2 >= want.length && sets > 0) || !!S.onTab;
   const team = o => typeof TEAMS !== 'undefined' && TEAMS.find(T => o.t === T.name || o.t.startsWith(T.name + ' ') || o.t.startsWith(T.name + ',') || o.t === T.short);
   const teams = want.filter(team).length >= 4;
+  // 돌아가기만 있는 화면(기록 보기 등)은 작은 단추로
+  if(want.length === 1 && /돌아가기/.test(want[0].t)) return `<div class="mback"><button type="button" class="gb b" data-sk="opt" data-n="${want[0].n}">${skIco('back')}${esc(want[0].t)}</button></div>`;
   const cards = want.map(o => {
     const T = team(o);
-    if(teams && T) return `<button type="button" class="card team" style="--tc:${T.color}" data-sk="opt" data-n="${o.n}"><span class="emb big">${esc(T.short[0])}</span><span class="tx"><b>${esc(T.name)}</b><small>${esc(o.s || '')}</small></span><span class="num">${o.n}</span></button>`;
+    if(teams && T) return `<button type="button" class="card team" style="--tc:${T.color}" data-sk="opt" data-n="${o.n}">${emb(T, 'big')}<span class="tx"><b>${esc(T.name)}</b><small>${esc(o.s || '')}</small></span></button>`;
     const m = /^([^:]{2,24}):\s*(.+)$/.exec(o.t);
-    if(setList && m){
+    // 설정 목록: 값이 있는 줄은 오른쪽에 값(켬·끔은 스위치), 값이 없는 줄(소리 시험 등)은 오른쪽에 화살표. 모두 같은 줄 모양
+    if(setList){
+      if(!m) return `<button type="button" class="card row act" data-sk="opt" data-n="${o.n}"><span class="tx"><b>${esc(o.t)}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</span><span class="chev">${skIco('next1')}</span></button>`;
       const v = m[2], on = /^(켬|켜짐)$/.test(v), off = /^(끔|꺼짐|읽지 않음)$/.test(v);
-      return `<button type="button" class="card row" data-sk="opt" data-n="${o.n}"><span class="tx"><b>${esc(m[1])}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</span><span class="val${on ? ' on' : off ? ' off' : ''}">${on || off ? `<i class="sw${on ? ' on' : ''}"></i>` : ''}${esc(v)}</span></button>`;
+      return `<button type="button" class="card row" data-sk="opt" data-n="${o.n}"><span class="tx"><b>${esc(m[1])}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</span><span class="val${on ? ' on' : off ? ' off' : ''}">${on || off ? `<i class="sw${on ? ' on' : ''}"></i>` : esc(v)}</span></button>`;
     }
     const g = uiGlyph(o.t);
-    return `<button type="button" class="card${S.hero ? ' hero-c' : ''}${S.hero && /이어하기/.test(o.t) ? ' wide pri' : ''}" data-sk="opt" data-n="${o.n}">${g ? `<span class="gico g-${g[0]}" aria-hidden="true">${g[1]}</span>` : ''}<span class="tx"><b>${esc(o.t)}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</span><span class="num">${o.n}</span></button>`;
+    return `<button type="button" class="card${S.hero ? ' hero-c' : ''}${S.hero && /이어하기/.test(o.t) ? ' wide pri' : ''}" data-sk="opt" data-n="${o.n}">${g ? `<span class="gico g-${g[0]}" aria-hidden="true">${g[1]}</span>` : ''}<span class="tx"><b>${esc(o.t)}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</span></button>`;
   }).join('');
-  return `<div class="cards${S.hero ? ' home' : ''}${teams ? ' teams' : ''}${setList ? ' sets' : ''}">${cards}</div>`;
+  const many = want.length > 6 ? ' many' : '';
+  return `<div class="cards${S.hero ? ' home' : ''}${teams ? ' teams' : ''}${setList ? ' sets' : ''}${many}">${cards}</div>`;
 }
 
-/* ---------- 창 (메모·점수표·능력치) ---------- */
-function skinNote(lines, html, title){
+/* ---------- 창 (메모·점수표·능력치·지금 상황) ---------- */
+function skinNote(lines, html, title, kind){
   skinInit();
+  if(!html && kind && typeof G !== 'undefined' && G){
+    if(kind === 'score'){ html = lineScoreHTML() + `<p class="sh-sit">${esc(situation(G))}</p>`; title = '점수표'; }
+    else if(kind === 'who'){ const h = document.createElement('div'); gstatRender(G, h); html = h.innerHTML; title = '타자와 투수'; }
+    else if(kind === 'status'){ html = situationHTML(); title = `${halfName(G)} · ${scoreText(G)}`; }
+    else if(kind === 'recent'){ html = `<div class="rec">${(lines || []).map(l => `<p>${esc(l)}</p>`).join('')}</div>`; title = '최근 기록'; }
+  }
   const sh = $('#skSheet');
   SK.sheet = html ? 'custom' : 'note'; SK.sheetMake = UI.make;
+  if(kind) SK.sheet = 'note';
   sh.innerHTML = `<div class="sh-back" data-sk="shx"></div><div class="sh-box" role="dialog" aria-modal="true" aria-label="${esc(title || '알림')}">
-    ${title ? `<h3>${esc(title)}</h3>` : ''}<div class="sh-body">${html || (lines || []).map(l => `<p>${esc(l)}</p>`).join('')}</div>
-    <button type="button" class="sk-btn pri" data-sk="shx">닫기</button></div>`;
+    <div class="sh-h"><h3>${esc(title || '알림')}</h3><button type="button" class="rb" data-sk="shx" aria-label="닫기">${skIco('x')}</button></div><div class="sh-body">${html || (lines || []).map(l => `<p>${esc(l)}</p>`).join('')}</div>
+    <button type="button" class="gb y" data-sk="shx">닫기</button></div>`;
   sh.hidden = false;
-  setTimeout(() => { const b = sh.querySelector('.sk-btn'); if(b) b.focus({ preventScroll:true }); }, 30);
+  setTimeout(() => { const b = sh.querySelector('.gb'); if(b) b.focus({ preventScroll:true }); }, 30);
 }
 function skinSheetClose(silent){
   const sh = $('#skSheet'); if(!sh) return;
   sh.hidden = true; sh.innerHTML = ''; SK.sheet = null;
   if(!silent) UI.note = null;
-}
-function statsSheet(){
-  const host = document.createElement('div'); host.className = 'sk-stats';
-  gstatRender(G, host); host.hidden = false;
-  skinNote(null, host.innerHTML, '타자와 투수');
 }
 
 /* ---------- 누르기 ---------- */
@@ -420,9 +525,10 @@ function skinClick(e){
   else if(a === 'menu'){ stopAutoPlay(); openMenu('click'); }
   else if(a === 'talk' && typeof talkScreen === 'function') go(talkScreen, 'click');
   else if(a === 'fs') FS.toggle();
-  else if(a === 'box' && G) skinNote(null, lineScoreHTML() + `<p class="sh-sit">${esc(situation(G))}</p>`, '점수표');
-  else if(a === 'stats' && G) statsSheet();
+  else if(a === 'box' && G) skinNote(null, null, null, 'score');
+  else if(a === 'stats' && G) skinNote(null, null, null, 'who');
   else if(a === 'shx') skinSheetClose();
+  else if(a === 'pg'){ SK.pgi = clamp(SK.pgi + Number(b.dataset.d), 0, (SK.pgn || 1) - 1); $('#skBody').querySelectorAll('.pg').forEach(paginate); }
   else if(a === 'pt' && SK.pc){ SK.pc.t = b.dataset.t; skinBody(); }
   else if(a === 'z' && SK.pc){
     const r = Number(b.dataset.r), c = b.dataset.c != null ? Number(b.dataset.c) : null, e2 = b.dataset.e;

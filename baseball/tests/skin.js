@@ -19,7 +19,7 @@ const PORT = 8767;
   const clickOpt = async (page, n) => {
     const skin = await page.evaluate(() => document.documentElement.classList.contains('skin'));
     if(!skin) return page.click(`#opts .opt[data-n="${n}"]`);
-    if(await page.isVisible('#skSheet .sk-btn')) await page.click('#skSheet .sk-btn');
+    if(await page.isVisible('#skSheet .gb')) await page.click('#skSheet .gb');
     const sel = `#sk [data-sk="opt"][data-n="${n}"]`;
     if(await page.$(sel) && await page.isVisible(sel)) return page.click(sel);
     if(await page.$('#sk [data-sk="throw"]') && Math.random() < 0.7){
@@ -78,12 +78,14 @@ const PORT = 8767;
         await clickOpt(page, os[Math.floor(Math.random() * os.length)].n);
       }
       if(steps === 3){ await noOverflow(page, tag + ' 경기'); }
+      // 스크롤 없이 한 화면: 조작판이 스크롤 상태가 되면 안 됨
+      if(await page.evaluate(() => { const b = document.querySelector('#skBody'); return b && b.classList.contains('scroll'); })) errors.push(`${tag}: 조작판이 한 화면을 넘침 (${await page.evaluate(() => UI.S.q)})`);
     }
     if(!(await page.evaluate(() => G.over))) errors.push(`${tag}: 600번 안에 끝나지 않음`);
     if(!throws) errors.push(`${tag}: 한 화면 던지기를 한 번도 하지 않음`);
     // 점수표·능력치 창
     await page.click('#sk [data-sk="box"]'); if(!(await page.isVisible('#skSheet .ls'))) errors.push(`${tag}: 점수표 창이 열리지 않음`);
-    await page.click('#skSheet .sk-btn');
+    await page.click('#skSheet .gb');
     console.log(`${tag}: ${steps}번 만에 끝, 던지기 ${throws}번, 타이밍 스윙 ${swings}번(딱 맞음 기록 ${perfect})`);
     await ctx.close();
   }
