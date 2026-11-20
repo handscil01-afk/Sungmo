@@ -1,4 +1,4 @@
-const CACHE = 'caption-v3';
+const CACHE = 'caption-v5';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './icon-maskable-512.png',
   './css/app.css',
   './js/config.js', './js/util.js', './js/store.js', './js/pwa.js', './js/reader.js', './js/typist.js', './js/app.js',

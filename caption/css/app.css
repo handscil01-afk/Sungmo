@@ -124,3 +124,9 @@ button.ln:hover{background:var(--panel)}
 .btn.spk{border-color:var(--acc)}
 #tLivePanel.minutes .padbar .btn small{display:none}
 .spkgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.rlist{flex:1;min-height:0;overflow-y:auto;background:var(--rbg);color:var(--rfg);font-size:var(--rsize);line-height:1.45;padding:6px max(16px,env(safe-area-inset-left,0px)) 12px}
+.rlist:focus{outline:none}
+.rl{margin:0;padding:1px 8px;border-left:4px solid transparent;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;border-radius:4px}
+.rl.now{border-left-color:var(--ok)}
+.rl:focus{outline:3px solid var(--acc);outline-offset:-2px}
+#vRead[data-theme="light"] .rl:focus{outline-color:#c00}
