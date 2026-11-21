@@ -36,10 +36,12 @@ function skTint(name, color){
 const crL = () => (typeof LG === 'function' && LSRC === 'career') ? LG() : null;
 const crColor = L => L ? teamInfo(L.my).color : '#3b82f6';
 // 얼굴 그림(faces.png 4칸 × 3줄)
+// i가 꾸미기 값(look 객체)이면 부위를 겹친 그림(look.js)
 function crFace(i, color, cls = ''){
+  if(i && typeof i === 'object') return `<span class="crf lk-f ${cls}" style="background-image:url(${lookURL(i, color)})" aria-hidden="true"></span>`;
   return `<span class="crf ${cls}" style="background-image:url(${skTint('faces', color)});background-position:${(i % 4) * 100 / 3}% ${Math.floor(i / 4) * 50}%" aria-hidden="true"></span>`;
 }
-const crFaceOf = (L, c, p) => c.face ?? faceOf(p.name);
+const crFaceOf = (L, c, p) => c.look || (c.face ?? faceOf(p.name));
 const crNumOf = (c, p) => c.num ?? numOf(p.name);
 // 능력치 막대 한 줄: 값, 등급, 성장 점수(작은 막대)
 function crStat(p, c, k){

@@ -113,8 +113,13 @@ const PORT = 8767;
     await page.click('.su-go'); if(await kind() !== 'wz-1') errors.push(`${tag}: 이름 없이 다음 단계로 넘어감`);
     await page.click('#skSheet .gb').catch(() => {});
     await page.fill('#wzName', '시험선수'); await page.press('#wzName', 'Enter');
-    await page.click('[data-k="pit"][data-v="1"]'); await page.click('[data-k="face"][data-v="7"]'); await page.click('[data-k="num"][data-v="10"]'); await page.click('[data-k="num"][data-v="1"]');
-    await page.click('[data-k="hand"][data-v="L"]'); await page.click('[data-k="form"][data-v="2"]'); await fit('선수 꾸미기');
+    await page.click('[data-k="pit"][data-v="1"]'); await page.click('[data-k="num"][data-v="10"]'); await page.click('[data-k="num"][data-v="1"]');
+    await page.click('[data-k="hand"][data-v="L"]'); await page.click('[data-k="form"][data-v="2"]');
+    // 얼굴 꾸미기: 머리 탭 → 곱슬머리, 장식 탭 → 동그란 안경
+    await page.click('[data-k="lt"][data-v="hair"]'); await page.click('[data-k="lk"][data-v="6"]'); await page.click('[data-k="lt"][data-v="acc"]'); await page.click('[data-k="lk"][data-v="2"]');
+    await page.waitForFunction(() => LK.ok);
+    if(!(await page.evaluate(() => /^url\("?data:image/.test(document.querySelector('.wz-card .crf').style.backgroundImage)))) errors.push(`${tag}: 꾸민 얼굴 그림이 없음`);
+    await fit('선수 꾸미기');
     await page.click('.su-go'); if(await kind() !== 'wz-2') errors.push(`${tag}: 둘째 단계로 가지 않음`);
     await page.click('[data-k="role"][data-v="rp"]'); await page.click('[data-k="type"][data-v="break"]'); await fit('보직과 유형');
     await page.click('.su-go'); if(await kind() !== 'wz-3') errors.push(`${tag}: 셋째 단계로 가지 않음`);
@@ -122,9 +127,16 @@ const PORT = 8767;
     await page.click(`[data-sk="set"][data-k="a"][data-v="${t5}"]`); await page.click('[data-sk="set"][data-k="len"][data-v="18"]'); await fit('팀과 시즌');
     if(await page.evaluate(() => !!LG())) errors.push(`${tag}: 입단하기 전에 선수가 만들어짐`);
     await page.click('.su-go');
-    const made = await page.evaluate(() => { const L = LG(), c = L && L.career; return c && [c.p.name, c.face, c.num, c.p.hand, c.p.form, c.p.role, c.type, L.my]; });
-    if(!made || made.join() !== `시험선수,7,18,L,2,불펜,break,${t5}`) errors.push(`${tag}: 선수 만들기 결과가 다름 ${JSON.stringify(made)}`);
+    const made = await page.evaluate(() => { const L = LG(), c = L && L.career; return c && [c.p.name, c.look && c.look.hair, c.look && c.look.acc, c.num, c.p.hand, c.p.form, c.p.role, c.type, L.my]; });
+    if(!made || made.join() !== `시험선수,6,2,18,L,2,불펜,break,${t5}`) errors.push(`${tag}: 선수 만들기 결과가 다름 ${JSON.stringify(made)}`);
     if(await page.evaluate(() => armSlot(CR().career.p)) !== 2) errors.push(`${tag}: 투구 폼이 경기 그림에 쓰이지 않음`);
+    // 내 선수 화면에서 얼굴 꾸미기: 고르기만 하면 그대로, "바꾸기"를 눌러야 저장
+    await page.evaluate(() => go(careerInfoScreen, 'click')); await page.click('#sk [data-sk="opt"][data-n="3"]');
+    if(await kind() !== 'cr-look') errors.push(`${tag}: 얼굴 꾸미기 화면이 아님 ${await kind()}`);
+    await page.click('[data-k="lt"][data-v="hat"]'); await page.click('[data-k="lk"][data-v="2"]'); await fit('얼굴 꾸미기');
+    if(await page.evaluate(() => CR().career.look.hat) === 2) errors.push(`${tag}: 바꾸기 전에 얼굴이 저장됨`);
+    await page.click('.su-go');
+    if(await page.evaluate(() => CR().career.look.hat) !== 2 || await kind() !== 'cr-info') errors.push(`${tag}: 얼굴 꾸미기가 저장되지 않음`);
     // 팀 고르기: 눌러서 고른 뒤 "이 팀으로"
     await page.evaluate(() => { NEW.kind = '1p'; go(matchSetupScreen, 'click'); }); await page.click('.su-t >> nth=1');
     if(await kind() !== 'team-pick') errors.push(`${tag}: 팀 고르기 화면이 아님`);
@@ -137,7 +149,7 @@ const PORT = 8767;
     await page.evaluate(() => { NEW.kind = 'online'; go(matchSetupScreen, 'click'); });
     const on = await page.evaluate(() => [UI.S.kind, UI.S.opts.find(o => o.key === 'start').t, !!UI.S.opts.find(o => o.key === 'diff' && !o.hide)]);
     if(on.join() !== 'setup,방 만들기,false') errors.push(`${tag}: 온라인 방 설정이 다름 ${on.join()}`); await fit('온라인 방 설정');
-    console.log(`${tag}: 리그 만들기·선수 만들기 세 단계·팀 고르기·온라인 방 설정 확인`);
+    console.log(`${tag}: 리그 만들기·선수 만들기 세 단계·얼굴 꾸미기·팀 고르기·온라인 방 설정 확인`);
     await ctx.close();
   }
   // 선수 육성 화면: 라커룸 → 마을 지도(장소 누르기) → 용품점에서 사기 → 가방에서 장착 → 훈련 → 선수 카드, 화면마다 한 화면에 들어가는지

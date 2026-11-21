@@ -33,12 +33,26 @@ function leagueSetupScreen(){
   ] };
 }
 
+/* ---------- 내 선수 얼굴 꾸미기 (화면 보며 하기, 내 선수 화면에서): 고른 뒤 "바꾸기"를 눌러야 저장 ---------- */
+let LOOK_DRAFT = null;
+function careerLookScreen(back){
+  const L = CR(), c = C(L);
+  if(!LOOK_DRAFT) LOOK_DRAFT = lookFix(c.look || LOOK_DEF);
+  return { kind:'cr-look', q:'얼굴을 꾸미세요. 다 되면 바꾸기를 누르세요.', draft: () => LOOK_DRAFT,
+    set: (k, v) => { LOOK_DRAFT = lookSet(LOOK_DRAFT, k, v); },
+    back: v => { LOOK_DRAFT = null; go(back, v); }, opts:[
+      { n:1, key:'rand', t:'무작위로 꾸미기', act: () => { LOOK_DRAFT = lookRandom(); stay('얼굴을 새로 꾸몄습니다.'); } },
+      { n:9, key:'done', t:'바꾸기', act: v => { c.look = LOOK_DRAFT; LOOK_DRAFT = null; saveLeague(); go(back, v, ['얼굴을 바꿨습니다.']); } },
+    ] };
+}
+
 /* ---------- 선수 만들기 (세 단계) ---------- */
 const FORMS = ['오버핸드', '사이드암', '언더핸드'];
 const BAT_POS9 = ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH'];
 function wzFill(){
   if(!NEWC.name) NEWC.name = '';
   if(NEWC.face == null) NEWC.face = 0;
+  if(!NEWC.look) NEWC.look = lookRandom();
   if(NEWC.num == null) NEWC.num = 7;
   if(!NEWC.hand) NEWC.hand = 'R';
   if(NEWC.form == null) NEWC.form = 0;
@@ -55,7 +69,7 @@ function careerWizard(step){
   const next = (v, why) => why ? stay(why) : go(() => careerWizard(step + 1), v);
   if(step === 1){
     const set = (k, v) => {
-      if(k === 'face') NEWC.face = Number(v);
+      if(k === 'lt' || k === 'lk' || k === 'lr') NEWC.look = lookSet(NEWC.look, k, v);
       else if(k === 'num') NEWC.num = clamp(NEWC.num + Number(v), 0, 99);
       else if(k === 'hand') NEWC.hand = v;
       else if(k === 'form') NEWC.form = Number(v);
@@ -65,7 +79,7 @@ function careerWizard(step){
       onText: t => { NEWC.name = t.trim().slice(0, 10); rerender(); },
       opts:[
         { n:1, key:'pit', t:`종류: ${NEWC.pit ? '투수' : '타자'}`, act: () => { set('pit', NEWC.pit ? '0' : '1'); stay(NEWC.pit ? '투수' : '타자'); } },
-        { n:2, key:'face', t:`얼굴: ${NEWC.face + 1}번`, act: () => { NEWC.face = (NEWC.face + 1) % 12; stay(`얼굴 ${NEWC.face + 1}번`); } },
+        { n:2, key:'look', t:'얼굴 무작위로 꾸미기', act: () => { NEWC.look = lookRandom(); stay('얼굴을 새로 꾸몄습니다.'); } },
         { n:3, key:'num', t:`등번호: ${NEWC.num}`, act: () => { NEWC.num = (NEWC.num + 1) % 100; stay(`등번호 ${NEWC.num}`); } },
         { n:4, key:'hand', t:`${NEWC.pit ? '던지는' : '치는'} 손: ${NEWC.hand === 'L' ? '왼손' : '오른손'}`, act: () => { NEWC.hand = NEWC.hand === 'L' ? 'R' : 'L'; stay(NEWC.hand === 'L' ? '왼손' : '오른손'); } },
         { n:5, key:'form', hide: !NEWC.pit, t:`투구 폼: ${FORMS[NEWC.form]}`, act: () => { NEWC.form = (NEWC.form + 1) % 3; stay(`투구 폼 ${FORMS[NEWC.form]}`); } },

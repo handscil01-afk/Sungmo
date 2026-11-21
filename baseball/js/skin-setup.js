@@ -38,7 +38,7 @@ const wzColor = () => teamInfo(NEW.a || TEAMS[0].key).color;
 function wzCard(sub){
   const col = wzColor();
   return `<div class="wz-card" style="--tc:${col}">
-    ${crFace(NEWC.face, col, 'big')}
+    ${crFace(NEWC.look, col, 'big')}
     <div class="wz-jer" aria-hidden="true"><span class="wz-nm">${esc(NEWC.name || '이름')}</span><b>${NEWC.num}</b></div>
     <p class="wz-sub">${esc(sub)}</p></div>`;
 }
@@ -47,7 +47,6 @@ function wzSum(){
   return NEWC.pit ? `투수 · ${hand} · ${FORMS[NEWC.form]}` : `타자 · ${hand}`;
 }
 function wz1Skin(S){
-  const faces = Array.from({ length:12 }, (_, i) => `<button type="button" class="wz-f${i === NEWC.face ? ' on' : ''}" data-sk="set" data-k="face" data-v="${i}" aria-label="얼굴 ${i + 1}" aria-pressed="${i === NEWC.face}">${crFace(i, wzColor(), 'sm')}</button>`).join('');
   const num = `<div class="su-row"><span>등번호</span><div class="wz-num">${[-10, -1].map(d => `<button type="button" data-sk="set" data-k="num" data-v="${d}">${d}</button>`).join('')}<b>${NEWC.num}</b>${[1, 10].map(d => `<button type="button" data-sk="set" data-k="num" data-v="${d}">+${d}</button>`).join('')}</div></div>`;
   return `<div class="su-l">${wzSteps(1)}
     <div class="wz-top">${wzCard(wzSum())}
@@ -58,7 +57,7 @@ function wz1Skin(S){
       </div></div>
     ${suGo(suOpt(S, 'next'), NEWC.name ? '포지션과 유형 고르기' : '먼저 이름을 적으세요', NEWC.name ? '' : 'dim')}</div>
     <div class="su-r"><div class="su panel">
-      <div class="su-row"><span>얼굴</span><div class="wz-fg">${faces}</div></div>
+      <div class="su-row"><span>얼굴 꾸미기</span>${lookEditor(NEWC.look, wzColor())}</div>
       ${suSeg(NEWC.pit ? '던지는 손' : '치는 손', 'hand', [['R', '오른손'], ['L', '왼손']], NEWC.hand)}
       ${NEWC.pit ? suSeg('투구 폼', 'form', FORMS.map((f, i) => [i, f]), NEWC.form) : ''}
     </div></div>`;
@@ -87,8 +86,16 @@ function wz3Skin(S){
       ${suSeg('시즌 길이 (팀당)', 'len', [18, 36, 72, 144].map(n => [n, n + '경기']), NEW.len)}
       ${suSeg('내 차례 방식', 'mode', [['detail', '정밀', '공마다 고르기'], ['simple', '간단', '주사위로 빠르게']], NEW.mode)}
     </div>
-    <div class="wz-mini" style="--tc:${teamInfo(NEW.a).color}">${crFace(NEWC.face, teamInfo(NEW.a).color, 'sm')}<span><b>${esc(NEWC.name)} · ${NEWC.num}번</b><small>${esc(NEWC.pit ? (NEWC.role === 'sp' ? '선발 투수' : '불펜 투수') : POS[NEWC.pos])} · ${esc(types.find(t => t.key === NEWC.type).name)} · ${esc(wzSum().replace(/^\S+ · /, ''))}</small></span></div>
+    <div class="wz-mini" style="--tc:${teamInfo(NEW.a).color}">${crFace(NEWC.look, teamInfo(NEW.a).color, 'sm')}<span><b>${esc(NEWC.name)} · ${NEWC.num}번</b><small>${esc(NEWC.pit ? (NEWC.role === 'sp' ? '선발 투수' : '불펜 투수') : POS[NEWC.pos])} · ${esc(types.find(t => t.key === NEWC.type).name)} · ${esc(wzSum().replace(/^\S+ · /, ''))}</small></span></div>
     ${suGo(suOpt(S, 'start'), `${teamInfo(NEW.a).short} 2군에서 시작 · ${NEW.len}경기 시즌`)}</div>`;
+}
+
+/* ---------- 내 선수 얼굴 꾸미기 (내 선수 화면에서) ---------- */
+function crLookSkin(S){
+  const L = crL(), col = crColor(L), c = L.career, p = myP(L);
+  return `<div class="su-l"><div class="wz-top one">${`<div class="wz-card" style="--tc:${col}">${crFace(S.draft(), col, 'big')}<div class="wz-jer" aria-hidden="true"><span class="wz-nm">${esc(p.name)}</span><b>${crNumOf(c, p)}</b></div></div>`}</div>
+    ${suGo(suOpt(S, 'done'), '고른 얼굴로 바꾸기')}</div>
+    <div class="su-r"><div class="su panel">${lookEditor(S.draft(), col)}</div></div>`;
 }
 
 /* ---------- 팀 고르기 (눌러 고르고 "이 팀으로") ---------- */
@@ -102,7 +109,7 @@ function teamPickSkin(S){
     <button type="button" class="crplay su-go" data-sk="opt" data-n="${sel.n}"><span class="pp">▶</span><span><b>이 팀으로</b><small>${esc(T.name)}</small></span></button>`;
 }
 
-Object.assign(CAREER_SK, { 'lg-setup':lgSetupSkin, 'wz-1':wz1Skin, 'wz-2':wz2Skin, 'wz-3':wz3Skin, 'team-pick':teamPickSkin });
+Object.assign(CAREER_SK, { 'lg-setup':lgSetupSkin, 'wz-1':wz1Skin, 'wz-2':wz2Skin, 'wz-3':wz3Skin, 'team-pick':teamPickSkin, 'cr-look':crLookSkin });
 
 // 이름 칸: 적는 동안 다시 그리지 않고(글자판이 닫히지 않게) 카드의 이름과 "다음" 단추만 고침
 if(typeof document !== 'undefined'){

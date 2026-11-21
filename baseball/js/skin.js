@@ -443,7 +443,7 @@ function timingEnd(tm){
 /* ---------- 메뉴 화면 ---------- */
 function topHTML(S){
   const fsOn = typeof FS !== 'undefined' && FS.on(), canFs = typeof isStandalone === 'function' && !isStandalone();
-  const CRT = { 'setup':'경기 설정', 'lg-setup':'새 리그', 'wz-1':'선수 만들기', 'wz-2':'선수 만들기', 'wz-3':'선수 만들기', 'team-pick':'팀 고르기', 'as-home':'올스타 휴식기', 'as-derby':'홈런 더비', 'fo-home':'구단 사무실', 'fo-list':'구단 사무실', 'cr-camp':'스프링캠프', 'ct-home':'우리 센터 팀', 'ct-list':'선수 고르기', 'ct-player':'선수 고치기', 'ct-num':'능력치', 'cr-home':'라커룸', 'cr-visit':'마을', 'cr-train':'훈련', 'cr-bag':'내 가방', 'cr-info':'내 선수', 'cr-face':'얼굴 고르기', 'cr-log':'업적과 경력', 'cr-game':'오늘 경기' };
+  const CRT = { 'setup':'경기 설정', 'lg-setup':'새 리그', 'wz-1':'선수 만들기', 'wz-2':'선수 만들기', 'wz-3':'선수 만들기', 'team-pick':'팀 고르기', 'cr-look':'얼굴 꾸미기', 'as-home':'올스타 휴식기', 'as-derby':'홈런 더비', 'fo-home':'구단 사무실', 'fo-list':'구단 사무실', 'cr-camp':'스프링캠프', 'ct-home':'우리 센터 팀', 'ct-list':'선수 고르기', 'ct-player':'선수 고치기', 'ct-num':'능력치', 'cr-home':'라커룸', 'cr-visit':'마을', 'cr-train':'훈련', 'cr-bag':'내 가방', 'cr-info':'내 선수', 'cr-face':'얼굴 고르기', 'cr-log':'업적과 경력', 'cr-game':'오늘 경기' };
   if(S.kind === 'cr-talk') CRT['cr-talk'] = S.who === 'gm' ? '연봉 계약' : S.who === 'agent' ? 'FA 시장' : '이벤트!';
   const title = S.hero ? '' : S.onTab ? '설정' : CRT[S.kind] || menuTitle(S).title;
   return `<div class="bar">${S.back ? `<button type="button" class="rb" data-sk="back" aria-label="뒤로">${skIco('back')}</button>` : ''}

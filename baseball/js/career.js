@@ -50,7 +50,7 @@ function careerNew(){
   if(!NEWC.pit) p.trait = { glove:['range'], speed:['quick'], power:['arm'], contact:[] }[NEWC.type] || [];   // 유형에 맞는 포지션 특기
   ensureGrowth(L, p);
   L.mv = 2;   // 새 저장 형식 (성장 유형·피로·계약·장비 상태가 처음부터 있음)
-  L.career = { v:CAREER_V, face: NEWC.face ?? faceOf(p.name), num: NEWC.num ?? numOf(p.name), id:p.id, p, where:'minor', pit:NEWC.pit, type:NEWC.type, pts:{}, fame:0, trained:-1, minor:{}, ach:[], hurt:0, slump:0, money:300, salary:3000, equip:{}, goods:{ drink:1 }, owned:[], fatigue:0, gs:{}, applied:{}, contract:{ years:1, salary:3000, bonus:0, until:L.season, team:L.my } };
+  L.career = { v:CAREER_V, face: NEWC.face ?? faceOf(p.name), ...(NEWC.look ? { look: { ...NEWC.look } } : {}), num: NEWC.num ?? numOf(p.name), id:p.id, p, where:'minor', pit:NEWC.pit, type:NEWC.type, pts:{}, fame:0, trained:-1, minor:{}, ach:[], hurt:0, slump:0, money:300, salary:3000, equip:{}, goods:{ drink:1 }, owned:[], fatigue:0, gs:{}, applied:{}, contract:{ years:1, salary:3000, bonus:0, until:L.season, team:L.my } };
   crLog(L, `${p.name}, ${teamInfo(NEWC.team).name}에 입단했습니다! 퓨처스리그(2군)에서 시작합니다.`);
   return L;
 }
@@ -66,7 +66,7 @@ const faceOf = n => hashName(n) % 12;
 const numOf = n => 1 + hashName(n + '#') % 99;
 // 얼굴 고르기 (화면 보며 하기만): back이 있으면 정보 화면에서 바꾸는 것
 function careerFaceScreen(back){
-  const pick = (i, v) => { if(back){ const L = CR(); C(L).face = i; saveLeague(); go(back, v, ['얼굴을 바꿨습니다.']); } else { NEWC.face = i; go(careerKindScreen, v); } };
+  const pick = (i, v) => { if(back){ const L = CR(); C(L).face = i; delete C(L).look; saveLeague(); go(back, v, ['얼굴을 바꿨습니다.']); } else { NEWC.face = i; go(careerKindScreen, v); } };
   return { kind:'cr-face', q:'얼굴을 고르세요.', back: v => go(back || careerNameScreen, v),
     opts: Array.from({ length:12 }, (_, i) => ({ n: i + 1, face: i, t:`얼굴 ${i + 1}`, act: v => pick(i, v) })) };
 }
@@ -425,7 +425,7 @@ function careerInfoScreen(){
   if(isPit(p)) say.push('구종: ' + (p.pitches || []).map(x => `${PITCH[x.t].name} ${x.g}`).join(', ') + '.');
   say.push(`통산(지난 시즌까지): ${careerText({ pit:isPit(p), cs:p.cs || {} })}.`);
   if((p.awards || []).length) say.push(`수상: ${p.awards.join(', ')}.`);
-  return { kind:'cr-info', q:'내 선수 정보입니다.', say, back: v => go(careerHome, v), opts:[{ n:1, t:'돌아가기', act: v => go(careerHome, v) }, { n:2, key:'log', t:'업적과 경력', act: v => go(careerLogScreen, v) }, { n:3, key:'face', t:'얼굴 바꾸기', hide: !VIEW.gfx, act: v => go(() => careerFaceScreen(careerInfoScreen), v) }] };
+  return { kind:'cr-info', q:'내 선수 정보입니다.', say, back: v => go(careerHome, v), opts:[{ n:1, t:'돌아가기', act: v => go(careerHome, v) }, { n:2, key:'log', t:'업적과 경력', act: v => go(careerLogScreen, v) }, { n:3, key:'face', t:'얼굴 꾸미기', hide: !VIEW.gfx, act: v => go(() => careerLookScreen(careerInfoScreen), v) }] };
 }
 function careerLogScreen(){
   const L = CR(), c = C(L);

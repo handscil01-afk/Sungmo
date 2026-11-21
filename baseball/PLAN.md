@@ -89,6 +89,7 @@
 
 - 9-6 (완료, 병렬 작업 세 개를 합침) 육성 감독 신뢰도·동료 관계와 2군 강등(career-trust.js), 컴퓨터 구단끼리 트레이드(office.js cpuTradeDay, league.js leagueAdvance에서 부름), 감독 모드 대수비·상대 타자·투수 분석(engine.js defSub, manager.js dsubScreen·scoutBatter·scoutPitcher, online.js dsub 검증, tests/manager.js).
 - 9-7 (완료) 만들기 화면 합치기와 "고른 뒤 정하기": 화면 보며 하기에서 리그 만들기(lg-setup, 팀·시즌 길이·경기 방식·이닝을 한 화면), 선수 만들기 세 단계(wz-1 꾸미기: 이름·얼굴·등번호·손·투구 폼 / wz-2 포지션·유형: 야구장 그림에서 수비 위치 / wz-3 팀·시즌 → 입단), 온라인 방 만들기도 한 화면 경기 설정으로, 팀 고르기는 눌러 고른 뒤 "이 팀으로". 누르면 빛나기만 하고 아래 단추를 눌러야 정해짐(setup.js, skin-setup.js). 소리와 글로 하기는 차례로 묻는 화면 그대로. 선수 꾸미기로 정한 등번호·손·투구 폼(p.form, gfx.js armSlot)이 저장되고 경기 그림에 쓰임.
+- 9-8 (완료) 얼굴 꾸미기: 사용자가 준 얼굴 시트 다섯 장에서 부위만 떼어(tools/look_parts.py: 머리 윤곽으로 크기·위치 맞추기 → 민머리·기본 얼굴과 달라진 점만 → 96칸) img/cr-parts.png를 만들고, look.js가 바탕·눈·입·머리(머리색)·장식·모자를 겹쳐 그림. 선수 만들기 1단계와 내 선수 화면(cr-look)에서 탭으로 고름. 옛 저장은 faces.png 얼굴 그대로.
 
 ## 7.7단계 (예정): 시각장애인들이 아는 숫자 야구 규칙
 

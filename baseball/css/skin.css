@@ -843,3 +843,25 @@ html.skin .su-l, html.skin .su-r{ display:contents; } html.skin .su-l > .su-go, 
   html.skin .su-tcard{ padding:5px 10px; } html.skin .wz-st li{ padding:2px; }
   html.skin .sk-body.f3 .wz-st{ display:flex; }
 }
+/* 얼굴 꾸미기 (look.js): 부위 탭 + 고를 것 격자 */
+html.skin .crf.lk-f{ background-size:100% 100%; background-position:0 0; }
+html.skin .crf.xs{ width:100%; height:auto; aspect-ratio:1; }
+html.skin .lk{ display:grid; gap:5px; }
+html.skin .lk-tabs{ display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)) auto; gap:3px; background:#c5ddf7; border-radius:12px; padding:3px; }
+html.skin .lk-tabs button{ border:0; border-radius:9px; background:#fff; min-height:2rem; padding:0 .1rem; font-size:.68rem; font-weight:900; color:var(--ink2); white-space:nowrap; }
+html.skin .lk-tabs button.on{ background:linear-gradient(180deg, #ff9a55, #e2501a); color:#fff; text-shadow:0 1px 0 #7a2a00; }
+html.skin .lk-tabs .lk-rand{ width:2.1rem; font-size:1rem; }
+html.skin .lk-g{ display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:4px; }
+html.skin .lk-o{ position:relative; display:grid; place-items:center; padding:1px; border-radius:10px; border:2px solid #c5ddf7; background:#fff; }
+html.skin .lk-o.on{ border-color:#e2501a; box-shadow:0 0 0 3px #ffb347; background:#fff3d6; }
+html.skin .lk-sw{ position:absolute; right:2px; bottom:2px; width:.7rem; height:.7rem; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1px #0003; }
+html.skin .lk-now{ margin:0; font-size:.7rem; font-weight:900; color:var(--ink2); text-align:center; }
+html.skin .wz-top.one{ grid-template-columns:1fr; justify-items:center; } html.skin .wz-top.one .wz-card{ width:9rem; } html.skin .wz-top.one .wz-card .crf.big{ width:6.5rem; height:6.5rem; }
+html.skin .sk-body.f2 .lk-now{ display:none; } html.skin .sk-body.f3 .lk-g{ grid-template-columns:repeat(9, minmax(0, 1fr)); }
+@media (orientation:landscape) and (max-height:620px){
+  html.skin .sk-body.k-cr-look{ display:grid; grid-template-columns:minmax(0, .8fr) minmax(0, 1.3fr); column-gap:10px; }
+  html.skin .k-wz-1 .lk-g, html.skin .k-cr-look .lk-g{ grid-template-columns:repeat(9, minmax(0, 1fr)); } html.skin .lk-now{ display:none; }
+  html.skin .wz-top.one .wz-card .crf.big{ width:4.5rem; height:4.5rem; }
+}
+/* 경기 끝 화면: 작은 휴대폰(f2)에서 결과 띠와 줄 점수표를 조금 더 줄여 여유를 둠 */
+html.skin .sk-body.f2 .res .ban3{ width:7.5rem; } html.skin .sk-body.f2 .res .emb{ width:1.4rem; height:1.4rem; } html.skin .sk-body.f2 .ls th, html.skin .sk-body.f2 .ls td{ padding:.18rem .2rem; }
