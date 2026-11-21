@@ -17,6 +17,7 @@ function homeScreen(){
       { n:7, t:'이어하기', hide: !sv, s: sv ? `${MODE_NAME[sv.G.mode]}, ${sv.G.pre ? '경기 전 준비 중' : situation(sv.G)}` : '', act: v => resumeGame(v) },
       { n:8, t:'설정과 게임 방법', s:'화면 방식, 글자 크기, 화면 색, 읽어 주기, 효과음, 관중 소리, 게임 방법과 키 안내', act: v => go(() => settingsScreen(() => go(homeScreen, 'click')), v) },
       { n:9, t:'홈 화면에 설치하기', hide: !canInstall(), s:'아이콘으로 바로 열고 화면을 넓게 씁니다.', act: () => doInstall() },
+      { n:10, t:'미니게임', s:'타격 연습장, 번트 챌린지, 도루 챌린지', act: v => mgOpen('home', v) },
     ] };
 }
 
