@@ -508,6 +508,13 @@ function skinNote(lines, html, title, kind){
     else if(kind === 'who'){ const h = document.createElement('div'); gstatRender(G, h); html = h.innerHTML; title = '타자와 투수'; }
     else if(kind === 'status'){ html = situationHTML(); title = `${halfName(G)} · ${scoreText(G)}`; }
     else if(kind === 'recent'){ html = `<div class="rec">${(lines || []).map(l => `<p>${esc(l)}</p>`).join('')}</div>`; title = '최근 기록'; }
+    else if(kind === 'scout' && typeof scoutBatter === 'function'){   // 상대 분석 (감독 모드): 타자 쪽에서 본 존에 약점 칸(빨강)·잘 치는 높이(초록)
+      const sc = scoutBatter(G), U = 30, cells = [];
+      for(let r = 0; r < 3; r++) for(let c = 0; c < 3; c++){ const weak = r === sc.weak.r && c === sc.weak.c, good = r === sc.strongR; cells.push(`<rect x="${20 + c * U}" y="${10 + r * U}" width="${U}" height="${U}" fill="${weak ? '#ff4d5e' : good ? '#7be39a' : '#1d3f7a'}" stroke="#fff" stroke-width="2"/>`); }
+      html = `<div class="scout"><svg viewBox="0 0 130 110" class="sc-z" aria-hidden="true">${cells.join('')}<text x="35" y="108" font-size="9" fill="#47608f" text-anchor="middle">몸쪽</text><text x="95" y="108" font-size="9" fill="#47608f" text-anchor="middle">바깥쪽</text></svg>`
+        + `<div class="rec">${(lines || []).map(l => `<p>${esc(l)}</p>`).join('')}</div></div>`;
+      title = `상대 분석 · ${sc.name}`;
+    }
   }
   const sh = $('#skSheet');
   SK.sheet = html ? 'custom' : 'note'; SK.sheetMake = UI.make;

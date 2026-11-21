@@ -728,3 +728,6 @@ html.skin .sk-body.f1 .as{ min-height:5rem; } html.skin .sk-body.f2 .as-t small{
 html.skin .k-as-derby .fo-opts{ flex:0 0 auto !important; max-height:7.5rem; grid-template-columns:repeat(2, minmax(0, 1fr)); }
 html.skin .k-as-derby .fo-opts .fo-b{ min-height:3.4rem; }
 html.skin .k-as-derby .bt-grid{ max-height:9rem; }
+html.skin .scout{ display:grid; grid-template-columns:7rem minmax(0, 1fr); gap:8px; align-items:start; }
+html.skin .sc-z{ width:100%; height:auto; }
+@media (max-width:360px){ html.skin .scout{ grid-template-columns:1fr; } html.skin .sc-z{ max-width:8rem; } }

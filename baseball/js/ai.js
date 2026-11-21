@@ -117,6 +117,11 @@ function aiManage(G){
     const pick = best(others.length ? others : bench);
     swapPitcher(G, ti, pick.i);
   }
+  // 대수비 (감독 모드): 마지막 이닝 시작에 1~3점 앞서면, 수비가 10 이상 좋은 벤치 선수를 가끔 넣음
+  if(G.mode === 'manager' && inningStart && G.inning >= G.innings && lead >= 1 && lead <= 3 && defSubOK(G, ti)){
+    const pr = defSubPairs(G, ti)[0];
+    if(pr && pr.gain >= 10 && rnd(G) < 0.5) benchIn(G, ti, pr.slot, pr.b, 'def');
+  }
   let inf = 1, of = 1;
   if(G.bases[2] != null && G.outs < 2 && lateGame(G) && closeGame(G)) inf = 0;
   else if(G.bases[0] != null && G.outs < 2) inf = 2;

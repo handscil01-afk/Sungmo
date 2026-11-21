@@ -84,8 +84,8 @@ function mgrDef(){
     { n:3, t:'어렵게 승부', s:'유인구로 장타를 피합니다. 볼넷이 늘어납니다.', act: order('nibble') },
     { n:4, t:'고의 볼넷', act: order('ibb') },
     { n:5, t:'투수 교체', s: bench.length ? `불펜 ${bench.length}명` : '바꿀 투수가 없습니다.', hide: !bench.length, act: v => go(bullpenScreen, v) },
-    { n:6, t:'수비 위치', s:`지금 내야 ${ALIGN_IN[T.align.inf]}, 외야 ${ALIGN_OUT[T.align.of]}`, act: v => go(alignScreen, v) },
-    { n:7, t:'투수 상태 듣기', act: v => note([pitcherInfo(G, T, T.pi, true)], v, 'who') },
+    { n:6, t: defSubOK(G, ti) ? '수비 위치 · 대수비' : '수비 위치', s:`지금 내야 ${ALIGN_IN[T.align.inf]}, 외야 ${ALIGN_OUT[T.align.of]}${defSubOK(G, ti) ? `. 대수비 ${DSUB_MAX - (T.dsub || 0)}번 남음` : ''}`, act: v => go(alignScreen, v) },
+    { n:7, t:'상대 타자 분석', s:'오늘 결과, 약점 코스, 성향과 우리 투수 상태', act: v => note([...scoutBatter(G).lines, '우리 투수: ' + pitcherInfo(G, T, T.pi, true)], v, 'scout') },
     pickOpt(8),
     { n:9, t:'더 보기', s:'점수판, 선수 정보, 묻는 때, 설정', act: v => go(moreScreen, v) },
   ] };
@@ -137,4 +137,54 @@ function mgrAuto(res){
     acc.lines.push(...r.lines); acc.fx.push(...r.fx); acc.events.push(...r.events);
   }
   return acc;
+}
+/* ===================== 감독 모드: 대수비 · 상대 분석 =====================
+   대수비: 경기 후반, 우리 수비 타석이 시작되기 전에 수비가 더 좋은 벤치 선수를 넣음 (engine.js defSubOK·defSubPairs·defSub)
+   상대 분석: 타자(오늘 타석마다 결과, 약점 코스, 성향, 상대 팀 능력치는 등급으로만), 투수(오늘 투구 수·체력·구종 등급·많이 던진 공)
+   소리와 글로 하기는 note()로 한 줄씩, 화면 보며 하기는 note kind 'scout'로 존 그림에 약점 칸을 표시 */
+
+/* ---------- 대수비 ---------- */
+function dsubScreen(){
+  const ti = 1 - batIdx(G), T = G.teams[ti], pairs = defSubPairs(G, ti);
+  const back = v => go(defMain, v);
+  if(!defSubOK(G, ti)) return { board:true, sub:true, q:`지금은 대수비를 할 수 없습니다. 경기 후반, 우리 수비 타석이 시작되기 전에만 경기마다 ${DSUB_MAX}번까지 바꿉니다.`, back, opts:[{ n:1, t:'돌아가기', act: back }] };
+  const seen = new Set(), list = pairs.filter(x => !seen.has(x.slot) && seen.add(x.slot)).slice(0, 8);
+  return { board:true, sub:true, q:`누구 대신 수비를 넣을까요? 남은 대수비 ${DSUB_MAX - (T.dsub || 0)}번. 바뀐 선수는 이번 경기에 다시 나오지 못합니다.`, back,
+    opts: list.length ? list.map((x, i) => {
+      const o = T.bat[x.slot], p = T.bench[x.b];
+      return { n: i + 1, t:`${POS[o.pos]} ${o.name} 대신 ${p.name}`, s:`수비 ${o.def} → ${p.def} (+${x.gain}). ${p.name}: ${p.role}, 컨택 ${p.con}, 파워 ${p.pow}.`,
+        act: v => go(() => confirmSub(`${o.name} 대신 ${josa(p.name, '을', '를')} 대수비로 넣을까요?`, [`나가는 선수: ${o.name}, 수비 ${o.def}, 오늘 ${batterLine(o)}`, `들어갈 선수: ${p.name}, ${p.role}, 수비 ${p.def}. ${statLine(p)}`], '대수비 넣기',
+          w => mgrDo({ k:'dsub', slot: x.slot, b: x.b }, () => defSub(G, ti, x.slot, x.b), w, (vv, lines) => go(defMain, vv, lines)), w => go(dsubScreen, w)), v) };
+    }) : [{ n:1, t:'수비가 더 좋은 벤치 선수가 없습니다. 돌아가기', act: back }] };
+}
+
+/* ---------- 상대 분석 ---------- */
+const PA_WORDS = [['홈런', '홈런'], ['3루타', '3루타'], ['2루타', '2루타'], ['병살', '병살타'], ['희생', '희생타'], ['볼넷', '볼넷'], ['몸에 맞', '몸에 맞는 공'], ['삼진', '삼진'], ['안타', '안타'], ['실책', '실책으로 출루'], ['땅볼', '땅볼 아웃'], ['뜬공', '뜬공 아웃'], ['직선타', '직선타 아웃'], ['플라이', '뜬공 아웃'], ['아웃', '아웃']];
+const paWord = s => (PA_WORDS.find(([w]) => s.includes(w)) || [, ''])[1];
+// 약점 칸(타자 쪽에서 본 존: r 0 높게·2 낮게, c 0 몸쪽·2 바깥쪽): 힘이 좋으면 낮은 공, 정확하면 높은 공 / 적극적이면 바깥쪽, 아니면 몸쪽
+function scoutBatter(G){
+  const bi = batIdx(G), B = curBatter(G), own = ownTeam(bi), v = x => own ? x : gradeWord(x);
+  const pas = G.log.filter(l => l.k === 'r' && l.b === B.name).map(l => paWord(l.s)).filter(Boolean);
+  const r = B.pow >= B.con + 4 ? 2 : B.con >= B.pow + 4 ? 0 : (B.eye < 50 ? 2 : 0);
+  const c = (B.aggr || 50) >= 55 ? 2 : 0;
+  const lines = [
+    `타자 ${B.name}, ${handText(B.hand)}. 컨택 ${v(B.con)}, 파워 ${v(B.pow)}, 선구안 ${v(B.eye)}, 스피드 ${v(B.spd)}.`,
+    `오늘 ${batterLine(B)}${pas.length ? `. 타석마다: ${pas.map((w, i) => `${i + 1}번째 ${w}`).join(', ')}` : '. 오늘 첫 타석입니다'}.`,
+    `약점: ${ZONE_NAME[r][c]} 공에 약해 보입니다. ${r === 2 ? '높은 공' : '낮은 공'}은 잘 칩니다.`,
+    `성향: ${(B.aggr || 50) >= 62 ? '적극적으로 초구부터 칩니다. 유인구가 잘 통합니다' : (B.aggr || 50) <= 38 ? '신중하게 공을 많이 봅니다. 정면 승부가 낫습니다' : '보통 성향입니다'}${B.eye < 45 ? '. 선구안이 약해 볼에 잘 속습니다' : B.eye >= 70 ? '. 선구안이 좋아 볼넷을 조심해야 합니다' : ''}.`,
+  ];
+  return { lines, weak:{ r, c }, strongR: r === 2 ? 0 : 2, hand: B.hand, name: B.name, pas };
+}
+function scoutPitcher(G){
+  const fi = 1 - batIdx(G), P = curPitcher(G), own = ownTeam(fi), v = x => own ? x : gradeWord(x);
+  const left = Math.round(clamp(1 - P.load / P.sta, 0, 1) * 100), ptc = P.ptc || {};
+  const most = Object.entries(ptc).sort((a, b) => b[1] - a[1]);
+  const best = P.pitches.slice().sort((a, b) => b.g - a.g)[0];
+  const lines = [
+    `투수 ${P.name}, ${handText(P.hand, true)}. 오늘 투구 수 ${P.n}개, 체력 약 ${left}퍼센트${fatigue(P) > 0.3 ? ', 많이 지쳤습니다' : ''}.`,
+    `구종: ${P.pitches.map(x => `${PITCH[x.t].name} ${v(x.g)}`).join(', ')}. 가장 좋은 공은 ${PITCH[best.t].name}입니다.`,
+    most.length ? `오늘 많이 던진 공: ${most.slice(0, 3).map(([t, n]) => `${PITCH[t].name} ${n}개`).join(', ')}.` : '아직 오늘 던진 공 기록이 없습니다.',
+    `제구 ${v(P.ctl)}, 구위 ${v(P.stf)}. ${P.ctl < 45 ? '제구가 흔들리니 신중하게 공을 보세요.' : P.stf >= 70 ? '공이 묵직하니 짧게 맞히는 것이 낫습니다.' : '정면으로 승부해 볼 만합니다.'}`,
+  ];
+  return { lines, name: P.name, pitches: P.pitches.map(x => ({ t: x.t, g: x.g, n: ptc[x.t] || 0 })), left, own };
 }

@@ -266,6 +266,10 @@ function onAct(v){
   if(a.k === 'pr' && role === 'off' && G.mode === 'manager' && G.bases.includes(a.slot) && G.teams[side].bench[a.b]){
     const r = useBench(G, side, a.slot, a.b, 'pr'); gameNext('auto', r); return;
   }
+  // 대수비: 수비하는 쪽 손님만, 경기 후반·타석 시작 전·횟수·지명타자 아님·벤치에 있는 선수 (defSub이 다시 확인)
+  if(a.k === 'dsub' && role === 'def' && G.mode === 'manager' && defSubOK(G, side) && Number.isInteger(a.slot) && a.slot >= 0 && a.slot < 9 && Number.isInteger(a.b) && G.teams[side].bench[a.b] && G.teams[side].bat[a.slot].pos !== 'DH'){
+    const r = defSub(G, side, a.slot, a.b); gameNext('auto', r); return;
+  }
   if(a.k === 'align' && role === 'def' && detailed(G) && [0, 1, 2].includes(a.inf) && [0, 1, 2].includes(a.of)){
     const r = setAlign(G, side, a.inf, a.of); gameNext('auto', r); return;
   }
