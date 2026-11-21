@@ -103,7 +103,7 @@ function skinRender(S){
   let ov = $('#skOv'); if(!ov){ ov = document.createElement('div'); ov.id = 'skOv'; ov.className = 'sk-ov'; } if(ov.parentNode !== st) st.appendChild(ov);
   // 결과를 보여 주기 전(뜸 들이는 동안)에는 점수판을 공을 던지기 전 상태로 (아웃·점수가 미리 바뀌지 않게)
   const hold = game && root.classList.contains('hold') && SK.pre && SK.pre.at === G.at;
-  ov.innerHTML = game ? hudHTML(hold ? SK.pre : G) + plateHTML() + (G.over && !hold ? finalCardHTML() : '') : '';
+  ov.innerHTML = game ? skOvHTML(S, hold) : '';
   if(game) playBallFlash();
   $('#skTop').innerHTML = game ? '' : topHTML(S);
   $('#skTop').hidden = game;
@@ -180,7 +180,12 @@ function listHTML(lines, cls = ''){
 // 결과가 나오면(뜸 들이기 끝) 점수판만 지금 상태로 다시 그림
 function skinHudRefresh(){
   const ov = $('#skOv'); if(!ov || !VIEW.gfx || !G || !isGame(UI.S)) return;
-  ov.innerHTML = hudHTML(G) + plateHTML() + (G.over ? finalCardHTML() : '');
+  ov.innerHTML = skOvHTML(UI.S, false);
+}
+// 그림 위 점수판·선수 상자·경기 끝 카드·날씨 아이콘. 명장면 다시 보기(highlights.js)는 그 장면의 점수판만
+function skOvHTML(S, hold){
+  const hl = typeof hlView === 'function' ? hlView(S) : null, X = hl || (hold ? SK.pre : G);
+  return hudHTML(X) + (hl ? '' : plateHTML() + (G.over && !hold ? finalCardHTML() : '')) + (typeof wxHudHTML === 'function' ? wxHudHTML(X) : '');
 }
 function hudHTML(X = G){
   const [A, H] = X.teams, b = X.bases;

@@ -196,6 +196,8 @@ function leagueAdvance(L, myG){
   const post = L.phase === 'post';
   games.forEach(g => {
     const mine = myG && (g.a === L.my || g.h === L.my);
+    // 우천 취소 (weather.js, 브라우저에서만): 결과 없이 시즌 끝에 다시 함
+    if(!mine && !post && typeof wxRainout === 'function' && wxRainout(L, g)){ wxPostpone(L, g); out.push(wxCancelText(g)); return; }
     const G = mine ? myG : leagueSim(L, g.a, g.h);
     g.ra = runsOf(G.teams[0]); g.rh = runsOf(G.teams[1]);
     leagueApply(L, G, post);

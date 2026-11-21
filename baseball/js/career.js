@@ -206,6 +206,7 @@ function doTrain(k, nm, via){
 // 1군 경기: 내 선수 차례만 직접 함
 function careerPlay(via){
   const L = CR(), g = myGameToday(L), c = C(L), p = myP(L); if(!g) return;
+  if(typeof wxRainDay === 'function' && wxRainDay(L, g, via)) return;   // 우천 취소 (weather.js)
   const opts = leagueGameOpts(L, g.a, g.h, ['cpu', 'cpu'], L.mode === 'simple' ? 'simple' : 'detail', 'pitch');
   // 선발 투수인데 오늘이 내 차례가 아니면 불펜에 대기 / 불펜 투수는 늘 대기
   G = newGame({ ...opts, easy: SET.easy ?? 1 }); G.night = nightPick();
@@ -377,6 +378,7 @@ function careerRest(via){
 // 1군 경기를 컴퓨터가 진행하고 내 기록만 알려 줌
 function careerSimDay(via, listen){
   const L = CR(), g = myGameToday(L), c = C(L); if(!g) return;
+  if(typeof wxRainDay === 'function' && wxRainDay(L, g, via)) return;   // 우천 취소 (weather.js)
   const G2 = newGame(leagueGameOpts(L, g.a, g.h, ['cpu', 'cpu'], listen ? 'detail' : 'manager', 'pitch'));
   const mine = simMine(G2, c.id);
   const out = [`${g.label || `${L.day + 1}일째`}: ${teamName(g.a)} ${runsOf(G2.teams[0])} 대 ${runsOf(G2.teams[1])} ${teamName(g.h)}.`];

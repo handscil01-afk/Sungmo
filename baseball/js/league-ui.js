@@ -140,6 +140,7 @@ function leagueInnScreen(){
 /* ---------- 경기 하기 · 넘기기 ---------- */
 function leaguePlay(via){
   const L = LG(), g = myGameToday(L); if(!g) return;
+  if(typeof wxRainDay === 'function' && wxRainDay(L, g, via)) return;   // 우천 취소 (weather.js)
   const ctrl = g.a === L.my ? ['human', 'cpu'] : ['cpu', 'human'];
   G = newGame({ ...leagueGameOpts(L, g.a, g.h, ctrl, L.mode, L.unit), easy: SET.easy ?? 1 }); G.night = nightPick();
   G.league = { season: L.season, day: L.day, phase: L.phase, n: postN(L), label: g.label || `정규 시즌 ${L.day + 1}일째` };
@@ -241,7 +242,7 @@ function schedScreen(){
   const L = LG(), say = [];
   if(L.post){ say.push(...L.post.log); if(L.phase === 'post') say.push(seriesText(L)); }
   if(L.phase === 'season' || !L.post){
-    for(let d = Math.max(0, L.day - 3); d < L.day; d++) say.push(`${d + 1}일째: ${L.sched[d].map(g => `${teamName(g.a)} ${g.ra} 대 ${g.rh} ${teamName(g.h)}`).join(', ')}.`);
+    for(let d = Math.max(0, L.day - 3); d < L.day; d++) say.push(`${d + 1}일째: ${L.sched[d].map(g => g.rain ? `${teamName(g.a)} 대 ${teamName(g.h)} 우천 취소` : `${teamName(g.a)} ${g.ra} 대 ${g.rh} ${teamName(g.h)}`).join(', ')}.`);
     const next = [];
     for(let d = L.day; d < L.sched.length && next.length < 5; d++){ const g = L.sched[d].find(x => x.a === L.my || x.h === L.my); if(g) next.push(`${d + 1}일째 ${g.h === L.my ? `${teamName(g.a)}와 홈 경기` : `${teamName(g.h)} 원정`}`); }
     if(next.length) say.push(`우리 팀 다음 일정: ${next.join(', ')}.`);
