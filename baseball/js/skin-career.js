@@ -86,7 +86,7 @@ function crHome(S){
     ${crBtn(bag, 'ct', `${itemIco(c.equip && c.equip.bat ? ITEMS.indexOf(itemOf(c.equip.bat)) : 19)}<b>가방</b>`)}
     ${crBtn(info, 'ct', `${crFace(crFaceOf(L, c, p), col, 'sm')}<b>내 선수</b>`)}
   </div>
-  <div class="minors">${['stand', 'lead', 'arch', 'set'].map(k => crOpt(S, k)).filter(Boolean).map(o => `<button type="button" class="mn" data-sk="opt" data-n="${o.n}"><span>${esc(o.t.replace('기록실과 명예의 전당', '명예의 전당').replace('은퇴하기와 설정', '설정'))}</span></button>`).join('')}</div>`;
+  ${hubBtns([[crOpt(S, 'stand'), 'stand', '팀 순위'], [crOpt(S, 'lead'), 'lead', '기록 순위'], [crOpt(S, 'arch'), 'arch', '명예의 전당'], [crOpt(S, 'set'), 'set', '설정']].filter(x => x[0]), 4).replace('class="hb ', 'class="hb sm ')}`;
 }
 
 // 승격 경쟁 막대(2군일 때)와 라이벌 카드
@@ -98,7 +98,7 @@ function crStory(L){
   const tr = c ? `<div class="trustb">${tb('감독 신뢰', c.trust, c.trust >= 65 ? '#2ec463' : c.trust >= 45 ? '#3fa9ff' : '#ff4d5e')}${tb('동료 관계', c.mates, c.mates >= 65 ? '#ff7ab6' : c.mates >= 45 ? '#3fa9ff' : '#9fb3d3')}${c.warned ? '<em class="tr-w">경고</em>' : ''}</div>` : '';
   if(!g && !r) return tr;
   const gp = g ? `<div class="st-g"><small>1군 승격 경쟁 <b>${g.mine}</b> / ${g.need}</small><span class="fb big"><i style="width:${g.pct}%;background:${g.pct >= 100 ? '#2ec463' : '#ffb800'}"></i></span><small>${esc(g.name)}${g.gap ? ` · ${g.gap} 모자람` : ' · 곧 승격!'}</small></div>` : '';
-  const rv = r ? `<div class="st-r">${emb(teamInfo(r.team), 'sm')}<span><small>라이벌</small><b>${esc(r.name)}</b></span><em class="${r.lead > 0 ? 'up' : r.lead < 0 ? 'dn' : ''}">${r.lead > 0 ? '앞섬' : r.lead < 0 ? '뒤짐' : '팽팽'}</em></div>` : '';
+  const rv = r ? `<div class="st-r">${emb(teamInfo(r.team), 'sm')}<span><small>라이벌</small><b>${esc(r.name)}</b></span><em class="${r.lead > 0 ? 'up' : r.lead < 0 ? 'dn' : ''}">${r.lead > 0 ? '앞섬' : r.lead < 0 ? '뒤처짐' : '팽팽'}</em></div>` : '';
   return `${tr}<div class="story">${gp}${rv}</div>`;
 }
 /* ---------- 스프링캠프 ---------- */
@@ -186,14 +186,23 @@ function crTrain(S){
 /* ---------- 선수 카드 ---------- */
 function crInfo(S){
   const L = crL(); if(!L || !L.career) return null;
-  const c = L.career, p = myP(L), col = crColor(L), T = L.teams[L.my];
-  const lines = (S.say || []).slice(2);
+  const c = L.career, p = myP(L), col = crColor(L), T = L.teams[L.my], pit = isPit(p);
+  // 기록 상자: 이번 시즌(1군) · 통산(지난 시즌까지)
+  const ss = p.ss || {}, cs = p.cs || {};
+  const box = (lab, v, hi) => `<span class="sbx${hi ? ' hi' : ''}"><b>${esc(String(v))}</b><small>${esc(lab)}</small></span>`;
+  const bat = x => [box('타율', x.ab ? avgOf(x).toFixed(3).replace(/^0/, '') : '-', avgOf(x) >= .3), box('안타', x.h || 0), box('홈런', x.hr || 0, (x.hr || 0) >= 20), box('타점', x.rbi || 0), box('도루', x.sb || 0)];
+  const pitx = x => [box('평균자책', x.out ? eraOf(x).toFixed(2) : '-', x.out && eraOf(x) < 3), box('승', x.w || 0), box('패', x.l || 0), box('세이브', x.sv || 0), box('탈삼진', x.k || 0)];
+  const row = (title, x) => `<div class="sbr"><span class="sbr-h">${esc(title)}</span><div class="sbx-g">${(pit ? pitx(x) : bat(x)).join('')}</div></div>`;
+  const pitches = pit ? `<div class="pch">${(p.pitches || []).map(x => `<span><b>${esc(PITCH[x.t].name)}</b><i class="g-${String(x.g).toLowerCase()}">${esc(String(x.g))}</i></span>`).join('')}</div>` : '';
+  const aw = (p.awards || []).slice(-8).reverse();
+  const awards = `<div class="awb">${aw.length ? aw.map(a => `<span class="awc">${awardIco(Math.max(0, awardIdx(a)))}<b>${esc(a.replace(/^(\d+)시즌 /, '$1시즌\n'))}</b></span>`).join('') : '<span class="awn">아직 받은 상이 없습니다. 시즌이 끝나면 시상식이 열립니다.</span>'}</div>`;
   return `<div class="lock info" style="background-image:url(${skTint('cr-locker', col)})">
       <div class="pcard">${crFace(crFaceOf(L, c, p), col, 'big')}<div class="pc-num" style="--tc:${col}">${crNumOf(c, p)}</div>
-        <div class="pc-nm"><b>${esc(p.name)}</b><small>${p.age}세 · ${esc(isPit(p) ? '투수' : POS[p.pos])}</small></div><div class="pc-tm">${emb(T, 'sm')}<span>${esc(teamInfo(L.my).short)}</span></div></div>
+        <div class="pc-nm"><b>${esc(p.name)}</b><small>${p.age}세 · ${esc(pit ? p.role || '투수' : POS[p.pos])}</small></div><div class="pc-tm">${emb(T, 'sm')}<span>${esc(teamInfo(L.my).short)}</span></div></div>
       <div class="pstats">${statKeys(p).map(k => crStat(p, c, k)).join('')}</div></div>
-    ${listHTML(lines)}
-    <div class="minors">${(S.opts || []).filter(o => !o.hide).map(o => `<button type="button" class="mn" data-sk="opt" data-n="${o.n}"><span>${esc(o.t)}</span></button>`).join('')}</div>`;
+    ${pitches}${row(`${L.season}시즌 1군`, ss)}${row('통산 (지난 시즌까지)', cs)}
+    <div class="sbr"><span class="sbr-h">수상 ${aw.length ? `${(p.awards || []).length}개` : ''}</span>${awards}</div>
+    ${hubBtns([[S.opts.find(o => o.n === 1), 'back', '돌아가기'], [S.opts.find(o => o.key === 'log'), 'list', '업적·경력'], [S.opts.find(o => o.key === 'face' && !o.hide), 'retired', '얼굴 꾸미기']].filter(x => x[0]), 3)}`;
 }
 
 /* ---------- 얼굴 고르기 ---------- */
@@ -262,7 +271,7 @@ function crLogSkin(S){
 function ctHome(S){
   const c = CE.c; if(!c) return null;
   const T = { key:'center', short: c.short, color: c.color }, saved = CENTER;
-  CENTER = { ...(CENTER || {}), emblem: c.emblem, short: c.short };   // 미리보기 엠블럼
+  CENTER = { ...(CENTER || {}), emblem: c.emblem, embImg: c.embImg, short: c.short };   // 미리보기 엠블럼
   const e = emb(T, 'big'); CENTER = saved;
   return `<div class="ctp" style="--tc:${c.color}">${e}<div class="ctp-tx"><b>${esc(c.name)}</b><small>${esc(c.short)} · ${esc(STYLES[c.style].name)} · ${esc(parkInfo(c.park).name)}</small>
     <span class="ctp-pl">${c.bat.slice(0, 5).map(p => `<i>${esc(p.nick || p.name)}</i>`).join('')}…</span></div></div>` + menuOpts(S);

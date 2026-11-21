@@ -113,6 +113,7 @@ function faScreen(){
 
 /* ---------- 용품점 ---------- */
 function shopScreen(msg){
+  if(typeof VIEW !== 'undefined' && VIEW.gfx) return shopAll(msg);   // 화면 보며 하기: 한 화면 용품점
   const L = CR(), c = life(L), p = myP(L);
   const list = ITEMS.filter(it => fits(it, p));
   const pageItems = list.slice(0, 6);
@@ -131,31 +132,32 @@ function buyItem(it, via){
   const L = CR(), c = life(L), p = myP(L);
   if(c.owned.includes(it.id)){ stay('이미 가지고 있습니다. 가방에서 장착하세요.'); return; }
   if(c.money < it.price){ stay(`돈이 모자랍니다. ${won(it.price - c.money)}이 더 있어야 합니다.`); return; }
-  openDlg('사기', [`${it.name}을 ${won(it.price)}에 살까요? (${fxText(it, p)})`], [
-    { label:'사고 바로 장착', act: () => { c.money -= it.price; c.owned.push(it.id); const say = equip(L, it); saveLeague(); go(shopScreen, 'click', [`${it.name}을 샀습니다.`, ...say]); } },
-    { label:'사기만', act: () => { c.money -= it.price; c.owned.push(it.id); saveLeague(); go(shopScreen, 'click', [`${it.name}을 샀습니다. 가방에 넣었습니다.`]); } },
+  openDlg('사기', [`${josa(it.name, '을', '를')} ${won(it.price)}에 살까요? (${fxText(it, p)})`], [
+    { label:'사고 바로 장착', act: () => { c.money -= it.price; c.owned.push(it.id); const say = equip(L, it); saveLeague(); go(shopScreen, 'click', [`${josa(it.name, '을', '를')} 샀습니다.`, ...say]); } },
+    { label:'사기만', act: () => { c.money -= it.price; c.owned.push(it.id); saveLeague(); go(shopScreen, 'click', [`${josa(it.name, '을', '를')} 샀습니다. 가방에 넣었습니다.`]); } },
     { label:'그만두기' },
   ]);
 }
 function equip(L, it){
   const c = life(L), p = myP(L), old = itemOf(c.equip[it.slot]);
   c.equip[it.slot] = it.id; refreshGear(L);
-  return [`${SLOT_NAME[it.slot]}: ${it.name} 장착. ${fxText(it, p)}. (${gearTag(c, it)})${old ? ` ${old.name}은 가방으로.` : ''}`];
+  return [`${SLOT_NAME[it.slot]}: ${it.name} 장착. ${fxText(it, p)}. (${gearTag(c, it)})${old ? ` ${josa(old.name, '은', '는')} 가방으로.` : ''}`];
 }
 function unequip(L, slot){
   const c = life(L), it = itemOf(c.equip[slot]);
   if(!it) return [];
   delete c.equip[slot]; refreshGear(L);
-  return [`${it.name}을 벗었습니다.`];
+  return [`${josa(it.name, '을', '를')} 벗었습니다.`];
 }
 function goodsShop(){
   const L = CR(), c = life(L);
   return { kind:'cr-shop', q:`소모품입니다. 가진 돈 ${won(c.money)}.`, back: v => go(shopScreen, v), opts: GOODS.map((g, i) => ({ n: i + 1, goods: g.id, price: g.price, have: c.goods[g.id] || 0, icon:['icons2', i], t:`${g.name} ${won(g.price)} (가진 것 ${c.goods[g.id] || 0}개)`, s: g.desc, act: () => {
     if(c.money < g.price){ stay('돈이 모자랍니다.'); return; }
-    c.money -= g.price; c.goods[g.id] = (c.goods[g.id] || 0) + 1; saveLeague(); stay(`${g.name}을 샀습니다. 가진 돈 ${won(c.money)}.`);
+    c.money -= g.price; c.goods[g.id] = (c.goods[g.id] || 0) + 1; saveLeague(); stay(`${josa(g.name, '을', '를')} 샀습니다. 가진 돈 ${won(c.money)}.`);
   } })) };
 }
 function bagScreen(msg){
+  if(typeof VIEW !== 'undefined' && VIEW.gfx) return bagAll(msg);   // 화면 보며 하기: 인벤토리 가방
   const L = CR(), c = life(L), p = myP(L), opts = [];
   const owned = c.owned.map(itemOf).filter(Boolean);
   owned.slice(0, 7).forEach((it, i) => {
@@ -173,8 +175,8 @@ function gearScreen(msg){
   const opts = [];
   owned.forEach((it, i) => {
     const st = gearState(c, it.id), rc = repairCost(it), ec = enhanceCost(it, st);
-    opts.push({ n: i * 2 + 1, t:`${it.name} 수리 (${won(rc)})`, s:`${gearTag(c, it)}`, act: () => { if(st.dur >= 100){ stay('이미 새것 같습니다.'); return; } if(c.money < rc){ stay('돈이 모자랍니다.'); return; } c.money -= rc; st.dur = 100; refreshGear(L); saveLeague(); stay(`${it.name}을 수리했습니다. 가진 돈 ${won(c.money)}.`); } });
-    opts.push({ n: i * 2 + 2, t:`${it.name} 강화 +${(st.lv || 0) + 1} (${won(ec)})`, hide: (st.lv || 0) >= 3, s:'실패 없이 주된 능력이 1 더 오릅니다. 장비로 오르는 능력의 합에는 상한이 있습니다.', act: () => { if(c.money < ec){ stay('돈이 모자랍니다.'); return; } c.money -= ec; st.lv = (st.lv || 0) + 1; refreshGear(L); saveLeague(); stay(`${it.name}을 +${st.lv}으로 강화했습니다. 가진 돈 ${won(c.money)}.`); } });
+    opts.push({ n: i * 2 + 1, t:`${it.name} 수리 (${won(rc)})`, s:`${gearTag(c, it)}`, act: () => { if(st.dur >= 100){ stay('이미 새것 같습니다.'); return; } if(c.money < rc){ stay('돈이 모자랍니다.'); return; } c.money -= rc; st.dur = 100; refreshGear(L); saveLeague(); stay(`${josa(it.name, '을', '를')} 수리했습니다. 가진 돈 ${won(c.money)}.`); } });
+    opts.push({ n: i * 2 + 2, t:`${it.name} 강화 +${(st.lv || 0) + 1} (${won(ec)})`, hide: (st.lv || 0) >= 3, s:'실패 없이 주된 능력이 1 더 오릅니다. 장비로 오르는 능력의 합에는 상한이 있습니다.', act: () => { if(c.money < ec){ stay('돈이 모자랍니다.'); return; } c.money -= ec; st.lv = (st.lv || 0) + 1; refreshGear(L); saveLeague(); stay(`${josa(it.name, '을', '를')} +${st.lv}로 강화했습니다. 가진 돈 ${won(c.money)}.`); } });
   });
   return { q:`장비 수리·강화. 가진 돈 ${won(c.money)}. 장비로 오르는 능력은 모두 합쳐 ${GEAR_CAP}까지입니다.`, say: msg || (owned.length ? null : ['아직 산 장비가 없습니다.']), back: v => go(bagScreen, v), opts };
 }
@@ -243,7 +245,7 @@ function fanMeet(via){
 }
 function coachScreen(){
   const L = CR(), c = life(L), p = myP(L);
-  return { q:'특별 코치에게 무엇을 배울까요? (300만 원)', back: v => go(visitScreen, v), opts: statKeys(p).map((k, i) => ({ n: i + 1, t: ABIL_NAME[k], s:`지금 ${p[k]}, 성장 점수 ${Math.round(c.pts[k] || 0)}/10`, act: v => {
+  return { kind:'cr-coach', q:'특별 코치에게 무엇을 배울까요? 레슨비는 300만 원입니다.', back: v => go(visitScreen, v), opts: statKeys(p).map((k, i) => ({ n: i + 1, stat:k, t: ABIL_NAME[k], s:`지금 ${p[k]}, 성장 점수 ${Math.round(c.pts[k] || 0)}/10`, act: v => {
     if(c.money < 300){ stay('돈이 모자랍니다.'); return; }
     c.money -= 300; c.visited = dayKey(L);
     const up = grow(L, k, 12 + rnd(L) * 4);
@@ -332,4 +334,55 @@ function careerTop(L){
   const c = life(L), p = myP(L), face = [15, 14, 14, 13, 12][(p.cond ?? 0) + 2];
   const ic = (sheet, i) => `<span class="oicon" aria-hidden="true" style="--ix:${i % 4};--iy:${Math.floor(i / 4)};background-image:url(img/${sheet}.png)"></span>`;
   return `<div class="crtop">${ic('icons2', 3)}<b>${won(c.money)}</b>${ic('icons2', 9)}<b>인기 ${c.fame || 0}</b>${ic('icons2', face)}<b>${COND[p.cond ?? 0]}</b></div>`;
+}
+
+/* ---------- 화면 보며 하기: 한 화면 용품점 · 인벤토리 가방 ----------
+   소리와 글로 하기는 위의 쪽 나눈 화면을 그대로 쓰고, 화면 보며 하기는 물건을 모두 한 화면에 놓음.
+   물건을 누르면 고르기만 하고(아래 설명 칸), 사기·장착·쓰기·수리·강화 단추를 눌러야 정해짐 */
+let SHOP_SEL = null, BAG_SEL = null;
+const goodsOf = id => GOODS.find(g => g.id === id);
+// 소모품 쓰기: [성공했나, 글]
+function useGood(L, id){
+  const c = life(L), p = myP(L);
+  if(!(c.goods[id] > 0)) return [false, '가진 것이 없습니다.'];
+  let msg = null;
+  if(id === 'drink'){ if(p.cond >= 2) return [false, '이미 컨디션이 아주 좋습니다.']; p.cond++; msg = `에너지 음료를 마셨습니다. 컨디션 ${COND[p.cond]}.`; }
+  else if(id === 'tape'){ if(!(c.hurt > 0)) return [false, '지금은 다친 곳이 없습니다.']; c.hurt = Math.max(0, c.hurt - 2); if(!c.hurt) heal(p, c); msg = c.hurt ? `치료했습니다. ${c.hurt}일 뒤 돌아옵니다.` : '치료했습니다. 다 나았습니다!'; }
+  else if(id === 'tonic'){ if(c.tonic) return [false, '이미 보약을 먹었습니다. 다음 훈련에 효과가 납니다.']; c.tonic = true; msg = '보약을 먹었습니다. 다음 훈련의 성장 효과가 두 배가 됩니다.'; }
+  c.goods[id]--; saveLeague(); return [true, msg];
+}
+function shopAll(msg){
+  const L = CR(), c = life(L), p = myP(L);
+  const ids = [...ITEMS.filter(it => fits(it, p)).map(it => it.id), ...GOODS.map(g => g.id)];
+  if(!ids.includes(SHOP_SEL)) SHOP_SEL = ids[0];
+  const it = itemOf(SHOP_SEL), g = goodsOf(SHOP_SEL), price = (it || g).price, owned = !!it && c.owned.includes(it.id);
+  const again = (v, lines) => go(() => shopAll(lines), v);
+  const buy = eq => v => {
+    if(owned){ again(v, ['이미 가지고 있습니다. 가방에서 장착하세요.']); return; }
+    if(c.money < price){ again(v, [`돈이 모자랍니다. ${won(price - c.money)}이 더 있어야 합니다.`]); return; }
+    c.money -= price;
+    if(g){ c.goods[g.id] = (c.goods[g.id] || 0) + 1; saveLeague(); again(v, [`${josa(g.name, '을', '를')} 샀습니다. 가방에 ${c.goods[g.id]}개.`]); return; }
+    c.owned.push(it.id); const say = eq ? equip(L, it) : []; saveLeague();
+    again(v, [`${josa(it.name, '을', '를')} 샀습니다.${eq ? '' : ' 가방에 넣었습니다.'}`, ...say]);
+  };
+  return { kind:'cr-shop2', ids, q:`스포츠 용품점입니다. 가진 돈 ${won(c.money)}. 물건을 고르고 사기를 누르세요.`, say: msg, set: (k, v) => { if(k === 'it') SHOP_SEL = v; }, back: v => go(visitScreen, v), opts:[
+    { n:1, key:'buy', t: owned ? '가지고 있음' : g ? '1개 사기' : '사기만', act: buy(false) },
+    { n:2, key:'buyeq', hide: !it || owned, t:'사고 바로 장착', act: buy(true) },
+    { n:9, key:'bag', t:'내 가방', act: v => go(bagAll, v) },
+  ] };
+}
+function bagAll(msg){
+  const L = CR(), c = life(L), p = myP(L);
+  const ids = [...c.owned.filter(itemOf), ...GOODS.filter(g => c.goods[g.id] > 0).map(g => g.id)];
+  if(!ids.includes(BAG_SEL)) BAG_SEL = ids[0] || null;
+  const it = BAG_SEL && itemOf(BAG_SEL), g = BAG_SEL && goodsOf(BAG_SEL), on = !!it && c.equip[it.slot] === it.id;
+  const st = it ? gearState(c, it.id) : null, rc = it ? repairCost(it) : 0, ec = it ? enhanceCost(it, st) : 0;
+  const again = (v, lines) => go(() => bagAll(lines), v);
+  return { kind:'cr-bag2', ids, q:`내 가방입니다. 장비: ${equipText(L)}. 물건을 고르고 아래 단추를 누르세요.`, say: msg, set: (k, v) => { if(k === 'it') BAG_SEL = v; }, back: v => go(careerHome, v), opts:[
+    { n:1, key:'equip', hide: !it, t: on ? '벗기' : '장착하기', act: v => { const say = on ? unequip(L, it.slot) : equip(L, it); saveLeague(); again(v, say); } },
+    { n:2, key:'repair', hide: !it, t:'수리', s: won(rc), act: v => { if(st.dur >= 100){ again(v, ['이미 새것 같습니다.']); return; } if(c.money < rc){ again(v, ['돈이 모자랍니다.']); return; } c.money -= rc; st.dur = 100; refreshGear(L); saveLeague(); again(v, [`${josa(it.name, '을', '를')} 수리했습니다.`]); } },
+    { n:3, key:'enh', hide: !it || (st && st.lv >= 3), t:`강화 +${st ? (st.lv || 0) + 1 : 1}`, s: won(ec), act: v => { if(c.money < ec){ again(v, ['돈이 모자랍니다.']); return; } c.money -= ec; st.lv = (st.lv || 0) + 1; refreshGear(L); saveLeague(); again(v, [`${josa(it.name, '을', '를')} +${st.lv}로 강화했습니다.`]); } },
+    { n:4, key:'use', hide: !g, t:'쓰기', act: v => { const [, m] = useGood(L, g.id); again(v, [m]); } },
+    { n:9, key:'shop', t:'용품점', act: v => go(shopAll, v) },
+  ] };
 }

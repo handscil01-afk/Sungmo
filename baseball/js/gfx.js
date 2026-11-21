@@ -604,7 +604,7 @@ function drawCard(A){
   });
   // 다음 이닝 안내
   const bt = ['1루', '2루', '3루'].filter((_, i) => G.bases[i] != null);
-  const msg = A.mode === 'skip' ? `${G.inning}회${G.top ? '초' : '말'} ${G.outs}아웃 ${bt.length ? '주자 ' + bt.join('·') : '주자 없음'} · 내 차례` : A.mode === 'end' ? (G.winner >= 0 ? `${G.teams[G.winner].short} 승리!` : '무승부') : `${G.inning}회${G.top ? '초' : '말'} · ${batTeam(G).short} 공격`;
+  const msg = A.mode === 'skip' ? `${G.inning}회${G.top ? '초' : '말'} ${G.outs}아웃 ${bt.length ? '주자 ' + bt.join('·') : '주자 없음'} · 내 차례` : A.mode === 'end' ? (G.winner != null && G.teams[G.winner] ? `${G.teams[G.winner].short} 승리!` : '무승부') : `${G.inning}회${G.top ? '초' : '말'} · ${batTeam(G).short} 공격`;
   pxText(msg, 128, y0 + 98, PAL.white, 11);
 }
 

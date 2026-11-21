@@ -32,6 +32,8 @@ function centerHomeScreen(){
     { n:2, t:`줄인 이름: ${c.short}`, s:'점수판과 중계에서 부르는 짧은 이름입니다. 예: 센터', act: v => go(() => textScreen('줄인 이름', c.short, 6, t => { c.short = t; }, centerHomeScreen), v) },
     { n:3, t:`팀 색: ${colorName(c.color)}`, s:'유니폼과 점수판 색입니다.', act: () => { const i = CENTER_COLORS.findIndex(x => x[1] === c.color); c.color = CENTER_COLORS[(i + 1) % CENTER_COLORS.length][1]; stay(`팀 색 ${colorName(c.color)}`); } },
     { n:4, t:`엠블럼: ${c.emblem == null ? '이름 첫 글자' : `${TEAMS[c.emblem].short} 그림`}`, hide: !VIEW.gfx, s:'화면 보며 하기에서 팀 표시로 쓰는 그림입니다.', act: () => { c.emblem = c.emblem == null ? 0 : c.emblem >= 9 ? null : c.emblem + 1; stay(`엠블럼 ${c.emblem == null ? '이름 첫 글자' : TEAMS[c.emblem].short + ' 그림'}`); } },
+    { n:11, key:'embimg', t: c.embImg ? '엠블럼 사진 바꾸기' : '엠블럼 사진 넣기', hide: !VIEW.gfx, s:'갖고 있는 그림 파일을 엠블럼으로 씁니다. 가운데를 정사각형으로 잘라 이 기기에만 저장합니다.', act: () => centerPickImage(c) },
+    { n:12, key:'embdel', t:'엠블럼 사진 빼기', hide: !VIEW.gfx || !c.embImg, act: () => { delete c.embImg; stay('엠블럼 사진을 뺐습니다.'); } },
     { n:5, t:`팀 스타일: ${STYLES[c.style].name}`, s: STYLES[c.style].desc, act: () => { const k = Object.keys(STYLES); c.style = k[(k.indexOf(c.style) + 1) % k.length]; stay(`팀 스타일 ${STYLES[c.style].name}`); } },
     { n:6, t:`홈구장: ${parkInfo(c.park).name}`, s: parkInfo(c.park).desc, act: () => { const k = TEAMS.map(t => t.key); c.park = k[(k.indexOf(c.park) + 1) % k.length]; stay(`홈구장 ${parkInfo(c.park).name}`); } },
     { n:7, t:'타자 9명', s: c.bat.map(nm).join(', '), act: v => go(batListScreen, v) },
@@ -40,6 +42,25 @@ function centerHomeScreen(){
     { n:10, t:'우리 팀 지우기', hide: !CENTER, act: () => openDlg('우리 팀 지우기', ['만든 팀을 지울까요? 우리 팀으로 하던 리그와 선수 육성 기록은 남지만 팀 이름은 "우리 팀"으로 바뀝니다.'], [
       { label:'지우기', act: () => { ls.del(CENTER_KEY); CENTER = null; CE.c = centerBlank(); go(centerHomeScreen, 'click', ['우리 팀을 지웠습니다.']); } }, { label:'그만두기' }]) },
   ] };
+}
+// 엠블럼 사진: 파일을 골라 가운데 정사각형을 96×96으로 줄여 저장 (저장하기를 눌러야 반영)
+function centerPickImage(c){
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
+  inp.onchange = () => {
+    const f = inp.files && inp.files[0]; if(!f) return;
+    const url = URL.createObjectURL(f), im = new Image();
+    im.onload = () => {
+      const S = 96, cv = document.createElement('canvas'); cv.width = cv.height = S;
+      const s = Math.min(im.width, im.height), x = cv.getContext('2d');
+      x.imageSmoothingQuality = 'high'; x.drawImage(im, (im.width - s) / 2, (im.height - s) / 2, s, s, 0, 0, S, S);
+      URL.revokeObjectURL(url);
+      try{ c.embImg = cv.toDataURL('image/png'); }catch(e){ stay('그림을 읽지 못했습니다.'); return; }
+      stay('엠블럼 사진을 넣었습니다. 저장하기를 눌러 주세요.');
+    };
+    im.onerror = () => { URL.revokeObjectURL(url); stay('그림 파일을 열지 못했습니다.'); };
+    im.src = url;
+  };
+  inp.click();
 }
 // 글자 입력 (팀 이름, 선수 이름·별명)
 function textScreen(what, cur, max, set, back){

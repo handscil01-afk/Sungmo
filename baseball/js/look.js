@@ -4,9 +4,10 @@
      0~2줄 바탕 얼굴(피부색 12) · 3~5줄 머리 모양 12 · 6~8줄 눈 12 · 9~11줄 입 12 · 12~14줄 장식 8 + 모자 4
    look = { skin, hair(-1 민머리), hc(머리색), eyes, mouth, acc(-1 없음), hat(-1 없음) }
    바탕 → 눈 → 입 → 머리 → 장식 → 모자 차례로 겹치고, 자홍색(#FF00FF 계열)은 팀 색으로 칠함.
-   모자를 쓰면 모자 위로 삐져나오는 머리카락(위쪽 LOOK_CLIP줄)은 지움 */
+   모자는 머리 위 여유 자리까지 써서 크게 씌우고, 모자가 덮는 열에서는 모자 아래 끝보다 위의 머리카락을 지움(모자 밖으로 삐져나온 옆머리는 남김) */
 const LOOK_ROW = { skin:0, hair:3, eyes:6, mouth:9, acc:12 };
-const LOOK_CLIP = 36;
+// 그리는 판은 112칸: 얼굴(96칸)을 (8, 16)에 놓아 머리 위에 모자 자리를 둠. 모자는 칸 위에 붙어 있고, 얼굴 기준 위 끝은 LOOK_HAT_TOP
+const LOOK_C = 112, LOOK_OX = 8, LOOK_OY = 16, LOOK_HAT_TOP = [-13, -4, -3, -14];
 const HAIR_COLORS = [null, '#7a4a26', '#e0b04a', '#c0472c', '#b9bcc6', '#3f63d6'];
 const HAIR_NAMES = ['검정', '갈색', '금발', '빨강', '은색', '파랑'];
 const LOOK_DEF = { skin:2, hair:0, hc:0, eyes:0, mouth:0, acc:-1, hat:0 };
@@ -50,13 +51,13 @@ function lookURL(look, color){
   lookLoad(); if(!LK.ok) return '';
   const l = lookFix(look), key = [l.skin, l.hair, l.hc, l.eyes, l.mouth, l.acc, l.hat, color].join(',');
   if(LK.cache[key]) return LK.cache[key];
-  const S = 96, cv = document.createElement('canvas'); cv.width = cv.height = S;
+  const S = 96, C = LOOK_C, cv = document.createElement('canvas'); cv.width = cv.height = C;
   const x = cv.getContext('2d'), T = [1, 3, 5].map(j => parseInt(String(color || '#3b82f6').slice(j, j + 2), 16));
-  const layer = () => { const c = document.createElement('canvas'); c.width = c.height = S; c.getContext('2d', { willReadFrequently:true }); return c; };
-  const part = (cnv, row, i) => cnv.getContext('2d').drawImage(LK.img, (i % 4) * S, (row + Math.floor(i / 4)) * S, S, S, 0, 0, S, S);
+  const layer = () => { const c = document.createElement('canvas'); c.width = c.height = C; c.getContext('2d', { willReadFrequently:true }); return c; };
+  const part = (cnv, row, i, dy = 0) => cnv.getContext('2d').drawImage(LK.img, (i % 4) * S, (row + Math.floor(i / 4)) * S, S, S, LOOK_OX, LOOK_OY + dy, S, S);
   // 팀 색: 자홍색 계열을 같은 밝기의 팀 색으로 (바탕 깃·머리끈·모자에만. 입 안·혀의 분홍은 그대로)
   const tint = cnv => {
-    const g = cnv.getContext('2d'), d = g.getImageData(0, 0, S, S), p = d.data;
+    const g = cnv.getContext('2d'), d = g.getImageData(0, 0, C, C), p = d.data;
     for(let i = 0; i < p.length; i += 4){
       const r = p[i], gg = p[i + 1], b = p[i + 2];
       if(p[i + 3] && r > 90 && b > 80 && gg < 0.6 * Math.min(r, b) && Math.abs(r - b) < 80){ const v = Math.max(r, b) / 255; p[i] = Math.round(T[0] * v); p[i + 1] = Math.round(T[1] * v); p[i + 2] = Math.round(T[2] * v); }
@@ -65,13 +66,21 @@ function lookURL(look, color){
   };
   const base = layer(); part(base, LOOK_ROW.skin, l.skin); x.drawImage(tint(base), 0, 0);
   const face = layer(); part(face, LOOK_ROW.eyes, l.eyes); part(face, LOOK_ROW.mouth, l.mouth); x.drawImage(face, 0, 0);
+  // 모자와, 열마다 모자가 덮는 가장 아래 줄
+  let hat = null, hatBot = null;
+  if(l.hat >= 0){
+    hat = layer(); part(hat, LOOK_ROW.acc, 8 + l.hat, LOOK_HAT_TOP[l.hat]);
+    const d = hat.getContext('2d').getImageData(0, 0, C, C).data; hatBot = new Array(C).fill(-1);
+    for(let xx = 0; xx < C; xx++) for(let y = 0; y < C; y++) if(d[(y * C + xx) * 4 + 3]) hatBot[xx] = y;
+  }
   if(l.hair >= 0){
     const hv = layer(), h = hv.getContext('2d');
     part(hv, LOOK_ROW.hair, l.hair);
-    if(l.hat >= 0) h.clearRect(0, 0, S, LOOK_CLIP);
+    // 모자 옆으로 가늘게 삐져나온 가닥까지 지우도록 열마다 양옆 4칸 안의 가장 낮은 모자 줄을 씀
+    if(hatBot) hatBot.forEach((_, xx) => { let y = -1; for(let k = Math.max(0, xx - 4); k <= Math.min(C - 1, xx + 4); k++) y = Math.max(y, hatBot[k]); if(y > 0) h.clearRect(xx, 0, 1, y - 1); });
     const col = HAIR_COLORS[l.hc];
     if(col){   // 머리색: 어두운 점의 밝기를 그 색의 명암으로 (윤곽선은 그대로 어두움)
-      const d = h.getImageData(0, 0, S, S), p = d.data, H = [1, 3, 5].map(j => parseInt(col.slice(j, j + 2), 16));
+      const d = h.getImageData(0, 0, C, C), p = d.data, H = [1, 3, 5].map(j => parseInt(col.slice(j, j + 2), 16));
       for(let i = 0; i < p.length; i += 4){
         if(!p[i + 3]) continue;
         const r = p[i], g = p[i + 1], b = p[i + 2];
@@ -84,7 +93,7 @@ function lookURL(look, color){
     x.drawImage(tint(hv), 0, 0);
   }
   if(l.acc >= 0){ const a = layer(); part(a, LOOK_ROW.acc, l.acc); x.drawImage(a, 0, 0); }
-  if(l.hat >= 0){ const a = layer(); part(a, LOOK_ROW.acc, 8 + l.hat); x.drawImage(tint(a), 0, 0); }
+  if(hat) x.drawImage(tint(hat), 0, 0);
   return LK.cache[key] = cv.toDataURL();
 }
 // 꾸미기 판: 부위 고르기 칸(탭)과 고를 것 격자. set 키: 'lt'(탭), 'lk'(값), 'lr'(무작위)

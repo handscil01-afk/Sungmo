@@ -434,7 +434,7 @@ function careerLogScreen(){
 }
 function careerSet(){
   const L = CR();
-  return { q:'은퇴와 설정입니다.', back: v => go(careerHome, v), opts:[
+  return { list:true, q:'은퇴와 설정입니다.', back: v => go(careerHome, v), opts:[
     { n:1, t:'은퇴하기', act: () => openDlg('은퇴하기', ['정말 은퇴할까요? 되돌릴 수 없습니다.'], [{ label:'은퇴하기', act: () => careerRetire('click') }, { label:'그만두기' }]) },
     { n:2, t:`내 차례 방식: ${L.mode === 'simple' ? '간단 모드 (공 하나씩)' : '정밀 모드'}`, act: () => { L.mode = L.mode === 'simple' ? 'detail' : 'simple'; L.unit = 'pitch'; saveLeague(); stay(`내 차례 방식: ${L.mode === 'simple' ? '간단 모드' : '정밀 모드'}`); } },
     { n:3, t:'백업 파일 내려받기', act: v => leagueExport(v) },

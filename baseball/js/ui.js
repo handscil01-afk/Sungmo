@@ -63,6 +63,7 @@ function go(make, via = 'init', lines = []){
     speak(say.join(' '));
     UI.holdT = setTimeout(() => {
       UI.holdT = 0; document.documentElement.classList.remove('hold');
+      if(typeof skinHudRefresh === 'function') skinHudRefresh();
       speak([...(castNow ? [] : sus.tail), lock && sus.ms < lock ? '' : UI.S.q].filter(Boolean).join(' '));
       if(via === 'click' && !$('#opts').contains(document.activeElement)) $('#q').focus({ preventScroll:true });
     }, sus.ms);

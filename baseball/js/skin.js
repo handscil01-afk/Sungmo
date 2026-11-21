@@ -43,6 +43,7 @@ const grade = v => v >= 80 ? 'A' : v >= 65 ? 'B' : v >= 45 ? 'C' : v >= 32 ? 'D'
 // 팀 엠블럼: img/emblems.png(5칸 × 2줄, TEAMS 순서). 없는 팀이면 팀 색 동그라미에 첫 글자
 function emb(T, cls = ''){
   const ctr = T.key === 'center' || (typeof CENTER !== 'undefined' && CENTER && T.short === CENTER.short);
+  if(ctr && CENTER && CENTER.embImg) return `<span class="emb pic ${cls}" style="--tc:${T.color};background-image:url(${CENTER.embImg})" aria-hidden="true"></span>`;   // 사용자가 넣은 엠블럼 사진
   const i = ctr ? (CENTER && CENTER.emblem != null ? CENTER.emblem : -1) : typeof TEAMS !== 'undefined' ? TEAMS.findIndex(x => x.key === T.key || x.short === T.short) : -1;
   if(i >= 0 && i < 10) return `<span class="emb img ${cls}" style="--tc:${T.color};background-position:${(i % 5) * 25}% ${Math.floor(i / 5) * 100}%" aria-hidden="true"></span>`;
   return `<span class="emb ${cls}" style="--tc:${T.color}" aria-hidden="true">${esc(T.short[0])}</span>`;
@@ -95,12 +96,14 @@ function skinRender(S){
   const st = $('#skStage');
   if(typeof GX !== 'undefined'){
     GX.hud = true;
-    if(game){ st.hidden = false; GX.host = st; gfxRender(G, UI.lastFx || [], UI.lastLines || [], UI.lastEv || []); UI.lastFx = []; UI.lastLines = []; UI.lastEv = []; }
+    if(game){ SK.pre = GX.lastSnap; st.hidden = false; GX.host = st; gfxRender(G, UI.lastFx || [], UI.lastLines || [], UI.lastEv || []); UI.lastFx = []; UI.lastLines = []; UI.lastEv = []; }
     else if(S.scene){ st.hidden = false; GX.host = st; gfxScene(st, S.scene); }
     else { st.hidden = true; GX.scene = null; }
   }
   let ov = $('#skOv'); if(!ov){ ov = document.createElement('div'); ov.id = 'skOv'; ov.className = 'sk-ov'; } if(ov.parentNode !== st) st.appendChild(ov);
-  ov.innerHTML = game ? hudHTML() + plateHTML() : '';
+  // 결과를 보여 주기 전(뜸 들이는 동안)에는 점수판을 공을 던지기 전 상태로 (아웃·점수가 미리 바뀌지 않게)
+  const hold = game && root.classList.contains('hold') && SK.pre && SK.pre.at === G.at;
+  ov.innerHTML = game ? hudHTML(hold ? SK.pre : G) + plateHTML() + (G.over && !hold ? finalCardHTML() : '') : '';
   if(game) playBallFlash();
   $('#skTop').innerHTML = game ? '' : topHTML(S);
   $('#skTop').hidden = game;
@@ -174,15 +177,20 @@ function listHTML(lines, cls = ''){
 }
 
 /* ---------- 경기 화면: 그림 위 점수판·선수 상자 ---------- */
-function hudHTML(){
-  const [A, H] = G.teams, b = G.bases;
+// 결과가 나오면(뜸 들이기 끝) 점수판만 지금 상태로 다시 그림
+function skinHudRefresh(){
+  const ov = $('#skOv'); if(!ov || !VIEW.gfx || !G || !isGame(UI.S)) return;
+  ov.innerHTML = hudHTML(G) + plateHTML() + (G.over ? finalCardHTML() : '');
+}
+function hudHTML(X = G){
+  const [A, H] = X.teams, b = X.bases;
   const lamp = (n, max, c) => Array.from({ length:max }, (_, i) => `<i class="${i < n ? 'on ' + c : ''}"></i>`).join('');
-  const tm = (T, i) => `<span class="sb-t${!G.over && (i === 0) === G.top ? ' bat' : ''}">${emb(T)}<b>${runsOf(T)}</b></span>`;
+  const tm = (T, i) => `<span class="sb-t${!X.over && (i === 0) === X.top ? ' bat' : ''}">${emb(T)}<b>${runsOf(T)}</b></span>`;
   const base = (x, y, on) => `<rect x="${x - 5.5}" y="${y - 5.5}" width="11" height="11" transform="rotate(45 ${x} ${y})" class="${on ? 'on' : ''}"/>`;
   return `<div class="sb"><button type="button" class="sb-main" data-sk="box" aria-label="점수표 보기">
-      ${tm(A, 0)}<span class="sb-inn">${G.over ? '끝' : `${G.inning}<small>${G.top ? '▲' : '▼'}</small>`}</span>${tm(H, 1)}
+      ${tm(A, 0)}<span class="sb-inn">${X.over ? '끝' : `${X.inning}<small>${X.top ? '▲' : '▼'}</small>`}</span>${tm(H, 1)}
       <svg class="sb-dia" viewBox="0 0 44 34" aria-hidden="true">${base(32, 18, b[0] != null)}${base(22, 8, b[1] != null)}${base(12, 18, b[2] != null)}</svg>
-      <span class="sb-cnt"><span><em>B</em>${lamp(G.balls, 3, 'g')}</span><span><em>S</em>${lamp(G.strikes, 2, 'y')}</span><span><em>O</em>${lamp(G.outs, 2, 'r')}</span></span>
+      <span class="sb-cnt"><span><em>B</em>${lamp(X.balls, 3, 'g')}</span><span><em>S</em>${lamp(X.strikes, 2, 'y')}</span><span><em>O</em>${lamp(X.outs, 2, 'r')}</span></span>
     </button>${typeof NET !== 'undefined' && NET.on ? `<button type="button" class="sb-btn" data-sk="talk" aria-label="채팅과 음성 대화">${skIco('chat')}</button>` : ''}<button type="button" class="sb-btn" data-sk="menu" aria-label="메뉴">${skIco('menu')}</button></div>`;
 }
 // 투수 상자(왼쪽 위)·타자 상자(오른쪽 아래). 누르면 능력치와 공 자취
@@ -241,6 +249,7 @@ function deckHTML(S){
   if(S.kind === 'roster') return deckHead(S) + rosterHTML(S.ti) + optsHTML(S, true);
   if(S.kind === 'log') return deckHead(S) + listHTML(S.say || [], 'log') + optsHTML(S, true);
   // 그 밖의 경기 화면: 위에 질문, 가운데 지난 기록(남는 자리), 아래쪽 엄지 닿는 곳에 단추
+  if(G.over && typeof endDeckHTML === 'function') return endDeckHTML(S) + notes;   // 경기 끝: 점수 카드는 그림 위, 아래는 줄 점수표와 같은 크기 단추
   const mid = G.over ? resultBanner() + lineScoreHTML() : S.grid || S.sub ? '' : playLogHTML(S);
   return deckHead(S, !G.over && !G.pre && !S.sub) + mid + notes + (S.grid ? gridHTML(S) : optsHTML(S, true));
 }
@@ -443,7 +452,7 @@ function timingEnd(tm){
 /* ---------- 메뉴 화면 ---------- */
 function topHTML(S){
   const fsOn = typeof FS !== 'undefined' && FS.on(), canFs = typeof isStandalone === 'function' && !isStandalone();
-  const CRT = { 'setup':'경기 설정', 'lg-setup':'새 리그', 'wz-1':'선수 만들기', 'wz-2':'선수 만들기', 'wz-3':'선수 만들기', 'team-pick':'팀 고르기', 'cr-look':'얼굴 꾸미기', 'as-home':'올스타 휴식기', 'as-derby':'홈런 더비', 'fo-home':'구단 사무실', 'fo-list':'구단 사무실', 'cr-camp':'스프링캠프', 'ct-home':'우리 센터 팀', 'ct-list':'선수 고르기', 'ct-player':'선수 고치기', 'ct-num':'능력치', 'cr-home':'라커룸', 'cr-visit':'마을', 'cr-train':'훈련', 'cr-bag':'내 가방', 'cr-info':'내 선수', 'cr-face':'얼굴 고르기', 'cr-log':'업적과 경력', 'cr-game':'오늘 경기' };
+  const CRT = { 'setup':'경기 설정', 'lg-home':'리그', 'ar-home':'기록실', 'ar-show': S.title || '기록실', 'cr-shop2':'스포츠 용품점', 'cr-coach':'특별 코치 레슨', 'sc-show':'일정과 결과', 'cr-bag2':'내 가방', 'lg-setup':'새 리그', 'wz-1':'선수 만들기', 'wz-2':'선수 만들기', 'wz-3':'선수 만들기', 'team-pick':'팀 고르기', 'cr-look':'얼굴 꾸미기', 'as-home':'올스타 휴식기', 'as-derby':'홈런 더비', 'fo-home':'구단 사무실', 'fo-list':'구단 사무실', 'cr-camp':'스프링캠프', 'ct-home':'우리 센터 팀', 'ct-list':'선수 고르기', 'ct-player':'선수 고치기', 'ct-num':'능력치', 'cr-home':'라커룸', 'cr-visit':'마을', 'cr-train':'훈련', 'cr-bag':'내 가방', 'cr-info':'내 선수', 'cr-face':'얼굴 고르기', 'cr-log':'업적과 경력', 'cr-game':'오늘 경기' };
   if(S.kind === 'cr-talk') CRT['cr-talk'] = S.who === 'gm' ? '연봉 계약' : S.who === 'agent' ? 'FA 시장' : '이벤트!';
   const title = S.hero ? '' : S.onTab ? '설정' : CRT[S.kind] || menuTitle(S).title;
   return `<div class="bar">${S.back ? `<button type="button" class="rb" data-sk="back" aria-label="뒤로">${skIco('back')}</button>` : ''}
@@ -453,7 +462,7 @@ function topHTML(S){
 }
 // 메뉴 화면 제목: '…입니다.'로 끝나는 첫 문장이 있으면 그것(예: 순위표, 홈런 순위), 없으면 마지막 질문. 나머지 문장은 제목 아래 작은 글
 function menuTitle(S){
-  const qs = skClean(S.q).split(/(?<=[.?!])\s+/).filter(Boolean);
+  const qs = skClean(S.q).replace(/\s*\([^)]*\)/g, '').split(/(?<=[.?!])\s+/).filter(x => x && !/^[(.]/.test(x));   // 괄호 설명은 제목으로 쓰지 않음
   const i = qs.findIndex(x => /입니다\.$/.test(x) && x.length <= 24);
   if(i >= 0) return { title: qs[i].replace(/(이)?입니다\.$/, ''), sub: qs.filter((_, j) => j !== i && !/고르세요|읽어 보세요/.test(qs[j])).join(' ') };
   return { title: qs[qs.length - 1] || '손잡다 야구', sub: qs.slice(0, -1).join(' ') };
@@ -466,6 +475,11 @@ function menuHTML(S){
   if(S.top) out.push(`<div class="mtop">${S.top}</div>`);
   // 질문의 설명 부분(제목 아래 작은 글)
   if(!S.hero && !S.onTab && q.sub) out.push(`<p class="msub">${esc(q.sub)}</p>`);
+  if(S.tabs){   // 기록 고르기 탭 + 순위표 (탭을 누르면 바로 그 기록)
+    out.push(`<div class="ld-tabs">${(S.opts || []).filter(o => !o.hide && o.key).map(o => `<button type="button" class="${o.key === S.tabs ? 'on' : ''}" data-sk="opt" data-n="${o.n}" aria-pressed="${o.key === S.tabs}">${esc(o.t.replace('세이브와 홀드', '세이브·홀드').replace('평균자책점', '평균자책'))}</button>`).join('')}</div>`);
+    out.push(S.table && S.table.length && S.table.some(t => t.rows.length) ? tableHTML(S.table) : `<div class="ar-empty panel">${typeof awardIco === 'function' ? awardIco(1) : ''}<p>${esc((S.say || [])[0] || '아직 기록이 없습니다.')}</p></div>`);
+    return out.join('');
+  }
   if(S.table && S.table.length) out.push(tableHTML(S.table));
   else if(S.say && S.say.length) out.push(S.say.length > 3 || S.say.join('').length > 160 ? listHTML(S.say) : `<div class="say panel">${S.say.map(l => `<p class="${l.k ? 'k-' + l.k : ''}">${esc(l.s || l)}</p>`).join('')}</div>`);
   if(S.note && !S.hero) out.push(`<div class="mnote">${S.note.map(l => `<p>${esc(l)}</p>`).join('')}</div>`);
@@ -485,7 +499,7 @@ function menuOpts(S){
   const want = (S.opts || []).filter(o => !o.hide && !(S.onTab && /^다음 탭:/.test(o.t)));   // 설정 탭은 위 탭 줄로 옮김
   if(!want.length) return '';
   const sets = want.filter(o => /^([^:]{2,24}):\s*(.+)$/.test(o.t)).length;
-  const setList = (sets * 2 >= want.length && sets > 0) || !!S.onTab;
+  const setList = (sets * 2 >= want.length && sets > 0) || !!S.onTab || !!S.list;
   const team = o => typeof TEAMS !== 'undefined' && [...(CENTER ? [centerInfo()] : []), ...TEAMS].find(T => o.t === T.name || o.t.startsWith(T.name + ' ') || o.t.startsWith(T.name + ',') || o.t === T.short);
   const teams = want.filter(team).length >= 4;
   // 돌아가기만 있는 화면(기록 보기 등)은 작은 단추로
@@ -503,7 +517,7 @@ function menuOpts(S){
     const g = uiGlyph(o.t), mi = menuIcon(o.t), it = itemIcon(o.t);
     const ico = mi >= 0 ? `<span class="mico" style="background-position:${(mi % 3) * 50}% ${Math.floor(mi / 3) * 50}%" aria-hidden="true"></span>`
       : it >= 0 ? `<span class="iico" style="background-position:${(it % 5) * 25}% ${Math.floor(it / 5) * 100 / 3}%" aria-hidden="true"></span>`
-      : g ? `<span class="gico g-${g[0]}" aria-hidden="true">${g[1]}</span>` : '';
+      : g ? `<span class="gico g-${g[0]}" aria-hidden="true">${g[1]}</span>` : typeof hubIco === 'function' ? hubIco(menuKey(o.t)) : '';   // 맞는 그림이 없어도 모든 단추에 아이콘
     return `<button type="button" class="card${S.hero ? ' hero-c' : ''}${S.hero && /이어하기/.test(o.t) ? ' wide pri' : ''}" data-sk="opt" data-n="${o.n}">${ico}<span class="tx"><b>${esc(o.t)}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</span></button>`;
   }).join('');
   const many = want.length > 6 ? ' many' : '';
@@ -578,6 +592,13 @@ document.addEventListener('pointerdown', e => { if(SK.tm && e.target.closest && 
 
 /* ---------- 도트 그림 아이콘 ---------- */
 // 처음 화면 메뉴 아이콘(img/icons-menu.png 3칸 × 3줄): 혼자·둘이·온라인 / 리그·육성·관전 / 이어하기·설정·설치
+// 일반 메뉴 단추의 선 아이콘(skin-hub.js HUB_ICO) 고르기
+function menuKey(t){
+  const L = [[/순위표|팀 순위/, 'stand'], [/기록 순위|통산/, 'lead'], [/일정|지난 결과|포스트시즌/, 'sched'], [/사무실|트레이드|드래프트|FA/, 'office'], [/명예|기록실|우승|시상/, 'arch'],
+    [/돌아가기|그만두기|취소/, 'back'], [/처음 화면/, 'home'], [/넘기기|건너뛰/, 'sim'], [/채팅|음성/, 'chat'], [/나가기|지우기|은퇴/, 'exit'], [/경기 하기|시작|이어/, 'play'],
+    [/기록|목록|명단|선수/, 'list'], [/만들기|새 /, 'rec'], [/백업|불러오기|저장/, 'bag'], [/다시/, 'again']];
+  const m = L.find(([re]) => re.test(t)); return m ? m[1] : 'go';
+}
 function menuIcon(t){
   const L = [/^혼자 하기/, /^둘이 하기/, /^온라인/, /^리그$|^리그 /, /^선수 육성/, /관전/, /^이어하기|^이어 하기|^지금 경기 이어/, /^설정/, /설치/];
   return L.findIndex(re => re.test(t));
