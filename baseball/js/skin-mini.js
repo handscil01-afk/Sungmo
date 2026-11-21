@@ -8,12 +8,16 @@ const SKM = { raf:0 };
 const mgCol = () => { try{ if(MG.from === 'career' && typeof crL === 'function' && crL()) return crColor(crL()); }catch(e){} return '#2f74e0'; };
 // 도트 그림 한 칸: n칸 × rows줄 그림에서 f번째 칸. w는 그림판 너비에 대한 %
 function mgSpr(name, f, n, rows = 1, row = 0, cls = '', pos = '', id = ''){
-  const url = skTint(name, mgCol());
+  const col = mgCol(), url = skTint(name, col);
+  // 팀 색으로 칠한 그림이 아직 없으면 잠시 뒤 다시 그림 (재는 중에는 그리지 않음)
+  if(!SKT.cache[name + col] && !SKM.tintT) SKM.tintT = setTimeout(() => { SKM.tintT = 0; if(VIEW.gfx && UI.S && /^mg-/.test(UI.S.kind || '') && !MG.run) skinBody(); }, 250);
   return `<i${id ? ` id="${id}"` : ''} class="mg-spr s-${name} ${cls}" style="background-image:url(${url});background-size:${n * 100}% ${rows * 100}%;background-position:${n > 1 ? f * 100 / (n - 1) : 0}% ${rows > 1 ? row * 100 / (rows - 1) : 0}%;${pos}" aria-hidden="true"></i>`;
 }
 // 내야 그림(bg-field.png를 홈~2루로 자른 것)에서 자리(%)
 const MGF = { home:[50, 87], b1:[78.8, 48.1], b2:[50, 22.6], b3:[21, 48.1], mound:[50, 51.9] };
 const mgAt = (p, extra = '') => `left:${p[0]}%;top:${p[1]}%;${extra}`;
+// 머리줄 제목: 질문 대신 게임 이름 (질문은 소리와 글로 하기에서 읽는 글)
+const mgTitle = t => { const el = document.querySelector('#skTop .ttl'); if(el) el.textContent = t; };
 const mgLerp = (a, b, k) => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
 // 결과 글씨(img/banners.png 13줄): 헛스윙 2 · 파울 3 · 안타 4 · 2루타 5 · 3루타 6 · 홈런 7 · 아웃 8 · 세이프 11
 const mgBan = (row, cls = '') => `<span class="mg-ban ${cls}" style="--r:${row}" aria-hidden="true"></span>`;
@@ -48,6 +52,7 @@ function mgStartSkin(S){
 function mgDotCls(r){ return { hr:'hr', b3:'xb', b2:'xb', hit:'h', foul:'f', perfect:'hr', good:'h', weak:'f', safe:'h', out:'x', whiff:'x', miss:'x', pop:'x' }[r.k] || 'n'; }
 function mgPlaySkin(S){
   const st = MG.st; if(!st) return null;
+  mgTitle(MG_GAMES[st.g].name + (st.mode === 'pick' ? ' · 고르기' : ''));
   const g = MG_GAMES[st.g], best = st.best0 ? st.best0.best : null, live = st.phase === 'live';
   const dots = Array.from({ length: st.n }, (_, i) => `<i class="${i < st.i ? 'd-' + mgDotCls(st.log[i]) : i === st.i && st.phase !== 'end' ? 'now' : ''}"></i>`).join('');
   const hud = `<div class="mg-hud"><span class="mg-dots" aria-hidden="true">${dots}</span><span class="mg-n">${Math.min(st.i + (st.phase === 'end' ? 0 : 1), st.n)}/${st.n}</span>
@@ -55,8 +60,8 @@ function mgPlaySkin(S){
   const stage = st.g === 'bat' ? mgCage(st) : st.g === 'bunt' ? mgBuntField(st) : mgStealField(st);
   // 알림 줄: 지금 할 일 또는 방금 결과
   const last = st.last, fresh = last && !live;
-  const msg = live ? (st.g === 'steal' ? '둥(투구)에 뛰고, 딱딱(견제)에는 참으세요!' : '삐 소리 · 노란 동그라미에 맞춰 누르세요!')
-    : fresh ? last.text : st.g === 'bat' ? (st.mode === 'tm' ? '공 던지기를 누르면 피칭 머신이 던집니다.' : `코치: "${st.hint}"`) : st.g === 'bunt' ? mgDefText(st.def) + ' 방향을 고르세요.' : '리드를 고르면 투수가 세트에 들어갑니다.';
+  const msg = st.phase === 'read' && !fresh ? '투수의 움직임을 읽고 뛸지 고르세요.' : live ? (st.g === 'steal' ? '둥(투구)에 뛰고, 딱딱(견제)에는 참으세요!' : '삐 소리 · 노란 동그라미에 맞춰 누르세요!')
+    : fresh ? last.text : st.g === 'bat' ? (st.mode === 'tm' ? '공 던지기를 누르면 피칭 머신이 던집니다.' : `코치: "${st.hint}"`) : st.g === 'bunt' ? mgDefText(st.def) + ' 방향을 고르세요.' : st.phase === 'read' ? '투수의 움직임을 읽고 뛸지 고르세요.' : '리드를 고르면 투수가 세트에 들어갑니다.';
   const msgCls = fresh ? (last.pts >= 10 ? 'top' : last.pts > 0 ? 'ok' : 'bad') : live ? 'live' : '';
   if(live && !SKM.raf) SKM.raf = requestAnimationFrame(mgTick);
   return `${hud}<div class="mg-wrap" data-mg="${live ? 'tap' : ''}">${stage}</div><p class="mg-msg ${msgCls}" role="status">${esc(msg)}</p><div class="mg-ctl">${mgCtl(S, st)}</div>`;
@@ -106,10 +111,10 @@ const mgFielder = (p, cls = '') => mgSpr('fielder-set', 0, 1, 1, 0, 'fld ' + cls
 function mgBuntField(st){
   const L = st.last, live = st.phase === 'live', def = live || !L ? st.def : st.def;
   const c1 = def === 'c1' ? [67, 62] : [76, 44], c3 = def === 'c3' ? [33, 62] : [24, 44];
-  const zone = (d, pts) => { const at = [[59, 74], [41, 74], [50, 66]][d]; return `<span class="mg-zone z${pts >= 10 ? 'a' : pts >= 5 ? 'b' : 'c'}${live && st.dir === d ? ' on' : ''}" style="${mgAt(at)}"><b>${pts}</b></span>`; };
+  const zone = (d, pts) => { const at = [[63, 71], [37, 71], [50, 64]][d]; return `<span class="mg-zone z${pts >= 10 ? 'a' : pts >= 5 ? 'b' : 'c'}${live && st.dir === d ? ' on' : ''}" style="${mgAt(at)}"><b>${pts}</b></span>`; };
   let fx = '';
   if(L && !live && L.g === 'bunt'){
-    const D = L.dir, end = { perfect:[[58, 76], [42, 76], [50, 70]][D], good:[[62, 67], [38, 67], [50, 64]][D], weak:[[68, 59], [32, 59], [50, 56]][D], foul:[[66, 86], [34, 86], [60, 90]][D], pop:[50, 74], miss:[50, 96], none:[50, 96] }[L.k] || [50, 90];
+    const D = L.dir, end = { perfect:[[60, 74], [40, 74], [50, 68]][D], good:[[64, 68], [36, 68], [50, 62]][D], weak:[[68, 59], [32, 59], [50, 56]][D], foul:[[66, 86], [34, 86], [60, 90]][D], pop:[50, 74], miss:[50, 96], none:[50, 96] }[L.k] || [50, 90];
     fx = `<span class="mg-roll k-${L.k}" style="--x0:${MGF.home[0]}%;--y0:${MGF.home[1] - 3}%;--x1:${end[0]}%;--y1:${end[1]}%"></span>`
       + `<span class="mg-tx k-${L.k}">${{ perfect:'완벽한 번트!', good:'좋은 번트', weak:'아쉬운 번트', foul:'파울', pop:'번트 뜬공', miss:'헛스윙', none:'놓침' }[L.k] || ''}${L.pts ? ` +${L.pts}` : ''}</span>`;
   }
@@ -117,7 +122,7 @@ function mgBuntField(st){
     ${mgFielder(c1, def === 'c1' ? 'chg' : '')}${mgFielder(c3, def === 'c3' ? 'chg' : '')}${mgFielder([50, 50], 'p')}
     ${def !== 'none' ? `<span class="mg-chg" style="${mgAt(def === 'c1' ? [67, 62] : [33, 62])}">전진!</span>` : ''}
     <span class="mg-ring sm${live ? ' on' : ''}" id="mgRing" style="${mgAt([50, 83])}"></span>
-    ${mgSpr('batter', live ? 3 : L && L.g === 'bunt' && ['perfect', 'good', 'weak', 'foul', 'pop'].includes(L.k) ? 3 : 0, 4, 1, 0, 'bat-bunt', mgAt([45, 92]))}
+    ${mgSpr('batter', live ? 3 : L && L.g === 'bunt' && ['perfect', 'good', 'weak', 'foul', 'pop'].includes(L.k) ? 3 : 0, 4, 1, 0, 'bat-bunt', mgAt([38, 99]))}
     <span class="mg-ball sm" id="mgBall" style="${mgAt(MGF.mound)}"></span>${fx}</div>`;
 }
 /* 도루: 투수(세트 → 견제·투구), 1루 주자 리드, 결과는 2루까지 달림 */
@@ -182,6 +187,7 @@ function mgTickSteal(r, now){
 function mgResSkin(S){
   const r = MG.res; if(!r) return null;
   const g = MG_GAMES[r.g], op = k => (S.opts || []).find(o => o.key === k && !o.hide);
+  mgTitle(`${g.name} 결과`);
   const again = op('again'), list = op('list'), out = op('out');
   const newRec = r.isNew && !r.first;
   const conf = newRec ? `<span class="mg-conf" aria-hidden="true">${Array.from({ length:16 }, (_, i) => `<i style="--cx:${(i * 37) % 100}%;--cd:${(i % 5) * 0.18}s;--cc:${['#ffd84d', '#ff6b8a', '#5bd7ff', '#7be39a'][i % 4]}"></i>`).join('')}</span>` : '';
