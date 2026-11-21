@@ -121,6 +121,36 @@ const PORT = 8769, URL0 = `http://localhost:${PORT}/baseball/?emu=1`;
   console.log(`경기 끝 (${steps}번). 방장: ${sb[0]}`);
   if(sb[0] !== sb[1]) errors.push('두 기기의 점수판이 다름: ' + sb.join(' / '));
   if(steps >= 3000){ errors.push('경기가 끝나지 않음'); console.log('멈춘 화면 방장:', (await q(host)).slice(0, 120), '/ 손님:', (await q(guest)).slice(0, 120)); }
+  // 온라인 전적(js/net-rank.js): 두 기기 모두 이 경기를 서버 기록에 반영해야 하고(서버 규칙 통과), 잘못된 쓰기는 서버 규칙이 막아야 함
+  const rid = await host.evaluate(() => `${NET.code}/${G.at}`);
+  for(const [p, n] of [[host, '방장'], [guest, '손님']]){
+    const ok = await p.waitForFunction(i => !!RK.done[i], rid, { timeout:20000 }).then(() => true, () => false);
+    if(!ok) errors.push(`${n}: 전적이 서버에 반영되지 않음 (${await p.evaluate(() => RK.err)})`);
+  }
+  const rk = await guest.evaluate(async i => {
+    const F = await fbInit(), { R } = F, g = p => R.get(R.ref(F.db, 'baseball/' + p)).then(s => s.val());
+    const t = async f => { try{ await f(); return '써짐'; }catch(e){ return /PERMISSION/i.test(String(e.code || e.message)) ? '막힘' : '오류 ' + e.message; } };
+    const res = await g('results/' + i), me = await g('players/' + F.uid);
+    return { res, me,
+      남의줄: await t(() => R.set(R.ref(F.db, 'baseball/players/' + res.h), { name:'x', w:9, l:0, d:0, g:9, r:1032, last:i, at:R.serverTimestamp() })),
+      다시반영: await t(() => R.update(R.ref(F.db, 'baseball'), { ['players/' + F.uid]: { ...me, w:me.w + 1, g:me.g + 1, at:R.serverTimestamp() } })),
+      결과덮어쓰기: await t(() => R.set(R.ref(F.db, 'baseball/results/' + i + '/hs'), 99)),
+      두번확인: await t(() => R.set(R.ref(F.db, 'baseball/results/' + i + '/ag'), true)),
+    };
+  }, rid);
+  const th = await third.evaluate(async ([i, h]) => {
+    const F = await fbInit(), { R } = F;
+    const t = async f => { try{ await f(); return '써짐'; }catch(e){ return /PERMISSION/i.test(String(e.code || e.message)) ? '막힘' : '오류 ' + e.message; } };
+    return { 남의결과로반영: await t(() => R.update(R.ref(F.db, 'baseball'), { ['players/' + F.uid]: { name:'구경꾼', w:1, l:0, d:0, g:1, r:1016, last:i, at:R.serverTimestamp() }, ['results/' + i + '/ah']: true })),
+      결과읽기: await t(() => R.get(R.ref(F.db, 'baseball/results/' + i))), 순위표읽기: await t(() => R.get(R.ref(F.db, 'baseball/players/' + h))) };
+  }, [rid, rk.res && rk.res.h]);
+  console.log('전적:', JSON.stringify(rk.res), '손님 기록', JSON.stringify(rk.me));
+  console.log('잘못된 쓰기(손님):', JSON.stringify({ 남의줄:rk.남의줄, 다시반영:rk.다시반영, 결과덮어쓰기:rk.결과덮어쓰기, 두번확인:rk.두번확인 }), '구경꾼:', JSON.stringify(th));
+  if(!rk.res || !rk.res.ok || !rk.res.ah || !rk.res.ag) errors.push('결과에 확인·반영 표시가 없음');
+  ['남의줄', '다시반영', '결과덮어쓰기', '두번확인'].forEach(k => { if(rk[k] !== '막힘') errors.push(`손님 ${k}: ${rk[k]}`); });
+  if(th.남의결과로반영 !== '막힘' || th.결과읽기 !== '막힘' || th.순위표읽기 !== '써짐') errors.push('구경꾼 전적 권한이 이상함 ' + JSON.stringify(th));
+  const endNote = await guest.evaluate(() => (UI.S.note || []).join(' ') + ' ' + (document.querySelector('.fin-rk') || {}).textContent);
+  if(!/상대 전적/.test(endNote)) errors.push('경기 끝 화면에 상대 전적이 없음');
   await shot(host, 'on-host-end'); await shot(guest, 'on-guest-end');
 
   // 한 판 더 → 새 경기가 손님에게도 시작됨

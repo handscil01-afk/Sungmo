@@ -12,7 +12,7 @@ html.skin .rk-empty .gico{ width:2.6rem; height:2.6rem; border-radius:14px; } ht
 html.skin .rk-err{ margin:0 4px; font-size:.74rem; font-weight:800; color:#fff; text-shadow:0 1px 0 #0b3a8c; text-align:center; }
 html.skin .rk-act{ margin-top:auto; }
 html.skin .rk-act .hb-b{ min-height:3.3rem; grid-auto-flow:column; justify-content:center; gap:6px; }
-html.skin .rk-act .hb-b b{ font-size:.85rem; }
+html.skin .rk-act .hb-b b{ font-size:.85rem; white-space:nowrap; }
 html.skin .sk-body.f2 .rk-act .hb-b{ min-height:2.8rem; }
 
 /* 순위표 */

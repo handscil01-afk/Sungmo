@@ -30,6 +30,8 @@
 - 끊김: 접속 표시(hb)로 상대에게 알림, 같은 기기에서 "방 다시 들어가기"로 이어 하기.
 - 남은 일: 직접 연결이 안 되는 망을 위한 TURN 서버(필요하면 무료 TURN을 `TURN_SERVERS`에 넣기), 상대가 오래 안 돌아오면 컴퓨터가 대신 고르기.
 
+- 온라인 전적(완료): 경기 끝마다 이 기기 기록(bb_rkh 최근 50경기, bb_rkvs 상대별, bb_pid 기기 번호)과 서버 기록(results 방장이 쓰고 손님이 확인 → players·h2h 각자 자기 자리만, 엘로 점수 1000 시작 K=32). 화면: 온라인 대전 → 내 전적·순위표, 로비·경기 끝에 상대 전적. 규칙은 sports-day/database.rules.json baseball 부분, 시험 tests/rank.js(가짜 서버)·tests/online.js(에뮬레이터).
+
 ## 3단계 (완료): 감독 모드
 
 - 공 하나하나는 선수(컴퓨터)가 하고, 감독은 경기 전 타순·벤치·선발 투수를 정하고(G.pre → beginGame), 경기 중에는 타석마다 작전만 지시(playManager: 작전에 맞춰 aiPitch·aiBat가 공마다 고름).
