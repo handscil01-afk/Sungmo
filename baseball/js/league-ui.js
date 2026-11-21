@@ -47,6 +47,7 @@ function awardLines(L){
   if(A.ksMvp) out.push(`한국시리즈 MVP: ${teamName(A.ksMvp.team)} ${A.ksMvp.name}.`);
   if(A.roy) out.push(`신인왕: ${teamName(A.roy.team)} ${A.roy.name}.`);
   (A.titles || []).forEach(t => out.push(`${STAT_NAME[t.st]} 1위: ${teamName(t.team)} ${t.name}, ${statVal(t.st, t.v)}.`));
+  if((A.gg || []).length) out.push(`골든글러브: ${A.gg.map(g => `${g.pos} ${g.name}`).join(', ')}.`);
   return out;
 }
 
@@ -58,6 +59,7 @@ function leagueHome(){
     note:['10개 팀이 정규 시즌을 치르고, 상위 5팀이 와일드카드 결정전, 준플레이오프, 플레이오프, 한국시리즈를 치릅니다.', '내 팀 경기는 직접 하고, 다른 경기는 결과만 나옵니다. 선수 기록이 쌓이고 시즌이 끝나면 시상식을 합니다.'],
     opts:[{ n:1, t:'새 리그 만들기', act: v => { NEW.kind = 'league'; go(VIEW.gfx ? leagueSetupScreen : modeScreen, v); } }, { n:2, t:'백업 파일 불러오기', act: () => leagueImport() }] };
   if(typeof allstarDue === 'function' && allstarDue(L) && !isMineSaved(L)) return allstarScreen();   // 시즌 절반: 올스타 휴식기
+  if(typeof awardShowDue === 'function' && awardShowDue(L)) return awardShowScreen(0);   // 시즌 끝: 시상식 (awards-show.js)
   const g = myGameToday(L), saved = isMineSaved(L), done = L.phase === 'done';
   return { kind:'lg-home', q: done ? '시즌이 끝났습니다. FA 영입과 신인 드래프트는 구단 사무실에서 합니다. 다음 시즌을 시작할까요?' : '무엇을 할까요?', back: v => go(homeScreen, v), note: leagueStatus(L), opts:[
     done ? { n:1, key:'play', t:'다음 시즌 시작', s:'선수들이 한 살씩 나이를 먹고, 성장하거나 은퇴하며 신인이 들어옵니다.', act: v => { leagueNextSeason(L); saveLeague(); go(lhome(), v, leagueNews(L)); } }
@@ -93,6 +95,7 @@ function archiveScreen(){
     { n:6, key:'feats', t:'대기록', s:'사이클링 히트, 노히트 노런, 퍼펙트게임, 통산 이정표', act: v => show('대기록', (L.feats || []).slice(-30).reverse().map(f => `${f.season}시즌 ${f.day}일째: ${f.text.replace(/^대기록! /, '')}`), v,
       feats.map(f => ({ team: f.team, aw: 1, head:`${f.season}시즌 ${f.day}일째`, title: f.text.replace(/^대기록! /, '') }))) },
     { n:7, key:'me', t:'내 감독 기록', act: v => show('내 감독 기록', myRecord(L), v, null) },
+    { n:8, key:'cab', t:'트로피 진열장', hide: typeof cabinetOpen !== 'function', s:'모은 트로피와 업적 배지', act: v => cabinetOpen(archiveScreen, v) },
   ] };
 }
 function careerText(r){ const c = r.cs || {}; return r.pit ? `통산 ${c.w || 0}승 ${c.l || 0}패 ${c.sv || 0}세이브, 평균자책점 ${c.out ? eraOf(c).toFixed(2) : '-'}, 탈삼진 ${c.k || 0}` : `통산 타율 ${avgText(avgOf(c))}, ${c.h || 0}안타, ${c.hr || 0}홈런, ${c.rbi || 0}타점`; }
