@@ -8,7 +8,7 @@
 function onlineHome(){
   const sv = ls.get('bb_net', null);
   return { q:'온라인 대전입니다. 무엇을 할까요?', back: v => go(homeScreen, v),
-    note:[`내 이름: ${SET.name || '아직 없음'}. 음성 대화 방식: ${SET.vmode === 'ptt' ? '무전기' : '통화'}.`],
+    note:[`내 이름: ${SET.name || '아직 없음'}. 음성 대화 방식: ${SET.vmode === 'ptt' ? '무전기' : '통화'}.`, ...(typeof rankHomeNote === 'function' ? rankHomeNote() : [])],
     opts:[
       { n:1, t:'방 만들기', s:'방을 만들고 방 코드를 상대에게 알려 줍니다.', act: v => needName(v, () => { NEW.kind = 'online'; go(VIEW.gfx ? matchSetupScreen : modeScreen, 'click'); }) },
       { n:2, t:'방 코드로 들어가기', s:'상대에게 받은 숫자 네 자리를 누릅니다.', act: v => needName(v, () => { UI.codeBuf = ''; go(codeScreen, 'click'); }) },
@@ -16,6 +16,8 @@ function onlineHome(){
       { n:4, t:`음성 대화 방식: ${SET.vmode === 'ptt' ? '무전기 (누르는 동안 말하기)' : '통화 (계속 켜 두기)'}`, s:'목소리는 기기끼리 직접 오가서 서버 한도를 쓰지 않습니다.',
         act: () => { SET.vmode = SET.vmode === 'ptt' ? 'call' : 'ptt'; saveSet(); applyMic(); voiceUI(); stay(`음성 대화 방식 ${SET.vmode === 'ptt' ? '무전기' : '통화'}`); } },
       { n:5, t:'방 다시 들어가기', hide: !sv, s: sv ? `방 코드 ${spaced(sv.code)}, ${sv.role === 'host' ? '내가 만든 방' : '손님으로 들어갔던 방'}` : '', act: v => resumeOnline(v) },
+      { n:6, t:'내 전적', hide: typeof rankMeScreen !== 'function', s:'통산 성적, 최근 경기, 상대별 전적', act: v => go(rankMeScreen, v) },
+      { n:7, t:'순위표', hide: typeof rankTopScreen !== 'function', s:'온라인 대전 점수가 높은 20명', act: v => go(rankTopScreen, v) },
     ] };
 }
 function needName(via, next){ if(SET.name) next(); else go(() => nameScreen(next), via); }
@@ -100,7 +102,7 @@ function lobbyScreen(){
   const host = NET.role === 'host', peer = NET.peer;
   const q = host ? (peer ? `${peer.name}님이 들어왔습니다. 경기를 시작할까요?` : `방 코드는 ${spaced(NET.code)}입니다. 상대에게 알려 주고, 들어오기를 기다립니다.`)
                  : `${peer ? peer.name + '님' : '방장'}이 경기를 시작하기를 기다립니다.`;
-  return { q, note: cfgSummary(), opts:[
+  return { q, note: [...cfgSummary(), ...(typeof rankVsNote === 'function' ? rankVsNote() : [])], opts:[
     { n:1, t:'경기 시작', hide: !host || !peer, act: v => netStartGame(v) },
     { n:2, t:'방 코드 다시 듣기', act: v => note([`방 코드는 ${spaced(NET.code)}입니다.`], v) },
     { n:3, t:'초대 링크 보내기', hide: !host, s:'카카오톡이나 문자로 링크를 보내면, 받은 사람은 이름만 적고 바로 들어옵니다.', act: v => shareRoom(v) },
@@ -141,7 +143,7 @@ function netNext(via, res, lines){
     rerender(); if(lines.length) speak(lines.map(l => l.s || l).join(' ')); return;
   }
   NET.key = key;
-  if(G.over){ GS.auto = null; go(endScreen, via, lines); return; }
+  if(G.over){ GS.auto = null; if(typeof rankOnOver === 'function') rankOnOver(); go(endScreen, via, lines); return; }
   if(G.pendingThrow){   // 던질 곳은 수비하는 팀의 기기에서 고름
     if(1 - batIdx(G) === NET.side && !NET.sent){ go(throwScreen, via, lines); return; }
     go(waitScreen, via, lines); return;

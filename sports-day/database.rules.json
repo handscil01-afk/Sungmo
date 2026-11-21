@@ -131,6 +131,134 @@
             }
           }
         }
+      },
+      "results": {
+        "$code": {
+          ".validate": "$code.matches(/^[0-9]{4}$/)",
+          "$gid": {
+            ".read": "auth != null && (data.child('h').val() === auth.uid || data.child('g').val() === auth.uid || root.child('baseball/rooms/' + $code + '/host/uid').val() === auth.uid || root.child('baseball/rooms/' + $code + '/guest/uid').val() === auth.uid)",
+            ".write": "auth != null && !data.exists() && newData.child('h').val() === auth.uid && root.child('baseball/rooms/' + $code + '/host/uid').val() === auth.uid && root.child('baseball/rooms/' + $code + '/guest/uid').val() === newData.child('g').val() && newData.child('at').val() === now",
+            ".validate": "$gid.matches(/^[0-9]{10,15}$/) && newData.hasChildren(['h', 'g', 'hn', 'gn', 'ht', 'gt', 'hs', 'gs', 'hr', 'gr', 'at'])",
+            "h": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 128"
+            },
+            "g": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 128"
+            },
+            "hn": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20"
+            },
+            "gn": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20"
+            },
+            "ht": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20"
+            },
+            "gt": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20"
+            },
+            "hs": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 999"
+            },
+            "gs": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 999"
+            },
+            "hr": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000"
+            },
+            "gr": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000"
+            },
+            "at": {
+              ".validate": "newData.isNumber()"
+            },
+            "ok": {
+              ".write": "auth != null && !data.exists() && root.child('baseball/results/' + $code + '/' + $gid + '/g').val() === auth.uid",
+              ".validate": "newData.val() === true && newData.parent().child('g').val() === auth.uid"
+            },
+            "ah": {
+              ".write": "auth != null && !data.exists() && root.child('baseball/results/' + $code + '/' + $gid + '/h').val() === auth.uid",
+              ".validate": "newData.val() === true && newData.parent().child('h').val() === auth.uid && newData.parent().child('ok').val() === true"
+            },
+            "ag": {
+              ".write": "auth != null && !data.exists() && root.child('baseball/results/' + $code + '/' + $gid + '/g').val() === auth.uid",
+              ".validate": "newData.val() === true && newData.parent().child('g').val() === auth.uid && newData.parent().child('ok').val() === true"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        }
+      },
+      "players": {
+        ".read": "auth != null",
+        ".indexOn": [
+          "r"
+        ],
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid && newData.exists()",
+          ".validate": "newData.hasChildren(['name', 'w', 'l', 'd', 'g', 'r', 'last', 'at']) && newData.child('g').val() === newData.child('w').val() + newData.child('l').val() + newData.child('d').val() && newData.child('at').val() === now && newData.child('last').val().matches(/^[0-9]{4}\\/[0-9]{10,15}$/) && newData.parent().parent().child('results/' + newData.child('last').val()).child('ok').val() === true && ((root.child('baseball/results/' + newData.child('last').val()).child('h').val() === $uid && !root.child('baseball/results/' + newData.child('last').val()).child('ah').exists() && newData.parent().parent().child('results/' + newData.child('last').val()).child('ah').val() === true && ((root.child('baseball/results/' + newData.child('last').val()).child('hs').val() > root.child('baseball/results/' + newData.child('last').val()).child('gs').val() && (newData.child('w').val() - (data.exists() ? data.child('w').val() : 0)) === 1 && (newData.child('l').val() - (data.exists() ? data.child('l').val() : 0)) === 0 && (newData.child('d').val() - (data.exists() ? data.child('d').val() : 0)) === 0 && (newData.child('r').val() - (data.exists() ? data.child('r').val() : 1000)) >= 0 && (newData.child('r').val() - (data.exists() ? data.child('r').val() : 1000)) <= 32) || (root.child('baseball/results/' + newData.child('last').val()).child('hs').val() < root.child('baseball/results/' + newData.child('last').val()).child('gs').val() && (newData.child('w').val() - (data.exists() ? data.child('w').val() : 0)) === 0 && (newData.child('l').val() - (data.exists() ? data.child('l').val() : 0)) === 1 && (newData.child('d').val() - (data.exists() ? data.child('d').val() : 0)) === 0 && (newData.child('r').val() - (data.exists() ? data.child('r').val() : 1000)) <= 0 && (newData.child('r').val() - (data.exists() ? data.child('r').val() : 1000)) >= -32) || (root.child('baseball/results/' + newData.child('last').val()).child('hs').val() === root.child('baseball/results/' + newData.child('last').val()).child('gs').val() && (newData.child('w').val() - (data.exists() ? data.child('w').val() : 0)) === 0 && (newData.child('l').val() - (data.exists() ? data.child('l').val() : 0)) === 0 && (newData.child('d').val() - (data.exists() ? data.child('d').val() : 0)) === 1 && (newData.child('r').val() - (data.exists() ? data.child('r').val() : 1000)) >= -16 && (newData.child('r').val() - (data.exists() ? data.child('r').val() : 1000)) <= 16))) || (root.child('baseball/results/' + newData.child('last').val()).child('g').val() === $uid && !root.child('baseball/results/' + newData.child('last').val()).child('ag').exists() && newData.parent().parent().child('results/' + newData.child('last').val()).child('ag').val() === true && ((root.child('baseball/results/' + newData.child('last').val()).child('gs').val() > root.child('baseball/results/' + newData.child('last').val()).child('hs').val() && (newData.child('w').val() - (data.exists() ? data.child('w').val() : 0)) === 1 && (newData.child('l').val() - (data.exists() ? data.child('l').val() : 0)) === 0 && (newData.child('d').val() - (data.exists() ? data.child('d').val() : 0)) === 0 && (newData.child('r').val() - (data.exists() ? data.child('r').val() : 1000)) >= 0 && (newData.child('r').val() - (data.exists() ? data.child('r').val() : 1000)) <= 32) || (root.child('baseball/results/' + newData.child('last').val()).child('gs').val() < root.child('baseball/results/' + newData.child('last').val()).child('hs').val() && (newData.child('w').val() - (data.exists() ? data.child('w').val() : 0)) === 0 && (newData.child('l').val() - (data.exists() ? data.child('l').val() : 0)) === 1 && (newData.child('d').val() - (data.exists() ? data.child('d').val() : 0)) === 0 && (newData.child('r').val() - (data.exists() ? data.child('r').val() : 1000)) <= 0 && (newData.child('r').val() - (data.exists() ? data.child('r').val() : 1000)) >= -32) || (root.child('baseball/results/' + newData.child('last').val()).child('gs').val() === root.child('baseball/results/' + newData.child('last').val()).child('hs').val() && (newData.child('w').val() - (data.exists() ? data.child('w').val() : 0)) === 0 && (newData.child('l').val() - (data.exists() ? data.child('l').val() : 0)) === 0 && (newData.child('d').val() - (data.exists() ? data.child('d').val() : 0)) === 1 && (newData.child('r').val() - (data.exists() ? data.child('r').val() : 1000)) >= -16 && (newData.child('r').val() - (data.exists() ? data.child('r').val() : 1000)) <= 16))))",
+          "name": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20"
+          },
+          "w": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
+          },
+          "l": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
+          },
+          "d": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
+          },
+          "g": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3000000"
+          },
+          "r": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000"
+          },
+          "last": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "at": {
+            ".validate": "newData.isNumber()"
+          },
+          "pid": {
+            ".validate": "newData.isString() && newData.val().length <= 24"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "h2h": {
+        "$pair": {
+          ".read": "auth != null && ($pair.beginsWith(auth.uid + '_') || $pair.endsWith('_' + auth.uid))",
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && newData.exists()",
+            ".validate": "newData.hasChildren(['n', 'w', 'l', 'd', 'last', 'at']) && newData.child('at').val() === now && ($pair === root.child('baseball/results/' + newData.child('last').val()).child('h').val() + '_' + root.child('baseball/results/' + newData.child('last').val()).child('g').val() || $pair === root.child('baseball/results/' + newData.child('last').val()).child('g').val() + '_' + root.child('baseball/results/' + newData.child('last').val()).child('h').val()) && newData.child('last').val().matches(/^[0-9]{4}\\/[0-9]{10,15}$/) && newData.parent().parent().parent().child('results/' + newData.child('last').val()).child('ok').val() === true && ((root.child('baseball/results/' + newData.child('last').val()).child('h').val() === $uid && !root.child('baseball/results/' + newData.child('last').val()).child('ah').exists() && newData.parent().parent().parent().child('results/' + newData.child('last').val()).child('ah').val() === true && ((root.child('baseball/results/' + newData.child('last').val()).child('hs').val() > root.child('baseball/results/' + newData.child('last').val()).child('gs').val() && (newData.child('w').val() - (data.exists() ? data.child('w').val() : 0)) === 1 && (newData.child('l').val() - (data.exists() ? data.child('l').val() : 0)) === 0 && (newData.child('d').val() - (data.exists() ? data.child('d').val() : 0)) === 0) || (root.child('baseball/results/' + newData.child('last').val()).child('hs').val() < root.child('baseball/results/' + newData.child('last').val()).child('gs').val() && (newData.child('w').val() - (data.exists() ? data.child('w').val() : 0)) === 0 && (newData.child('l').val() - (data.exists() ? data.child('l').val() : 0)) === 1 && (newData.child('d').val() - (data.exists() ? data.child('d').val() : 0)) === 0) || (root.child('baseball/results/' + newData.child('last').val()).child('hs').val() === root.child('baseball/results/' + newData.child('last').val()).child('gs').val() && (newData.child('w').val() - (data.exists() ? data.child('w').val() : 0)) === 0 && (newData.child('l').val() - (data.exists() ? data.child('l').val() : 0)) === 0 && (newData.child('d').val() - (data.exists() ? data.child('d').val() : 0)) === 1))) || (root.child('baseball/results/' + newData.child('last').val()).child('g').val() === $uid && !root.child('baseball/results/' + newData.child('last').val()).child('ag').exists() && newData.parent().parent().parent().child('results/' + newData.child('last').val()).child('ag').val() === true && ((root.child('baseball/results/' + newData.child('last').val()).child('gs').val() > root.child('baseball/results/' + newData.child('last').val()).child('hs').val() && (newData.child('w').val() - (data.exists() ? data.child('w').val() : 0)) === 1 && (newData.child('l').val() - (data.exists() ? data.child('l').val() : 0)) === 0 && (newData.child('d').val() - (data.exists() ? data.child('d').val() : 0)) === 0) || (root.child('baseball/results/' + newData.child('last').val()).child('gs').val() < root.child('baseball/results/' + newData.child('last').val()).child('hs').val() && (newData.child('w').val() - (data.exists() ? data.child('w').val() : 0)) === 0 && (newData.child('l').val() - (data.exists() ? data.child('l').val() : 0)) === 1 && (newData.child('d').val() - (data.exists() ? data.child('d').val() : 0)) === 0) || (root.child('baseball/results/' + newData.child('last').val()).child('gs').val() === root.child('baseball/results/' + newData.child('last').val()).child('hs').val() && (newData.child('w').val() - (data.exists() ? data.child('w').val() : 0)) === 0 && (newData.child('l').val() - (data.exists() ? data.child('l').val() : 0)) === 0 && (newData.child('d').val() - (data.exists() ? data.child('d').val() : 0)) === 1))))",
+            "n": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20"
+            },
+            "w": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
+            },
+            "l": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
+            },
+            "d": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000000"
+            },
+            "last": {
+              ".validate": "newData.isString() && newData.val().length <= 40"
+            },
+            "at": {
+              ".validate": "newData.isNumber()"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        }
       }
     },
     "goldenbell1": {
