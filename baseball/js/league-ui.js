@@ -57,6 +57,7 @@ function leagueHome(){
   if(!L) return { q:'아직 리그가 없습니다. 새 리그를 만들까요?', back: v => go(homeScreen, v),
     note:['10개 팀이 정규 시즌을 치르고, 상위 5팀이 와일드카드 결정전, 준플레이오프, 플레이오프, 한국시리즈를 치릅니다.', '내 팀 경기는 직접 하고, 다른 경기는 결과만 나옵니다. 선수 기록이 쌓이고 시즌이 끝나면 시상식을 합니다.'],
     opts:[{ n:1, t:'새 리그 만들기', act: v => { NEW.kind = 'league'; go(modeScreen, v); } }, { n:2, t:'백업 파일 불러오기', act: () => leagueImport() }] };
+  if(typeof allstarDue === 'function' && allstarDue(L) && !isMineSaved(L)) return allstarScreen();   // 시즌 절반: 올스타 휴식기
   const g = myGameToday(L), saved = isMineSaved(L), done = L.phase === 'done';
   return { q: done ? '시즌이 끝났습니다. FA 영입과 신인 드래프트는 구단 사무실에서 합니다. 다음 시즌을 시작할까요?' : '무엇을 할까요?', back: v => go(homeScreen, v), note: leagueStatus(L), opts:[
     done ? { n:1, t:'다음 시즌 시작', s:'선수들이 한 살씩 나이를 먹고, 성장하거나 은퇴하며 신인이 들어옵니다.', act: v => { leagueNextSeason(L); saveLeague(); go(lhome(), v, leagueNews(L)); } }

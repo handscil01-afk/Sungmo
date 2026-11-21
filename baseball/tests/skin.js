@@ -156,6 +156,25 @@ const PORT = 8767;
     console.log(`${tag}: 트레이드·드래프트 누르기 확인`);
     await ctx.close();
   }
+  // 올스타 휴식기: 시즌 절반에 나오고, 홈런 더비를 끝까지 보고, 올스타전 결과를 보고, 휴식기를 끝냄 (소리와 글로 하기는 번호 키로)
+  for(const view of ['1', '2']){
+    const ctx = await browser.newContext({ viewport:{ width:390, height:844 }, hasTouch: view === '1' });
+    const page = await ctx.newPage(), tag = `올스타(${view === '1' ? '화면' : '소리와 글'})`;
+    page.on('pageerror', e => errors.push(`${tag}: ${e.message}`));
+    await page.goto(`http://localhost:${PORT}/baseball/`); await page.waitForSelector('#opts .opt'); await page.keyboard.press(view);
+    await page.evaluate(() => { LSRC = 'league'; const L = leagueNew({ my:'star', len:18, mode:'manager', inn:9, seed:7 }); setLG(L); while(!allstarDue(L)) leagueAdvance(L, null); saveLeague(); go(leagueHome, 'click'); });
+    if(!(await page.evaluate(() => UI.S.kind === 'as-home'))) errors.push(`${tag}: 시즌 절반에 올스타 휴식기가 나오지 않음`);
+    await page.keyboard.press('1');
+    for(let i = 0; i < 80 && !(await page.evaluate(() => !!LG().allstar.derby.champ)); i++) await page.keyboard.press('1');
+    if(!(await page.evaluate(() => !!LG().allstar.derby.champ))) errors.push(`${tag}: 홈런 더비가 끝나지 않음`);
+    await page.keyboard.press('1'); await page.keyboard.press('3');
+    if(!(await page.evaluate(() => !!LG().allstar.game))) errors.push(`${tag}: 올스타전 결과가 없음`);
+    await page.keyboard.press('9');
+    if(!(await page.evaluate(() => LG().allstar.closed && UI.S.kind !== 'as-home'))) errors.push(`${tag}: 휴식기를 끝내지 못함`);
+    if(view === '1' && await page.evaluate(() => document.querySelector('#skBody').classList.contains('scroll'))) errors.push(`${tag}: 한 화면을 넘침`);
+    console.log(`${tag}: 휴식기·홈런 더비·올스타전·후반기 확인`);
+    await ctx.close();
+  }
   // 우리 센터 팀: 소리와 글로 하기에서 번호 키와 명령 칸만으로 팀 이름·선수 이름을 정해 저장하고, 팀 고르기에서 골라 경기를 끝까지
   {
     const ctx = await browser.newContext({ viewport:{ width:390, height:844 } });

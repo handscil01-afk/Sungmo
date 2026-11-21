@@ -128,7 +128,7 @@ function careerHome(){
     note:['내 선수 한 명을 만들어 신인으로 입단합니다. 2군에서 훈련하며 실력을 키워 1군 주전이 되고, 타이틀과 우승, 명예의 전당을 노립니다.', '1군 경기에서는 내 선수의 타석(투수라면 내 선수가 던지는 동안)만 직접 하고, 나머지는 빠르게 진행합니다.'],
     opts:[{ n:1, t:'새 선수 만들기', act: v => go(careerNameScreen, v) }] };
   const c = C(L), p = myP(L), done = L.phase === 'done', g = myGameToday(L);
-  if(!c.retired){ life(L); if(c.offer) return contractScreen(); if(c.event) return eventScreen(); if(c.camp > 0) return campScreen(); }
+  if(!c.retired){ life(L); if(c.offer) return contractScreen(); if(c.event) return eventScreen(); if(c.camp > 0) return campScreen(); if(typeof allstarDue === 'function' && allstarDue(L) && !loadSaved()) return allstarScreen(); }
   if(c.retired) return { q:'은퇴한 선수입니다. 새 선수를 만들까요?', back: v => go(homeScreen, v), note: c.final || [], opts:[
     { n:1, t:'새 선수 만들기', act: v => go(careerNameScreen, v) }, { n:2, t:'감독으로 새 출발', s:'이 리그를 리그 모드로 옮겨, 선수 시절 팀의 감독이 되어 이어 갑니다.', act: v => becomeManager(v) }, { n:7, t:'업적과 경력', act: v => go(careerLogScreen, v) }, { n:8, t:'기록실과 명예의 전당', act: v => go(archiveScreen, v) }] };
   const saved = (() => { const s = loadSaved(); return s && s.G.career && s.G.career.day === L.day && s.G.career.phase === L.phase && s.G.career.season === L.season ? s : null; })();

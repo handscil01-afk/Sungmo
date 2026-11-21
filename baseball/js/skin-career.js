@@ -289,7 +289,34 @@ function foHome(S){
     </div><div class="fo-opts">${opts}</div>`;
 }
 
-const CAREER_SK = { 'fo-home':foHome, 'cr-camp':crCamp, 'ct-home':ctHome, 'ct-num':ctNum, 'cr-talk':crTalk, 'cr-game':crGame, 'cr-log':crLogSkin, 'cr-home':crHome, 'cr-visit':crVisit, 'cr-shop':crShop, 'cr-bag':crBag, 'cr-train':crTrain, 'cr-info':crInfo, 'cr-face':crFacePick };
+/* ---------- 올스타 휴식기 (allstar.js) ---------- */
+function asHome(S){
+  const L = typeof LG === 'function' ? LG() : null; if(!L) return null;
+  const A = asState(L), R = allstarRosters(L), me = allstarMe(L);
+  const side = k => `<div class="as-t" style="--tc:${teamInfo(k).color}"><span class="emb big" style="--tc:${teamInfo(k).color}">${k === 'dream' ? 'D' : 'N'}</span><b>${esc(teamInfo(k).name)}</b>
+    <small>${R[k].bat.slice(0, 4).map(e => esc((asPlayer(L, e) || {}).name)).join(' · ')}</small>${me === k ? '<em class="stamp">내 선수 선정!</em>' : ''}</div>`;
+  const res = [A.derby && A.derby.champ ? `<span>🏆 홈런 더비 <b>${esc(A.derby.champ.name)}</b></span>` : '', A.game ? `<span>⚾ 나눔 ${A.game.score[0]} : ${A.game.score[1]} 드림 · MVP <b>${esc(A.game.mvp)}</b></span>` : ''].filter(Boolean).join('');
+  const ICO = { derby:'power', watch:'play', sim:'next', list:'list', close:'check' };
+  const opts = (S.opts || []).filter(o => !o.hide).map(o => `<button type="button" class="fo-b${o.key === 'close' ? ' pri' : ''}" data-sk="opt" data-n="${o.n}">${skIco(ICO[o.key] || 'next')}<span class="tx"><b>${esc(o.t)}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</span></button>`).join('');
+  return `<div class="as" style="background-image:url(img/cr-stage.png)"><span class="as-ban">${ban3('mvp').replace('MVP', '올스타')}</span><b class="as-ttl">${L.season}시즌 올스타 휴식기</b></div>
+    <div class="as-vs">${side('dream')}<span class="vs-x">VS</span>${side('nanum')}</div>${res ? `<div class="as-res">${res}</div>` : ''}<div class="fo-opts">${opts}</div>`;
+}
+function asDerby(S){
+  const L = typeof LG === 'function' ? LG() : null, D = S.D; if(!L || !D) return null;
+  const list = D.round === 1 ? D.field : D.round === 2 ? D.final : D.final, cur = !D.champ && list[D.turn];
+  const row = (e, sc) => `<div class="db-r${cur && e.id === cur.id ? ' now' : ''}${D.champ && D.champ.id === e.id ? ' win' : ''}">${emb(teamInfo(e.team), 'sm')}<b>${esc(e.name)}</b>${derbyMine(L, e) ? '<i>우리</i>' : ''}<em>${sc ?? '-'}</em></div>`;
+  const rows = D.round === 1 ? D.field.map(e => row(e, D.score[e.id])) : D.final.map(e => row(e, D.score[e.id]));
+  const lamps = Array.from({ length: AS_OUTS }, (_, i) => `<i class="${i < D.outs ? 'on' : ''}"></i>`).join('');
+  const last = D.log[D.log.length - 1] || '홈런 더비 시작!';
+  const hr = /홈런!/.test(last);
+  const opts = (S.opts || []).filter(o => !o.hide).map((o, i) => `<button type="button" class="${S.mine && o.key !== 'auto' ? `bt bt-${o.key === 'big' ? 'power' : 'contact'}` : 'fo-b' + (i === 0 ? ' pri' : '')}" data-sk="opt" data-n="${o.n}">${skIco(o.key === 'big' ? 'power' : o.key === 'easy' ? 'contact' : 'next')}<b>${esc(o.t)}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</button>`).join('');
+  return `<div class="db" style="background-image:url(img/bg-pitch-n.png)"><div class="db-h">${D.champ ? '🏆 우승 ' + esc(D.champ.name) : D.round === 1 ? '홈런 더비 예선' : '홈런 더비 결승'}</div>
+      <div class="db-tb">${rows.join('')}</div>${cur ? `<div class="db-out">아웃 ${lamps}</div>` : ''}
+      <div class="db-say${hr ? ' hr' : ''}">${esc(last)}</div></div>
+    <div class="${S.mine ? 'bt-grid n2' : 'fo-opts'}">${opts}</div>`;
+}
+
+const CAREER_SK = { 'as-home':asHome, 'as-derby':asDerby, 'fo-home':foHome, 'cr-camp':crCamp, 'ct-home':ctHome, 'ct-num':ctNum, 'cr-talk':crTalk, 'cr-game':crGame, 'cr-log':crLogSkin, 'cr-home':crHome, 'cr-visit':crVisit, 'cr-shop':crShop, 'cr-bag':crBag, 'cr-train':crTrain, 'cr-info':crInfo, 'cr-face':crFacePick };
 function careerSkin(S){
   const f = S && S.kind && CAREER_SK[S.kind];
   if(!f) return null;

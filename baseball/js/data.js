@@ -80,7 +80,9 @@ let CENTER = null;
 const CENTER_FALLBACK = { key:'center', name:'우리 팀', short:'우리', style:'balance', color:'#ec4899' };
 const centerInfo = () => CENTER ? { key:'center', name: CENTER.name, short: CENTER.short, style: CENTER.style || 'balance', color: CENTER.color, emblem: CENTER.emblem } : CENTER_FALLBACK;
 const parkInfo = key => key === 'center' ? parkInfo((CENTER && CENTER.park) || 'star') : ({ key, ...PARK_BASE, ...(PARKS[key] || PARKS.star) });
-const teamInfo = key => key === 'center' ? centerInfo() : TEAMS.find(t => t.key === key) || TEAMS[0];
+// 올스타전 두 팀 (리그의 앞 다섯 팀이 드림, 뒤 다섯 팀이 나눔)
+const ALLSTAR_TEAMS = { dream:{ key:'dream', name:'드림 올스타', short:'드림', style:'balance', color:'#3b82f6' }, nanum:{ key:'nanum', name:'나눔 올스타', short:'나눔', style:'balance', color:'#ef4444' } };
+const teamInfo = key => key === 'center' ? centerInfo() : ALLSTAR_TEAMS[key] || TEAMS.find(t => t.key === key) || TEAMS[0];
 
 const POS = { P:'투수', C:'포수', '1B':'1루수', '2B':'2루수', '3B':'3루수', SS:'유격수', LF:'좌익수', CF:'중견수', RF:'우익수', DH:'지명타자' };
 // 타순별 수비 위치 (1번 중견수 … 9번 유격수)

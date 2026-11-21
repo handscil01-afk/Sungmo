@@ -700,3 +700,31 @@ html.skin .sk-body.f1 .fo{ min-height:7rem; } html.skin .sk-body.f1 .fo-b small{
   html.skin .sk-body.k-fo-home{ display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); column-gap:8px; align-content:start; }
   html.skin .fo-opts{ grid-template-columns:minmax(0, 1fr); max-height:none; }
 }
+/* 올스타 휴식기 · 홈런 더비 */
+html.skin .as{ position:relative; display:grid; place-content:end center; justify-items:center; gap:2px; min-height:8rem; padding:8px; border-radius:16px; border:3px solid var(--line); background:#2a1d6b center 40% / cover no-repeat; image-rendering:pixelated; box-shadow:0 3px 0 var(--line2); }
+html.skin .as-ban{ display:none; }
+html.skin .as-ttl{ font-size:1.35rem; font-weight:900; color:#fff36b; text-shadow:0 3px 0 #7a1f00, 2px 0 0 #7a1f00, -2px 0 0 #7a1f00, 0 -2px 0 #7a1f00; }
+html.skin .as-vs{ display:grid; grid-template-columns:minmax(0, 1fr) auto minmax(0, 1fr); align-items:center; gap:4px; }
+html.skin .as-t{ position:relative; overflow:hidden; display:grid; justify-items:center; gap:3px; padding:8px 6px; border-radius:14px; text-align:center; color:#fff; text-shadow:0 1px 0 rgba(0,0,0,.5);
+  border:3px solid color-mix(in srgb, var(--tc) 55%, #000); background:linear-gradient(180deg, color-mix(in srgb, var(--tc) 70%, #fff), var(--tc)); box-shadow:0 3px 0 color-mix(in srgb, var(--tc) 50%, #000); }
+html.skin .as-t .emb.big{ width:2.6rem; height:2.6rem; font-size:1.2rem; } html.skin .as-t b{ font-size:.9rem; font-weight:900; } html.skin .as-t small{ font-size:.62rem; font-weight:700; line-height:1.3; }
+html.skin .as-res{ display:grid; gap:3px; padding:6px 10px; border-radius:12px; background:#fff6c2; border:2px solid #a86c00; color:#4a2a00; font-size:.78rem; font-weight:800; }
+html.skin .db{ display:grid; gap:6px; padding:10px; border-radius:16px; border:3px solid var(--line); background:#0c1b4a center 30% / cover no-repeat; image-rendering:pixelated; box-shadow:0 3px 0 var(--line2); }
+html.skin .db-h{ justify-self:center; font-size:1.1rem; font-weight:900; color:#fff36b; text-shadow:0 2px 0 #000; }
+html.skin .db-tb{ display:grid; gap:3px; }
+html.skin .db-r{ display:grid; grid-template-columns:auto minmax(0, 1fr) auto auto; align-items:center; gap:6px; padding:4px 8px; border-radius:10px; background:rgba(5,9,22,.72); color:#fff; border:2px solid transparent; }
+html.skin .db-r b{ font-size:.88rem; font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } html.skin .db-r i{ font-style:normal; font-size:.6rem; font-weight:900; background:#ff7a1a; padding:0 6px; border-radius:999px; }
+html.skin .db-r em{ font-style:normal; font-size:1.2rem; font-weight:900; color:#ffe94d; min-width:1.6rem; text-align:right; }
+html.skin .db-r.now{ border-color:#ffe94d; background:rgba(30,60,140,.85); } html.skin .db-r.win{ border-color:#ffe94d; background:rgba(168,108,0,.85); }
+html.skin .db-out{ display:flex; align-items:center; justify-content:center; gap:4px; color:#fff; font-size:.78rem; font-weight:900; text-shadow:0 1px 0 #000; }
+html.skin .db-out i{ width:.8rem; height:.8rem; border-radius:50%; background:#0a2a63; border:2px solid #fff; } html.skin .db-out i.on{ background:#ff4d5e; }
+html.skin .db-say{ text-align:center; padding:6px 8px; border-radius:10px; background:rgba(255,255,255,.92); color:var(--ink); font-size:.86rem; font-weight:900; }
+html.skin .db-say.hr{ background:linear-gradient(180deg, #fff27e, #ffc21a); color:#7a1f00; font-size:1rem; }
+html.skin .sk-body.f1 .as{ min-height:5rem; } html.skin .sk-body.f2 .as-t small{ display:none; }
+@media (orientation:landscape) and (max-height:620px){
+  html.skin .sk-body.k-as-home, html.skin .sk-body.k-as-derby{ display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); column-gap:8px; align-content:start; }
+  html.skin .k-as-home .fo-opts, html.skin .k-as-derby .fo-opts{ grid-template-columns:minmax(0, 1fr); }
+}
+html.skin .k-as-derby .fo-opts{ flex:0 0 auto !important; max-height:7.5rem; grid-template-columns:repeat(2, minmax(0, 1fr)); }
+html.skin .k-as-derby .fo-opts .fo-b{ min-height:3.4rem; }
+html.skin .k-as-derby .bt-grid{ max-height:9rem; }

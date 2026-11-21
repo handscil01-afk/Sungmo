@@ -118,6 +118,7 @@ function gameNext(via, res){
     // 리그 경기: 결과를 리그에 넣고 그날의 다른 경기도 진행
     if(G.league && !G.league.done){ G.league.done = true; lines.push(...visible(leagueAfterMine(G))); }
     if(G.career && !G.career.done){ G.career.done = true; lines.push(...visible(careerAfterGame(G))); }
+    if(G.allstar && !G.allstar.done){ G.allstar.done = true; lines.push(...allstarAfterGame(G)); }
     ls.del('bb_game'); go(endScreen, via, lines); return;
   }
   if(G.pre){ const ti = [0, 1].find(t => !G.pre.ready[t] && needs(t)); go(() => pregameScreen(ti), via, lines); return; }
@@ -653,6 +654,11 @@ function endScreen(){
   const o = GS.opts;
   if(G.career) return { board:true, q:'경기가 끝났습니다. 무엇을 할까요?', opts:[
     { n:1, t:'육성 화면으로', act: v => { G = null; go(careerHome, v); } },
+    { n:2, t:'점수판', act: v => note(scoreboard(G), v, 'score') },
+    { n:3, t:'경기 기록 전체', act: v => go(() => logScreen(), v) },
+  ] };
+  if(G.allstar) return { board:true, q:'올스타전이 끝났습니다. 무엇을 할까요?', opts:[
+    { n:1, t:'올스타 휴식기로 돌아가기', act: v => { LSRC = G.allstar.src || 'league'; G = null; go(allstarScreen, v); } },
     { n:2, t:'점수판', act: v => note(scoreboard(G), v, 'score') },
     { n:3, t:'경기 기록 전체', act: v => go(() => logScreen(), v) },
   ] };

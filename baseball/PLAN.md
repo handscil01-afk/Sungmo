@@ -85,7 +85,7 @@
 - 9-2 (완료) 우리 센터 팀 만들기: js/center.js(편집 화면, 저장 bb_center), data.js의 CENTER·centerInfo(key 'center'), engine.js의 makeCenterTeam, league.js의 leagueCenterTeam·leagueKeys(리그에서는 star 자리). 온라인은 제외. 시험 tests/center.js, tests/skin.js(키보드만으로 만들기→경기).
 - 9-3 (완료) 육성 이야기: js/career-story.js. 라이벌(c.rival, 시즌 점수 seasonScore로 견줌), 2군 승격 경쟁(promoteGap, 승격 규칙은 promote 그대로), 스프링캠프(c.camp 사흘, campScreen), 은퇴 뒤 감독(becomeManager: 리그를 bb_league로 복사). 남은 후보: 감독·동료와의 관계(신뢰도), 1군 부진 때 2군 강등.
 - 9-4 (완료) 구단 운영: office.js(가치 fov·연봉 fsal·상한 capOf, doTrade·signFA·draftSign, L.office·L.moves·L.faPool·L.draftPool), office-ui.js(리그 첫 화면 6번). 컴퓨터 구단끼리의 트레이드는 아직 없음.
-- 9-5 올스타전·홈런 더비.
+- 9-5 (완료) 올스타전·홈런 더비: allstar.js(allstarDue·allstarRosters·derby*·allstarSim, L.allstar), 리그·육성 첫 화면 앞에 휴식기, 관전 경기는 G.allstar(endScreen·gameNext 연결), 팀 key dream·nanum(data.js ALLSTAR_TEAMS).
 
 ## 7.7단계 (예정): 시각장애인들이 아는 숫자 야구 규칙
 
