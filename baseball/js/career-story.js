@@ -71,7 +71,7 @@ const CAMP_DAYS = 3;
 function campScreen(){
   const L = CR(), c = C(L), p = myP(L), day = CAMP_DAYS - c.camp + 1;
   const done = (say, v) => { c.camp--; if(c.camp <= 0){ delete c.camp; say.push('스프링캠프를 마쳤습니다. 이제 정규 시즌 개막입니다!'); crLog(L, `${L.season}시즌 스프링캠프를 마쳤습니다.`); } saveLeague(); go(careerHome, v, say); };
-  const focus = k => v => { const up = grow(L, k, 7 + rnd(L) * 4); addFatigue(c, 18); done([`${ABIL_NAME[k]} 집중 훈련! 성장 점수 ${Math.round(c.pts[k] || 0)}/10.`, ...up], v); };
+  const focus = k => v => { const up = grow(L, k, 7 + rnd(L) * 4); addFatigue(c, 18); if(typeof badgeTrain === 'function') badgeTrain(L); done([`${ABIL_NAME[k]} 집중 훈련! 성장 점수 ${Math.round(c.pts[k] || 0)}/10.`, ...up], v); };
   return { kind:'cr-camp', day, q:`스프링캠프 ${day}일째입니다. 개막까지 ${c.camp}일 남았습니다. 오늘은 무엇을 할까요?`, opts:[
     ...statKeys(p).map((k, i) => ({ n: i + 1, key:k, stat:k, t:`${ABIL_NAME[k]} 집중 훈련`, s:`지금 ${p[k]}. 평소 훈련보다 많이 오르지만 피로가 쌓입니다.`, act: focus(k) })),
     { n:7, key:'scrim', t:'연습 경기 뛰기', s:'감독에게 눈도장을 받아 인기가 오르고, 아무 능력이나 조금 오릅니다.', act: v => { const k = pickOne(L, statKeys(p)); c.fame = (c.fame || 0) + 2; addFatigue(c, 10); if(typeof trustAdd === 'function'){ trustAdd(L, 2); matesAdd(L, 1); } done([`연습 경기에서 좋은 모습을 보였습니다! 인기 2 올라 ${c.fame}. 감독 신뢰도가 올랐습니다.`, ...grow(L, k, 4)], v); } },

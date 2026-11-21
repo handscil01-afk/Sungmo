@@ -133,9 +133,10 @@ function careerHome(){
     note:['내 선수 한 명을 만들어 신인으로 입단합니다. 2군에서 훈련하며 실력을 키워 1군 주전이 되고, 타이틀과 우승, 명예의 전당을 노립니다.', '1군 경기에서는 내 선수의 타석(투수라면 내 선수가 던지는 동안)만 직접 하고, 나머지는 빠르게 진행합니다.'],
     opts:[{ n:1, t:'새 선수 만들기', act: v => go(careerNameScreen, v) }] };
   const c = C(L), p = myP(L), done = L.phase === 'done', g = myGameToday(L);
+  if(typeof awardShowDue === 'function' && awardShowDue(L)) return awardShowScreen(0);   // 시즌 끝: 시상식 (awards-show.js)
   if(!c.retired){ life(L); if(c.offer) return contractScreen(); if(c.event) return eventScreen(); if(c.camp > 0) return campScreen(); if(typeof allstarDue === 'function' && allstarDue(L) && !loadSaved()) return allstarScreen(); }
   if(c.retired) return { q:'은퇴한 선수입니다. 새 선수를 만들까요?', back: v => go(homeScreen, v), note: c.final || [], opts:[
-    { n:1, t:'새 선수 만들기', act: v => go(careerNameScreen, v) }, { n:2, t:'감독으로 새 출발', s:'이 리그를 리그 모드로 옮겨, 선수 시절 팀의 감독이 되어 이어 갑니다.', act: v => becomeManager(v) }, { n:7, t:'업적과 경력', act: v => go(careerLogScreen, v) }, { n:8, t:'기록실과 명예의 전당', act: v => go(archiveScreen, v) }] };
+    { n:1, t:'새 선수 만들기', act: v => go(careerNameScreen, v) }, { n:2, t:'감독으로 새 출발', s:'이 리그를 리그 모드로 옮겨, 선수 시절 팀의 감독이 되어 이어 갑니다.', act: v => becomeManager(v) }, { n:7, t:'업적과 경력', act: v => go(careerLogScreen, v) }, { n:8, t:'기록실과 명예의 전당', act: v => go(archiveScreen, v) }, { n:9, key:'cab', t:'트로피 진열장', hide: typeof cabinetOpen !== 'function', act: v => cabinetOpen(careerHome, v) }] };
   const saved = (() => { const s = loadSaved(); return s && s.G.career && s.G.career.day === L.day && s.G.career.phase === L.phase && s.G.career.season === L.season ? s : null; })();
   const first = c.where !== 'minor' && c.hurt <= 0;
   const trained = c.trained === `${L.season}-${L.phase}-${L.day}`;
@@ -155,6 +156,7 @@ function careerHome(){
     { n:7, key:'info', t:'내 선수 정보와 업적', act: v => go(careerInfoScreen, v) },
     { n:8, key:'arch', t:'기록실과 명예의 전당', act: v => go(archiveScreen, v) },
     { n:9, key:'set', t:'은퇴하기와 설정', act: v => go(careerSet, v) },
+    { n:10, key:'cab', t:'트로피 진열장', hide: typeof cabinetOpen !== 'function', s:'모은 트로피와 업적 배지', act: v => cabinetOpen(careerHome, v) },
   ] };
 }
 
@@ -186,6 +188,7 @@ function trainDay(L, k, nm){
   c.trained = `${L.season}-${L.phase}-${L.day}`;
   const tt = typeof trustTrain === 'function' ? trustTrain(L, k) : [];   // 성실 훈련·휴식 남용
   if(!k){ p.cond = Math.min(2, p.cond + 1); addFatigue(c, -30); return [`푹 쉬었습니다. 컨디션 ${COND[p.cond]}, 피로 ${fatigueWord(c)}.`, ...tt]; }
+  if(typeof badgeTrain === 'function') badgeTrain(L);   // 훈련왕 배지 (badges.js)
   // 대성공(15%): 두 배, 보약을 먹었으면 또 두 배. 컨디션이 좋으면 조금 더
   const great = rnd(L) < 0.15, tonic = !!c.tonic; c.tonic = false;
   const amt = (4 + rnd(L) * 3) * (great ? 2 : 1) * (tonic ? 2 : 1) * (1 + (p.cond || 0) * 0.08);
@@ -267,6 +270,7 @@ function careerGrowFromGame(L, G, minor){
     }
     if(!minor && (dec.w === c.id || dec.s === c.id) && s.r === 0) out.push(...interview(L, p, dec.w === c.id ? '무실점 승리' : '세이브'));
   }
+  if(typeof badgeGame === 'function') badgeGame(L, ln, G, minor);   // 첫 안타·첫 승·삼진 10개 배지 (badges.js)
   if(!minor && typeof trustGame === 'function') out.push(...trustGame(L, ln, G));   // 감독 신뢰도·최근 10경기 (career-trust.js)
   out.push(...gameBonus(L, ln, G, minor));
   addFatigue(c, minor ? 3 : 5); out.push(...wearGear(L, minor ? 1 : 2));
@@ -292,6 +296,7 @@ function careerAfterDay(L){
   out.push(...payDay(L));
   if(typeof trustDay === 'function') out.push(...trustDay(L));   // 동료 효과·타순과 보직·경고와 2군 강등
   rollEvent(L);
+  if(typeof badgeCheck === 'function') badgeCheck(L);   // 승격·돈·인기 배지 (badges.js)
   out.push(...leagueNews(L));
   return out;
 }
@@ -415,6 +420,7 @@ function careerRetire(via, why){
   (L.retired ||= []).push({ id:p.id, name:p.name, team:L.my, pit:isPit(p), pos: isPit(p) ? p.role : POS[p.pos], age:p.age, seasons:p.seasons, cs:p.cs, awards:p.awards || [], hof, season:L.season });
   if(hof) (L.hof ||= []).push({ id:p.id, name:p.name, team:L.my, pit:isPit(p), cs:p.cs, awards:p.awards || [], season:L.season });
   crLog(L, `${p.name} 은퇴.${hof ? ' 명예의 전당 헌액!' : ''}`);
+  if(typeof badgeCheck === 'function') badgeCheck(L);
   saveLeague(); go(careerHome, via, c.final);
 }
 

@@ -163,7 +163,10 @@ const PORT = 8766;
       await page.keyboard.press('1');
       for(const k of ['4', '.', '5', '2', '.', '6', '.', '7', '.']) await page.keyboard.press(k);
       await page.keyboard.press('3'); await page.keyboard.press('4');
-      await page.waitForFunction(() => document.querySelector('#q').textContent.includes('시즌이 끝났습니다'), null, { timeout:120000 });
+      // 시즌이 끝나면 시상식이 먼저 나옴 (awards-show.js): 건너뛰기(2)
+      await page.waitForFunction(() => /시즌이 끝났습니다|시상식입니다/.test(document.querySelector('#q').textContent), null, { timeout:120000 });
+      if(/시상식입니다/.test(await q(page))) await page.keyboard.press('2');
+      await page.waitForFunction(() => document.querySelector('#q').textContent.includes('시즌이 끝났습니다'), null, { timeout:10000 });
       const aw = await page.$eval('#note', e => e.innerText);
       if(!/한국시리즈 우승/.test(aw)) errors.push('시상식 글이 없음');
       console.log(`${name}: 리그 시즌 끝 / ${aw.split('\n').slice(1, 4).join(' / ')}`);

@@ -207,6 +207,7 @@ function leagueAdvance(L, myG){
   });
   if(!post && typeof cpuTradeDay === 'function') cpuTradeDay(L);   // 컴퓨터 구단끼리 트레이드 (office.js)
   if(!post){ L.day++; if(L.day >= L.sched.length) startPost(L); }
+  if(typeof badgeCheck === 'function') badgeCheck(L);   // 업적 배지 (badges.js)
   return out;
 }
 
@@ -311,6 +312,7 @@ function endSeason(L, champ, S){
   const give = (a, what) => { if(!a) return; const f = findPlayer(L, a.id); if(f) (f.p.awards ||= []).push(`${L.season}시즌 ${what}`); };
   give(mvp, 'MVP'); give(ks, '한국시리즈 MVP'); give(L.awards.roy, '신인왕');
   titles.forEach(t => give(t, TITLE_NAME[t.st]));
+  if(typeof awardsGG === 'function') awardsGG(L);   // 골든글러브 (badges.js)
   L.news.push(`한국시리즈 우승: ${teamInfo(champ).name}!`);
   seasonRecords(L);
 }

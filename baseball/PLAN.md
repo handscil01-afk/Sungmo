@@ -96,6 +96,7 @@
 - 9-10 (완료) 컷인·명장면·날씨: cutin.js(그림 위 잠깐 띄우기 차례 SHOW, gfxStart 뒤 홈런·끝내기 컷인), highlights.js(engine.js flush가 hlFlush를 불러 큰 장면 8개를 메모리에만 모음, 줄인 상태 hlMini + G.anim 사본으로 다시 그림, endScreen·endDeckHTML 연결), weather.js(경기·리그마다 해시 씨앗으로 날씨: 우천 취소는 leagueAdvance의 wxRainout·wxPostpone, 우천 중단·강우 콜드게임은 gameNext의 wxTick, 콜드게임 설정은 engine.js endHalf의 G.mercy). 자동 시험은 window.__show를 켠 때만 띄우고 비가 옴. 시험 tests/show.js.
 
 - 9-10 (완료) 미니게임: js/mini.js(화면 정의·판정·소리 신호, 저장 bb_mini), js/skin-mini.js·css/skin-mini.css(그림, kind mg-home·mg-start·mg-play·mg-res). 타격 연습장·번트 챌린지·도루 챌린지, 타이밍(MG.run: 오디오 시계로 신호를 맞추고 누른 때와 칠 때의 차이로 판정, 소리와 글로 하기는 판정 폭 1.3배)과 고르기로 하기. 처음 화면 10번, 육성 마을(어디 가기 10번·지도의 미니게임 연습장). 시험 tests/mini.js.
+- 9-10 (완료) 시즌 끝 시상식(awards-show.js, 한 번만: L.awShow), 업적 배지 24개(badges.js: L.career.badges·L.badges, badgeGive·badgeCheck, 새 배지는 ui.js go·rerender의 badgeFlush로 알림), 골든글러브(league.js endSeason → awardsGG), 트로피 진열장(육성 첫 화면 10번·기록실 8번, 그림 skin-awards.js). 시험 tests/awards.js.
 
 ## 7.7단계 (예정): 시각장애인들이 아는 숫자 야구 규칙
 

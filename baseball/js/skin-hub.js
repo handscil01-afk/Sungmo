@@ -79,8 +79,8 @@ function arHomeSkin(S){
   const h = L.history || [], my = L.my;
   const champs = h.filter(x => x.my.champ).length + (L.champ === my ? 1 : 0);
   const sum = `<div class="ar-sum"><span>${awardIco(0)}<b>${champs}</b><small>우승</small></span><span>${awardIco(6)}<b>${(L.hof || []).length}</b><small>명예의 전당</small></span><span>${awardIco(1)}<b>${(L.feats || []).length}</b><small>대기록</small></span><span>${hubIco('me')}<b>${L.season}</b><small>시즌째</small></span></div>`;
-  const list = [['champ', 'champ', '역대 우승'], ['career', 'career', '통산 순위'], ['rec', 'rec', '시즌 최고'], ['hof', 'hof', '명예의 전당'], ['retired', 'retired', '은퇴 선수'], ['feats', 'feats', '대기록'], ['me', 'me', '내 감독 기록']];
-  return `${sum}${hubBtns(list.map(([k, ico, lab]) => [hubOpt(S, k), ico, lab]), 2)}`;
+  const list = [['champ', 'champ', '역대 우승'], ['career', 'career', '통산 순위'], ['rec', 'rec', '시즌 최고'], ['hof', 'hof', '명예의 전당'], ['retired', 'retired', '은퇴 선수'], ['feats', 'feats', '대기록'], ['me', 'me', '내 감독 기록'], ['cab', 'cab', '트로피 진열장']];
+  return `${sum}${hubBtns(list.map(([k, ico, lab]) => [hubOpt(S, k), ico, lab]).filter(x => x[0]), 2)}`;
 }
 // 기록 카드 목록 (쪽 넘기기)
 function arShowSkin(S){

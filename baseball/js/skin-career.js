@@ -86,7 +86,7 @@ function crHome(S){
     ${crBtn(bag, 'ct', `${itemIco(c.equip && c.equip.bat ? ITEMS.indexOf(itemOf(c.equip.bat)) : 19)}<b>가방</b>`)}
     ${crBtn(info, 'ct', `${crFace(crFaceOf(L, c, p), col, 'sm', L.my)}<b>내 선수</b>`)}
   </div>
-  ${hubBtns([[crOpt(S, 'stand'), 'stand', '팀 순위'], [crOpt(S, 'lead'), 'lead', '기록 순위'], [crOpt(S, 'arch'), 'arch', '명예의 전당'], [crOpt(S, 'set'), 'set', '설정']].filter(x => x[0]), 4).replace('class="hb ', 'class="hb sm ')}`;
+  ${(() => { const sm = [[crOpt(S, 'stand'), 'stand', '팀 순위'], [crOpt(S, 'lead'), 'lead', '기록 순위'], [crOpt(S, 'arch'), 'arch', '명예의 전당'], [crOpt(S, 'cab'), 'cab', '진열장'], [crOpt(S, 'set'), 'set', '설정']].filter(x => x[0]); return hubBtns(sm, sm.length > 4 ? 5 : 4).replace('class="hb ', 'class="hb sm '); })()}`;
 }
 
 // 승격 경쟁 막대(2군일 때)와 라이벌 카드

@@ -44,6 +44,7 @@ function go(make, via = 'init', lines = []){
   const sus = suspend(lines || []);
   UI.make = make; UI.say = sus ? sus.lines : lines || []; UI.note = null;
   UI.S = make(); if(UI.say.length || !UI.S.say) UI.S.say = UI.say;
+  if(typeof badgeFlush === 'function') badgeFlush(UI.S);   // 새 배지 알림 (awards-show.js)
   addStatusOpt(UI.S);
   if(sus) document.documentElement.classList.add('hold');
   render();
@@ -76,7 +77,7 @@ function go(make, via = 'init', lines = []){
   } else if(via === 'key' || via === 'auto') speak(msg);
 }
 // 같은 화면을 다시 그림 (설정을 바꿨을 때, 설치 단추가 생겼을 때). 초점은 그대로
-function rerender(){ if(!UI.make) return; UI.S = UI.make(); if(UI.say.length || !UI.S.say) UI.S.say = UI.say; addStatusOpt(UI.S); render(); }
+function rerender(){ if(!UI.make) return; UI.S = UI.make(); if(UI.say.length || !UI.S.say) UI.S.say = UI.say; if(typeof badgeFlush === 'function') badgeFlush(UI.S, true); addStatusOpt(UI.S); render(); }
 // 경기 화면에는 언제나 "지금 상황 확인" 단추(0번)를 둠: 아웃·볼카운트·주자·점수를 한 번에 들음
 function addStatusOpt(S){
   if(!S.board || typeof G === 'undefined' || !G || S.input) return;
