@@ -1013,3 +1013,4 @@ html.skin .sg{ font-size:.82rem; padding:3px 8px; } html.skin .sg strong{ font-s
   html.skin .k-ct-home .ctp{ padding:4px 10px; } html.skin .k-ct-home .ctp-pl{ display:none; } html.skin .k-ct-home .ctp .emb.big{ width:2.2rem; height:2.2rem; }
   html.skin .k-ct-home .cards.sets{ grid-template-columns:repeat(3, minmax(0, 1fr)); } html.skin .k-ct-home .card.row{ min-height:2.4rem; padding:.3rem .5rem; } html.skin .k-ct-home .card.row small{ display:none; }
 }
+html.skin .hb-b{ align-items:center; }
