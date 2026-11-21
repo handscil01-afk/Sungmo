@@ -121,3 +121,55 @@ function foLine(p){
   const kind = p.vel ? `${p.role || '투수'} · 구속 ${p.vel} 제구 ${p.ctl} 구위 ${p.stf}` : `${POS[p.pos] || p.role || ''} · 컨택 ${p.con} 파워 ${p.pow} 선구안 ${p.eye} 스피드 ${p.spd} 수비 ${p.def}`;
   return `가치 ${fov(p)} · 연봉 ${eok(fsal(p))} · ${p.age || '?'}세 · ${kind}`;
 }
+
+/* ---------- 컴퓨터 구단끼리 트레이드 ----------
+   정규 시즌 3분의 2 지점(마감) 전까지, 하루에 한 번 확률로 시도. 시즌 기대 건수는 리그 길이에 비례(144경기면 6건 안팎, 18경기면 1건 안팎)
+   - A 구단의 가장 약한 주전(타자는 타순, 투수는 선발) X를 메울 같은 종류 선수 Y를 B 구단에서 찾음(가치가 2~8 높음, 타자는 같은 수비 위치를 먼저)
+   - A는 Y와 가치가 비슷한(차이 3 이하) 같은 종류 선수 Z를 내줌(마무리는 내주지 않음). 양쪽 연봉 총액이 상한을 넘지 않아야 함
+   - 바꾼 뒤 A에서는 Y가 약했던 X의 자리에 들어가고, X는 Y가 받았던 자리(Z가 있던 자리)로 감
+   - 내 팀(L.my)과 육성 중인 내 선수(L.career.id)는 건드리지 않음. 이번 시즌에 이미 옮긴 선수도 다시 옮기지 않음. 난수는 rnd(L)만 씀 */
+const cpuTradeTarget = L => Math.max(1, Math.round(L.len / 144 * 6));
+const cpuDeadline = L => Math.floor(L.sched.length * 2 / 3);
+function cpuTradeDay(L){
+  if(L.phase !== 'season' || L.day >= cpuDeadline(L)) return null;
+  const st = (L.cpuTrades && L.cpuTrades.season === L.season) ? L.cpuTrades : (L.cpuTrades = { season: L.season, n:0 });
+  const want = cpuTradeTarget(L);
+  if(st.n >= want + 1) return null;
+  if(rnd(L) >= want * 1.15 / Math.max(1, cpuDeadline(L))) return null;
+  const keys = Object.keys(L.teams).filter(k => k !== L.my);
+  const free = p => !(L.career && p.id === L.career.id) && p.moved !== L.season;
+  const a = keys[Math.floor(rnd(L) * keys.length)], A = L.teams[a], bat = rnd(L) < 0.6;
+  const starters = (bat ? A.bat : A.sp).filter(free);
+  if(!starters.length) return null;
+  const X = starters.slice().sort((p, q) => fov(p) - fov(q))[0];
+  const cap = capOf(L), mineA = (bat ? [...A.bat, ...A.bench] : [...A.sp, ...A.rp]).filter(Z => Z !== X && free(Z) && Z.role !== '마무리');
+  let best = null;
+  keys.filter(k => k !== a).forEach(b => {
+    const B = L.teams[b], pool = (bat ? [...B.bat, ...B.bench] : [...B.sp, ...B.rp]).filter(free);
+    pool.forEach(Y => {
+      const up = fov(Y) - fov(X);
+      if(up < 2 || up > 8) return;
+      const fit = !bat || Y.pos === X.pos ? 2 : 0;   // 타자는 같은 수비 위치를 먼저
+      mineA.forEach(Z => {
+        const diff = Math.abs(fov(Z) - fov(Y));
+        if(diff > 3) return;
+        if(payroll(A) - fsal(Z) + fsal(Y) > cap || payroll(L.teams[b]) - fsal(Y) + fsal(Z) > cap) return;
+        const score = up + fit - diff;
+        if(!best || score > best.score) best = { b, Y, Z, score };
+      });
+    });
+  });
+  if(!best) return null;
+  const { b, Y, Z } = best, B = L.teams[b];
+  const za = spotOf(A, Z), yb = spotOf(B, Y);
+  putIn(B, Y, Z, yb); putIn(A, Z, Y, za);
+  // A: 새로 온 Y는 약했던 X 자리로, X는 Y가 받았던 자리로
+  const xa = spotOf(A, X), ya = spotOf(A, Y);
+  putIn(A, X, Y, xa); putIn(A, Y, X, ya);
+  [Y, Z].forEach(p => { p.moved = L.season; delete p.fa; });
+  st.n++;
+  const text = `트레이드: ${teamInfo(a).short} ${Y.name} ↔ ${teamInfo(b).short} ${Z.name}`;
+  L.news.push(`${text}. ${teamInfo(a).short}의 ${bat ? (POS[xa.pos] || '주전') + ' 자리' : '선발진'} 보강.`);
+  (L.moves ||= []).push({ season:L.season, day:L.day + 1, text, cpu:true });
+  return text;
+}

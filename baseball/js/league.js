@@ -203,6 +203,7 @@ function leagueAdvance(L, myG){
     out.push(`${teamName(g.a)} ${g.ra} 대 ${g.rh} ${teamName(g.h)}`);
     if(post) seriesResult(L, g, G);
   });
+  if(!post && typeof cpuTradeDay === 'function') cpuTradeDay(L);   // 컴퓨터 구단끼리 트레이드 (office.js)
   if(!post){ L.day++; if(L.day >= L.sched.length) startPost(L); }
   return out;
 }
