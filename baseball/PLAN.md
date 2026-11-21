@@ -88,6 +88,7 @@
 - 9-5 (완료) 올스타전·홈런 더비: allstar.js(allstarDue·allstarRosters·derby*·allstarSim, L.allstar), 리그·육성 첫 화면 앞에 휴식기, 관전 경기는 G.allstar(endScreen·gameNext 연결), 팀 key dream·nanum(data.js ALLSTAR_TEAMS).
 
 - 9-6 (완료, 병렬 작업 세 개를 합침) 육성 감독 신뢰도·동료 관계와 2군 강등(career-trust.js), 컴퓨터 구단끼리 트레이드(office.js cpuTradeDay, league.js leagueAdvance에서 부름), 감독 모드 대수비·상대 타자·투수 분석(engine.js defSub, manager.js dsubScreen·scoutBatter·scoutPitcher, online.js dsub 검증, tests/manager.js).
+- 9-7 (완료) 만들기 화면 합치기와 "고른 뒤 정하기": 화면 보며 하기에서 리그 만들기(lg-setup, 팀·시즌 길이·경기 방식·이닝을 한 화면), 선수 만들기 세 단계(wz-1 꾸미기: 이름·얼굴·등번호·손·투구 폼 / wz-2 포지션·유형: 야구장 그림에서 수비 위치 / wz-3 팀·시즌 → 입단), 온라인 방 만들기도 한 화면 경기 설정으로, 팀 고르기는 눌러 고른 뒤 "이 팀으로". 누르면 빛나기만 하고 아래 단추를 눌러야 정해짐(setup.js, skin-setup.js). 소리와 글로 하기는 차례로 묻는 화면 그대로. 선수 꾸미기로 정한 등번호·손·투구 폼(p.form, gfx.js armSlot)이 저장되고 경기 그림에 쓰임.
 
 ## 7.7단계 (예정): 시각장애인들이 아는 숫자 야구 규칙
 

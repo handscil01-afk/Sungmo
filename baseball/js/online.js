@@ -10,7 +10,7 @@ function onlineHome(){
   return { q:'온라인 대전입니다. 무엇을 할까요?', back: v => go(homeScreen, v),
     note:[`내 이름: ${SET.name || '아직 없음'}. 음성 대화 방식: ${SET.vmode === 'ptt' ? '무전기' : '통화'}.`],
     opts:[
-      { n:1, t:'방 만들기', s:'방을 만들고 방 코드를 상대에게 알려 줍니다.', act: v => needName(v, () => { NEW.kind = 'online'; go(modeScreen, 'click'); }) },
+      { n:1, t:'방 만들기', s:'방을 만들고 방 코드를 상대에게 알려 줍니다.', act: v => needName(v, () => { NEW.kind = 'online'; go(VIEW.gfx ? matchSetupScreen : modeScreen, 'click'); }) },
       { n:2, t:'방 코드로 들어가기', s:'상대에게 받은 숫자 네 자리를 누릅니다.', act: v => needName(v, () => { UI.codeBuf = ''; go(codeScreen, 'click'); }) },
       { n:3, t:`내 이름: ${SET.name || '없음'}`, s:'상대에게 보이는 이름입니다.', act: v => go(() => nameScreen(() => go(onlineHome, 'click')), v) },
       { n:4, t:`음성 대화 방식: ${SET.vmode === 'ptt' ? '무전기 (누르는 동안 말하기)' : '통화 (계속 켜 두기)'}`, s:'목소리는 기기끼리 직접 오가서 서버 한도를 쓰지 않습니다.',

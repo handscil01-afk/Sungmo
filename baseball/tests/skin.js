@@ -89,6 +89,57 @@ const PORT = 8767;
     console.log(`${tag}: ${steps}번 만에 끝, 던지기 ${throws}번, 타이밍 스윙 ${swings}번(딱 맞음 기록 ${perfect})`);
     await ctx.close();
   }
+  // 만들기 화면(화면 보며 하기): 누르면 고르기만 하고 "다음"·"시작"으로 정함. 리그 만들기 한 화면, 선수 만들기 세 단계, 팀 고르기, 온라인 방 설정
+  for(const [name, w, h] of [['휴대폰', 390, 844], ['작은 휴대폰', 375, 667], ['가로', 844, 390], ['태블릿', 820, 1180]]){
+    const ctx = await browser.newContext({ viewport:{ width:w, height:h }, hasTouch:true });
+    const page = await ctx.newPage(), tag = `만들기 화면(${name})`;
+    page.on('pageerror', e => errors.push(`${tag}: ${e.message}`));
+    page.on('console', m => { if(m.type() === 'error' || m.type() === 'warning') errors.push(`${tag} console: ${m.text()}`); });
+    await page.goto(`http://localhost:${PORT}/baseball/`); await page.waitForSelector('#opts .opt'); await page.keyboard.press('1');
+    const fit = async where => { await page.waitForTimeout(250); const o = await page.evaluate(() => { const b = document.querySelector('#skBody'); return [b.className, b.scrollHeight > b.clientHeight + 1, document.documentElement.scrollWidth > innerWidth + 1]; }); if(o[1] || o[2] || /scroll/.test(o[0])) errors.push(`${tag} ${where}: 한 화면을 넘침 ${o[0]}`); };
+    const kind = () => page.evaluate(() => UI.S.kind);
+    // 리그 만들기
+    await page.evaluate(() => { LSRC = 'league'; setLG(null); go(leagueHome, 'click'); }); await page.click('#sk [data-sk="opt"][data-n="1"]');
+    if(await kind() !== 'lg-setup') errors.push(`${tag}: 새 리그 만들기가 한 화면이 아님 ${await kind()}`);
+    const t3 = await page.evaluate(() => TEAMS[3].key);
+    await page.click(`[data-sk="set"][data-k="a"][data-v="${t3}"]`); await page.click('[data-sk="set"][data-k="len"][data-v="36"]'); await page.click('[data-sk="set"][data-k="inn"][data-v="3"]');
+    if(await kind() !== 'lg-setup' || await page.evaluate(() => !!LG())) errors.push(`${tag}: 고르기만 했는데 리그가 만들어짐`);
+    await fit('리그 만들기'); await page.click('.su-go');
+    const lg = await page.evaluate(() => LG() && [LG().my, LG().inn, LG().teams[LG().my].sched || LG().len]);
+    if(!lg || lg[0] !== t3 || lg[1] !== 3) errors.push(`${tag}: 리그 만들기 값이 다름 ${JSON.stringify(lg)}`);
+    // 선수 만들기: 이름이 없으면 다음으로 가지 않음
+    await page.evaluate(() => { LSRC = 'career'; setLG(null); NEWC.name = ''; NEWC.num = null; go(careerHome, 'click'); }); await page.click('#sk [data-sk="opt"][data-n="1"]');
+    if(await kind() !== 'wz-1') errors.push(`${tag}: 선수 만들기 첫 단계가 아님 ${await kind()}`);
+    await page.click('.su-go'); if(await kind() !== 'wz-1') errors.push(`${tag}: 이름 없이 다음 단계로 넘어감`);
+    await page.click('#skSheet .gb').catch(() => {});
+    await page.fill('#wzName', '시험선수'); await page.press('#wzName', 'Enter');
+    await page.click('[data-k="pit"][data-v="1"]'); await page.click('[data-k="face"][data-v="7"]'); await page.click('[data-k="num"][data-v="10"]'); await page.click('[data-k="num"][data-v="1"]');
+    await page.click('[data-k="hand"][data-v="L"]'); await page.click('[data-k="form"][data-v="2"]'); await fit('선수 꾸미기');
+    await page.click('.su-go'); if(await kind() !== 'wz-2') errors.push(`${tag}: 둘째 단계로 가지 않음`);
+    await page.click('[data-k="role"][data-v="rp"]'); await page.click('[data-k="type"][data-v="break"]'); await fit('보직과 유형');
+    await page.click('.su-go'); if(await kind() !== 'wz-3') errors.push(`${tag}: 셋째 단계로 가지 않음`);
+    const t5 = await page.evaluate(() => TEAMS[5].key);
+    await page.click(`[data-sk="set"][data-k="a"][data-v="${t5}"]`); await page.click('[data-sk="set"][data-k="len"][data-v="18"]'); await fit('팀과 시즌');
+    if(await page.evaluate(() => !!LG())) errors.push(`${tag}: 입단하기 전에 선수가 만들어짐`);
+    await page.click('.su-go');
+    const made = await page.evaluate(() => { const L = LG(), c = L && L.career; return c && [c.p.name, c.face, c.num, c.p.hand, c.p.form, c.p.role, c.type, L.my]; });
+    if(!made || made.join() !== `시험선수,7,18,L,2,불펜,break,${t5}`) errors.push(`${tag}: 선수 만들기 결과가 다름 ${JSON.stringify(made)}`);
+    if(await page.evaluate(() => armSlot(CR().career.p)) !== 2) errors.push(`${tag}: 투구 폼이 경기 그림에 쓰이지 않음`);
+    // 팀 고르기: 눌러서 고른 뒤 "이 팀으로"
+    await page.evaluate(() => { NEW.kind = '1p'; go(matchSetupScreen, 'click'); }); await page.click('.su-t >> nth=1');
+    if(await kind() !== 'team-pick') errors.push(`${tag}: 팀 고르기 화면이 아님`);
+    const t7 = await page.evaluate(() => TEAMS[7].key);
+    await page.click(`[data-sk="set"][data-k="pick"][data-v="${t7}"]`); await fit('팀 고르기');
+    if(await kind() !== 'team-pick') errors.push(`${tag}: 팀을 누르자마자 넘어감`);
+    await page.click('.su-go');
+    if(await kind() !== 'setup' || await page.evaluate(() => NEW.b) !== t7) errors.push(`${tag}: 고른 팀이 상대 팀이 되지 않음`);
+    // 온라인 방 설정: 한 화면 경기 설정을 쓰고 우리 센터 팀은 빠짐
+    await page.evaluate(() => { NEW.kind = 'online'; go(matchSetupScreen, 'click'); });
+    const on = await page.evaluate(() => [UI.S.kind, UI.S.opts.find(o => o.key === 'start').t, !!UI.S.opts.find(o => o.key === 'diff' && !o.hide)]);
+    if(on.join() !== 'setup,방 만들기,false') errors.push(`${tag}: 온라인 방 설정이 다름 ${on.join()}`); await fit('온라인 방 설정');
+    console.log(`${tag}: 리그 만들기·선수 만들기 세 단계·팀 고르기·온라인 방 설정 확인`);
+    await ctx.close();
+  }
   // 선수 육성 화면: 라커룸 → 마을 지도(장소 누르기) → 용품점에서 사기 → 가방에서 장착 → 훈련 → 선수 카드, 화면마다 한 화면에 들어가는지
   for(const [name, w, h] of [['휴대폰', 390, 844], ['작은 휴대폰', 375, 667], ['가로', 844, 390], ['태블릿', 820, 1180]]){
     const ctx = await browser.newContext({ viewport:{ width:w, height:h }, hasTouch:true });

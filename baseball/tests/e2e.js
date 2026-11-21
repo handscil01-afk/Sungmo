@@ -150,7 +150,9 @@ const PORT = 8766;
       console.log(`${name}: 감독 모드 관전 끝`);
       // 리그: 새 리그(간단 공 하나씩, 18경기, 3이닝) → 오늘 경기 → 순위표·기록 → 시즌 끝까지 넘기기 → 시상식
       await page.keyboard.press('4'); await page.keyboard.press('4');
-      for(const k of ['1', '1', '1', '1', '1', '3']) await page.keyboard.press(k);
+      // 화면 보며 하기: 한 화면 리그 만들기 (감독 → 간단 공 하나씩, 9이닝 → 3이닝, 리그 시작)
+      for(const k of gfxView ? ['1', '3', '3', '4', '9'] : ['1', '1', '1', '1', '1', '3']) await page.keyboard.press(k);
+      if(gfxView && !(await page.evaluate(() => LG() && LG().inn === 3 && NEW.mode === 'simple' && NEW.unit === 'pitch'))) errors.push(`${name}: 한 화면 리그 만들기 값이 다름 ${await page.evaluate(() => JSON.stringify([LG() && LG().inn, NEW.mode, NEW.unit]))}`);
       if(!(await q(page)).includes('무엇을 할까요')) errors.push('리그 첫 화면이 아님: ' + await q(page));
       await shot(page, `${name}-league`);
       await page.keyboard.press('1');
@@ -179,9 +181,20 @@ const PORT = 8766;
       // 선수 육성: 타자(유격수, 교타자) 만들기 → 훈련 → 퓨처스리그 → (능력치를 올려) 1군 승격 → 1군 경기(내 타석만) → 은퇴
       await page.keyboard.press('.');
       await page.keyboard.press('5'); await page.keyboard.press('1');
-      await page.waitForFunction(() => document.querySelector('#q').textContent.includes('선수 이름'));
-      { const f = await page.isVisible('#cmd') ? '#cmd' : '#skIn'; await page.fill(f, '홍길동'); await page.press(f, 'Enter'); }
-      for(const k of ['1', '5', '1', '1', '4', '1']) await page.keyboard.press(k);
+      if(gfxView){   // 화면 보며 하기: 선수 만들기 세 단계 (꾸미기 → 포지션·유형 → 팀·시즌), "다음"(9)을 눌러야 넘어감
+        await page.waitForFunction(() => UI.S.kind === 'wz-1');
+        await page.fill('#wzName', '홍길동'); await page.press('#wzName', 'Enter');
+        await page.click('[data-sk="set"][data-k="num"][data-v="10"]');
+        await page.keyboard.press('9'); await page.keyboard.press('9');
+        if(await page.evaluate(() => NEW.mode !== 'detail')) await page.keyboard.press('3');
+        await page.keyboard.press('9');
+        const made = await page.evaluate(() => { const c = CR().career; return [c.p.name, c.num, c.p.pos, c.type]; });
+        if(made.join() !== '홍길동,17,SS,contact') errors.push(`${name}: 선수 만들기 결과가 다름 ${made.join()}`);
+      } else {
+        await page.waitForFunction(() => document.querySelector('#q').textContent.includes('선수 이름'));
+        { const f = await page.isVisible('#cmd') ? '#cmd' : '#skIn'; await page.fill(f, '홍길동'); await page.press(f, 'Enter'); }
+        for(const k of ['1', '5', '1', '1', '4', '1']) await page.keyboard.press(k);
+      }
       if(!(await q(page)).includes('오늘은 무엇을')) errors.push('육성 첫 화면이 아님: ' + await q(page));
       await shot(page, `${name}-career`);
       const skipEvent = async () => { for(let i = 0; i < 3 && (await q(page)).includes('이벤트'); i++) await page.keyboard.press('1'); };

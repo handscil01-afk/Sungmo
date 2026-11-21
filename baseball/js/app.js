@@ -46,7 +46,7 @@ function teamScreen(which, page = 0){
   const taken = which ? NEW.a : null;
   // 우리 센터 팀(만들었으면)은 맨 앞에. 온라인 대전은 상대 기기에 팀 자료가 없어서 빼고, 리그·육성에서는 손잡다 핸즈 자리에 들어감
   const list = [...(CENTER && NEW.kind !== 'online' ? [centerInfo()] : []), ...TEAMS].filter(t => t.key !== taken);
-  const set = (k, v) => {
+  let set = (k, v) => {
     if(NEW.quick){ if(which) NEW.b = k; else { NEW.a = k; if(NEW.b === k) NEW.b = null; } go(matchSetupScreen, v); return; }   // 한 화면 경기 설정에서 팀만 바꿈
     if(which){ NEW.b = k; go(NEW.kind === 'watch' ? inningsScreen : sideScreen, v); }
     else { NEW.a = k; go(NEW.kind === 'league' ? leagueLenScreen : NEW.kind === 'career' ? careerLenScreen : () => teamScreen(1), v); }
@@ -55,10 +55,13 @@ function teamScreen(which, page = 0){
   const desc = t => `${STYLES[t.style].name}. 홈구장 ${parkInfo(t.key).name}: ${parkInfo(t.key).desc}`;
   // 화면 보며 하기: 한 화면에 모든 팀 (번호 키는 1~9, 그 뒤는 눌러서)
   if(VIEW.gfx){
-    const opts = list.map((t, i) => ({ n: i + 1, t: t.name, s: desc(t), act: v => set(t.key, v) }));
+    // 화면 보며 하기: 팀을 눌러 고른 뒤(TSEL) 아래의 "이 팀으로"를 눌러야 정해짐. 번호 키는 바로 정함
+    if(!TSEL || !list.some(t => t.key === TSEL)) TSEL = list.some(t => t.key === (which ? NEW.b : NEW.a)) ? (which ? NEW.b : NEW.a) : list[0].key;
+    const set0 = set; set = (k, v) => { TSEL = null; set0(k, v); };
+    const opts = list.map((t, i) => ({ n: i + 1, key: t.key, t: t.name, s: desc(t), act: v => set(t.key, v) }));
     opts.push({ n: list.length + 1, t:'아무 팀이나', s:'무작위로 고릅니다.', act: v => set(list[Math.floor(Math.random() * list.length)].key, v) });
     if(NEW.kind !== 'online' && !which) opts.push({ n: list.length + 2, t: CENTER ? '우리 팀 고치기' : '우리 센터 팀 만들기', s:'이용자 이름과 별명으로 팀과 선수를 만들고 능력치를 정합니다.', act: v => go(() => centerEdit(w => go(() => teamScreen(which), w)), v) });
-    return { q, opts, back: v => go(NEW.quick ? matchSetupScreen : which ? () => teamScreen(0) : NEW.kind === 'career' ? careerTypeScreen : NEW.mode === 'simple' ? unitScreen : modeScreen, v) };
+    return { kind:'team-pick', q, opts, which, set: (k, v) => { TSEL = v; }, back: v => { TSEL = null; go(NEW.quick ? matchSetupScreen : which ? () => teamScreen(0) : NEW.kind === 'career' ? careerTypeScreen : NEW.mode === 'simple' ? unitScreen : modeScreen, v); } };
   }
   const shown = page ? list.slice(8) : list.slice(0, 8);
   const opts = shown.map((t, i) => ({ n: i + 1, t: t.name, s: desc(t), act: v => set(t.key, v) }));
@@ -125,7 +128,7 @@ function readyScreen(){
 const SETUP_MODES = [['simple', 'pitch', '간단 · 공 하나씩'], ['simple', 'pa', '간단 · 타석 한 번에'], ['detail', null, '정밀'], ['manager', null, '감독']];
 const setupModeIdx = () => Math.max(0, SETUP_MODES.findIndex(m => m[0] === NEW.mode && (m[0] !== 'simple' || m[1] === NEW.unit)));
 function setupFill(){
-  const keys = [...(CENTER ? ['center'] : []), ...TEAMS.map(t => t.key)];
+  const keys = [...(CENTER && NEW.kind !== 'online' ? ['center'] : []), ...TEAMS.map(t => t.key)];   // 온라인 대전은 상대 기기에 우리 센터 팀 자료가 없어서 뺌
   if(!keys.includes(NEW.a)) NEW.a = keys[0];
   if(!NEW.b || NEW.b === NEW.a || !keys.includes(NEW.b)) NEW.b = keys.filter(k => k !== NEW.a)[Math.floor(Math.random() * (keys.length - 1))];
   if(![1, 3, 5, 7, 9].includes(NEW.innings)) NEW.innings = 3;
@@ -135,8 +138,8 @@ function matchSetupScreen(){
   const k = NEW.kind, A = teamInfo(NEW.a), B = teamInfo(NEW.b), m = SETUP_MODES[setupModeIdx()];
   const who = k === '2p' ? ['첫째 사람 팀', '둘째 사람 팀'] : k === 'watch' ? ['원정 팀', '홈 팀'] : ['내 팀', '상대 팀'];
   const pickTeam = which => v => go(() => teamScreen(which), v);
-  return { kind:'setup', q: k === '2p' ? '둘이 하기 경기를 정하세요.' : k === 'watch' ? '관전할 경기를 정하세요.' : '혼자 하기 경기를 정하세요.',
-    back: v => { NEW.quick = false; go(homeScreen, v); }, opts:[
+  return { kind:'setup', q: k === '2p' ? '둘이 하기 경기를 정하세요.' : k === 'watch' ? '관전할 경기를 정하세요.' : k === 'online' ? '온라인 대전 방을 정하세요.' : '혼자 하기 경기를 정하세요.',
+    back: v => { NEW.quick = false; go(k === 'online' ? onlineHome : homeScreen, v); }, opts:[
     { n:1, key:'a', t:`${who[0]}: ${A.name}`, act: pickTeam(0) },
     { n:2, key:'b', t:`${who[1]}: ${B.name}`, act: pickTeam(1) },
     { n:3, key:'mode', t:`경기 방식: ${m[2]}`, act: () => { const x = SETUP_MODES[(setupModeIdx() + 1) % SETUP_MODES.length]; NEW.mode = x[0]; if(x[1]) NEW.unit = x[1]; stay(`경기 방식 ${x[2]}`); } },
@@ -144,7 +147,7 @@ function matchSetupScreen(){
     { n:5, key:'inn', t:`이닝: ${NEW.innings}이닝`, act: () => { const L = [1, 3, 5, 7, 9]; NEW.innings = L[(L.indexOf(NEW.innings) + 1) % L.length]; stay(`${NEW.innings}이닝`); } },
     { n:6, key:'diff', hide: k !== '1p', t:`컴퓨터 수준: ${['쉬움', '보통', '어려움'][NEW.diff]}`, act: () => { NEW.diff = (NEW.diff + 1) % 3; stay(`컴퓨터 수준 ${['쉬움', '보통', '어려움'][NEW.diff]}`); } },
     { n:7, key:'picks', hide: NEW.mode !== 'detail' || k === 'watch', t:`직접 고를 것: ${pickName()}`, act: v => go(() => picksScreen(w => go(matchSetupScreen, w), w => go(matchSetupScreen, w)), v) },
-    { n:9, key:'start', t:'경기 시작', act: v => { NEW.quick = false; if(k === 'watch') NEW.first = 1; startGame(newOpts(), v); } },
+    { n:9, key:'start', t: k === 'online' ? '방 만들기' : '경기 시작', act: v => { NEW.quick = false; if(k === 'watch') NEW.first = 1; if(k === 'online') createRoomFlow(v); else startGame(newOpts(), v); } },
   ] };
 }
 

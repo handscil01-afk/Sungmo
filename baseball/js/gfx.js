@@ -118,8 +118,8 @@ function drawPerson(kind, x, foot, team, pose, flip, row = 0){
   }
   person(x, foot - (kind === 'catcher' ? 14 : 20), team, pose, flip);
 }
-// 투수 폼: 투수마다 정해짐 (오버핸드 60%, 사이드암 25%, 언더핸드 15%). 그림 줄 번호
-function armSlot(P){ let h = 7; for(const c of String(P.name) + P.id) h = (h * 31 + c.charCodeAt(0)) | 0; const v = Math.abs(h) % 20; return v < 12 ? 0 : v < 17 ? 1 : 2; }
+// 투수 폼: 선수 꾸미기로 정한 폼(P.form)이 있으면 그것, 없으면 투수마다 정해짐 (오버핸드 60%, 사이드암 25%, 언더핸드 15%). 그림 줄 번호
+function armSlot(P){ if(P.form != null) return P.form; let h = 7; for(const c of String(P.name) + P.id) h = (h * 31 + c.charCodeAt(0)) | 0; const v = Math.abs(h) % 20; return v < 12 ? 0 : v < 17 ? 1 : 2; }
 // 화면 배치: 그림 파일 배경과 코드로 그린 배경의 자리가 다름
 const LAY_IMG = { pitcher:[128, 121], batR:[76, 214], batL:[180, 214], catcher:[128, 244], zone:[128, 160, 12, 11], release:[[121, 88], [114, 96], [118, 108]] };
 const LAY_CODE = { pitcher:[128, 102], batR:[106, 202], batL:[150, 202], catcher:[128, 218], zone:[128, 186, 10, 9], release:[[130, 92], [126, 96], [128, 100]] };

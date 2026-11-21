@@ -45,14 +45,18 @@ function careerNew(){
     for(const k in m) p[k] = clamp(p[k] + m[k], 25, 90);
   }
   p.name = NEWC.name; p.age = 20; p.rookie = true; p.cond = 0;
+  if(NEWC.hand) p.hand = NEWC.hand;            // 화면 보며 하기의 선수 꾸미기에서 고른 손·투구 폼
+  if(NEWC.pit && NEWC.form != null) p.form = NEWC.form;
   if(!NEWC.pit) p.trait = { glove:['range'], speed:['quick'], power:['arm'], contact:[] }[NEWC.type] || [];   // 유형에 맞는 포지션 특기
   ensureGrowth(L, p);
   L.mv = 2;   // 새 저장 형식 (성장 유형·피로·계약·장비 상태가 처음부터 있음)
-  L.career = { v:CAREER_V, face: NEWC.face ?? faceOf(p.name), num: numOf(p.name), id:p.id, p, where:'minor', pit:NEWC.pit, type:NEWC.type, pts:{}, fame:0, trained:-1, minor:{}, ach:[], hurt:0, slump:0, money:300, salary:3000, equip:{}, goods:{ drink:1 }, owned:[], fatigue:0, gs:{}, applied:{}, contract:{ years:1, salary:3000, bonus:0, until:L.season, team:L.my } };
+  L.career = { v:CAREER_V, face: NEWC.face ?? faceOf(p.name), num: NEWC.num ?? numOf(p.name), id:p.id, p, where:'minor', pit:NEWC.pit, type:NEWC.type, pts:{}, fame:0, trained:-1, minor:{}, ach:[], hurt:0, slump:0, money:300, salary:3000, equip:{}, goods:{ drink:1 }, owned:[], fatigue:0, gs:{}, applied:{}, contract:{ years:1, salary:3000, bonus:0, until:L.season, team:L.my } };
   crLog(L, `${p.name}, ${teamInfo(NEWC.team).name}에 입단했습니다! 퓨처스리그(2군)에서 시작합니다.`);
   return L;
 }
 function careerNameScreen(){
+  if(VIEW.gfx) return careerWizard(1);   // 화면 보며 하기: 한 화면씩 고르고 "다음"으로 정하는 선수 만들기 (setup.js)
+  NEWC.num = NEWC.hand = NEWC.form = null;
   return { q:'선수 이름을 명령 칸에 적고 입력을 누르세요.', focusCmd:true, back: v => go(careerHome, v),
     onText: t => { t = t.trim().slice(0, 10); if(!t) return; NEWC.name = t; NEWC.face = null; go(VIEW.gfx ? () => careerFaceScreen(null) : careerKindScreen, 'click'); }, opts:[] };
 }
