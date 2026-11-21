@@ -122,5 +122,5 @@ function hlDeckHTML(S){
   const ico = t => /다음/.test(t) ? 'go' : /다시/.test(t) ? 'again' : 'back';
   const dots = Array.from({ length: S.hlN }, (_, i) => `<i class="${i === S.hlI ? 'on' : ''}"></i>`).join('');
   return `<div class="hl-cap" style="--tc:${esc(h.color || '#3b82f6')}">${face}<span class="hl-tx"><small>명장면 ${S.hlI + 1} / ${S.hlN}</small><b>${esc(h.cap)}</b><span class="hl-dots">${dots}</span></span></div>
-    <div class="hb c3 end">${(S.opts || []).filter(o => !o.hide).map(o => `<button type="button" class="hb-b${o.n === 1 ? ' pri' : ''}" data-sk="opt" data-n="${o.n}">${hubIco(ico(o.t))}<b>${esc(o.t)}</b></button>`).join('')}</div>`;
+    <div class="hb c3 end">${(S.opts || []).filter(o => !o.hide && o.key !== 'status').map(o => `<button type="button" class="hb-b${o.n === 1 ? ' pri' : ''}" data-sk="opt" data-n="${o.n}">${hubIco(ico(o.t))}<b>${esc(o.t)}</b></button>`).join('')}</div>`;
 }

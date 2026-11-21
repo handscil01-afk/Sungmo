@@ -32,7 +32,7 @@ html.skin .wt span{ display:grid; } html.skin .wt b{ font-size:1.2rem; font-weig
 
 /* 명장면 다시 보기: 아래쪽 장면 설명 */
 html.skin .hl-cap{ display:flex; align-items:center; gap:10px; margin:6px 8px 4px; padding:6px 10px; border-radius:14px; background:#fff; border:3px solid var(--tc); box-shadow:0 3px 0 rgba(0,0,0,.18); color:var(--ink); min-height:0; }
-html.skin .hl-cap .crf.mid{ width:3.6rem; height:3.6rem; border-radius:12px; background:var(--tc); }
+html.skin .hl-cap .crf.mid{ width:3.6rem; height:3.6rem; border-radius:12px; background-color:var(--tc); }
 html.skin .hl-tx{ display:grid; gap:2px; min-width:0; }
 html.skin .hl-tx small{ font-size:.7rem; font-weight:900; color:var(--ink2); letter-spacing:.04em; }
 html.skin .hl-tx b{ font-size:1rem; font-weight:900; line-height:1.25; }

@@ -40,6 +40,7 @@ function showOpen(it){
   el.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); showClose(); });
   (host || document.body).appendChild(el);
   SHOW.cur = it; SHOW.el = el;
+  if(it.refresh) [150, 400].forEach(ms => setTimeout(() => { if(SHOW.el === el) it.refresh(el); }, ms));
   SHOW.t = setTimeout(showClose, it.ms);
 }
 function showClose(){
@@ -57,7 +58,12 @@ function cutinHTML(c){
   return `<div class="ci ci-${c.kind}" style="--tc:${esc(c.color || '#3b82f6')}"><div class="ci-band"></div>
     <div class="ci-in"><span class="ci-face">${face}</span><span class="ci-tx"><small>${esc(c.short || '')}${c.sub ? ` · ${esc(c.sub)}` : ''}</small><b>${esc(c.p ? c.p.name : '')}</b><strong>${esc(c.word)}</strong></span></div></div>`;
 }
-function cutinShow(c, after, done){ showPush({ kind:'cut', html: () => cutinHTML(c), ms: c.ms || 1600, after, done }); }
+function cutinShow(c, after, done){
+  if(typeof lookLoad === 'function') lookLoad();   // 얼굴 부위 그림을 미리 불러옴
+  // 얼굴 그림이 아직 없으면 불러온 뒤 다시 그림
+  const refresh = el => { const f = el.querySelector('.ci-face'); if(f && typeof LK !== 'undefined' && LK.ok && c.p) f.innerHTML = playerFace(c.p, c.team, 'big'); };
+  showPush({ kind:'cut', html: () => cutinHTML(c), ms: c.ms || 1600, after, done, refresh });
+}
 // 결과에서 홈런·끝내기를 찾아 컷인 정보로 (사건 목록 evs, 결과 글 lines의 타자 이름 b, 그 경기 상태 X)
 function cutinInfo(X, evs, lines){
   if(!X || !X.teams) return null;
@@ -76,6 +82,7 @@ function cutinInfo(X, evs, lines){
 // gfx.js gfxStart가 부름: 결과 글씨(배너)가 나온 뒤 컷인을 띄움
 function cutinCheck(evs, pre, lines, A){
   if(!showOn() || typeof G === 'undefined' || !G) return;
+  if(typeof lookLoad === 'function') lookLoad();
   const c = cutinInfo(G, evs || [], lines);
   if(c) cutinShow(c, A);
 }
