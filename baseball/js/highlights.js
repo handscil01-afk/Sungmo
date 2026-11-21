@@ -64,6 +64,7 @@ const hlLines = () => HL.list.flatMap((h, i) => [`명장면 ${i + 1}. ${h.cap}.`
 function hlStart(v){ HL.i = 0; hlGo(v); }
 function hlGo(v){
   clearInterval(HL.tm); HL.tm = 0;
+  HL.cur = HL.list[clamp(HL.i, 0, HL.list.length - 1)] || null; HL.A = null;   // 처음 그릴 때부터 그 장면의 점수판 (경기 끝 카드 없이)
   go(hlScreen, v);
   if(VIEW.gfx) setTimeout(hlPlay, 30);
 }

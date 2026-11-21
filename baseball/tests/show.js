@@ -55,6 +55,7 @@ const PORT = 8771;
     if(!end.opt) errors.push(`${tag}: 경기 끝 화면에 명장면 다시 보기가 없음`);
     if(!(await page.$('.hb.end .hb-b'))) errors.push(`${tag}: 경기 끝 단추가 없음`);
     await page.click(`#sk [data-sk="opt"][data-n="${end.opt ? end.opt.n : 5}"]`);
+    await page.waitForTimeout(300);
     const st = await page.evaluate(() => ({ kind: UI.S.kind, anim: !!(GX.anim && GX.anim.hl), cap: !!document.querySelector('.hl-cap'), fin: !!document.querySelector('.fin') }));
     if(st.kind !== 'hl' || !st.anim || !st.cap) errors.push(`${tag}: 명장면 다시 보기가 시작되지 않음 ${JSON.stringify(st)}`);
     if(st.fin) errors.push(`${tag}: 명장면을 보는 동안 경기 끝 카드가 가림`);
@@ -77,7 +78,7 @@ const PORT = 8771;
     const { ctx, page } = await open('날씨', 390, 844), tag = '날씨';
     const newLeague = () => page.evaluate(() => { SET.cast = false; LSRC = 'league'; setLG(leagueNew({ my: TEAMS[0].key, len:18, mode:'simple', unit:'pa', inn:9, seed:4242 })); const L = LG(); L.teams[L.my]; saveLeague(); });
     const playLeague = async wx => {
-      await page.evaluate(wx => { window.__wx = wx; const L = LG(); for(let d = L.day; d < L.sched.length; d++){ const g = L.sched[d].find(x => x.a === L.my || x.h === L.my); if(g && !parkInfo(g.h).dome){ L.day = d; break; } } leaguePlay('click'); }, wx);
+      await page.evaluate(wx => { window.__wx = null; const L = LG(); for(let k = 0; k < 30; k++){ const g = myGameToday(L); if(g && !parkInfo(g.h).dome && !wxRainout(L, g)) break; leagueAdvance(L, null); } window.__wx = wx; leaguePlay('click'); }, wx);   // 비로 취소되지 않는 돔 아닌 날까지 넘김
       await page.evaluate(() => { if(G && !G.over) G.ctrl = ['cpu', 'cpu']; });
     };
     await newLeague();
@@ -142,8 +143,8 @@ const PORT = 8771;
         out.mercy++;
         const d = Math.abs(runsOf(A.teams[0]) - runsOf(A.teams[1]));
         if(d < 10 || A.inning < 7) out.bad.push(`씨앗 ${s}: ${A.inning}회 ${d}점 차에 끝남`);
-        const n = A.log.findIndex(l => /콜드게임/.test(l.s));
-        if(A.log.slice(0, n).map(l => l.s).join('\n') !== B.log.slice(0, n).map(l => l.s).join('\n')) out.bad.push(`씨앗 ${s}: 콜드게임 전까지의 경기가 달라짐`);
+        const n = A.log.find(l => /콜드게임/.test(l.s)).n, n0 = Math.max(A.log[0].n, B.log[0].n), before = X => X.log.filter(l => l.n >= n0 && l.n < n).map(l => l.s).join('\n');   // 기록은 1500줄까지만 남으므로 번호로 견줌
+        if(before(A) !== before(B)) out.bad.push(`씨앗 ${s}: 콜드게임 전까지의 경기가 달라짐`);
       }
       return out;
     });

@@ -18,7 +18,7 @@ function showReady(it){
   if(performance.now() - it.at > 9000) return true;   // 너무 오래 기다리면 그냥 띄움
   const A = typeof GX !== 'undefined' ? GX.anim : null;
   if(it.after) return A !== it.after;
-  if(it.idle) return !A || A.kind === 'card' || A.kind === 'review';
+  if(it.idle) return !showHost() || !A || A.kind === 'card' || A.kind === 'review';   // 그림판이 없는 화면(리그 첫 화면)은 바로
   return true;
 }
 function showPump(){
