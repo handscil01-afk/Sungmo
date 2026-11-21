@@ -392,6 +392,7 @@ function alignScreen(){
     { n:4, t:'외야 전진 수비' + mark(a.of === 0), s:'앞에 떨어지는 안타를 막습니다. 큰 타구는 머리 위로 넘어갑니다.', act: v => set(a.inf, 0, v) },
     { n:5, t:'외야 보통 수비' + mark(a.of === 1), act: v => set(a.inf, 1, v) },
     { n:6, t:'외야 후진 수비' + mark(a.of === 2), s:'장타를 막습니다. 짧은 안타는 늘어납니다.', act: v => set(a.inf, 2, v) },
+    { n:7, t:'대수비', hide: G.mode !== 'manager' || !defSubOK(G, ti), s:`수비가 더 좋은 벤치 선수를 넣습니다. 경기마다 ${DSUB_MAX}번, 남은 ${DSUB_MAX - (T.dsub || 0)}번.`, act: v => go(dsubScreen, v) },
     { n:9, t:'다 됐어요, 공 고르러 가기', act: v => go(defMain, v) },
   ] };
 }
@@ -579,7 +580,7 @@ function moreScreen(){
   const [A, H] = G.teams;
   return { board:true, sub:true, q:'더 보기', back: v => gameNext(v, null), opts:[
     { n:1, t:'점수판', act: v => note(scoreboard(G), v, 'score') },
-    { n:2, t:'지금 타자와 투수', act: v => note(whoInfo(), v, 'who') },
+    { n:2, t: G.mode === 'manager' ? '상대 분석 (타자·투수)' : '지금 타자와 투수', act: v => G.mode === 'manager' ? note([...scoutBatter(G).lines, ...scoutPitcher(G).lines], v, 'scout') : note(whoInfo(), v, 'who') },
     { n:3, t:`${A.short} 명단`, act: v => go(() => rosterScreen(0), v) },
     { n:4, t:`${H.short} 명단`, act: v => go(() => rosterScreen(1), v) },
     { n:5, t: NET.on ? '채팅과 음성 대화' : '최근 기록', s: NET.on ? voiceLabel() : '최근 12줄', act: v => NET.on ? go(talkScreen, v) : note(recentLines(12), v, 'recent') },

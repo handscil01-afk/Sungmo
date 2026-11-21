@@ -737,3 +737,6 @@ html.skin .tr-w{ font-style:normal; font-size:.6rem; font-weight:900; color:#fff
 @keyframes trBlink{ 50%{ opacity:.45; } }
 html.skin .sk-body.f3 .trustb{ display:none; }
 @media (orientation:landscape) and (max-height:620px){ html.skin .k-cr-home > .trustb{ grid-column:2; } }
+html.skin .scout{ display:grid; grid-template-columns:7rem minmax(0, 1fr); gap:8px; align-items:start; }
+html.skin .sc-z{ width:100%; height:auto; }
+@media (max-width:360px){ html.skin .scout{ grid-template-columns:1fr; } html.skin .sc-z{ max-width:8rem; } }

@@ -736,6 +736,7 @@ function playPitch(G, Psel, Bsel){
   }
   F.lastSel = { ...Psel };
   G.pitchNo++; P.n++; P.load += POWER[Psel.w || 5].cost; fx(G, 'pitch');
+  (P.ptc ||= {})[Psel.t] = (P.ptc[Psel.t] || 0) + 1;   // 구종별 투구 수 (상대 투수 분석)
   const pt = PITCH[Psel.t], vel = expVel(P, Psel.t, Psel.w) + Math.round(gauss(G) * 0.8);
   const pq = 0.45 * P.stf + 0.35 * gradeOf(P, Psel.t) + (pt.fast ? (vel - 147) * 0.7 : 4) + POWER[Psel.w || 5].q + P.cond * 4 - fatigue(P) * 14;
   // 제구: 겨냥한 곳에서 얼마나 벗어나는지
@@ -1443,7 +1444,10 @@ function benchIn(G, ti, slot, b, kind){
   if(kind === 'pre'){ T.bench[b] = old; emit(G, `${T.short} 선발 명단 변경: ${slot + 1}번 ${POS[nw.pos]} ${nw.name}, ${josa(old.name, '은', '는')} 벤치로.`, 'c'); }
   else {
     T.bench.splice(b, 1); T.gone.push(old);
-    if(kind === 'ph'){
+    if(kind === 'def'){
+      T.dsub = (T.dsub || 0) + 1;
+      emit(G, `${T.short} 대수비: ${POS[old.pos]} ${old.name} 대신 ${nw.name}, ${josa(nw.role || '벤치 선수', '이', '가')} 수비를 맡습니다.`, 'c');
+    } else if(kind === 'ph'){
       old.st.pa--; nw.st.pa++;
       emit(G, `${T.short} 대타: ${old.name} 대신 ${nw.name}, ${handText(nw.hand)}. ${nw.role}입니다.`, 'c');
     } else {
@@ -1453,6 +1457,27 @@ function benchIn(G, ti, slot, b, kind){
   }
   T.def = teamDef(T);
   fx(G, 'sub');
+}
+/* ---------- 대수비 (감독 모드) ----------
+   경기 후반(마지막 세 이닝, 3이닝 이하 경기는 마지막 이닝), 수비하는 팀이 타석이 시작되기 전에만. 경기마다 2번까지.
+   지명타자는 수비를 하지 않아 바꾸지 않음. 들어간 선수는 나간 선수의 수비 위치를 맡고, 나간 선수는 다시 못 나옴 */
+const DSUB_MAX = 2;
+const dsubLate = G => G.inning >= Math.max(1, G.innings - (G.innings >= 7 ? 2 : 0));
+function defSubOK(G, ti){
+  const T = G.teams[ti];
+  return G.mode === 'manager' && !G.over && !G.pre && ti === 1 - batIdx(G) && G.pitchNo === 0 && dsubLate(G) && T.bench.length > 0 && (T.dsub || 0) < DSUB_MAX;
+}
+// 바꿀 만한 짝: 수비가 더 좋은 벤치 선수 (슬롯, 벤치 번호, 좋아지는 정도)
+function defSubPairs(G, ti){
+  const T = G.teams[ti], out = [];
+  T.bat.forEach((b, slot) => { if(b.pos === 'DH') return; T.bench.forEach((p, bi) => { if(p.def > b.def) out.push({ slot, b: bi, gain: p.def - b.def }); }); });
+  return out.sort((a, b) => b.gain - a.gain);
+}
+function defSub(G, ti, slot, b){
+  const T = G.teams[ti];
+  if(!defSubOK(G, ti) || !T.bat[slot] || T.bat[slot].pos === 'DH' || !T.bench[b]) return flush(G);
+  benchIn(G, ti, slot, b, 'def');
+  return flush(G);
 }
 // 중요한 순간: 감독에게 작전을 물을 때 (ti 팀 기준)
 function mgrImportant(G, ti){
