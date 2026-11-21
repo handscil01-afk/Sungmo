@@ -7,7 +7,6 @@ html.skin .dly-g.new{ border-color:#e2501a; background:#fff4e6; }
 html.skin .dly-at{ position:relative; flex:none; display:grid; justify-items:center; color:#d33447; }
 html.skin .dly-at svg{ width:1.5rem; height:1.5rem; }
 html.skin .dly-at em{ font-style:normal; font-size:.58rem; font-weight:900; color:var(--ink2); line-height:1; }
-html.skin .dly-at .dot{ position:absolute; top:-7px; right:-14px; font-size:.52rem; font-weight:900; color:#fff; background:#ff3d7f; border-radius:999px; padding:1px 5px; white-space:nowrap; animation:dlPop 1.2s ease-in-out infinite; }
 @keyframes dlPop{ 50%{ transform:scale(1.12); } }
 html.skin .dly-l{ display:grid; gap:2px; min-width:0; }
 html.skin .dly-l small{ font-size:.6rem; font-weight:900; color:var(--ink2); }
@@ -19,7 +18,13 @@ html.skin .dly-p{ flex:none; display:grid; justify-items:center; align-content:c
 html.skin .dly-p svg{ width:1.3rem; height:1.3rem; }
 html.skin .dly-p b{ font-size:.6rem; font-weight:900; white-space:nowrap; }
 html.skin .dly-p.new::after{ content:''; position:absolute; top:-4px; right:-4px; width:.7rem; height:.7rem; border-radius:50%; background:#ff3d7f; border:2px solid #fff; }
-html.skin .sk-body.f3 .dly-at em{ display:none; }
+html.skin .dly-g.new .dly-at em{ color:#fff; background:#ff3d7f; border-radius:999px; padding:1px 4px; animation:dlPop 1.2s ease-in-out infinite; }
+/* 가로 화면: 라커룸 띠는 돈·인기 줄 오른쪽(첫 줄)에 놓아 세로 자리를 쓰지 않음 */
+@media (orientation:landscape) and (max-height:620px){
+  html.skin .k-cr-home > .crres{ grid-column:1; }
+  html.skin .k-cr-home > .dly{ grid-column:2; grid-row:1; }
+  html.skin .dly-g, html.skin .dly-p{ padding-top:2px; padding-bottom:2px; }
+}
 
 /* ---------- 리그 첫 화면: 신문 띠 · 상대 전적 ---------- */
 html.skin .pp-ban{ flex:none; display:flex; align-items:center; gap:8px; padding:4px 10px; border-radius:12px; border:2px solid #8a6d3b; background:#f6f0e1; color:#3b2f1c; text-align:left; box-shadow:0 2px 0 #6b5428; }
@@ -46,14 +51,14 @@ html.skin .dl-ri{ display:inline-grid; place-items:center; width:1rem; height:1r
 html.skin .dl-ri.m{ background:#2ec463 url(../img/items.png) 100% 100% / 500% 400% no-repeat; image-rendering:pixelated; }
 html.skin .dl-ri.f{ background:#ff4d7a; } html.skin .dl-ri.p{ background:#3f63d6; } html.skin .dl-ri.g{ background:#e2501a; }
 html.skin .dl-none{ margin:4px 0; font-size:.8rem; color:var(--ink2); font-weight:800; }
-html.skin .dl-ss{ display:grid; grid-template-columns:repeat(6, minmax(0, 1fr)) minmax(0, 1.5fr); gap:4px; }
-html.skin .dl-s{ position:relative; display:grid; justify-items:center; align-content:start; gap:2px; min-height:4.2rem; padding:3px 2px; border-radius:10px; border:2px dashed #9cc8f5; background:#fff; overflow:hidden; }
-html.skin .dl-s.big{ border:2px solid #d4a017; background:linear-gradient(180deg, #fff8d6, #ffe9a3); }
+html.skin .dl-ss{ display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:4px; }
+html.skin .dl-s{ position:relative; display:grid; justify-items:center; align-content:start; gap:2px; min-height:3.6rem; padding:3px 2px; border-radius:10px; border:2px dashed #9cc8f5; background:#fff; overflow:hidden; }
+html.skin .dl-s.big{ grid-column:span 2; border:2px solid #d4a017; background:linear-gradient(180deg, #fff8d6, #ffe9a3); }
 html.skin .dl-s.now{ border:2px solid #e2501a; box-shadow:0 0 0 2px rgba(226,80,26,.25); }
 html.skin .dl-s small{ font-size:.58rem; font-weight:900; color:var(--ink2); }
 html.skin .dl-sr{ display:grid; justify-items:center; gap:1px; }
-html.skin .dl-sr em{ display:inline-flex; align-items:center; gap:2px; font-style:normal; font-size:.56rem; font-weight:900; color:var(--ink); white-space:nowrap; }
-html.skin .dl-s.big .dl-sr{ grid-template-columns:1fr; }
+html.skin .dl-sr em{ display:inline-flex; align-items:center; gap:2px; font-style:normal; font-size:.66rem; font-weight:900; color:var(--ink); white-space:nowrap; }
+html.skin .dl-s.big .dl-sr{ grid-auto-flow:column; gap:6px; }
 html.skin .dl-st{ position:absolute; inset:auto 0 50% 0; transform:translateY(50%) rotate(-14deg); margin:0 auto; width:2.6rem; height:2.6rem; border-radius:50%; border:3px solid #d33447; color:#d33447; background:rgba(255,255,255,.75);
   display:grid; place-items:center; font-size:.66rem; font-weight:900; animation:dlStamp .35s ease-out both; }
 html.skin .dl-s.big .dl-st{ width:3.2rem; height:3.2rem; font-size:.8rem; }
@@ -67,15 +72,16 @@ html.skin .dl-m .fb{ height:6px; background:#c5ddf7; } html.skin .dl-m .fb i{ ba
 html.skin .dl-bd{ display:block; flex:none; width:2.2rem; height:2.2rem; background:url(../img/badges.png) no-repeat; background-size:600% 400%; image-rendering:pixelated; }
 html.skin .hb-b .dl-bi{ width:2.2rem; height:2.2rem; color:#fff; }
 html.skin .k-dl-home .hb{ margin-top:auto; } html.skin .k-dl-home .hb-b{ min-height:3.4rem; }
-html.skin .sk-body.f1 .dl-s{ min-height:3.6rem; } html.skin .sk-body.f1 .dl-r{ padding:3px 0; }
-html.skin .sk-body.f2 .dl-ms{ display:none; } html.skin .sk-body.f2 .k-dl-home .hb-b{ min-height:2.8rem; }
+html.skin .sk-body.f1 .dl-s{ min-height:3rem; } html.skin .sk-body.f1 .dl-r{ padding:3px 0; }
+html.skin .sk-body.f2 .dl-ms{ display:none; } html.skin .sk-body.f2.k-dl-home .hb-b{ min-height:2.8rem; }
 html.skin .sk-body.f3 .dl-sr em:not(:first-child){ display:none; } html.skin .sk-body.f3 .dl-t .fb{ display:none; }
 @media (orientation:landscape) and (max-height:620px){
   html.skin .sk-body.k-dl-home{ display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.25fr); grid-auto-rows:min-content; align-content:start; column-gap:8px; row-gap:6px; }
-  html.skin .k-dl-home > .crres, html.skin .k-dl-home > .toast, html.skin .k-dl-home > .hb{ grid-column:1 / -1; }
-  html.skin .k-dl-home > .dl-goals{ grid-column:1; } html.skin .k-dl-home > .dl-card{ grid-column:2; }
-  html.skin .k-dl-home .hb{ margin-top:0; } html.skin .k-dl-home .hb-b{ min-height:2.6rem; }
-  html.skin .dl-s{ min-height:3.4rem; }
+  html.skin .k-dl-home > .crres, html.skin .k-dl-home > .toast{ grid-column:1 / -1; }
+  html.skin .k-dl-home > .dl-goals{ grid-column:1; grid-row:span 1; } html.skin .k-dl-home > .dl-card{ grid-column:2; grid-row:span 2; }
+  html.skin .k-dl-home > .hb{ grid-column:1 !important; }
+  html.skin .k-dl-home .hb{ margin-top:0; align-self:start; } html.skin .k-dl-home .hb-b{ min-height:2.6rem; max-height:3rem; grid-auto-flow:column; } html.skin .k-dl-home .hb-b .gico, html.skin .k-dl-home .hb-b .dl-bi{ width:1.6rem; height:1.6rem; }
+  html.skin .dl-s{ min-height:2.9rem; } html.skin .dl-st{ width:2.2rem; height:2.2rem; } html.skin .dl-s.big .dl-st{ width:2.4rem; height:2.4rem; }
 }
 
 /* ---------- 주간 리그 신문 ---------- */
@@ -116,7 +122,7 @@ html.skin .pp-g strong{ font-variant-numeric:tabular-nums; font-weight:900; }
 html.skin .pp-g em{ font-style:normal; font-size:.58rem; font-weight:900; color:#fff; background:#8a6d3b; border-radius:3px; padding:0 4px; text-align:center; white-space:nowrap; }
 html.skin .pp-nt p{ font-size:.7rem; line-height:1.3; } html.skin .pp-nt p::before{ content:'■ '; font-size:.5rem; vertical-align:middle; }
 html.skin .pp-my{ display:flex; align-items:center; gap:8px; padding:5px 6px; border:1.5px solid #2b2216; border-radius:4px; background:rgba(255,255,255,.35); }
-html.skin .pp-myt{ display:grid; gap:1px; min-width:0; } html.skin .pp-myt small{ font-size:.6rem; font-weight:900; color:#6b5428; } html.skin .pp-myt b{ font-size:.86rem; font-weight:900; display:inline-flex; align-items:center; gap:4px; }
+html.skin .pp-myt{ display:grid; gap:1px; min-width:0; flex:none; } html.skin .pp-myt b{ white-space:nowrap; } html.skin .pp-myt small{ font-size:.6rem; font-weight:900; color:#6b5428; } html.skin .pp-myt b{ font-size:.86rem; font-weight:900; display:inline-flex; align-items:center; gap:4px; }
 html.skin .pp-my .dots i{ border-color:#2b2216; }
 html.skin .pp-ms{ margin-left:auto; display:flex; align-items:center; gap:5px; min-width:0; } html.skin .pp-ms > span{ display:grid; min-width:0; } html.skin .pp-ms b{ font-size:.76rem; } html.skin .pp-ms small{ font-size:.6rem; color:#4a3b24; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 html.skin .pp-paper .pg-nav .pg-b{ background:#2b2216; color:#f4ecd8; border-color:#2b2216; }
@@ -125,6 +131,18 @@ html.skin .k-pp-show .hb-b{ min-height:2.9rem; }
 html.skin .sk-body.f1 .pp-mast b{ font-size:1.25rem; } html.skin .sk-body.f2 .pp-mv p{ display:none; }
 @media (orientation:landscape) and (max-height:620px){
   html.skin .pp-mast b{ font-size:1.1rem; display:inline; margin-right:10px; } html.skin .pp-mast small{ display:inline-flex; border:0; } html.skin .pp-mast{ display:flex; align-items:center; justify-content:center; padding:3px 8px; }
-  html.skin .pp-mvps .crf.mid{ width:3rem; height:3rem; }
+  html.skin .pp-pg{ display:grid !important; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); grid-auto-rows:min-content; column-gap:12px; align-content:start; }
+  html.skin .pp-pg > .pp-head, html.skin .pp-pg > .pg-nav{ grid-column:1 / -1; }
+  html.skin .pp-head{ padding-bottom:3px; } html.skin .pp-paper h3{ font-size:1rem; }
+  html.skin .pp-mvps .crf.mid{ width:2.4rem; height:2.4rem; } html.skin .pp-mv p{ font-size:.58rem; }
+  html.skin .pp-mvps{ grid-template-columns:1fr; gap:4px; }
+  html.skin .pp-mv{ grid-template-columns:auto minmax(0, 1fr); justify-items:start; text-align:left; column-gap:8px; padding:0; }
+  html.skin .pp-mv + .pp-mv{ border-left:0; border-top:1px solid #8a6d3b; padding-top:3px; }
+  html.skin .pp-mv > small{ grid-column:2; } html.skin .pp-mf{ grid-column:1; grid-row:1 / span 4; } html.skin .pp-mf strong{ right:-.6rem; font-size:.6rem; }
+  html.skin .pp-mv > b, html.skin .pp-mv > p{ grid-column:2; } html.skin .pp-mv > b{ font-size:.8rem; line-height:1.1; } html.skin .pp-mv > .pp-tm{ display:none; } html.skin .pp-mv p{ line-height:1.15; }
+  html.skin .pp-mf{ grid-row:1 / span 3; align-self:start; } html.skin .pp-mv > small{ font-size:.56rem; } html.skin .pp-mv{ align-content:start; align-items:start; } html.skin .pp-mv > *{ line-height:1.2; }
+  html.skin .pp-sc span{ padding:0 2px; line-height:1.2; } html.skin .pp-sc .emb.sm{ width:.95rem; height:.95rem; } html.skin .pp-paper h4{ margin-bottom:1px; }
+  html.skin .pp-head p{ font-size:.66rem; margin-top:0; } html.skin .pp-head .emb.big{ width:1.7rem; height:1.7rem; } html.skin .pp-pg{ gap:4px !important; padding-top:4px !important; row-gap:4px; } html.skin .pp-paper h3{ line-height:1.1; }
+  html.skin .pp-sc span{ font-size:.64rem; }
   html.skin .k-pp-show .hb-b{ min-height:2.3rem; grid-auto-flow:column; } html.skin .k-pp-show .hb-b .gico{ width:1.6rem; height:1.6rem; }
 }

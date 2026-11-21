@@ -17,7 +17,7 @@ function dailyStrip(L, S){
   const D = typeof dailyEnsure === 'function' ? dailyEnsure(L) : null, a = attOf(c), can = attCan(c);
   const chips = D && D.goals.length ? D.goals.map(g => `<i class="${g.done ? 'ok' : ''}">${g.done ? '✓ ' : ''}${esc(DL_SHORT[g.id] || g.t)}${!g.done && g.need > 1 ? ` ${g.have}/${g.need}` : ''}</i>`).join('') : '<i class="none">오늘은 목표 없음</i>';
   const goal = o ? `<button type="button" class="dly-g${can ? ' new' : ''}" data-sk="opt" data-n="${o.n}" aria-label="${esc(o.t)}">
-      <span class="dly-at">${DL_ICO}<em>${attStamps(a)}/7</em>${can ? '<b class="dot">도장!</b>' : ''}</span>
+      <span class="dly-at">${DL_ICO}<em>${can ? '도장!' : `${attStamps(a)}/7`}</em></span>
       <span class="dly-l"><small>오늘의 목표${D && D.goals.length ? ` ${D.goals.filter(g => g.done).length}/${D.goals.length}` : ''}</small><span class="dly-c">${chips}</span></span></button>` : '';
   const paper = pp ? `<button type="button" class="dly-p${pp.unread ? ' new' : ''}" data-sk="opt" data-n="${pp.n}" aria-label="${esc(pp.t)}">${PP_ICO}<b>${pp.unread ? '신문 왔어요' : '신문'}</b></button>` : '';
   return `<div class="dly">${goal}${paper}</div>`;
@@ -81,4 +81,10 @@ function ppShowSkin(S){
     </div></div>
     <div class="hb c${btns.length} act sm">${btns.join('')}</div>`;
 }
-Object.assign(CAREER_SK, { 'dl-home':dlHomeSkin, 'pp-show':ppShowSkin });
+// 얼굴 부품 그림(look.js)을 아직 못 불러왔으면, 불러온 뒤 신문을 다시 그림 (look.js는 육성 화면만 다시 그림)
+function ppFaceWait(){
+  if(typeof LK === 'undefined' || LK.ok || !LK.img || LK.ppWait) return;
+  LK.ppWait = true;
+  LK.img.addEventListener('load', () => { LK.ppWait = false; if(UI.S && UI.S.kind === 'pp-show' && typeof skinBody === 'function') skinBody(); }, { once:true });
+}
+Object.assign(CAREER_SK, { 'dl-home':dlHomeSkin, 'pp-show': S => { const h = ppShowSkin(S); ppFaceWait(); return h; } });
