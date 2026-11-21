@@ -18,9 +18,9 @@ function awFace(L, who, cls){
   return typeof playerFace === 'function' ? playerFace(f ? f.p : { name: who.name, id: who.id }, who.team, cls) : '';
 }
 // 아래 단추 (선택지 그대로, 같은 모양 아이콘 단추)
-function awBtns(S, ico){
+function awBtns(S, ico, short = {}){
   const os = (S.opts || []).filter(o => !o.hide);
-  return `<div class="hb c${Math.min(os.length, 3)} aw-act">${os.map((o, i) => `<button type="button" class="hb-b${i === 0 ? ' pri' : ''}" data-sk="opt" data-n="${o.n}">${hubIco(ico[o.key] || 'go')}<b>${esc(o.t)}</b></button>`).join('')}</div>`;
+  return `<div class="hb c${Math.min(os.length, 3)} aw-act">${os.map((o, i) => `<button type="button" class="hb-b${i === 0 ? ' pri' : ''}" data-sk="opt" data-n="${o.n}">${hubIco(ico[o.key] || 'go')}<b>${esc(short[o.key] || o.t)}</b></button>`).join('')}</div>`;
 }
 
 /* ---------- 시상식 ---------- */
@@ -43,7 +43,7 @@ function crAwardSkin(S){
   const dots = `<div class="aw-dots" aria-hidden="true">${Array.from({ length: S.n }, (_, j) => `<i class="${j < S.i ? 'done' : j === S.i ? 'now' : ''}"></i>`).join('')}</div>`;
   return `<div class="awsw"><div class="aws${st.list ? ' list' : ''}" style="background-image:url(${skTint('cr-award', T.color)})">
       <b class="aw-ttl">${L.season}시즌 시상식</b>${scr}${hero}${plate}${mine ? `<em class="aw-mine">${L.career ? '내 선수!' : '우리 팀!'}</em>` : ''}</div></div>
-    <div class="aw-side">${dots}${awBtns(S, { next:'go', skip:'sim' })}</div>`;
+    <div class="aw-side"><div class="aw-info"><small>${esc(st.label)}</small><b>${esc(st.team ? T.name : st.who ? st.who.name : `${st.list.length}명`)}</b>${st.who ? `<em>${esc(T.short)}${st.val ? ` · ${esc(st.val)}` : ''}</em>` : ''}</div>${dots}${awBtns(S, { next:'go', skip:'sim' })}</div>`;
 }
 
 /* ---------- 트로피 진열장 ---------- */
@@ -57,7 +57,7 @@ function crCabinetSkin(S){
   const pages = Math.max(1, Math.ceil(items.length / (per * 4)));
   CAB.pg = clamp(CAB.pg, 0, pages - 1);
   const shown = items.slice(CAB.pg * per * 4, (CAB.pg + 1) * per * 4);
-  const shelves = [0, 1, 2, 3].map(r => `<div class="shf r${r} ${tab}">${shown.slice(r * per, (r + 1) * per).map(it => `<button type="button" class="cab-i${it.on ? '' : ' off'}${CAB.sel === it.id ? ' on' : ''}" data-sk="set" data-k="sel" data-v="${it.id}" aria-pressed="${CAB.sel === it.id}" aria-label="${esc(it.label + (it.on ? '' : ', 아직 받지 못함'))}">${it.ico}${it.n > 1 ? `<em>×${it.n}</em>` : ''}</button>`).join('')}</div>`).join('');
+  const shelves = [0, 1, 2, 3].map(r => `<div class="shf r${r} t-${tab}">${shown.slice(r * per, (r + 1) * per).map(it => `<button type="button" class="cab-i${it.on ? '' : ' off'}${CAB.sel === it.id ? ' on' : ''}" data-sk="set" data-k="sel" data-v="${it.id}" aria-pressed="${CAB.sel === it.id}" aria-label="${esc(it.label + (it.on ? '' : ', 아직 받지 못함'))}">${it.ico}${it.n > 1 ? `<em>×${it.n}</em>` : ''}</button>`).join('')}</div>`).join('');
   const none = !items.length ? `<p class="cab-none">아직 트로피가 없습니다.<br>시즌이 끝나면 시상식에서 받습니다.</p>` : '';
   const pager = pages > 1 ? `<div class="cab-pg"><button type="button" data-sk="set" data-k="pg" data-v="-1" aria-label="앞 칸"${CAB.pg === 0 ? ' disabled' : ''}>${skIco('back')}</button><span>${CAB.pg + 1} / ${pages}</span><button type="button" data-sk="set" data-k="pg" data-v="1" aria-label="다음 칸"${CAB.pg >= pages - 1 ? ' disabled' : ''}>${skIco('next1')}</button></div>` : '';
   // 고른 것 설명 (높이 고정)
@@ -65,7 +65,7 @@ function crCabinetSkin(S){
   if(CAB.sel && tab === 'tro'){ const t = S.tro.find(x => x.key === CAB.sel); if(t) dt = `${troIco(t.cell)}<span class="cab-tx"><b>${esc(t.name)} <i>×${t.n}</i></b><small>${esc(t.who.join(' · '))}</small></span>`; }
   if(CAB.sel && tab === 'bdg'){ const b = badgeOf(CAB.sel), g = b && S.got[b.id]; if(b) dt = `${badgeIco(BADGES.indexOf(b), g ? '' : 'off')}<span class="cab-tx"><b>${esc(b.name)} <i class="${g ? 'ok' : ''}">${g ? `${esc(badgeWhen(g))} 받음` : '아직 못 받음'}</i></b><small>${esc(badgeDesc(L, b))}</small></span>`; }
   return `<div class="cabw"><div class="cab" style="background-image:url(${skTint('cr-cabinet', teamInfo(L.my).color)})"><b class="cab-ttl">${esc(S.owner)}</b>${shelves}${none}${pager}</div></div>
-    <div class="cab-side">${tabs}<div class="cab-dt">${dt}</div>${awBtns(S, { back:'back', show:'again' })}</div>`;
+    <div class="cab-side">${tabs}<div class="cab-dt">${dt}</div>${awBtns(S, { back:'back', show:'again' }, { show:'시상식 다시 보기' })}</div>`;
 }
 Object.assign(CAREER_SK, { 'cr-award':crAwardSkin, 'cr-cabinet':crCabinetSkin });
 

@@ -68,7 +68,7 @@ const errors = [];
 (async () => {
   const { chromium } = require('playwright');
   const { spawn } = require('child_process');
-  const root = path.join(__dirname, '..', '..'), PORT = 8771, shots = process.argv[2] || null;
+  const root = path.join(__dirname, '..', '..'), PORT = 8840 + process.pid % 150, shots = process.argv[2] || null;
   if(shots) fs.mkdirSync(shots, { recursive:true });
   const srv = spawn('python3', ['-m', 'http.server', String(PORT), '--directory', root], { stdio:'ignore' });
   await new Promise(r => setTimeout(r, 800));
