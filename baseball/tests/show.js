@@ -123,6 +123,12 @@ const PORT = 8771;
     // 시즌 끝까지: 다시 하는 경기까지 모두 해서 팀마다 경기 수가 같음
     const fin = await page.evaluate(() => { const L = LG(); let k = 0; while(L.phase === 'season' && k++ < 400) leagueAdvance(L, null); return Object.values(L.teams).map(T => T.w + T.l + T.d); });
     if(new Set(fin).size !== 1 || fin[0] !== 18) errors.push(`${tag}: 우천 취소 뒤 팀마다 경기 수가 다름 ${fin}`);
+    // 선수 육성: 1군 경기도 우천 취소되면 하루가 지나고 육성 화면으로
+    const cr = await page.evaluate(() => { G = null; LSRC = 'career'; NEWC.name = '시험'; NEWC.pit = false; NEWC.pos = 'SS'; NEWC.type = BAT_TYPES[0].key; NEWC.face = 3; NEW.a = TEAMS[1].key; NEW.len = 18; NEW.mode = 'detail'; NEWC.team = NEW.a;
+      setLG(careerNew()); const L = LG(); L.career.event = null; L.career.camp = 0; const d0 = L.day, g = myGameToday(L); window.__wx = { rainout:true }; careerPlay('click'); window.__wx = null;
+      return { dome: !!(g && parkInfo(g.h).dome), game: !!G, day: L.day - d0, rain: !!(g && g.rain), say: (UI.S.say || []).map(l => l.s || l).join(' ') }; });
+    if(!cr.dome && (cr.game || cr.day !== 1 || !cr.rain || !/우천 취소/.test(cr.say))) errors.push(`${tag}: 육성 우천 취소가 이상함 ${JSON.stringify(cr)}`);
+    await page.evaluate(() => { LSRC = 'league'; });
     // 설정의 규칙 탭에 콜드게임·날씨
     const rules = await page.evaluate(() => settingsScreen(() => {}, 1).opts.map(o => o.t).join(' | '));
     if(!/콜드게임: 끔/.test(rules) || !/날씨와 비: 켬/.test(rules)) errors.push(`${tag}: 규칙 탭에 콜드게임·날씨가 없음 ${rules}`);
