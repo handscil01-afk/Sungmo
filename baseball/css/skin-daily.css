@@ -138,7 +138,7 @@ html.skin .sk-body.f1 .pp-mast b{ font-size:1.25rem; } html.skin .sk-body.f2 .pp
   html.skin .pp-mvps{ grid-template-columns:1fr; gap:4px; }
   html.skin .pp-mv{ grid-template-columns:auto minmax(0, 1fr); justify-items:start; text-align:left; column-gap:8px; padding:0; }
   html.skin .pp-mv + .pp-mv{ border-left:0; border-top:1px solid #8a6d3b; padding-top:3px; }
-  html.skin .pp-mv > small{ grid-column:2; } html.skin .pp-mf{ grid-column:1; grid-row:1 / span 4; } html.skin .pp-mf strong{ right:-.6rem; font-size:.6rem; }
+  html.skin .pp-mv > small{ grid-column:2; } html.skin .pp-mf{ grid-column:1; grid-row:1 / span 4; } html.skin .pp-mf strong{ right:auto; left:50%; bottom:-.3rem; transform:translateX(-50%) rotate(-8deg); font-size:.52rem; padding:0 3px; }
   html.skin .pp-mv > b, html.skin .pp-mv > p{ grid-column:2; } html.skin .pp-mv > b{ font-size:.8rem; line-height:1.1; } html.skin .pp-mv > .pp-tm{ display:none; } html.skin .pp-mv p{ line-height:1.15; }
   html.skin .pp-mf{ grid-row:1 / span 3; align-self:start; } html.skin .pp-mv > small{ font-size:.56rem; } html.skin .pp-mv{ align-content:start; align-items:start; } html.skin .pp-mv > *{ line-height:1.2; }
   html.skin .pp-sc span{ padding:0 2px; line-height:1.2; } html.skin .pp-sc .emb.sm{ width:.95rem; height:.95rem; } html.skin .pp-paper h4{ margin-bottom:1px; }
