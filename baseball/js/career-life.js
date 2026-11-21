@@ -205,6 +205,7 @@ function visitScreen(msg){
     { n:8, key:'donate', t:`기부하기 (연봉의 10%, ${won(Math.round(c.salary * 0.1))})`, s: c.donated === L.season ? '이번 시즌에는 이미 했습니다.' : '인기가 4 오릅니다. 시즌에 한 번.', act: () => { const cost = Math.round(c.salary * 0.1); if(c.donated === L.season){ stay('이번 시즌에는 이미 기부했습니다.'); return; } if(c.money < cost){ stay('돈이 모자랍니다.'); return; } c.money -= cost; c.donated = L.season; c.fame += 4; saveLeague(); stay(`기부했습니다. 인기 4 올라 ${c.fame}.`); } },
     { n:6, key:'vac', day:true, t:'휴가 (150만 원)', s: lock || '하루를 통째로 쉽니다. 피로가 크게 풀리고 컨디션이 좋아집니다.', act: v => done ? stay(lock) : vacation(v) },
     { n:5, key:'clinic', day:true, t: c.hurt > 0 ? '재활 센터 (100만 원)' : '마사지 숍 (50만 원)', s: lock || (c.hurt > 0 ? '부상이 2일 빨리 낫습니다.' : '컨디션이 한 단계 좋아집니다.'), act: v => done ? stay(lock) : clinic(v) },
+    { n:10, key:'mini', t:'미니게임 연습장', s:'타격 연습장, 번트 챌린지, 도루 챌린지. 재미로 하는 연습이라 하루 일정과 상관없습니다.', act: v => mgOpen('career', v) },
   ] };
 }
 // 마을 지도(화면 보며 하기)의 장소 → 할 수 있는 일. 야구장·훈련장은 첫 화면의 경기·훈련으로 감
@@ -218,6 +219,7 @@ const TOWN = [
   { id:'hospital', name:'병원', desc:'마사지 · 재활', keys:['clinic'], at:[2, 61, 28, 20] },
   { id:'house', name:'내 집', desc:'가방 · 집 구하기', keys:['bag', 'house'], at:[35, 62, 30, 20] },
   { id:'airport', name:'공항', desc:'휴가', keys:['vac'], at:[70, 59, 29, 23] },
+  { id:'mini', name:'미니게임 연습장', desc:'타격 · 번트 · 도루', keys:['mini'], at:[30, 86, 40, 11] },
 ];
 function vacation(via){
   const L = CR(), c = life(L), p = myP(L);
