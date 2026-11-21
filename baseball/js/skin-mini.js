@@ -25,9 +25,9 @@ const MG_BAN_ROW = { hr:7, b3:6, b2:5, hit:4, foul:3, whiff:2, out:8, safe:11, p
 
 /* ---------- 작은 그림(목록·설명·결과 카드) ---------- */
 function mgThumb(g, cls = ''){
-  if(g === 'bat') return `<span class="mg-thumb t-bat ${cls}" aria-hidden="true">${mgSpr('batter', 1, 4, 1, 0, 'th-bat')}</span>`;
-  if(g === 'bunt') return `<span class="mg-thumb t-fld ${cls}" aria-hidden="true">${mgSpr('batter', 3, 4, 1, 0, 'th-bunt')}<i class="mg-dotb" style="left:38%;top:70%"></i></span>`;
-  return `<span class="mg-thumb t-fld t-steal ${cls}" aria-hidden="true">${mgSpr('run-b', 1, 4, 1, 0, 'th-run flip')}</span>`;
+  // img/mg-cards.png (3칸: 타격 연습장 · 번트 · 도루), 자홍색은 팀 색
+  const i = { bat:0, bunt:1 }[g] ?? 2, url = skTint('mg-cards', mgCol());
+  return `<span class="mg-thumb t-img ${cls}" style="background-image:url(${url});background-position:${i * 50}% 50%" aria-hidden="true"></span>`;
 }
 const mgRecChip = g => { const a = mgBest(g, 'tm'), b = mgBest(g, 'pick'); return a || b ? `${a ? `<em>최고 ${a.best}점</em>` : ''}${b ? `<em class="c">고르기 ${b.best}점</em>` : ''}` : '<em class="no">기록 없음</em>'; };
 
@@ -103,6 +103,7 @@ function mgCage(st){
   const tag = !live && st.phase !== 'end' ? `<span class="mg-tag">${esc(st.mode === 'tm' ? '다음 공 · ' + st.pitch.name : '노릴 코스를 고르세요')}</span>` : '';
   return `<div class="mg-st cage" id="mgSt"><span class="mg-ring${live ? ' on' : ''}" id="mgRing" style="${mgAt(MGC.hit)}"></span>
     ${mgSpr('batter', live ? 0 : f, 4, 1, 0, 'bat-me' + (L && !live && f ? ' swung' : ''), '', 'mgBat')}
+    ${mgSpr('mg-machine', live ? 1 : 0, 4, 1, 0, 'mach', mgAt([MGC.mach[0], MGC.mach[1] + 6]), 'mgMach')}
     <span class="mg-ball" id="mgBall" style="${mgAt(MGC.mach)}"></span>${fx}${tag}</div>`;
 }
 // 내야 그림 위 수비수(서 있는 그림)
@@ -143,7 +144,7 @@ function mgStealField(st){
     } else fx = `<span class="mg-tx">출발 못함${L.pts ? ` +${L.pts}` : ''}</span>`;
   }
   return `<div class="mg-st fld steal" id="mgSt">${mgFielder([MGF.b1[0] + 3, MGF.b1[1] + 2])}${mgFielder([58, 30], 'ss')}${mgFielder([50, 95], 'c')}
-    ${mgSpr('pitcher', 0, 4, 3, 0, 'pit', mgAt([MGF.mound[0], MGF.mound[1] + 1]), 'mgPit')}${runner}
+    ${mgSpr('pitcher', 0, 4, 3, 0, 'pit', mgAt([MGF.mound[0], MGF.mound[1] + 1]), 'mgPit')}${mgSpr('pitcher-pick', 0, 4, 1, 0, 'pick', mgAt([MGF.mound[0] + 1, MGF.mound[1] + 1]) + 'visibility:hidden;', 'mgPick')}${runner}
     <span class="mg-ball sm" id="mgBall" style="${mgAt(MGF.mound)};opacity:0"></span>${fx}
     ${live ? '<span class="mg-cue" id="mgCue"></span>' : ''}</div>`;
 }
@@ -159,6 +160,8 @@ function mgTick(){
 function mgTickPitch(r, now){
   const ball = $('#mgBall'), ring = $('#mgRing'); if(!ball) return;
   const k = (now - r.rel) / r.T, bat = r.g === 'bat';
+  // 피칭 머신: 던지기 전 바퀴 돌기(1) → 발사(2) → 반동(3) → 멈춤(0)
+  const mach = $('#mgMach'); if(mach){ const f = k < 0 ? 1 : k < 0.12 ? 2 : k < 0.35 ? 3 : 0; mach.style.backgroundPosition = `${f * 100 / 3}% 0%`; }
   if(k < 0){ ball.style.opacity = '0'; return; }
   const kk = Math.min(k, 1.5), a = bat ? MGC.mach : [50, 53], b = bat ? MGC.hit : [50, 83];
   const p = mgLerp(a, b, kk);
@@ -178,6 +181,10 @@ function mgTickSteal(r, now){
     else if(m.type === 'pitch'){ f = t < 220 ? 1 : 2; bp = t >= 220 ? mgLerp(MGF.mound, MGF.home, Math.min(1, (t - 220) / 450)) : null; word = '투구!'; }
   }
   pit.style.backgroundPosition = `${f * 100 / 3}% 0%`; pit.classList.toggle('flip', flip);
+  // 견제: 1루 쪽을 보는 견제 동작 그림(img/pitcher-pick.png 4칸)으로 바꿔 보여 줌
+  const pk = $('#mgPick'), picking = !!(m && m.type === 'pick' && (now - m.at) / sc < 900);
+  if(pk){ const t = picking ? (now - m.at) / sc : 0; pk.style.visibility = picking ? 'visible' : 'hidden'; pit.style.visibility = picking ? 'hidden' : 'visible';
+    if(picking) pk.style.backgroundPosition = `${(t < 200 ? 1 : t < 450 ? 2 : t < 700 ? 3 : 0) * 100 / 3}% 0%`; }
   if(ball){ ball.style.opacity = bp ? '1' : '0'; if(bp){ ball.style.left = bp[0] + '%'; ball.style.top = (bp[1] - 4) + '%'; } }
   if(run) run.style.backgroundPosition = `${Math.floor(now / 380) % 2 ? 100 / 3 : 0}% 0%`;
   if(cue){ cue.textContent = word; cue.className = 'mg-cue' + (word ? ' on ' + (m.type === 'pick' ? 'pk' : 'pt') : ''); }
