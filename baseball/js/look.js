@@ -113,3 +113,20 @@ function lookSet(look, key, v){
   if(key === 'lk'){ const l = lookFix(look); l[LOOK_TAB] = Number(v); return lookFix(l); }
   return look;
 }
+
+/* ---------- 모든 선수의 얼굴 (화면 보며 하기) ----------
+   playerLook(p): 선수 이름·번호로 정해지는 무작위 얼굴(늘 같은 얼굴). 내 선수(육성)는 꾸민 얼굴
+   playerFace(p, teamKey, cls): 얼굴 그림 <span> (팀 색 유니폼·모자, 모자에 팀 알파벳) */
+function lookHash(s){ let h = 2166136261; for(const ch of String(s)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return h >>> 0; }
+function playerLook(p){
+  if(!p) return lookFix(LOOK_DEF);
+  if(p.look) return lookFix(p.look);
+  let h = lookHash(`${p.name}#${p.id || ''}`);
+  const pick = n => { const v = h % n; h = Math.floor(h / n) ^ lookHash(String(h)); return v; };
+  return lookFix({ skin: pick(12), hair: pick(12), hc: [0, 0, 0, 0, 1, 1, 2, 3, 4, 5][pick(10)], eyes: pick(12), mouth: [0, 1, 2, 6, 9, 11, 0, 2][pick(8)],
+    acc: pick(10) < 7 ? -1 : [0, 2, 4, 5, 6][pick(5)], hat: 0 });
+}
+function playerFace(p, teamKey, cls = ''){
+  const T = typeof teamInfo === 'function' && teamKey ? teamInfo(teamKey) : null;
+  return typeof crFace === 'function' ? crFace(playerLook(p), T ? T.color : '#3b82f6', cls, teamKey) : '';
+}
