@@ -396,7 +396,9 @@ const PORT = 8766;
     await page.goto(`http://localhost:${PORT}/baseball/`); await page.waitForSelector('#opts .opt');
     await page.keyboard.press('1');
     const r = await page.evaluate(() => {
-      const fake = { currentTime:0, state:'running' }; audio = () => fake; SET.snd = true; SET.sndKind = 'rec'; SET.cast = false;
+      // 녹음 소리가 먼저 불러와졌으면 recPlay가 소리 마디를 만들므로 가짜 장치에도 함수를 둠
+      const gainNode = () => ({ gain:{ value:1, setValueAtTime(){}, linearRampToValueAtTime(){}, setTargetAtTime(){}, cancelScheduledValues(){} }, connect(){} });
+      const fake = { currentTime:0, state:'running', destination:{}, createGain: gainNode, createBufferSource: () => ({ buffer:null, connect(){}, start(){}, stop(){} }), createOscillator: () => ({ frequency:{ value:0, setValueAtTime(){}, exponentialRampToValueAtTime(){}, linearRampToValueAtTime(){} }, type:'', connect(){}, start(){}, stop(){} }) }; audio = () => fake; SET.snd = true; SET.sndKind = 'rec'; SET.cast = false;
       const rec = { swell:[], glove:0, pitches:0 }; crowdSwell = (c, t0, t1, kind, sc) => rec.swell.push({ t0, t1, kind, sc }); SOUNDS.glove = () => { rec.glove++; };
       const out = [], kinds = {}; let guard = 0, seed = 41;
       for(; seed < 53 && !(kinds.hit && kinds.xbh && kinds.big); seed++){

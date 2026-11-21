@@ -87,6 +87,8 @@
 - 9-4 (완료) 구단 운영: office.js(가치 fov·연봉 fsal·상한 capOf, doTrade·signFA·draftSign, L.office·L.moves·L.faPool·L.draftPool), office-ui.js(리그 첫 화면 6번). 컴퓨터 구단끼리의 트레이드는 아직 없음.
 - 9-5 (완료) 올스타전·홈런 더비: allstar.js(allstarDue·allstarRosters·derby*·allstarSim, L.allstar), 리그·육성 첫 화면 앞에 휴식기, 관전 경기는 G.allstar(endScreen·gameNext 연결), 팀 key dream·nanum(data.js ALLSTAR_TEAMS).
 
+- 9-6 (완료, 병렬 작업 세 개를 합침) 육성 감독 신뢰도·동료 관계와 2군 강등(career-trust.js), 컴퓨터 구단끼리 트레이드(office.js cpuTradeDay, league.js leagueAdvance에서 부름), 감독 모드 대수비·상대 타자·투수 분석(engine.js defSub, manager.js dsubScreen·scoutBatter·scoutPitcher, online.js dsub 검증, tests/manager.js).
+
 ## 7.7단계 (예정): 시각장애인들이 아는 숫자 야구 규칙
 
 - 투수 숫자와 타자 숫자로 판정표에서 결과를 찾는 방식. 규칙(숫자 범위, 결과표, 볼카운트, 주자)을 받으면 판정표를 채움. 결과마다 이유를 한 줄로 알려 주기.
