@@ -30,7 +30,7 @@ function leagueStatus(L){
   if(L.phase === 'season'){
     const g = myGameToday(L);
     out.push(`정규 시즌 ${L.day + 1}일째, 남은 경기 ${L.sched.length - L.day}경기.`);
-    if(g) out.push(`오늘 경기: ${teamName(g.a)} 대 ${teamName(g.h)}, ${g.h === L.my ? '홈' : '원정'} 경기, ${parkInfo(g.h).name}. 우리 선발 ${L.teams[L.my].sp[L.teams[L.my].rot % 5].name}, 상대 선발 ${(() => { const o = g.a === L.my ? g.h : g.a; return L.teams[o].sp[L.teams[o].rot % 5].name; })()}.`);
+    if(g) out.push(`오늘 경기: ${teamName(g.a)} 대 ${teamName(g.h)}, ${g.h === L.my ? '홈' : '원정'} 경기, ${parkInfo(g.h).name}. 우리 선발 ${L.teams[L.my].sp[L.teams[L.my].rot % 5].name}, 상대 선발 ${(() => { const o = g.a === L.my ? g.h : g.a; return L.teams[o].sp[L.teams[o].rot % 5].name; })()}.${typeof h2hToday === 'function' && h2hToday(L) ? ` ${h2hToday(L).text}.` : ''}`);
   } else if(L.phase === 'post'){
     out.push(seriesText(L));
     const g = todayGames(L)[0];
@@ -39,6 +39,7 @@ function leagueStatus(L){
   } else if(L.phase === 'done'){
     out.push(...awardLines(L));
   }
+  if(typeof paperLine === 'function'){ const s = paperLine(L); if(s) out.push(s); }   // 주간 리그 신문 (paper.js)
   return out;
 }
 function awardLines(L){
@@ -72,6 +73,7 @@ function leagueHome(){
     { n:7, key:'sched', t: L.phase === 'post' || done ? '포스트시즌 결과' : '일정과 지난 결과', act: v => go(schedScreen, v) },
     { n:8, key:'arch', t:'기록실과 명예의 전당', s:'역대 우승, 통산 순위, 시즌 최고 기록, 명예의 전당, 대기록, 내 감독 기록', act: v => go(archiveScreen, v) },
     { n:9, key:'set', t:'리그 설정', s:`경기 방식: ${lmodeName(L)}. 백업, 새 리그, 리그 지우기`, act: v => go(leagueSet, v) },
+    ...(typeof paperOpt === 'function' && paperOpt(L, 10) ? [paperOpt(L, 10)] : []),
   ] };
 }
 
@@ -209,7 +211,8 @@ function standScreen(){
   // table: 화면 보며 하기에서 표로 보여 줌 (글은 say 그대로)
   const table = [{ cols:['', '팀', '승', '패', '무', '승률', '차', '최근 10'], hiTeam: L.my, foot: L.phase === 'season' ? '5위까지 포스트시즌' : '',
     rows: standings(L).map(x => { const r = x.T.last.slice(-10); return { team: x.T.key, cells:[x.rank, teamName(x.T.key), x.T.w, x.T.l, x.T.d || 0, pctText(x.T), x.gb === 0 ? '-' : x.gb, r.length ? `${r.filter(y => y === 'W').length}-${r.filter(y => y === 'L').length}` : '-'] }; }) }];
-  return { q:'순위표입니다. 위 글을 한 줄씩 읽어 보세요.', say, table, back: v => go(lhome(), v), opts:[{ n:1, t:'돌아가기', act: v => go(lhome(), v) }] };
+  return { q:'순위표입니다. 위 글을 한 줄씩 읽어 보세요.', say, table, back: v => go(lhome(), v), opts:[{ n:1, t:'돌아가기', act: v => go(lhome(), v) },
+    { n:2, key:'h2h', t:'맞대결 전적', hide: typeof h2hScreen !== 'function', s:'우리 팀이 팀마다 몇 승 몇 패인지 봅니다.', act: v => go(() => h2hScreen(standScreen), v) }] };
 }
 const LEAD_MENU = [['avg', '타율'], ['hr', '홈런'], ['rbi', '타점'], ['h', '안타'], ['sb', '도루'], ['era', '평균자책점'], ['w', '승리'], ['svhd', '세이브와 홀드'], ['k', '탈삼진']];
 function leadersScreen(stat){
@@ -255,7 +258,8 @@ function schedScreen(){
   const days = L.phase === 'season' || !L.post ? Array.from({ length: Math.min(3, L.day) }, (_, i) => L.day - 1 - i).map(d => ({ day: d + 1, games: L.sched[d] })) : [];
   const next = [];
   if(L.phase === 'season') for(let d = L.day; d < L.sched.length && next.length < 5; d++){ const g = L.sched[d].find(x => x.a === L.my || x.h === L.my); if(g) next.push({ day: d + 1, a: g.a, h: g.h }); }
-  return { kind: L.post && L.phase !== 'season' ? undefined : 'sc-show', days, next, q:'일정과 결과입니다.', say, back: v => go(lhome(), v), opts:[{ n:1, t:'돌아가기', act: v => go(lhome(), v) }] };
+  return { kind: L.post && L.phase !== 'season' ? undefined : 'sc-show', days, next, q:'일정과 결과입니다.', say, back: v => go(lhome(), v), opts:[{ n:1, t:'돌아가기', act: v => go(lhome(), v) },
+    { n:2, key:'h2h', t:'맞대결 전적', hide: typeof h2hScreen !== 'function', act: v => go(() => h2hScreen(schedScreen), v) }] };
 }
 
 /* ---------- 리그 설정 · 백업 ---------- */

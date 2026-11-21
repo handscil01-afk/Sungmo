@@ -124,6 +124,7 @@ function careerStatus(L){
   if(L.phase === 'season') out.push(`${L.season}시즌 ${L.day + 1}일째. 팀은 ${myRank(L).rank}위, ${T.w}승 ${T.l}패.`);
   else if(L.phase === 'post') out.push(seriesText(L));
   else out.push(...awardLines(L));
+  if(typeof dailyLines === 'function') out.push(...dailyLines(L));   // 오늘의 목표·출석·신문 (daily.js)
   return out;
 }
 function careerHome(){
@@ -156,7 +157,8 @@ function careerHome(){
     { n:7, key:'info', t:'내 선수 정보와 업적', act: v => go(careerInfoScreen, v) },
     { n:8, key:'arch', t:'기록실과 명예의 전당', act: v => go(archiveScreen, v) },
     { n:9, key:'set', t:'은퇴하기와 설정', act: v => go(careerSet, v) },
-    { n:10, key:'cab', t:'트로피 진열장', hide: typeof cabinetOpen !== 'function', s:'모은 트로피와 업적 배지', act: v => cabinetOpen(careerHome, v) },
+    ...(typeof dailyOpts === 'function' ? dailyOpts(L) : []),   // 10 오늘의 목표와 출석 · 11 주간 리그 신문 (daily.js)
+    { n:12, key:'cab', t:'트로피 진열장', hide: typeof cabinetOpen !== 'function', s:'모은 트로피와 업적 배지', act: v => cabinetOpen(careerHome, v) },
   ] };
 }
 
@@ -187,6 +189,7 @@ function trainDay(L, k, nm){
   const c = C(L), p = myP(L);
   c.trained = `${L.season}-${L.phase}-${L.day}`;
   const tt = typeof trustTrain === 'function' ? trustTrain(L, k) : [];   // 성실 훈련·휴식 남용
+  if(typeof dailyHook === 'function') tt.push(...dailyHook(L, 'train', k));   // 오늘의 목표 (daily.js)
   if(!k){ p.cond = Math.min(2, p.cond + 1); addFatigue(c, -30); return [`푹 쉬었습니다. 컨디션 ${COND[p.cond]}, 피로 ${fatigueWord(c)}.`, ...tt]; }
   if(typeof badgeTrain === 'function') badgeTrain(L);   // 훈련왕 배지 (badges.js)
   // 대성공(15%): 두 배, 보약을 먹었으면 또 두 배. 컨디션이 좋으면 조금 더
@@ -273,6 +276,7 @@ function careerGrowFromGame(L, G, minor){
   if(typeof badgeGame === 'function') badgeGame(L, ln, G, minor);   // 첫 안타·첫 승·삼진 10개 배지 (badges.js)
   if(!minor && typeof trustGame === 'function') out.push(...trustGame(L, ln, G));   // 감독 신뢰도·최근 10경기 (career-trust.js)
   out.push(...gameBonus(L, ln, G, minor));
+  if(typeof dailyHook === 'function') out.push(...dailyHook(L, 'game', { ln, G, minor }));   // 오늘의 목표·팀별 기록 (daily.js)
   addFatigue(c, minor ? 3 : 5); out.push(...wearGear(L, minor ? 1 : 2));
   if(minor){ const mm = c.minor; mm.g = (mm.g || 0) + 1; ['ab', 'h', 'hr', 'out', 'r', 'ur'].forEach(k => { mm[k] = (mm[k] || 0) + (s[k] || 0); }); if((G.decision || {}).w === c.id) mm.w = (mm.w || 0) + 1; }
   return out;

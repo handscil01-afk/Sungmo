@@ -182,7 +182,7 @@ function gearScreen(msg){
 }
 function useGoods(){
   const L = CR(), c = life(L), p = myP(L);
-  const use = (id, fn) => () => { if(!(c.goods[id] > 0)){ stay('가진 것이 없습니다.'); return; } const msg = fn(); if(!msg) return; c.goods[id]--; saveLeague(); stay(msg); };
+  const use = (id, fn) => () => { if(!(c.goods[id] > 0)){ stay('가진 것이 없습니다.'); return; } const msg = fn(); if(!msg) return; c.goods[id]--; const dg = typeof dailyHook === 'function' ? dailyHook(L, 'goods', id) : []; saveLeague(); stay([msg, ...dg].join(' ')); };
   return { q:'무엇을 쓸까요?', back: v => go(bagScreen, v), opts:[
     { n:1, t:`에너지 음료 (${c.goods.drink || 0}개)`, s: GOODS[0].desc, act: use('drink', () => { if(p.cond >= 2){ stay('이미 컨디션이 아주 좋습니다.'); return null; } p.cond++; return `에너지 음료를 마셨습니다. 컨디션 ${COND[p.cond]}.`; }) },
     { n:2, t:`테이핑과 찜질 세트 (${c.goods.tape || 0}개)`, s: GOODS[1].desc, act: use('tape', () => { if(!(c.hurt > 0)){ stay('지금은 다친 곳이 없습니다.'); return null; } c.hurt = Math.max(0, c.hurt - 2); if(!c.hurt) heal(p, c); return c.hurt ? `치료했습니다. ${c.hurt}일 뒤 돌아옵니다.` : '치료했습니다. 다 나았습니다!'; }) },
@@ -225,7 +225,7 @@ function vacation(via){
   const L = CR(), c = life(L), p = myP(L);
   if(c.money < 150){ stay('돈이 모자랍니다.'); return; }
   c.money -= 150; c.visited = dayKey(L); addFatigue(c, -50); p.cond = Math.min(2, p.cond + 1);
-  saveLeague(); go(() => sceneScreen('rest', '휴가'), via, [`하루 푹 쉬고 왔습니다. 피로 ${fatigueWord(c)}, 컨디션 ${COND[p.cond]}.`]);
+  saveLeague(); go(() => sceneScreen('rest', '휴가'), via, [`하루 푹 쉬고 왔습니다. 피로 ${fatigueWord(c)}, 컨디션 ${COND[p.cond]}.`, ...(typeof dailyHook === 'function' ? dailyHook(L, 'visit') : [])]);
 }
 // 집: 좋은 집에서 살수록 날마다 피로가 더 풀림. 큰돈이 드는 지출처
 const HOMES = [['숙소', 0], ['작은 아파트', 2000], ['넓은 아파트', 6000], ['단독 주택', 15000]];
@@ -243,6 +243,7 @@ function fanMeet(via){
   c.fame += up; c.money += cash;
   const say = [`팬 사인회에 다녀왔습니다. 팬들이 줄을 섰습니다! 인기 ${up} 올라 ${c.fame}, 용돈 ${won(cash)}.`];
   if(rnd(L) < 0.25){ p.cond = Math.max(-2, p.cond - 1); say.push('사인을 너무 많이 해서 조금 피곤합니다.'); }
+  say.push(...(typeof dailyHook === 'function' ? dailyHook(L, 'visit') : []));
   saveLeague(); go(() => sceneScreen('fans', '팬 사인회'), via, say);
 }
 function coachScreen(){
@@ -251,7 +252,7 @@ function coachScreen(){
     if(c.money < 300){ stay('돈이 모자랍니다.'); return; }
     c.money -= 300; c.visited = dayKey(L);
     const up = grow(L, k, 12 + rnd(L) * 4);
-    saveLeague(); go(() => sceneScreen(k, `특별 코치 레슨: ${ABIL_NAME[k]}`), v, [`특별 코치에게 ${ABIL_NAME[k]}을 배웠습니다. 성장 점수 ${Math.round(c.pts[k])}/10.`, ...up]);
+    saveLeague(); go(() => sceneScreen(k, `특별 코치 레슨: ${ABIL_NAME[k]}`), v, [`특별 코치에게 ${ABIL_NAME[k]}을 배웠습니다. 성장 점수 ${Math.round(c.pts[k])}/10.`, ...up, ...(typeof dailyHook === 'function' ? dailyHook(L, 'visit') : [])]);
   } })) };
 }
 function clinic(via){
@@ -261,6 +262,7 @@ function clinic(via){
   let say;
   if(c.hurt > 0){ c.hurt = Math.max(0, c.hurt - 2); if(!c.hurt) heal(p, c); say = [c.hurt ? `재활 치료를 받았습니다. ${c.hurt}일 뒤 돌아옵니다.` : '재활 치료로 다 나았습니다!']; }
   else { p.cond = Math.min(2, p.cond + 1); say = [`마사지를 받았습니다. 컨디션 ${COND[p.cond]}.`]; }
+  say.push(...(typeof dailyHook === 'function' ? dailyHook(L, 'visit') : []));
   saveLeague(); go(() => sceneScreen(cost === 100 ? 'clinic' : 'massage', cost === 100 ? '재활 센터' : '마사지 숍'), via, say);
 }
 
@@ -320,7 +322,8 @@ function eventScreen(){
 function careerGameChoice(minor){
   const where = minor ? '퓨처스리그(2군)' : '1군';
   const rv = typeof rivalToday === 'function' ? rivalToday(CR()) : null;
-  return { kind:'cr-game', minor, note: rv ? [rv] : null, q:`오늘 ${where} 경기를 어떻게 할까요?`, back: v => go(careerHome, v), opts:[
+  const hh = !minor && typeof h2hToday === 'function' && h2hToday(CR()) ? h2hToday(CR()).text : null;   // 상대 전적 (h2h.js)
+  return { kind:'cr-game', minor, rv, hh, note: rv || hh ? [rv, hh].filter(Boolean) : null, q:`오늘 ${where} 경기를 어떻게 할까요?`, back: v => go(careerHome, v), opts:[
     { n:1, t:'내 차례만 직접 하기', s:'내 타석(투수라면 내가 던질 때)만 직접 고르고, 나머지는 빠르게 진행합니다.', act: v => minor ? careerMinorPlay(v) : careerPlay(v) },
     { n:2, t:'내 차례도 맡기고 내 결과 듣기', s:'컴퓨터가 내 선수도 대신 하고, 내 타석(투구) 결과를 하나씩 알려 줍니다.', act: v => minor ? careerMinorDay(v, true) : careerSimDay(v, true) },
     { n:3, t:'경기 건너뛰기', s:'최종 점수와 오늘 내 기록만 봅니다.', act: v => minor ? careerMinorDay(v) : careerSimDay(v) },
@@ -351,7 +354,7 @@ function useGood(L, id){
   if(id === 'drink'){ if(p.cond >= 2) return [false, '이미 컨디션이 아주 좋습니다.']; p.cond++; msg = `에너지 음료를 마셨습니다. 컨디션 ${COND[p.cond]}.`; }
   else if(id === 'tape'){ if(!(c.hurt > 0)) return [false, '지금은 다친 곳이 없습니다.']; c.hurt = Math.max(0, c.hurt - 2); if(!c.hurt) heal(p, c); msg = c.hurt ? `치료했습니다. ${c.hurt}일 뒤 돌아옵니다.` : '치료했습니다. 다 나았습니다!'; }
   else if(id === 'tonic'){ if(c.tonic) return [false, '이미 보약을 먹었습니다. 다음 훈련에 효과가 납니다.']; c.tonic = true; msg = '보약을 먹었습니다. 다음 훈련의 성장 효과가 두 배가 됩니다.'; }
-  c.goods[id]--; saveLeague(); return [true, msg];
+  c.goods[id]--; const dg = typeof dailyHook === 'function' ? dailyHook(L, 'goods', id) : []; saveLeague(); return [true, [msg, ...dg].join(' ')];
 }
 function shopAll(msg){
   const L = CR(), c = life(L), p = myP(L);

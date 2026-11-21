@@ -153,7 +153,7 @@ const errors = [];
     else if(!/MVP/.test(await page.$eval('#bdgToast', e => e.textContent))) errors.push(`${tag}: 알림 띠에 MVP 배지가 없음`);
     await shot(page, `${name}-배지-알림`);
     await fit(page, tag, '라커룸');
-    const cab = await page.$('.hb.sm [data-sk="opt"][data-n="10"]');
+    const cab = await page.$('.hb.sm [data-sk="opt"][data-n="12"]');
     if(!cab) errors.push(`${tag}: 라커룸에 진열장 단추가 없음`); else await cab.click();
     if(await kind(page) !== 'cr-cabinet') errors.push(`${tag}: 라커룸에서 진열장으로 가지 않음`);
     await page.waitForTimeout(300); await fit(page, tag, '육성 진열장'); await shot(page, `${name}-진열장-육성`);

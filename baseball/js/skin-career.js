@@ -78,7 +78,7 @@ function crHome(S){
       <div class="pc-tm">${emb(T, 'sm')}<span>${esc(where)}</span></div></div>
     <div class="pstats">${statKeys(p).map(k => crStat(p, c, k)).join('')}</div>
   </div>
-  <p class="crday">${esc(day)}</p>${crStory(L)}
+  <p class="crday">${esc(day)}</p>${crStory(L)}${typeof dailyStrip === 'function' ? dailyStrip(L, S) : ''}
   ${play ? `<button type="button" class="crplay" data-sk="opt" data-n="${play.n}"><span class="pp">▶</span><span><b>${esc(play.t)}</b>${play.s ? `<small>${esc(play.s)}</small>` : ''}</span></button>` : ''}
   <div class="crtiles">
     ${train ? `<button type="button" class="ct${S.trained ? ' done' : ''}" data-sk="opt" data-n="${train.n}">${trainIco(isPit(p) ? 5 : 0)}<b>훈련</b>${S.trained ? '<em class="stamp">완료</em>' : ''}</button>` : ''}
@@ -240,7 +240,7 @@ function crGame(S){
   const ICON = ['swing', 'take', 'next'];
   const opts = (S.opts || []).filter(o => !o.hide).map((o, i) => `<button type="button" class="gm-o${i === 0 ? ' pri' : ''}" data-sk="opt" data-n="${o.n}">${skIco(ICON[i] || 'next')}<span class="tx"><b>${esc(o.t)}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</span></button>`).join('');
   return `${crRes(L)}<div class="vs">
-      <div class="vs-h">${S.minor ? '퓨처스리그(2군)' : `${L.season}시즌 ${L.day + 1}일째`}${park ? ` · ${esc(park.name)}` : ''}</div>${(S.note || []).length ? `<div class="vs-rv">🔥 ${esc(S.note[0])}</div>` : ''}
+      <div class="vs-h">${S.minor ? '퓨처스리그(2군)' : `${L.season}시즌 ${L.day + 1}일째`}${park ? ` · ${esc(park.name)}` : ''}</div>${S.rv ? `<div class="vs-rv">🔥 ${esc(S.rv)}</div>` : ''}${S.hh ? `<div class="vs-hh">${esc(S.hh)}</div>` : ''}
       <div class="vs-row">${side(me, home ? '홈' : '원정')}<span class="vs-x">VS</span>${side(opp, home ? '원정' : '홈')}</div>
       <div class="vs-me">${crFace(crFaceOf(L, c, p), col, 'sm', L.my)}<span><b>${esc(p.name)}</b> · ${esc(role)}${p.cond ? ` · 컨디션 ${esc(COND[p.cond])}` : ''}</span></div>
     </div><div class="gm-opts">${opts}</div>`;
