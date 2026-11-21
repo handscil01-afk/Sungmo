@@ -193,10 +193,11 @@ const errors = [];
     const cs = await page.$eval('#say', e => e.innerText);
     if(!/배지를 받았습니다! MVP/.test(cs)) errors.push(`${tag}: 새 배지 글이 없음: ${cs.slice(0, 80)}`);
     if(await page.$('#bdgToast')) errors.push(`${tag}: 소리와 글로 하기에 알림 띠가 나옴`);
-    const ten = await page.evaluate(() => (UI.S.opts.find(o => o.n === 10) || {}).t);
-    if(ten !== '트로피 진열장') errors.push(`${tag}: 육성 첫 화면 10번이 진열장이 아님`);
-    await page.fill('#cmd', '10'); await page.press('#cmd', 'Enter');
-    if(!/트로피 진열장입니다/.test(await q())) errors.push(`${tag}: 명령 칸 10으로 진열장에 가지 않음: ${await q()}`);
+    // 육성 첫 화면 10·11번은 오늘의 목표·신문(daily.js), 12번이 진열장
+    const ten = await page.evaluate(() => (UI.S.opts.find(o => o.n === 12) || {}).t);
+    if(ten !== '트로피 진열장') errors.push(`${tag}: 육성 첫 화면 12번이 진열장이 아님`);
+    await page.fill('#cmd', '12'); await page.press('#cmd', 'Enter');
+    if(!/트로피 진열장입니다/.test(await q())) errors.push(`${tag}: 명령 칸 12로 진열장에 가지 않음: ${await q()}`);
     console.log(`${tag}: 시상 ${said.length}단계를 번호 키로, 건너뛰기, 진열장 글, 배지 글 확인`);
     await ctx.close();
   }

@@ -150,7 +150,7 @@ async function netLeave(){
 /* ---------- 보내기 ---------- */
 // 방장: 경기 상태를 보냄. pend: 팀마다 이미 고른 선택이 방장 기기에 있는지(무엇을 골랐는지는 보내지 않음)
 function netPushState(res){
-  if(!NET.on || NET.role !== 'host' || !G) return;
+  if(!NET.on || NET.role !== 'host' || !G || !FB) return;   // 서버에 아직 연결되지 않았으면(시험 등) 보내지 않음
   if(NET.gidPushed !== G.at){ NET.gidPushed = G.at; NET.pushedN = 0; }
   const F = FB, { R } = F;
   const c = JSON.parse(JSON.stringify(G, (k, v) => (k === 'log' || k === 'rng' || k === 'out' || k === 'fx' || k === 'evs' || k === 'names' || k === 'prevTypes') ? undefined : v));
