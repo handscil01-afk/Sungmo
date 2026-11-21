@@ -226,13 +226,23 @@ function deckHead(S, noSub = false){
   return `<div class="dk-head">${S.back ? `<button type="button" class="rb" data-sk="back" aria-label="뒤로">${skIco('back')}</button>` : ''}
     ${q.chip ? `<span class="chip ${q.side || ''}">${esc(q.chip)}</span>` : ''}<div class="dk-q"><b>${esc(q.main)}</b>${q.sub ? `<small>${esc(q.sub)}</small>` : ''}</div></div>`;
 }
+// 경기 기록 (조작판 가운데 남는 자리): 지난 결과를 최근 것부터 아래로. 지금 결과(위 한 줄·뜸 들이는 중)는 빼서 미리 보이지 않게
+function playLogHTML(S){
+  if(!G || G.pre) return '';
+  const now = (S.say || []).map(l => String(l.s || l).slice(0, 18));
+  const lines = G.log.filter(l => 'ric'.includes(l.k) && !now.some(h => h && l.s.startsWith(h))).slice(-14);
+  if(!lines.length) return '<div class="dk-log"></div>';
+  return `<div class="dk-log" aria-hidden="true">${lines.map(l => `<p class="k-${l.k}">${esc(l.s)}</p>`).join('')}</div>`;
+}
 function deckHTML(S){
   const notes = S.note ? `<div class="dk-note">${S.note.map(l => `<p>${esc(l)}</p>`).join('')}</div>` : '';
   if(S.kind === 'pitch' && !G.over) return deckHead(S, true) + pitchDeck(S);
-  if(S.kind === 'bat' && !G.over) return deckHead(S, true) + batDeck(S);
+  if(S.kind === 'bat' && !G.over) return deckHead(S, true) + playLogHTML(S) + batDeck(S);
   if(S.kind === 'roster') return deckHead(S) + rosterHTML(S.ti) + optsHTML(S, true);
   if(S.kind === 'log') return deckHead(S) + listHTML(S.say || [], 'log') + optsHTML(S, true);
-  return deckHead(S, !G.over && !G.pre && !S.sub) + (G.over ? resultBanner() + lineScoreHTML() : '') + notes + (S.grid ? gridHTML(S) : optsHTML(S, true));
+  // 그 밖의 경기 화면: 위에 질문, 가운데 지난 기록(남는 자리), 아래쪽 엄지 닿는 곳에 단추
+  const mid = G.over ? resultBanner() + lineScoreHTML() : S.grid || S.sub ? '' : playLogHTML(S);
+  return deckHead(S, !G.over && !G.pre && !S.sub) + mid + notes + (S.grid ? gridHTML(S) : optsHTML(S, true));
 }
 // 명단: 타자(오늘 기록)와 투수
 function rosterHTML(ti){
@@ -433,7 +443,7 @@ function timingEnd(tm){
 /* ---------- 메뉴 화면 ---------- */
 function topHTML(S){
   const fsOn = typeof FS !== 'undefined' && FS.on(), canFs = typeof isStandalone === 'function' && !isStandalone();
-  const CRT = { 'as-home':'올스타 휴식기', 'as-derby':'홈런 더비', 'fo-home':'구단 사무실', 'fo-list':'구단 사무실', 'cr-camp':'스프링캠프', 'ct-home':'우리 센터 팀', 'ct-list':'선수 고르기', 'ct-player':'선수 고치기', 'ct-num':'능력치', 'cr-home':'라커룸', 'cr-visit':'마을', 'cr-train':'훈련', 'cr-bag':'내 가방', 'cr-info':'내 선수', 'cr-face':'얼굴 고르기', 'cr-log':'업적과 경력', 'cr-game':'오늘 경기' };
+  const CRT = { 'setup':'경기 설정', 'as-home':'올스타 휴식기', 'as-derby':'홈런 더비', 'fo-home':'구단 사무실', 'fo-list':'구단 사무실', 'cr-camp':'스프링캠프', 'ct-home':'우리 센터 팀', 'ct-list':'선수 고르기', 'ct-player':'선수 고치기', 'ct-num':'능력치', 'cr-home':'라커룸', 'cr-visit':'마을', 'cr-train':'훈련', 'cr-bag':'내 가방', 'cr-info':'내 선수', 'cr-face':'얼굴 고르기', 'cr-log':'업적과 경력', 'cr-game':'오늘 경기' };
   if(S.kind === 'cr-talk') CRT['cr-talk'] = S.who === 'gm' ? '연봉 계약' : S.who === 'agent' ? 'FA 시장' : '이벤트!';
   const title = S.hero ? '' : S.onTab ? '설정' : CRT[S.kind] || menuTitle(S).title;
   return `<div class="bar">${S.back ? `<button type="button" class="rb" data-sk="back" aria-label="뒤로">${skIco('back')}</button>` : ''}
@@ -541,6 +551,7 @@ function skinClick(e){
   if(SK.tm) return;
   if(a === 'opt'){ GS.tm = null; if(b.closest('#skSheet')) skinSheetClose(true); choose(b.dataset.n, 'click'); }
   else if(a === 'spot' && typeof crSpot === 'function') crSpot(b.dataset.spot);
+  else if(a === 'set' && typeof setupSet === 'function') setupSet(b.dataset.k, b.dataset.v);
   else if(a === 'back') back('click');
   else if(a === 'menu'){ stopAutoPlay(); openMenu('click'); }
   else if(a === 'talk' && typeof talkScreen === 'function') go(talkScreen, 'click');

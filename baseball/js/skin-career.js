@@ -320,7 +320,36 @@ function asDerby(S){
     <div class="${S.mine ? 'bt-grid n2' : 'fo-opts'}">${opts}</div>`;
 }
 
-const CAREER_SK = { 'as-home':asHome, 'as-derby':asDerby, 'fo-home':foHome, 'cr-camp':crCamp, 'ct-home':ctHome, 'ct-num':ctNum, 'cr-talk':crTalk, 'cr-game':crGame, 'cr-log':crLogSkin, 'cr-home':crHome, 'cr-visit':crVisit, 'cr-shop':crShop, 'cr-bag':crBag, 'cr-train':crTrain, 'cr-info':crInfo, 'cr-face':crFacePick };
+/* ---------- 한 화면 경기 설정 (app.js matchSetupScreen) ---------- */
+function setupSkin(S){
+  const A = teamInfo(NEW.a), B = teamInfo(NEW.b), k = NEW.kind, o = key => (S.opts || []).find(x => x.key === key && !x.hide);
+  const who = k === '2p' ? ['첫째 사람', '둘째 사람'] : k === 'watch' ? ['원정', '홈'] : ['내 팀', '상대'];
+  const tm = (T, key, lab) => `<button type="button" class="su-t" data-sk="opt" data-n="${o(key).n}" style="--tc:${T.color}">${emb(T, 'big')}<b>${esc(T.short)}</b><small>${esc(lab)} · 바꾸기</small></button>`;
+  const seg = (label, key, list, cur) => `<div class="su-row"><span>${esc(label)}</span><div class="seg">${list.map(([v, t]) => `<button type="button" class="${v === cur ? 'on' : ''}" data-sk="set" data-k="${key}" data-v="${v}">${esc(t)}</button>`).join('')}</div></div>`;
+  const mi = setupModeIdx(), park = parkInfo(k === 'watch' || NEW.first !== 2 ? NEW.b : NEW.a);
+  const picks = o('picks'), start = o('start');
+  return `<div class="su-vs">${tm(A, 'a', who[0])}<span class="vs-x">VS</span>${tm(B, 'b', who[1])}</div>
+    <p class="su-park">경기장: ${esc(park.name)}</p>
+    <div class="su panel">
+      ${seg('경기 방식', 'mode', SETUP_MODES.map((m, i) => [i, m[2]]), mi)}
+      ${k !== 'watch' ? seg('공격 순서', 'first', [[1, '먼저 (원정)'], [2, '나중 (홈)']], NEW.first === 2 ? 2 : 1) : ''}
+      ${seg('이닝', 'inn', [1, 3, 5, 7, 9].map(n => [n, n + '회']), NEW.innings)}
+      ${k === '1p' ? seg('컴퓨터 수준', 'diff', [[0, '쉬움'], [1, '보통'], [2, '어려움']], NEW.diff) : ''}
+      ${picks ? `<button type="button" class="su-pk" data-sk="opt" data-n="${picks.n}"><span>직접 고를 것</span><b>${esc(pickName())}</b>${skIco('next1')}</button>` : ''}
+    </div>
+    <button type="button" class="crplay su-go" data-sk="opt" data-n="${start.n}"><span class="pp">▶</span><span><b>경기 시작</b><small>${esc(SETUP_MODES[mi][2])} · ${NEW.innings}이닝</small></span></button>`;
+}
+// 한 화면 경기 설정의 바로 고르는 단추
+function setupSet(key, v){
+  v = Number(v);
+  if(key === 'mode'){ const m = SETUP_MODES[v]; NEW.mode = m[0]; if(m[1]) NEW.unit = m[1]; }
+  else if(key === 'first') NEW.first = v;
+  else if(key === 'inn') NEW.innings = v;
+  else if(key === 'diff') NEW.diff = v;
+  rerender();
+}
+
+const CAREER_SK = { 'setup':setupSkin, 'as-home':asHome, 'as-derby':asDerby, 'fo-home':foHome, 'cr-camp':crCamp, 'ct-home':ctHome, 'ct-num':ctNum, 'cr-talk':crTalk, 'cr-game':crGame, 'cr-log':crLogSkin, 'cr-home':crHome, 'cr-visit':crVisit, 'cr-shop':crShop, 'cr-bag':crBag, 'cr-train':crTrain, 'cr-info':crInfo, 'cr-face':crFacePick };
 function careerSkin(S){
   const f = S && S.kind && CAREER_SK[S.kind];
   if(!f) return null;

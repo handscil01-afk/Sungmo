@@ -3,16 +3,17 @@
 
 /* ---------- 처음 화면 ---------- */
 function homeScreen(){
+  NEW.quick = false;
   const sv = loadSaved();
   return { top: installBanner(), hero:true, q:'무엇을 할까요?',
     note:['공 하나하나를 고르며 진행하는 확률 야구입니다.', '번호 키, 화면 단추, 명령 칸 가운데 편한 방법으로 고릅니다.', '0은 지금 상황, 점(.)은 뒤로, 곱하기(*)는 키 안내입니다. 게임 방법은 8번 설정에 있습니다.'],
     opts:[
-      { n:1, t:'혼자 하기', s:'컴퓨터 팀과 대결합니다.', act: v => { NEW.kind = '1p'; go(modeScreen, v); } },
-      { n:2, t:'둘이 하기', s:'한 기기를 번갈아 쓰며 대결합니다.', act: v => { NEW.kind = '2p'; go(modeScreen, v); } },
+      { n:1, t:'혼자 하기', s:'컴퓨터 팀과 대결합니다.', act: v => { NEW.kind = '1p'; go(VIEW.gfx ? matchSetupScreen : modeScreen, v); } },
+      { n:2, t:'둘이 하기', s:'한 기기를 번갈아 쓰며 대결합니다.', act: v => { NEW.kind = '2p'; go(VIEW.gfx ? matchSetupScreen : modeScreen, v); } },
       { n:3, t:'온라인 대전', s:'각자 휴대폰으로 만나 대결하고, 채팅과 음성 대화를 합니다.', act: v => go(onlineHome, v) },
       { n:4, t:'리그', s: peekL('league') ? `${teamInfo(peekL('league').my).name}, ${peekL('league').season}시즌` : '10개 팀 정규 시즌과 포스트시즌, 기록과 시상식', act: v => go(leagueHome, v) },
       { n:5, t:'선수 육성', s: (() => { const L = peekL('career'); return L && L.career && !L.career.retired ? `${(L.career.p || findPlayer(L, L.career.id)?.p || {}).name}, ${L.season}시즌` : '내 선수 한 명을 키워 명예의 전당까지'; })(), act: v => go(careerHome, v) },
-      { n:6, t:'컴퓨터끼리 관전', s:'컴퓨터 두 팀의 경기를 듣습니다.', act: v => { NEW.kind = 'watch'; go(modeScreen, v); } },
+      { n:6, t:'컴퓨터끼리 관전', s:'컴퓨터 두 팀의 경기를 듣습니다.', act: v => { NEW.kind = 'watch'; go(VIEW.gfx ? matchSetupScreen : modeScreen, v); } },
       { n:7, t:'이어하기', hide: !sv, s: sv ? `${MODE_NAME[sv.G.mode]}, ${sv.G.pre ? '경기 전 준비 중' : situation(sv.G)}` : '', act: v => resumeGame(v) },
       { n:8, t:'설정과 게임 방법', s:'화면 방식, 글자 크기, 화면 색, 읽어 주기, 효과음, 관중 소리, 게임 방법과 키 안내', act: v => go(() => settingsScreen(() => go(homeScreen, 'click')), v) },
       { n:9, t:'홈 화면에 설치하기', hide: !canInstall(), s:'아이콘으로 바로 열고 화면을 넓게 씁니다.', act: () => doInstall() },
@@ -46,6 +47,7 @@ function teamScreen(which, page = 0){
   // 우리 센터 팀(만들었으면)은 맨 앞에. 온라인 대전은 상대 기기에 팀 자료가 없어서 빼고, 리그·육성에서는 손잡다 핸즈 자리에 들어감
   const list = [...(CENTER && NEW.kind !== 'online' ? [centerInfo()] : []), ...TEAMS].filter(t => t.key !== taken);
   const set = (k, v) => {
+    if(NEW.quick){ if(which) NEW.b = k; else { NEW.a = k; if(NEW.b === k) NEW.b = null; } go(matchSetupScreen, v); return; }   // 한 화면 경기 설정에서 팀만 바꿈
     if(which){ NEW.b = k; go(NEW.kind === 'watch' ? inningsScreen : sideScreen, v); }
     else { NEW.a = k; go(NEW.kind === 'league' ? leagueLenScreen : NEW.kind === 'career' ? careerLenScreen : () => teamScreen(1), v); }
   };
@@ -56,7 +58,7 @@ function teamScreen(which, page = 0){
     const opts = list.map((t, i) => ({ n: i + 1, t: t.name, s: desc(t), act: v => set(t.key, v) }));
     opts.push({ n: list.length + 1, t:'아무 팀이나', s:'무작위로 고릅니다.', act: v => set(list[Math.floor(Math.random() * list.length)].key, v) });
     if(NEW.kind !== 'online' && !which) opts.push({ n: list.length + 2, t: CENTER ? '우리 팀 고치기' : '우리 센터 팀 만들기', s:'이용자 이름과 별명으로 팀과 선수를 만들고 능력치를 정합니다.', act: v => go(() => centerEdit(w => go(() => teamScreen(which), w)), v) });
-    return { q, opts, back: v => go(which ? () => teamScreen(0) : NEW.kind === 'career' ? careerTypeScreen : NEW.mode === 'simple' ? unitScreen : modeScreen, v) };
+    return { q, opts, back: v => go(NEW.quick ? matchSetupScreen : which ? () => teamScreen(0) : NEW.kind === 'career' ? careerTypeScreen : NEW.mode === 'simple' ? unitScreen : modeScreen, v) };
   }
   const shown = page ? list.slice(8) : list.slice(0, 8);
   const opts = shown.map((t, i) => ({ n: i + 1, t: t.name, s: desc(t), act: v => set(t.key, v) }));
@@ -114,6 +116,35 @@ function readyScreen(){
   return { q:'이대로 시작할까요?', say, back: v => go(NEW.kind === '1p' ? diffScreen : inningsScreen, v), opts:[
     { n:1, t:'경기 시작', act: v => startGame(newOpts(), v) },
     { n:2, t:'처음부터 다시 고르기', act: v => go(modeScreen, v) },
+  ] };
+}
+
+/* ---------- 한 화면 경기 설정 (화면 보며 하기: 혼자·둘이 하기·관전) ----------
+   소리와 글로 하기는 차례로 묻는 화면(modeScreen → … → readyScreen)을 그대로 쓰고, 화면 보며 하기는 이 한 화면에서 모두 정함.
+   선택지를 고를 때마다 값이 다음 것으로 바뀜(숫자 키도 됨). 화면 보며 하기 그림은 skin-setup(skin.js)이 바로 고르는 단추로 그림 */
+const SETUP_MODES = [['simple', 'pitch', '간단 · 공 하나씩'], ['simple', 'pa', '간단 · 타석 한 번에'], ['detail', null, '정밀'], ['manager', null, '감독']];
+const setupModeIdx = () => Math.max(0, SETUP_MODES.findIndex(m => m[0] === NEW.mode && (m[0] !== 'simple' || m[1] === NEW.unit)));
+function setupFill(){
+  const keys = [...(CENTER ? ['center'] : []), ...TEAMS.map(t => t.key)];
+  if(!keys.includes(NEW.a)) NEW.a = keys[0];
+  if(!NEW.b || NEW.b === NEW.a || !keys.includes(NEW.b)) NEW.b = keys.filter(k => k !== NEW.a)[Math.floor(Math.random() * (keys.length - 1))];
+  if(![1, 3, 5, 7, 9].includes(NEW.innings)) NEW.innings = 3;
+}
+function matchSetupScreen(){
+  NEW.quick = true; setupFill();
+  const k = NEW.kind, A = teamInfo(NEW.a), B = teamInfo(NEW.b), m = SETUP_MODES[setupModeIdx()];
+  const who = k === '2p' ? ['첫째 사람 팀', '둘째 사람 팀'] : k === 'watch' ? ['원정 팀', '홈 팀'] : ['내 팀', '상대 팀'];
+  const pickTeam = which => v => go(() => teamScreen(which), v);
+  return { kind:'setup', q: k === '2p' ? '둘이 하기 경기를 정하세요.' : k === 'watch' ? '관전할 경기를 정하세요.' : '혼자 하기 경기를 정하세요.',
+    back: v => { NEW.quick = false; go(homeScreen, v); }, opts:[
+    { n:1, key:'a', t:`${who[0]}: ${A.name}`, act: pickTeam(0) },
+    { n:2, key:'b', t:`${who[1]}: ${B.name}`, act: pickTeam(1) },
+    { n:3, key:'mode', t:`경기 방식: ${m[2]}`, act: () => { const x = SETUP_MODES[(setupModeIdx() + 1) % SETUP_MODES.length]; NEW.mode = x[0]; if(x[1]) NEW.unit = x[1]; stay(`경기 방식 ${x[2]}`); } },
+    { n:4, key:'first', hide: k === 'watch', t:`공격 순서: ${NEW.first === 2 ? '나중에 공격 (홈)' : '먼저 공격 (원정)'}`, act: () => { NEW.first = NEW.first === 2 ? 1 : 2; stay(NEW.first === 2 ? '나중에 공격' : '먼저 공격'); } },
+    { n:5, key:'inn', t:`이닝: ${NEW.innings}이닝`, act: () => { const L = [1, 3, 5, 7, 9]; NEW.innings = L[(L.indexOf(NEW.innings) + 1) % L.length]; stay(`${NEW.innings}이닝`); } },
+    { n:6, key:'diff', hide: k !== '1p', t:`컴퓨터 수준: ${['쉬움', '보통', '어려움'][NEW.diff]}`, act: () => { NEW.diff = (NEW.diff + 1) % 3; stay(`컴퓨터 수준 ${['쉬움', '보통', '어려움'][NEW.diff]}`); } },
+    { n:7, key:'picks', hide: NEW.mode !== 'detail' || k === 'watch', t:`직접 고를 것: ${pickName()}`, act: v => go(() => picksScreen(w => go(matchSetupScreen, w), w => go(matchSetupScreen, w)), v) },
+    { n:9, key:'start', t:'경기 시작', act: v => { NEW.quick = false; if(k === 'watch') NEW.first = 1; startGame(newOpts(), v); } },
   ] };
 }
 

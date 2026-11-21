@@ -217,7 +217,7 @@ html.skin .dk-q small{ font-size:.72rem; color:#eaf5ff; font-weight:700; line-he
 html.skin .dk-note{ background:rgba(255,255,255,.9); border-radius:12px; padding:6px 10px; font-size:.8rem; color:var(--ink2); border:2px solid #9cc8f5; }
 html.skin .dk-note p{ margin:2px 0; }
 /* 큰 칸: 남은 높이를 나눠 씀 */
-html.skin .tiles{ display:grid; gap:7px; flex:1 1 auto !important; grid-template-rows:repeat(var(--rows), minmax(0, 1fr)); min-height:calc(var(--rows) * 3rem) !important; max-height:calc(var(--rows) * 6.5rem); }
+html.skin .tiles{ display:grid; gap:7px; flex:none !important; grid-auto-rows:minmax(3.3rem, auto); margin-top:auto; }
 html.skin .tiles.c1{ grid-template-columns:minmax(0, 1fr); } html.skin .tiles.c2{ grid-template-columns:repeat(2, minmax(0, 1fr)); } html.skin .tiles.c3{ grid-template-columns:repeat(3, minmax(0, 1fr)); }
 html.skin .tile{ position:relative; display:flex; align-items:center; gap:8px; min-height:0; overflow:hidden; padding:.45rem .7rem; border-radius:16px; text-align:left; color:#fff; border:3px solid; text-shadow:0 1px 0 rgba(0,0,0,.4); }
 html.skin .tile .ico{ width:1.6em; height:1.6em; flex:none; }
@@ -297,7 +297,7 @@ html.skin .sk-go b{ font-size:1.2rem; font-weight:900; } html.skin .sk-go small{
 html.skin .sk-go[disabled]{ background:#c9d6ea; border-color:#8ea3c4; color:#6c7fa3; box-shadow:0 4px 0 #8ea3c4; cursor:default; }
 
 /* ===== 정밀 모드 공격 ===== */
-html.skin .bt-grid{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:7px; flex:1 1 auto !important; grid-auto-rows:minmax(0, 1fr); min-height:6.5rem !important; max-height:14rem; }
+html.skin .bt-grid{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:7px; flex:none !important; grid-auto-rows:minmax(3.8rem, auto); margin-top:auto; }
 html.skin .bt-grid.n1{ grid-template-columns:minmax(0, 1fr); }
 html.skin .bt{ position:relative; display:grid; grid-template-columns:auto 1fr; grid-template-rows:auto auto; column-gap:8px; align-content:center; align-items:center; text-align:left; min-height:0; overflow:hidden;
   padding:.5rem .8rem; border-radius:18px; color:#fff; border:3px solid; text-shadow:0 1px 0 rgba(0,0,0,.45); }
@@ -740,3 +740,33 @@ html.skin .sk-body.f3 .trustb{ display:none; }
 html.skin .scout{ display:grid; grid-template-columns:7rem minmax(0, 1fr); gap:8px; align-items:start; }
 html.skin .sc-z{ width:100%; height:auto; }
 @media (max-width:360px){ html.skin .scout{ grid-template-columns:1fr; } html.skin .sc-z{ max-width:8rem; } }
+
+/* 조작판 가운데: 지난 경기 기록 (남는 자리를 채움, 넘치면 오래된 줄부터 가림) */
+html.skin .dk-log{ flex:1 1 0 !important; min-height:0 !important; display:flex; flex-direction:column; justify-content:flex-end; gap:2px; overflow:hidden; padding:4px 8px; border-radius:12px;
+  background:rgba(8,28,70,.35); -webkit-mask-image:linear-gradient(180deg, transparent 0, #000 28%); mask-image:linear-gradient(180deg, transparent 0, #000 28%); }
+html.skin .dk-log p{ margin:0; font-size:.74rem; line-height:1.35; color:#dcecff; text-shadow:0 1px 0 rgba(0,0,0,.4); }
+html.skin .dk-log p:last-child{ color:#fff; font-weight:700; }
+html.skin .dk-log p.k-i{ color:#ffe94d; font-weight:800; } html.skin .dk-log p.k-c{ color:#bfe3ff; }
+html.skin .dk-log:empty{ background:transparent; }
+html.skin .sk-body.deck .minors{ margin-top:0; }
+html.skin .sk-body.deck > .tiles + .minors, html.skin .sk-body.deck > .bt-grid + .bt-mid{ margin-top:0; }
+html.skin .tile{ min-height:3.3rem; } html.skin .bt{ min-height:3.8rem; }
+/* 한 화면 경기 설정 */
+html.skin .su-vs{ display:grid; grid-template-columns:minmax(0, 1fr) auto minmax(0, 1fr); align-items:center; gap:4px; }
+html.skin .su-t{ display:grid; justify-items:center; gap:2px; padding:10px 6px 8px; border-radius:16px; color:#fff; text-shadow:0 1px 0 rgba(0,0,0,.5);
+  border:3px solid color-mix(in srgb, var(--tc) 55%, #000); background:linear-gradient(180deg, color-mix(in srgb, var(--tc) 70%, #fff), var(--tc)); box-shadow:0 3px 0 color-mix(in srgb, var(--tc) 50%, #000); }
+html.skin .su-t .emb.big{ width:3.6rem; height:3.6rem; } html.skin .su-t b{ font-size:1.05rem; font-weight:900; } html.skin .su-t small{ font-size:.64rem; font-weight:800; opacity:.95; }
+html.skin .su-park{ margin:0; text-align:center; font-size:.74rem; font-weight:800; color:#fff; text-shadow:0 1px 0 #0b3a8c; }
+html.skin .su{ display:grid; gap:8px; padding:10px; }
+html.skin .su-row{ display:grid; gap:3px; } html.skin .su-row > span{ font-size:.72rem; font-weight:900; color:var(--ink2); padding-left:2px; }
+html.skin .su .seg{ grid-auto-flow:column; }
+html.skin .su .seg button{ min-height:2.4rem; font-size:.78rem; white-space:nowrap; padding:.3rem .15rem; }
+html.skin .su-pk{ display:flex; align-items:center; gap:8px; padding:.5rem .7rem; border-radius:12px; border:2px solid #9cc8f5; background:#fff; color:var(--ink); text-align:left; }
+html.skin .su-pk span{ font-size:.72rem; font-weight:900; color:var(--ink2); } html.skin .su-pk b{ flex:1; font-size:.86rem; font-weight:900; } html.skin .su-pk .ico{ color:var(--line); }
+html.skin .su-go{ margin-top:auto; }
+html.skin .sk-body.f1 .su-park{ display:none; } html.skin .sk-body.f2 .su-t .emb.big{ width:2.6rem; height:2.6rem; } html.skin .sk-body.f2 .su{ gap:5px; padding:7px; }
+html.skin .su .su-row:first-child .seg{ grid-auto-flow:row; grid-template-columns:repeat(2, minmax(0, 1fr)); }
+/* 한 화면 맞추기: 고정 높이 단추도 단계마다 줄임 */
+html.skin .sk-body.f1 .tiles{ grid-auto-rows:minmax(2.9rem, auto); } html.skin .sk-body.f1 .tile, html.skin .sk-body.f1 .bt{ min-height:2.9rem; } html.skin .sk-body.f1 .res .ban3{ width:9rem; }
+html.skin .sk-body.f2 .tiles{ grid-auto-rows:minmax(2.5rem, auto); gap:5px; } html.skin .sk-body.f2 .tile, html.skin .sk-body.f2 .bt{ min-height:2.5rem; } html.skin .sk-body.f2 .bt-grid{ grid-auto-rows:minmax(3rem, auto); }
+html.skin .sk-body.f3 .tiles{ grid-auto-rows:minmax(2.2rem, auto); } html.skin .sk-body.f3 .tile{ min-height:2.2rem; padding:.25rem .5rem; } html.skin .sk-body.f3 .tile .ico{ width:1.2em; height:1.2em; } html.skin .sk-body.f3 .ls th, html.skin .sk-body.f3 .ls td{ padding:.15rem; }

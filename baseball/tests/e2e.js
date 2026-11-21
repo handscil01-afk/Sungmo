@@ -68,9 +68,12 @@ const PORT = 8766;
     await page.keyboard.press(name === 'phone' ? '2' : '1');
     await shot(page, `${name}-home`); await noOverflow(page, name + ' 처음');
     // 혼자 하기, 정밀 모드(2단계: 구종만), 1이닝
-    for(const k of ['1', '2', '2', '1', '1', '1', '1', '1', '2']) await page.keyboard.press(k);
+    // 소리와 글로 하기: 차례로 묻는 화면 / 화면 보며 하기: 한 화면 경기 설정(3 경기 방식 바꾸기, 7 직접 고를 것, 5 이닝 바꾸기, 9 시작)
+    const gfxView = name !== 'phone';
+    for(const k of gfxView ? ['1', '3', '3', '7', '2', '1', '5', '5', '5', '5'] : ['1', '2', '2', '1', '1', '1', '1', '1', '2']) await page.keyboard.press(k);
+    if(gfxView && !(await page.evaluate(() => UI.S.kind === 'setup' && NEW.mode === 'detail' && NEW.innings === 1))) errors.push(`${name}: 한 화면 경기 설정이 정밀 1이닝으로 바뀌지 않음`);
     await shot(page, `${name}-ready`);
-    await page.keyboard.press('1');
+    await page.keyboard.press(gfxView ? '9' : '1');
     await page.waitForFunction(() => UI.S && UI.S.board && G);
     await shot(page, `${name}-game`); await noOverflow(page, name + ' 경기');
     // 수비라면 코스 판까지 가서 찍어 둠
@@ -83,12 +86,12 @@ const PORT = 8766;
     console.log(`${name}: 정밀 1이닝 ${steps}번 만에 끝`);
     // 처음 화면 → 둘이 하기, 간단 모드, 3이닝 (명령 칸으로 입력)
     await page.keyboard.press('4');
-    for(const k of ['2', '1', '1', '2', '3', '2', '2', '1']){ if(await page.isVisible('#cmd')){ await page.fill('#cmd', ''); await page.type('#cmd', k); } else await page.keyboard.press(k); }
+    for(const k of gfxView ? ['2', '3', '3', '5', '4', '9'] : ['2', '1', '1', '2', '3', '2', '2', '1']){ if(await page.isVisible('#cmd')){ await page.fill('#cmd', ''); await page.type('#cmd', k); } else await page.keyboard.press(k); }
     const s2 = await playToEnd(page, name + ' 간단 둘이', false);
     console.log(`${name}: 간단 둘이 3이닝 ${s2}번 만에 끝`);
     // 관전: 정밀 3이닝, 경기 끝까지
     await page.keyboard.press('4');
-    for(const k of ['6', '2', '1', '2', '2', '1']) await page.keyboard.press(k);
+    for(const k of gfxView ? ['6', '3', '3', '9'] : ['6', '2', '1', '2', '2', '1']) await page.keyboard.press(k);
     await page.keyboard.press('4');
     await page.waitForFunction(() => document.querySelector('#q').textContent.includes('경기가 끝났습니다'));
     console.log(`${name}: 관전 끝`);
