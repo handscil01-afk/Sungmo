@@ -343,8 +343,8 @@ function drawFieldScene(G, A){
     // 1루수가 직접 잡으면 공을 들고 베이스를 밟음
     if(p === '1B' && gbOut && near === '1B' && now > TL.field){ const q = Math.min(1, (now - TL.field) / (TL.result - TL.field)); return [land.x + (b1.x - land.x) * q, land.y + (b1.y - land.y) * q, F.color, q < 1 ? 'run' : 'catch', Math.floor(now * 12), true]; }
     if(p !== near) return [hp.x, hp.y, F.color, 'ready', 0, hp.x < chase.x];
-    // 땅볼은 잡는 순간(field)에 도착, 뜬공 아웃은 떨어지기 직전에 도착, 안타는 늦게
-    const go = gbOut ? Math.min(1, (now - fs) / (TL.field - fs)) : Math.min(1, k * (bb.hit ? 0.8 : 1.12)), x = hp.x + (chase.x - hp.x) * go, y = hp.y + (chase.y - hp.y) * go;
+    // 땅볼은 잡는 순간(field)에 도착, 뜬공 아웃은 떨어지기 직전에 도착, 안타는 공이 떨어질 때 아직 멀리 있다가(55%) 떨어진 뒤 쫓아감
+    const go = gbOut ? Math.min(1, (now - fs) / (TL.field - fs)) : bb.hit ? Math.min(0.55, k * 0.55) + (A.ph === 'fresult' ? 0.45 : 0) : Math.min(1, k * 1.12), x = hp.x + (chase.x - hp.x) * go, y = hp.y + (chase.y - hp.y) * go;
     const mode = go < 1 ? 'run' : bb.hit || gbOut ? 'throw' : 'catch';
     return [x, y, F.color, A.ph === 'fresult' ? (bb.hit ? 'throw' : 'catch') : mode, Math.floor(k * 12), x < home.x];
   });

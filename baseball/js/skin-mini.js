@@ -64,7 +64,7 @@ function mgPlaySkin(S){
     : fresh ? last.text : st.g === 'bat' ? (st.mode === 'tm' ? '공 던지기를 누르면 피칭 머신이 던집니다.' : `코치: "${st.hint}"`) : st.g === 'bunt' ? mgDefText(st.def) + ' 방향을 고르세요.' : st.phase === 'read' ? '투수의 움직임을 읽고 뛸지 고르세요.' : '리드를 고르면 투수가 세트에 들어갑니다.';
   const msgCls = fresh ? (last.pts >= 10 ? 'top' : last.pts > 0 ? 'ok' : 'bad') : live ? 'live' : '';
   if(live && !SKM.raf) SKM.raf = requestAnimationFrame(mgTick);
-  return `${hud}<div class="mg-wrap" data-mg="${live ? 'tap' : ''}">${stage}</div><p class="mg-msg ${msgCls}" role="status">${esc(msg)}</p><div class="mg-ctl">${mgCtl(S, st)}</div>`;
+  return `${hud}<div class="mg-wrap ${st.g === 'bat' ? 'g-bat' : 'g-fld'}" data-mg="${live ? 'tap' : ''}">${stage}</div><p class="mg-msg ${msgCls}" role="status">${esc(msg)}</p><div class="mg-ctl">${mgCtl(S, st)}</div>`;
 }
 function mgCtl(S, st){
   const os = (S.opts || []).filter(o => !o.hide && o.key !== 'quit');
@@ -115,15 +115,15 @@ function mgBuntField(st){
   const zone = (d, pts) => { const at = [[63, 71], [37, 71], [50, 64]][d]; return `<span class="mg-zone z${pts >= 10 ? 'a' : pts >= 5 ? 'b' : 'c'}${live && st.dir === d ? ' on' : ''}" style="${mgAt(at)}"><b>${pts}</b></span>`; };
   let fx = '';
   if(L && !live && L.g === 'bunt'){
-    const D = L.dir, end = { perfect:[[60, 74], [40, 74], [50, 68]][D], good:[[64, 68], [36, 68], [50, 62]][D], weak:[[68, 59], [32, 59], [50, 56]][D], foul:[[66, 86], [34, 86], [60, 90]][D], pop:[50, 74], miss:[50, 96], none:[50, 96] }[L.k] || [50, 90];
+    const D = L.dir, end = { perfect:[[60, 74], [40, 74], [50, 68]][D], good:[[64, 68], [36, 68], [50, 62]][D], weak:[[68, 59], [32, 59], [50, 56]][D], foul:[[66, 86], [34, 86], [60, 90]][D], pop:[50, 74], miss:[50, 88], none:[50, 88] }[L.k] || [50, 88];
     fx = `<span class="mg-roll k-${L.k}" style="--x0:${MGF.home[0]}%;--y0:${MGF.home[1] - 3}%;--x1:${end[0]}%;--y1:${end[1]}%"></span>`
       + `<span class="mg-tx k-${L.k}">${{ perfect:'완벽한 번트!', good:'좋은 번트', weak:'아쉬운 번트', foul:'파울', pop:'번트 뜬공', miss:'헛스윙', none:'놓침' }[L.k] || ''}${L.pts ? ` +${L.pts}` : ''}</span>`;
   }
   return `<div class="mg-st fld" id="mgSt">${[0, 1, 2].map(d => zone(d, mgBuntMax(d, st.def))).join('')}
     ${mgFielder(c1, def === 'c1' ? 'chg' : '')}${mgFielder(c3, def === 'c3' ? 'chg' : '')}${mgFielder([50, 50], 'p')}
-    ${def !== 'none' ? `<span class="mg-chg" style="${mgAt(def === 'c1' ? [67, 62] : [33, 62])}">전진!</span>` : ''}
+    ${def !== 'none' ? `<span class="mg-chg" style="${mgAt(def === 'c1' ? [67, 50] : [33, 50])}">전진!</span>` : ''}
     <span class="mg-ring sm${live ? ' on' : ''}" id="mgRing" style="${mgAt([50, 83])}"></span>
-    ${mgSpr('batter', live ? 3 : L && L.g === 'bunt' && ['perfect', 'good', 'weak', 'foul', 'pop'].includes(L.k) ? 3 : 0, 4, 1, 0, 'bat-bunt', mgAt([38, 99]))}
+    ${mgSpr('batter', live ? 3 : L && L.g === 'bunt' && ['perfect', 'good', 'weak', 'foul', 'pop'].includes(L.k) ? 3 : 0, 4, 1, 0, 'bat-bunt', mgAt([42, 98]))}
     <span class="mg-ball sm" id="mgBall" style="${mgAt(MGF.mound)}"></span>${fx}</div>`;
 }
 /* 도루: 투수(세트 → 견제·투구), 1루 주자 리드, 결과는 2루까지 달림 */
@@ -143,7 +143,7 @@ function mgStealField(st){
       fx = `<span class="mg-roll pick" style="--x0:${MGF.mound[0]}%;--y0:${MGF.mound[1] - 4}%;--x1:${MGF.b1[0]}%;--y1:${MGF.b1[1] - 2}%"></span>${mgBan(8)}`;
     } else fx = `<span class="mg-tx">출발 못함${L.pts ? ` +${L.pts}` : ''}</span>`;
   }
-  return `<div class="mg-st fld steal" id="mgSt">${mgFielder([MGF.b1[0] + 3, MGF.b1[1] + 2])}${mgFielder([58, 30], 'ss')}${mgFielder([50, 95], 'c')}
+  return `<div class="mg-st fld steal" id="mgSt">${mgFielder([MGF.b1[0] + 6, MGF.b1[1] + 7])}${mgFielder([58, 30], 'ss')}${mgFielder([50, 95], 'c')}
     ${mgSpr('pitcher', 0, 4, 3, 0, 'pit', mgAt([MGF.mound[0], MGF.mound[1] + 1]), 'mgPit')}${mgSpr('pitcher-pick', 0, 4, 1, 0, 'pick', mgAt([MGF.mound[0] + 1, MGF.mound[1] + 1]) + 'visibility:hidden;', 'mgPick')}${runner}
     <span class="mg-ball sm" id="mgBall" style="${mgAt(MGF.mound)};opacity:0"></span>${fx}
     ${live ? '<span class="mg-cue" id="mgCue"></span>' : ''}</div>`;

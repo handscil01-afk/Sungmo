@@ -42,10 +42,11 @@ html.skin .mg-rules .lst-in p{ font-size:.82rem; }
 html.skin .sk-body.f1 .mg-thumb.big{ width:4.6rem; } html.skin .sk-body.f1 .mg-it small{ display:none; }
 
 /* ===== 놀이 화면 ===== */
-html.skin .sk-body.k-mg-play{ display:grid; grid-template-columns:minmax(0, 1fr); grid-template-rows:auto minmax(0, 1fr) auto auto; grid-template-areas:'hud' 'st' 'msg' 'ctl'; }
+html.skin .sk-body.k-mg-play{ display:grid; grid-template-columns:minmax(0, 1fr); grid-template-rows:auto auto auto auto; grid-template-areas:'hud' 'st' 'msg' 'ctl'; align-content:start; }   /* 그림은 위에 붙이고 알림·단추는 그림 바로 아래 */
 html.skin .k-mg-play > .mg-hud{ grid-area:hud; } html.skin .k-mg-play > .mg-wrap{ grid-area:st; } html.skin .k-mg-play > .mg-msg{ grid-area:msg; } html.skin .k-mg-play > .mg-ctl{ grid-area:ctl; }
 @media (orientation:landscape){
-  html.skin .sk-body.k-mg-play{ grid-template-columns:minmax(0, 1.15fr) minmax(0, 1fr); grid-template-rows:auto minmax(0, 1fr) auto; grid-template-areas:'st hud' 'st msg' 'st ctl'; column-gap:10px; }
+  html.skin .sk-body.k-mg-play{ grid-template-columns:minmax(0, 1.15fr) minmax(0, 1fr); grid-template-rows:auto auto minmax(0, 1fr); grid-template-areas:'st hud' 'st msg' 'st ctl'; column-gap:10px; align-content:stretch; }
+  html.skin .k-mg-play > .mg-wrap{ aspect-ratio:auto; max-height:none; height:100%; } html.skin .k-mg-play > .mg-ctl{ align-self:start; }
   html.skin .k-mg-play > .mg-msg{ align-self:center; }
 }
 html.skin .mg-hud{ display:flex; align-items:center; gap:8px; padding:5px 10px; border-radius:14px; background:linear-gradient(180deg, #23417e, #142b5c); border:2px solid #fff; color:#fff; box-shadow:0 3px 0 rgba(0,0,0,.25); }
@@ -60,8 +61,9 @@ html.skin .mg-sc, html.skin .mg-bs{ display:grid; justify-items:center; line-hei
 html.skin .mg-sc b{ font-size:1.35rem; font-weight:900; color:#ffe35c; font-variant-numeric:tabular-nums; } html.skin .mg-bs b{ font-size:.95rem; font-weight:900; }
 @keyframes mgPulse{ to{ transform:scale(1.25); } }
 
-html.skin .mg-wrap{ position:relative; min-height:9rem; container-type:size; touch-action:manipulation; }
-html.skin .mg-st{ position:absolute; left:50%; top:50%; transform:translate(-50%, -50%); width:min(100cqw, calc(100cqh * 256 / 224)); aspect-ratio:256 / 224; overflow:hidden;
+html.skin .mg-wrap{ position:relative; width:100%; aspect-ratio:256 / 224; max-height:calc(100svh - 20rem); min-height:9rem; container-type:size; touch-action:manipulation; }
+html.skin .mg-wrap.g-fld{ aspect-ratio:320 / 270; }
+html.skin .mg-st{ position:absolute; left:50%; top:0; transform:translateX(-50%); width:min(100cqw, calc(100cqh * 256 / 224)); aspect-ratio:256 / 224; overflow:hidden;
   border-radius:16px; border:3px solid var(--line); box-shadow:0 3px 0 var(--line2); background:#16301a url(../img/cr-cage.png) center / 100% 100% no-repeat; image-rendering:pixelated; }
 html.skin .mg-st.fld{ width:min(100cqw, calc(100cqh * 320 / 270)); aspect-ratio:320 / 270; background:#1b2a4a url(../img/bg-field.png) 50% 70.25% / 160% auto no-repeat; }
 html.skin .mg-ring{ position:absolute; width:16%; aspect-ratio:1; transform:translate(-50%, -50%); border-radius:50%; border:3px dashed rgba(255,255,255,.75); box-shadow:0 0 0 3px rgba(0,0,0,.3); }
@@ -70,12 +72,12 @@ html.skin .mg-ring.hot{ border-style:solid; border-color:#ffe94d; box-shadow:0 0
 html.skin .mg-ball{ position:absolute; width:5%; aspect-ratio:1; border-radius:50%; background:#fff; box-shadow:0 0 0 1.5px #000, 0 0 8px rgba(255,255,255,.9); transform:translate(-50%, -50%) scale(.3); opacity:0; z-index:3; }
 html.skin .mg-ball.sm{ width:3.4%; }
 html.skin .mg-spr.bat-me{ left:33%; top:100%; width:42%; aspect-ratio:74 / 62; z-index:2; }
-html.skin .mg-spr.bat-me.swung{ animation:mgSwing .25s steps(2) 1; }
+html.skin .mg-spr.bat-me.swung{ animation:mgSwing .25s step-end 1; }   /* 스윙 칸(1)을 잠깐 보여 준 뒤 끝난 자세(2)로: 칸 사이 중간 위치를 보이지 않게 */
 @keyframes mgSwing{ from{ background-position:33.33% 0; } }
-html.skin .mg-spr.bat-bunt{ width:19%; aspect-ratio:74 / 62; z-index:2; }
+html.skin .mg-spr.bat-bunt{ width:15%; aspect-ratio:74 / 62; z-index:2; }
 html.skin .mg-spr.fld{ width:7.5%; aspect-ratio:16 / 22; }
 html.skin .mg-spr.fld.chg{ filter:drop-shadow(0 0 4px #ff5a6a); }
-html.skin .mg-spr.pit{ width:17%; aspect-ratio:1; z-index:2; }
+html.skin .mg-spr.pit{ width:11%; aspect-ratio:1; z-index:2; }
 html.skin .mg-spr.run-me{ width:13%; aspect-ratio:30 / 20; z-index:2; }
 html.skin .mg-spr.s-run-b.run-me{ width:9.5%; aspect-ratio:21 / 22; } html.skin .mg-spr.s-slide.run-me{ width:14%; aspect-ratio:31 / 22; }
 html.skin .mg-tag{ position:absolute; left:50%; top:5%; transform:translateX(-50%); white-space:nowrap; font-size:.78rem; font-weight:900; color:#fff; padding:2px 10px; border-radius:999px; background:rgba(16,38,79,.82); border:2px solid #fff; }
@@ -157,4 +159,4 @@ html.skin .spot[data-spot="mini"] .sign{ background:linear-gradient(180deg, #ff8
 /* 받은 그림: 카드(mg-cards.png 3칸), 피칭 머신(mg-machine.png 4칸), 견제 투수(pitcher-pick.png 4칸) */
 html.skin .mg-thumb.t-img{ background-size:300% 100%; background-repeat:no-repeat; background-color:#2a5bb8; aspect-ratio:1; image-rendering:pixelated; }
 html.skin .mg-spr.mach{ width:15%; aspect-ratio:80 / 96; z-index:1; }
-html.skin .mg-spr.pick{ width:19%; aspect-ratio:80 / 96; z-index:2; }
+html.skin .mg-spr.pick{ width:10%; aspect-ratio:80 / 96; z-index:2; }

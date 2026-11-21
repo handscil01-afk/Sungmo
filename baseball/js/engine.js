@@ -1219,7 +1219,7 @@ function simpleSim(G, k, head){
   if(!['S1', 'S2', 'S3', 'HR', 'GO', 'FO'].includes(k) || typeof simPlay !== 'function') return false;
   const ok = r => ({ S1: (r.kind === 'hit' && (r.hitBases || r.batTried || r.bat) === 1) || r.kind === 'ifh', S2: r.kind === 'hit' && (r.hitBases || r.batTried || r.bat) === 2,
     S3: r.kind === 'hit' && (r.hitBases || r.batTried || r.bat) === 3, HR: r.kind === 'hr', GO: ['go', 'dp', 'fc'].includes(r.kind), FO: ['fo', 'pu', 'lo', 'ldp'].includes(r.kind) })[k];
-  for(let i = 0; i < 40; i++){
+  for(let i = 0; i < (k === 'S3' ? 240 : 40); i++){   // 3루타는 계산으로 나오기 어려워 더 많이 찾음 (못 찾으면 그림만 꾸민 타구가 됨)
     const fi = rint(G, 0, 2), u = rnd(G), probe = battedBall(G, { type:'fb', fi, ev:0.5, q:0.5, d:60 }), fence = Math.round(fenceAng(G, probe.ang));
     let type, ev, q = 0.3 + rnd(G) * 0.6, d = 0;
     const opt = {};
@@ -1245,7 +1245,7 @@ function simpleOutcome(G, k, head){
   const fi = rint(G, 0, 2), fieldWord = ['왼쪽', '가운데', '오른쪽'][fi];
   // 화면 모드 그림용 타구 (종류·방향·거리). 꾸밈이라 경기 난수를 쓰지 않음
   const fz = parkOf(G).fence[fi], rr = Math.random();
-  const bb = { HR:{ type:'fb', d: fz + 15, hit:4 }, S3:{ type:'ld', d: fz - 6, hit:3 }, S2:{ type: rr < 0.5 ? 'ld' : 'fb', d: fz - 14, hit:2 }, S1:{ type: rr < 0.5 ? 'gb' : 'ld', d: 40 + rr * 25, hit:1 },
+  const bb = { HR:{ type:'fb', d: fz + 15, hit:4 }, S3:{ type:'fb', d: fz - 3, hit:3 }, S2:{ type: rr < 0.5 ? 'ld' : 'fb', d: fz - 14, hit:2 }, S1:{ type: rr < 0.5 ? 'gb' : 'ld', d: 40 + rr * 25, hit:1 },
     GO:{ type:'gb', d: 25 + rr * 12 }, FO:{ type: rr < 0.25 ? 'pu' : 'fb', d: rr < 0.25 ? 25 : 55 + rr * 40 } }[k];
   if(bb && G.anim && G.anim.res === 'inplay') G.anim.bb = { ...bb, fi };
   const hit = (n, text) => { B.st.ab++; B.st.h++; T.H++; P.st.h++; if(n === 4){ B.st.hr++; P.st.hr++; fx(G, 'hr'); } else fx(G, n === 3 ? 'b3' : n === 2 ? 'b2' : 'hit'); emit(G, `${head} ${text}`, 'r'); onHit(G, n, 0.5, true); };
