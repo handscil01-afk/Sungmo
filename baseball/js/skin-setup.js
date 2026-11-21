@@ -38,7 +38,7 @@ const wzColor = () => teamInfo(NEW.a || TEAMS[0].key).color;
 function wzCard(sub){
   const col = wzColor();
   return `<div class="wz-card" style="--tc:${col}">
-    ${crFace(NEWC.look, col, 'big')}
+    ${crFace(NEWC.look, col, 'big', NEW.a)}
     <div class="wz-jer" aria-hidden="true"><span class="wz-nm">${esc(NEWC.name || '이름')}</span><b>${NEWC.num}</b></div>
     <p class="wz-sub">${esc(sub)}</p></div>`;
 }
@@ -86,14 +86,14 @@ function wz3Skin(S){
       ${suSeg('시즌 길이 (팀당)', 'len', [18, 36, 72, 144].map(n => [n, n + '경기']), NEW.len)}
       ${suSeg('내 차례 방식', 'mode', [['detail', '정밀', '공마다 고르기'], ['simple', '간단', '주사위로 빠르게']], NEW.mode)}
     </div>
-    <div class="wz-mini" style="--tc:${teamInfo(NEW.a).color}">${crFace(NEWC.look, teamInfo(NEW.a).color, 'sm')}<span><b>${esc(NEWC.name)} · ${NEWC.num}번</b><small>${esc(NEWC.pit ? (NEWC.role === 'sp' ? '선발 투수' : '불펜 투수') : POS[NEWC.pos])} · ${esc(types.find(t => t.key === NEWC.type).name)} · ${esc(wzSum().replace(/^\S+ · /, ''))}</small></span></div>
+    <div class="wz-mini" style="--tc:${teamInfo(NEW.a).color}">${crFace(NEWC.look, teamInfo(NEW.a).color, 'sm', NEW.a)}<span><b>${esc(NEWC.name)} · ${NEWC.num}번</b><small>${esc(NEWC.pit ? (NEWC.role === 'sp' ? '선발 투수' : '불펜 투수') : POS[NEWC.pos])} · ${esc(types.find(t => t.key === NEWC.type).name)} · ${esc(wzSum().replace(/^\S+ · /, ''))}</small></span></div>
     ${suGo(suOpt(S, 'start'), `${teamInfo(NEW.a).short} 2군에서 시작 · ${NEW.len}경기 시즌`)}</div>`;
 }
 
 /* ---------- 내 선수 얼굴 꾸미기 (내 선수 화면에서) ---------- */
 function crLookSkin(S){
   const L = crL(), col = crColor(L), c = L.career, p = myP(L);
-  return `<div class="su-l"><div class="wz-top one">${`<div class="wz-card" style="--tc:${col}">${crFace(S.draft(), col, 'big')}<div class="wz-jer" aria-hidden="true"><span class="wz-nm">${esc(p.name)}</span><b>${crNumOf(c, p)}</b></div></div>`}</div>
+  return `<div class="su-l"><div class="wz-top one">${`<div class="wz-card" style="--tc:${col}">${crFace(S.draft(), col, 'big', L.my)}<div class="wz-jer" aria-hidden="true"><span class="wz-nm">${esc(p.name)}</span><b>${crNumOf(c, p)}</b></div></div>`}</div>
     ${suGo(suOpt(S, 'done'), '고른 얼굴로 바꾸기')}</div>
     <div class="su-r"><div class="su panel">${lookEditor(S.draft(), col)}</div></div>`;
 }

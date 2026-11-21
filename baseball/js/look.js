@@ -8,6 +8,11 @@
 const LOOK_ROW = { skin:0, hair:3, eyes:6, mouth:9, acc:12 };
 // 그리는 판은 112칸: 얼굴(96칸)을 (8, 16)에 놓아 머리 위에 모자 자리를 둠. 모자는 칸 위에 붙어 있고, 얼굴 기준 위 끝은 LOOK_HAT_TOP
 const LOOK_C = 112, LOOK_OX = 8, LOOK_OY = 16, LOOK_HAT_TOP = [-13, -4, -3, -14];
+// 모자 앞 글자 자리(칸 안 좌표: 가운데 x, 가운데 y, 글자 높이). 거꾸로 쓴 모자(1)는 뒤라서 없음
+const LOOK_HAT_MARK = [[48.5, 20.5, 15], null, [49, 16.5, 15], [49, 38, 11]];
+// 팀 알파벳 (영어 이름 첫 글자, 겹치면 두 글자)
+const TEAM_LETTER = { star:'H', whale:'W', thunder:'T', hawk:'R', swallow:'S', turtle:'ST', meteor:'M', knight:'K', beacon:'B', windy:'WD' };
+const teamLetter = k => !k ? '' : k === 'center' ? ((typeof CENTER !== 'undefined' && CENTER && CENTER.letter) || 'C') : TEAM_LETTER[k] || '';
 const HAIR_COLORS = [null, '#7a4a26', '#e0b04a', '#c0472c', '#b9bcc6', '#3f63d6'];
 const HAIR_NAMES = ['검정', '갈색', '금발', '빨강', '은색', '파랑'];
 const LOOK_DEF = { skin:2, hair:0, hc:0, eyes:0, mouth:0, acc:-1, hat:0 };
@@ -47,9 +52,9 @@ function lookRandom(){
 }
 const lookName = (k, v) => k === 'skin' ? `피부 ${v + 1}` : k === 'hc' ? HAIR_NAMES[v] : v < 0 ? (k === 'hair' ? '민머리' : '없음') : (LOOK_PART_NAMES[k] || [])[v] || String(v + 1);
 // 겹쳐 그린 얼굴 그림 주소 (그림을 아직 못 불러왔으면 빈 글자)
-function lookURL(look, color){
+function lookURL(look, color, letter = ''){
   lookLoad(); if(!LK.ok) return '';
-  const l = lookFix(look), key = [l.skin, l.hair, l.hc, l.eyes, l.mouth, l.acc, l.hat, color].join(',');
+  const l = lookFix(look), key = [l.skin, l.hair, l.hc, l.eyes, l.mouth, l.acc, l.hat, color, letter].join(',');
   if(LK.cache[key]) return LK.cache[key];
   const S = 96, C = LOOK_C, cv = document.createElement('canvas'); cv.width = cv.height = C;
   const x = cv.getContext('2d'), T = [1, 3, 5].map(j => parseInt(String(color || '#3b82f6').slice(j, j + 2), 16));
@@ -93,7 +98,18 @@ function lookURL(look, color){
     x.drawImage(tint(hv), 0, 0);
   }
   if(l.acc >= 0){ const a = layer(); part(a, LOOK_ROW.acc, l.acc); x.drawImage(a, 0, 0); }
-  if(hat) x.drawImage(tint(hat), 0, 0);
+  if(hat){
+    x.drawImage(tint(hat), 0, 0);
+    // 모자 앞에 팀 알파벳 (흰 글자, 진한 테두리)
+    const mk = LOOK_HAT_MARK[l.hat];
+    if(mk && letter){
+      const fs = letter.length > 1 ? Math.round(mk[2] * 0.72) : mk[2];
+      x.font = `900 ${fs}px "Arial Black", "Segoe UI", sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle';
+      const cx = LOOK_OX + mk[0], cy = LOOK_OY + LOOK_HAT_TOP[l.hat] + mk[1] + 1;
+      x.lineWidth = 3; x.strokeStyle = 'rgba(20, 20, 40, .85)'; x.lineJoin = 'round'; x.strokeText(letter, cx, cy, 26);
+      x.fillStyle = '#fff'; x.fillText(letter, cx, cy, 26);
+    }
+  }
   return LK.cache[key] = cv.toDataURL();
 }
 // 꾸미기 판: 부위 고르기 칸(탭)과 고를 것 격자. set 키: 'lt'(탭), 'lk'(값), 'lr'(무작위)

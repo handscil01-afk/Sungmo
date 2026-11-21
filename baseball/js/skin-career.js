@@ -37,8 +37,8 @@ const crL = () => (typeof LG === 'function' && LSRC === 'career') ? LG() : null;
 const crColor = L => L ? teamInfo(L.my).color : '#3b82f6';
 // 얼굴 그림(faces.png 4칸 × 3줄)
 // i가 꾸미기 값(look 객체)이면 부위를 겹친 그림(look.js)
-function crFace(i, color, cls = ''){
-  if(i && typeof i === 'object') return `<span class="crf lk-f ${cls}" style="background-image:url(${lookURL(i, color)})" aria-hidden="true"></span>`;
+function crFace(i, color, cls = '', teamKey = null){
+  if(i && typeof i === 'object') return `<span class="crf lk-f ${cls}" style="background-image:url(${lookURL(i, color, typeof teamLetter === 'function' ? teamLetter(teamKey) : '')})" aria-hidden="true"></span>`;
   return `<span class="crf ${cls}" style="background-image:url(${skTint('faces', color)});background-position:${(i % 4) * 100 / 3}% ${Math.floor(i / 4) * 50}%" aria-hidden="true"></span>`;
 }
 const crFaceOf = (L, c, p) => c.look || (c.face ?? faceOf(p.name));
@@ -73,7 +73,7 @@ function crHome(S){
   const L2 = L.career.visited === dayKey(L);
   return `${crRes(L)}
   <div class="lock" style="background-image:url(${skTint('cr-locker', col)})">
-    <div class="pcard">${crFace(crFaceOf(L, c, p), col, 'big')}<div class="pc-num" style="--tc:${col}">${crNumOf(c, p)}</div>
+    <div class="pcard">${crFace(crFaceOf(L, c, p), col, 'big', L.my)}<div class="pc-num" style="--tc:${col}">${crNumOf(c, p)}</div>
       <div class="pc-nm"><b>${esc(p.name)}</b><small>${p.age}세 · ${esc(isPit(p) ? '투수' : POS[p.pos])}</small></div>
       <div class="pc-tm">${emb(T, 'sm')}<span>${esc(where)}</span></div></div>
     <div class="pstats">${statKeys(p).map(k => crStat(p, c, k)).join('')}</div>
@@ -84,7 +84,7 @@ function crHome(S){
     ${train ? `<button type="button" class="ct${S.trained ? ' done' : ''}" data-sk="opt" data-n="${train.n}">${trainIco(isPit(p) ? 5 : 0)}<b>훈련</b>${S.trained ? '<em class="stamp">완료</em>' : ''}</button>` : ''}
     ${crBtn(visit, 'ct' + (L2 ? ' done' : ''), `<span class="mapico" aria-hidden="true"></span><b>마을</b>${L2 ? '<em class="stamp">다녀옴</em>' : ''}`)}
     ${crBtn(bag, 'ct', `${itemIco(c.equip && c.equip.bat ? ITEMS.indexOf(itemOf(c.equip.bat)) : 19)}<b>가방</b>`)}
-    ${crBtn(info, 'ct', `${crFace(crFaceOf(L, c, p), col, 'sm')}<b>내 선수</b>`)}
+    ${crBtn(info, 'ct', `${crFace(crFaceOf(L, c, p), col, 'sm', L.my)}<b>내 선수</b>`)}
   </div>
   ${hubBtns([[crOpt(S, 'stand'), 'stand', '팀 순위'], [crOpt(S, 'lead'), 'lead', '기록 순위'], [crOpt(S, 'arch'), 'arch', '명예의 전당'], [crOpt(S, 'set'), 'set', '설정']].filter(x => x[0]), 4).replace('class="hb ', 'class="hb sm ')}`;
 }
@@ -165,7 +165,7 @@ function crBag(S){
   const sum = Object.values(c.equip || {}).length;
   return `${crRes(L)}${(S.say || []).length ? `<div class="crmsg">${S.say.map(l => `<p>${esc(l.s || l)}</p>`).join('')}</div>` : ''}
     <div class="bag">
-      <div class="bag-me">${crFace(crFaceOf(L, c, p), col, 'mid')}<div class="slots">${['bat', 'glove', 'shoes', 'wrist', 'acc'].map(slot).join('')}</div><small class="bag-sum">장착 ${sum}개 · 누르면 벗기</small></div>
+      <div class="bag-me">${crFace(crFaceOf(L, c, p), col, 'mid', L.my)}<div class="slots">${['bat', 'glove', 'shoes', 'wrist', 'acc'].map(slot).join('')}</div><small class="bag-sum">장착 ${sum}개 · 누르면 벗기</small></div>
       <div class="bag-inv">${items.length ? items.map(o => { const it = itemOf(o.item); return `<button type="button" class="inv${o.on ? ' on' : ''}" data-sk="opt" data-n="${o.n}">${itemIco(ITEMS.indexOf(it))}<b>${esc(it.name)}</b><small>${o.on ? '장착 중' : '눌러서 장착'}</small></button>`; }).join('') : '<p class="bag-empty">아직 산 장비가 없습니다.<br>마을의 스포츠 용품점에서 사세요.</p>'}</div>
     </div>
     <div class="minors">${other.map(o => `<button type="button" class="mn" data-sk="opt" data-n="${o.n}"><span>${esc(o.t)}</span></button>`).join('')}</div>`;
@@ -197,7 +197,7 @@ function crInfo(S){
   const aw = (p.awards || []).slice(-8).reverse();
   const awards = `<div class="awb">${aw.length ? aw.map(a => `<span class="awc">${awardIco(Math.max(0, awardIdx(a)))}<b>${esc(a.replace(/^(\d+)시즌 /, '$1시즌\n'))}</b></span>`).join('') : '<span class="awn">아직 받은 상이 없습니다. 시즌이 끝나면 시상식이 열립니다.</span>'}</div>`;
   return `<div class="lock info" style="background-image:url(${skTint('cr-locker', col)})">
-      <div class="pcard">${crFace(crFaceOf(L, c, p), col, 'big')}<div class="pc-num" style="--tc:${col}">${crNumOf(c, p)}</div>
+      <div class="pcard">${crFace(crFaceOf(L, c, p), col, 'big', L.my)}<div class="pc-num" style="--tc:${col}">${crNumOf(c, p)}</div>
         <div class="pc-nm"><b>${esc(p.name)}</b><small>${p.age}세 · ${esc(pit ? p.role || '투수' : POS[p.pos])}</small></div><div class="pc-tm">${emb(T, 'sm')}<span>${esc(teamInfo(L.my).short)}</span></div></div>
       <div class="pstats">${statKeys(p).map(k => crStat(p, c, k)).join('')}</div></div>
     ${pitches}${row(`${L.season}시즌 1군`, ss)}${row('통산 (지난 시즌까지)', cs)}
@@ -217,7 +217,7 @@ const WHO = { gm:[0, '단장'], fan:[1, '팬'], agent:[2, '에이전트'], legen
 function crTalk(S){
   const L = crL(); if(!L || !L.career) return null;
   const c = L.career, p = myP(L), col = crColor(L), w = WHO[S.who];
-  const who = w ? `<span class="tk-p" style="background-image:url(${skTint('cr-people2', col)});background-position:${(w[0] % 4) * 100 / 3}% ${Math.floor(w[0] / 4) * 100}%" aria-hidden="true"></span>` : crFace(crFaceOf(L, c, p), col, 'mid');
+  const who = w ? `<span class="tk-p" style="background-image:url(${skTint('cr-people2', col)});background-position:${(w[0] % 4) * 100 / 3}% ${Math.floor(w[0] / 4) * 100}%" aria-hidden="true"></span>` : crFace(crFaceOf(L, c, p), col, 'mid', L.my);
   const name = w ? w[1] : p.name;
   const notes = (S.note || []).map(l => `<p>${esc(l)}</p>`).join('');
   const opts = (S.opts || []).filter(o => !o.hide).map(o => o.team
@@ -242,7 +242,7 @@ function crGame(S){
   return `${crRes(L)}<div class="vs">
       <div class="vs-h">${S.minor ? '퓨처스리그(2군)' : `${L.season}시즌 ${L.day + 1}일째`}${park ? ` · ${esc(park.name)}` : ''}</div>${(S.note || []).length ? `<div class="vs-rv">🔥 ${esc(S.note[0])}</div>` : ''}
       <div class="vs-row">${side(me, home ? '홈' : '원정')}<span class="vs-x">VS</span>${side(opp, home ? '원정' : '홈')}</div>
-      <div class="vs-me">${crFace(crFaceOf(L, c, p), col, 'sm')}<span><b>${esc(p.name)}</b> · ${esc(role)}${p.cond ? ` · 컨디션 ${esc(COND[p.cond])}` : ''}</span></div>
+      <div class="vs-me">${crFace(crFaceOf(L, c, p), col, 'sm', L.my)}<span><b>${esc(p.name)}</b> · ${esc(role)}${p.cond ? ` · 컨디션 ${esc(COND[p.cond])}` : ''}</span></div>
     </div><div class="gm-opts">${opts}</div>`;
 }
 
