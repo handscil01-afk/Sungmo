@@ -91,6 +91,7 @@
 - 9-7 (완료) 만들기 화면 합치기와 "고른 뒤 정하기": 화면 보며 하기에서 리그 만들기(lg-setup, 팀·시즌 길이·경기 방식·이닝을 한 화면), 선수 만들기 세 단계(wz-1 꾸미기: 이름·얼굴·등번호·손·투구 폼 / wz-2 포지션·유형: 야구장 그림에서 수비 위치 / wz-3 팀·시즌 → 입단), 온라인 방 만들기도 한 화면 경기 설정으로, 팀 고르기는 눌러 고른 뒤 "이 팀으로". 누르면 빛나기만 하고 아래 단추를 눌러야 정해짐(setup.js, skin-setup.js). 소리와 글로 하기는 차례로 묻는 화면 그대로. 선수 꾸미기로 정한 등번호·손·투구 폼(p.form, gfx.js armSlot)이 저장되고 경기 그림에 쓰임.
 - 9-8 (완료) 얼굴 꾸미기: 사용자가 준 얼굴 시트 다섯 장에서 부위만 떼어(tools/look_parts.py: 머리 윤곽으로 크기·위치 맞추기 → 민머리·기본 얼굴과 달라진 점만 → 96칸) img/cr-parts.png를 만들고, look.js가 바탕·눈·입·머리(머리색)·장식·모자를 겹쳐 그림. 선수 만들기 1단계와 내 선수 화면(cr-look)에서 탭으로 고름. 옛 저장은 faces.png 얼굴 그대로.
 - 9-9 (완료) 화면 보며 하기 다시 훑기: 허브 화면 그림(skin-hub.js: 리그 첫 화면·기록실·기록 카드·일정·기록 탭+순위표·경기 끝 점수 카드), 내 선수 기록 상자·수상 배지, 한 화면 용품점·인벤토리 가방(career-life.js shopAll·bagAll), 같은 모양 아이콘 단추, 결과 전 점수판 유지(SK.pre), 밝은 안내 창, 설명 칸 높이 고정, 장식·모자 새 그림(tools/look_acc.py, 112칸 판), 우리 센터 팀 엠블럼 사진.
+- 9-10 (완료) 컷인·명장면·날씨: cutin.js(그림 위 잠깐 띄우기 차례 SHOW, gfxStart 뒤 홈런·끝내기 컷인), highlights.js(engine.js flush가 hlFlush를 불러 큰 장면 8개를 메모리에만 모음, 줄인 상태 hlMini + G.anim 사본으로 다시 그림, endScreen·endDeckHTML 연결), weather.js(경기·리그마다 해시 씨앗으로 날씨: 우천 취소는 leagueAdvance의 wxRainout·wxPostpone, 우천 중단·강우 콜드게임은 gameNext의 wxTick, 콜드게임 설정은 engine.js endHalf의 G.mercy). 자동 시험은 window.__show를 켠 때만 띄우고 비가 옴. 시험 tests/show.js.
 
 ## 7.7단계 (예정): 시각장애인들이 아는 숫자 야구 규칙
 
