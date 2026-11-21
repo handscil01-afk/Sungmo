@@ -111,6 +111,7 @@ function careerStatus(L){
   out.push(`${p.name}, ${p.age}세, ${teamInfo(L.my).name} ${isPit(p) ? '투수' : POS[p.pos]}. ${where}. 인기 ${c.fame}.`);
   if(!isPit(p)) out.push(`특기: ${traitText(p)}.`);
   if(typeof promoteGap === 'function'){ const g = promoteGap(L); if(g) out.push(g.text); const r = rivalLine(L); if(r) out.push(r.text); }
+  if(typeof trustLine === 'function') out.push(trustLine(L));
   out.push(isPit(p) ? `능력치: 구속 ${p.vel}, 제구 ${p.ctl}, 구위 ${p.stf}, 체력 ${p.sta}. 컨디션 ${COND[p.cond]}.` : `능력치: 컨택 ${p.con}, 파워 ${p.pow}, 선구안 ${p.eye}, 스피드 ${p.spd}, 수비 ${p.def}. 컨디션 ${COND[p.cond]}.`);
   const s = p.ss || {}, m = c.minor || {};
   if(c.where !== 'minor') out.push(isPit(p) ? `이번 시즌 1군: ${pitLine(p).replace(/^[^:]+: /, '')}` : `이번 시즌 1군: ${batLine(p).replace(/^[^:]+: /, '')}`);
@@ -179,7 +180,8 @@ function grow(L, k, amt){
 function trainDay(L, k, nm){
   const c = C(L), p = myP(L);
   c.trained = `${L.season}-${L.phase}-${L.day}`;
-  if(!k){ p.cond = Math.min(2, p.cond + 1); addFatigue(c, -30); return [`푹 쉬었습니다. 컨디션 ${COND[p.cond]}, 피로 ${fatigueWord(c)}.`]; }
+  const tt = typeof trustTrain === 'function' ? trustTrain(L, k) : [];   // 성실 훈련·휴식 남용
+  if(!k){ p.cond = Math.min(2, p.cond + 1); addFatigue(c, -30); return [`푹 쉬었습니다. 컨디션 ${COND[p.cond]}, 피로 ${fatigueWord(c)}.`, ...tt]; }
   // 대성공(15%): 두 배, 보약을 먹었으면 또 두 배. 컨디션이 좋으면 조금 더
   const great = rnd(L) < 0.15, tonic = !!c.tonic; c.tonic = false;
   const amt = (4 + rnd(L) * 3) * (great ? 2 : 1) * (tonic ? 2 : 1) * (1 + (p.cond || 0) * 0.08);
@@ -189,7 +191,7 @@ function trainDay(L, k, nm){
   if(rnd(L) < 0.2){ p.cond = Math.max(-2, p.cond - 1); up.push('훈련이 힘들어 몸이 조금 무겁습니다.'); }
   if(tired) up.push('너무 피곤해서 훈련 효과가 크게 줄었습니다. 푹 쉬세요.');
   else if((c.fatigue || 0) > 70) up.push('피로가 많이 쌓였습니다. 더 하면 부상 위험이 커집니다.');
-  return [`${great ? '대성공! ' : ''}${nm} 훈련을 했습니다.${tonic ? ' 보약 덕분에 효과가 두 배!' : ''} 성장 점수 ${Math.round(c.pts[k] || 0)}/10, 피로 ${fatigueWord(c)}.`, ...up];
+  return [`${great ? '대성공! ' : ''}${nm} 훈련을 했습니다.${tonic ? ' 보약 덕분에 효과가 두 배!' : ''} 성장 점수 ${Math.round(c.pts[k] || 0)}/10, 피로 ${fatigueWord(c)}.`, ...up, ...tt];
 }
 function doTrain(k, nm, via){
   const L = CR(), say = trainDay(L, k, nm);
@@ -260,6 +262,7 @@ function careerGrowFromGame(L, G, minor){
     }
     if(!minor && (dec.w === c.id || dec.s === c.id) && s.r === 0) out.push(...interview(L, p, dec.w === c.id ? '무실점 승리' : '세이브'));
   }
+  if(!minor && typeof trustGame === 'function') out.push(...trustGame(L, ln, G));   // 감독 신뢰도·최근 10경기 (career-trust.js)
   out.push(...gameBonus(L, ln, G, minor));
   addFatigue(c, minor ? 3 : 5); out.push(...wearGear(L, minor ? 1 : 2));
   if(minor){ const mm = c.minor; mm.g = (mm.g || 0) + 1; ['ab', 'h', 'hr', 'out', 'r', 'ur'].forEach(k => { mm[k] = (mm[k] || 0) + (s[k] || 0); }); if((G.decision || {}).w === c.id) mm.w = (mm.w || 0) + 1; }
@@ -282,12 +285,14 @@ function careerAfterDay(L){
   else if(rnd(L) < 0.02){ p.cond = -2; out.push('요즘 슬럼프입니다. 몸이 무겁습니다. 훈련하거나 푹 쉬어 보세요.'); }
   if(c.where === 'minor' && L.phase === 'season') out.push(...promote(L));
   out.push(...payDay(L));
+  if(typeof trustDay === 'function') out.push(...trustDay(L));   // 동료 효과·타순과 보직·경고와 2군 강등
   rollEvent(L);
   out.push(...leagueNews(L));
   return out;
 }
 // 승격: 같은 자리 1군 주전(투수는 가장 약한 선발·불펜)보다 비슷하거나 좋으면 1군으로
 function promote(L){
+  if(typeof promoteBlocked === 'function' && promoteBlocked(L)) return [];   // 강등된 뒤 7일은 그대로 2군
   const c = C(L), p = c.p, T = L.teams[L.my];
   if(isPit(p)){
     const list = p.role === '선발' ? T.sp : T.rp, worst = list.slice().sort((a, b) => ratingPit(a) - ratingPit(b))[0];

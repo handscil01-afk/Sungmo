@@ -12,9 +12,9 @@ var LSRC = 'career', STORE = { L:null }, NEW = { len:18, mode:'simple', kind:'ca
 function LG(){ return STORE.L; } function setLG(L){ STORE.L = L; } function saveLeague(){}
 function leagueNews(L){ const n = L.newsRead || 0; L.newsRead = L.news.length; return L.news.slice(n); }
 function go(){} function stay(){} function playFx(){} function speak(){} function openDlg(){} function note(){}
-const myRank = L => standings(L).find(x => x.T.key === L.my); function loadSaved(){ return null; }
+const myRank = L => standings(L).find(x => x.T.key === L.my); function loadSaved(){ return null; } function batLine(p){ return p.name + ': 기록'; } function pitLine(p){ return p.name + ': 기록'; }
 `);
-['career-grow.js', 'career.js', 'career-life.js', 'career-story.js'].forEach(f => vm.runInThisContext(fs.readFileSync(path.join(dir, f), 'utf8'), { filename: f }));
+['career-grow.js', 'career.js', 'career-life.js', 'career-story.js', 'career-trust.js'].forEach(f => vm.runInThisContext(fs.readFileSync(path.join(dir, f), 'utf8'), { filename: f }));
 
 const SEASONS = +process.argv[2] || 10, SEED = +process.argv[3] || 5;
 const errs = [], log = [];
@@ -119,6 +119,44 @@ run(false, SEED, SEASONS); run(true, SEED + 1, SEASONS);
   if(c.camp) fail('이야기: 캠프가 끝나지 않음');
   if(careerHome().kind !== 'cr-home') fail('이야기: 캠프 뒤 라커룸으로 돌아오지 않음');
   log.push(`  이야기: 라이벌 ${r && r.p.name}(${r && r.T.key}), ${out.find(l => /라이벌/.test(l))}, 캠프 ${CAMP_DAYS}일 통과`);
+}
+// 감독 신뢰도·동료 관계·강등: 오르내림, 경고 → 2군 강등 → 7일 뒤 재승격, 명단 크기 유지 (타자·투수)
+for(const pit of [false, true]){
+  const L = newCareer(pit, 91 + pit), c = life(L), who = pit ? '투수' : '타자';
+  if(c.trust !== 50 || c.mates !== 50) fail(`신뢰도(${who}): 처음 값이 50이 아님`);
+  const size = T => [T.bat.length, T.bench.length, T.sp.length, T.rp.length].join('/'), T = L.teams[L.my], s0 = size(T);
+  // 승격시켜 1군으로
+  const p0 = myP(L); keysOf(p0).forEach(k => { p0[k] = k === 'vel' ? 158 : 95; }); promote(L);
+  if(c.where === 'minor') fail(`신뢰도(${who}): 시험용 승격이 안 됨`);
+  const p = myP(L);
+  // 좋은 경기 → 신뢰도 오름, 나쁜 경기 → 내림
+  const t0 = c.trust;
+  trustGame(L, pit ? { pit:p, used:true, st:{ out:9, r:0, h:2, bb:0, k:6 } } : { bat:p, st:{ pa:4, ab:4, h:3, hr:1, rbi:2 } }, { decision:{} });
+  if(!(c.trust > t0)) fail(`신뢰도(${who}): 좋은 경기 뒤에 오르지 않음`);
+  const t1 = c.trust;
+  trustGame(L, pit ? { pit:p, used:true, st:{ out:2, r:5 } } : { bat:p, st:{ pa:4, ab:4, h:0 } }, { decision:{} });
+  if(!(c.trust < t1)) fail(`신뢰도(${who}): 부진한 경기 뒤에 내리지 않음`);
+  // 성실 훈련 (사흘 이어) → 오름, 피곤하지 않은데 이어 쉬기 → 내림
+  const t2 = c.trust; for(let i = 0; i < 3; i++) trustTrain(L, keysOf(p)[0]); if(!(c.trust > t2)) fail(`신뢰도(${who}): 성실 훈련으로 오르지 않음`);
+  c.fatigue = 0; const t3 = c.trust; trustTrain(L, null); trustTrain(L, null); if(!(c.trust < t3)) fail(`신뢰도(${who}): 휴식 남용으로 내리지 않음`);
+  // 이벤트 선택에 동료 관계 효과
+  const m0 = c.mates; EVENTS.find(e => e.id === 'birthday').opts[0][1](L, c, p); if(!(c.mates > m0)) fail(`신뢰도(${who}): 생일 이벤트로 동료 관계가 오르지 않음`);
+  // 부진 10경기 + 낮은 신뢰도 → 경고 → 강등
+  c.trust = 20; c.recent = Array.from({ length:10 }, () => pit ? { out:3, r:4 } : { ab:4, h:0 });
+  L.day = 5; let warned = false, down = false;
+  for(let d = 0; d < 60 && !down; d++){ L.day++; trustDay(L); if(c.warned) warned = true; if(c.where === 'minor') down = true; c.recent = Array.from({ length:10 }, () => pit ? { out:3, r:4 } : { ab:4, h:0 }); c.trust = Math.min(c.trust, 20); }
+  if(!warned) fail(`신뢰도(${who}): 강등 전에 경고가 없음`);
+  if(!down) fail(`신뢰도(${who}): 부진해도 2군으로 내려가지 않음`);
+  if(size(T) !== s0) fail(`신뢰도(${who}): 강등 뒤 명단 크기가 바뀜 ${s0} → ${size(T)}`);
+  if(allPlayers(T).includes(c.p)) fail(`신뢰도(${who}): 강등된 선수가 아직 1군 명단에 있음`);
+  if(myP(L) !== c.p) fail(`신뢰도(${who}): 강등 뒤 내 선수를 찾지 못함`);
+  // 7일 안에는 승격하지 않고, 지나면 기존 규칙으로 다시 올라옴
+  if(promote(L).length) fail(`신뢰도(${who}): 강등 바로 뒤에 다시 승격함`);
+  L.day += 8; const up = promote(L);
+  if(!up.length || c.where === 'minor') fail(`신뢰도(${who}): 7일 뒤 재승격이 안 됨`);
+  if(size(T) !== s0) fail(`신뢰도(${who}): 재승격 뒤 명단 크기가 바뀜`);
+  if(!careerStatus(L).some(l => /감독 신뢰도/.test(l))) fail(`신뢰도(${who}): 상태 글에 신뢰도가 없음`);
+  log.push(`  신뢰도(${who}): 오르내림·경고·강등·재승격 통과, 명단 ${size(T)}`);
 }
 console.log(`[육성] ${SEASONS}시즌 자동 진행 (타자·투수)\n` + log.join('\n'));
 if(errs.length){ console.log('육성 시험 오류:\n  ' + errs.join('\n  ')); process.exit(1); }

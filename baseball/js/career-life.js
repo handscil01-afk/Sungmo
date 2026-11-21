@@ -43,6 +43,7 @@ function life(L){
   const c = C(L);
   if(c.money == null){ c.money = 200; c.equip = {}; c.goods = {}; c.salary = c.where === 'minor' ? 3000 : salaryOf(L); }
   c.equip ||= {}; c.goods ||= {}; c.owned ||= []; c.gs ||= {}; c.applied ||= {};
+  if(typeof trustInit === 'function') trustInit(c);   // 옛 저장: 감독 신뢰도·동료 관계 50
   return c;
 }
 function salaryOf(L, raw){
@@ -298,7 +299,7 @@ const EVENTS = [
     ['용돈을 보내 드리기 (100만 원)', (L, c, p) => { c.money = Math.max(0, c.money - 100); c.fame += 2; p.cond = Math.min(2, p.cond + 1); return ['효자라는 소문이 났습니다. 인기 2 오르고 마음도 뿌듯합니다.']; }]] },
 ];
 // 이벤트마다 말을 거는 사람 (화면 보며 하기의 대화 창 그림: cr-people2)
-const EV_WHO = { senior:'mate', fan:'fan', sponsor:'agent', press:'press', cold:'me', rival:'rival', coach:'legend', birthday:'mate', family:'me' };
+const EV_WHO = { dinner:'mate', secret:'mate', senior:'mate', fan:'fan', sponsor:'agent', press:'press', cold:'me', rival:'rival', coach:'legend', birthday:'mate', family:'me' };
 function rollEvent(L){
   const c = life(L);
   if(c.event || c.retired || rnd(L) > 0.22) return;

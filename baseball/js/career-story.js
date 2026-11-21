@@ -74,7 +74,7 @@ function campScreen(){
   const focus = k => v => { const up = grow(L, k, 7 + rnd(L) * 4); addFatigue(c, 18); done([`${ABIL_NAME[k]} 집중 훈련! 성장 점수 ${Math.round(c.pts[k] || 0)}/10.`, ...up], v); };
   return { kind:'cr-camp', day, q:`스프링캠프 ${day}일째입니다. 개막까지 ${c.camp}일 남았습니다. 오늘은 무엇을 할까요?`, opts:[
     ...statKeys(p).map((k, i) => ({ n: i + 1, key:k, stat:k, t:`${ABIL_NAME[k]} 집중 훈련`, s:`지금 ${p[k]}. 평소 훈련보다 많이 오르지만 피로가 쌓입니다.`, act: focus(k) })),
-    { n:7, key:'scrim', t:'연습 경기 뛰기', s:'감독에게 눈도장을 받아 인기가 오르고, 아무 능력이나 조금 오릅니다.', act: v => { const k = pickOne(L, statKeys(p)); c.fame = (c.fame || 0) + 2; addFatigue(c, 10); done([`연습 경기에서 좋은 모습을 보였습니다! 인기 2 올라 ${c.fame}.`, ...grow(L, k, 4)], v); } },
+    { n:7, key:'scrim', t:'연습 경기 뛰기', s:'감독에게 눈도장을 받아 인기가 오르고, 아무 능력이나 조금 오릅니다.', act: v => { const k = pickOne(L, statKeys(p)); c.fame = (c.fame || 0) + 2; addFatigue(c, 10); if(typeof trustAdd === 'function'){ trustAdd(L, 2); matesAdd(L, 1); } done([`연습 경기에서 좋은 모습을 보였습니다! 인기 2 올라 ${c.fame}. 감독 신뢰도가 올랐습니다.`, ...grow(L, k, 4)], v); } },
     { n:8, key:'rest', t:'쉬면서 몸 만들기', s:'피로가 풀리고 컨디션이 좋아집니다.', act: v => { addFatigue(c, -40); p.cond = Math.min(2, (p.cond || 0) + 1); done([`푹 쉬며 몸을 만들었습니다. 컨디션 ${COND[p.cond]}.`], v); } },
     { n:9, key:'skip', t:'캠프 남은 날 건너뛰기', s:'남은 날은 쉬면서 보냅니다.', act: v => { c.camp = 1; addFatigue(c, -30); done(['남은 캠프는 가볍게 보냈습니다.'], v); } },
   ] };

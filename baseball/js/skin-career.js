@@ -90,10 +90,14 @@ function crHome(S){
 // 승격 경쟁 막대(2군일 때)와 라이벌 카드
 function crStory(L){
   const g = typeof promoteGap === 'function' ? promoteGap(L) : null, r = typeof rivalLine === 'function' ? rivalLine(L) : null;
-  if(!g && !r) return '';
+  // 감독 신뢰도·동료 관계 (career-trust.js): 한 줄에 작은 막대 두 개
+  const c = typeof trustInit === 'function' ? trustInit(L.career) : null;
+  const tb = (lab, v, col) => `<span class="tr-i"><small>${lab}</small><span class="fb"><i style="width:${v}%;background:${col}"></i></span><b>${Math.round(v)}</b></span>`;
+  const tr = c ? `<div class="trustb">${tb('감독 신뢰', c.trust, c.trust >= 65 ? '#2ec463' : c.trust >= 45 ? '#3fa9ff' : '#ff4d5e')}${tb('동료 관계', c.mates, c.mates >= 65 ? '#ff7ab6' : c.mates >= 45 ? '#3fa9ff' : '#9fb3d3')}${c.warned ? '<em class="tr-w">경고</em>' : ''}</div>` : '';
+  if(!g && !r) return tr;
   const gp = g ? `<div class="st-g"><small>1군 승격 경쟁 <b>${g.mine}</b> / ${g.need}</small><span class="fb big"><i style="width:${g.pct}%;background:${g.pct >= 100 ? '#2ec463' : '#ffb800'}"></i></span><small>${esc(g.name)}${g.gap ? ` · ${g.gap} 모자람` : ' · 곧 승격!'}</small></div>` : '';
   const rv = r ? `<div class="st-r">${emb(teamInfo(r.team), 'sm')}<span><small>라이벌</small><b>${esc(r.name)}</b></span><em class="${r.lead > 0 ? 'up' : r.lead < 0 ? 'dn' : ''}">${r.lead > 0 ? '앞섬' : r.lead < 0 ? '뒤짐' : '팽팽'}</em></div>` : '';
-  return `<div class="story">${gp}${rv}</div>`;
+  return `${tr}<div class="story">${gp}${rv}</div>`;
 }
 /* ---------- 스프링캠프 ---------- */
 function crCamp(S){
