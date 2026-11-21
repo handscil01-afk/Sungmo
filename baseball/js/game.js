@@ -108,6 +108,7 @@ function suspenseMs(fx){
 function gameNext(via, res){
   // 감독 모드: 묻지 않는 타석은 바로 진행하고 결과를 모음 (온라인 손님은 방장이 계산)
   if(G.mode === 'manager' && !(NET.on && NET.role === 'guest')) res = mgrAuto(res);
+  if(typeof wxTick === 'function') res = wxTick(G, res);   // 날씨: 처음이면 정하고, 비가 오면 우천 중단·재개·강우 콜드게임 (weather.js)
   if(res){ const willSkip = !!(G.focus && !G.review && !needs(batIdx(G)) && !needs(1 - batIdx(G)));   // 육성: 이 결과 뒤 바로 다음 내 차례까지 건너뜀
     if(res.skip && typeof castSkip === 'function'){ const e = castSkip(); if(e){ UI.castLock = e * 1000; UI.castNow = true; } }
     if(!res.skip){ UI.susp = suspenseMs(res.fx || []); if(typeof castResult === 'function' && castOn()){ const c = castResult(res, { noAfter: willSkip }); UI.castNow = true; if(c){ if(c.at && UI.susp){ UI.susp = Math.max(UI.susp, c.at * 1000); SFX.castAt = c.at; } SFX.hitAt = c.hit != null ? c.hit : null; UI.castLock = c.end * 1000; } } } if(typeof castSeen === 'function') castSeen(); SFX.ev = res.events || []; playFx(res.fx, res.skip ? 0 : UI.susp || 0); UI.lastFx = res.skip ? res.skip.fx : res.fx || []; UI.lastEv = res.skip ? res.skip.events || [] : res.events || []; UI.lastLines = res.lines || []; UI.lastSkip = res.skip || null; }
@@ -657,22 +658,26 @@ function endScreen(){
     { n:1, t:'육성 화면으로', act: v => { G = null; go(careerHome, v); } },
     { n:2, t:'점수판', act: v => note(scoreboard(G), v, 'score') },
     { n:3, t:'경기 기록 전체', act: v => go(() => logScreen(), v) },
+    { n:4, t:'명장면 다시 보기', hide: typeof hlHas !== 'function' || !hlHas(), s:'홈런·끝내기 같은 큰 장면을 다시 봅니다.', act: v => hlStart(v) },
   ] };
   if(G.allstar) return { board:true, q:'올스타전이 끝났습니다. 무엇을 할까요?', opts:[
     { n:1, t:'올스타 휴식기로 돌아가기', act: v => { LSRC = G.allstar.src || 'league'; G = null; go(allstarScreen, v); } },
     { n:2, t:'점수판', act: v => note(scoreboard(G), v, 'score') },
     { n:3, t:'경기 기록 전체', act: v => go(() => logScreen(), v) },
+    { n:4, t:'명장면 다시 보기', hide: typeof hlHas !== 'function' || !hlHas(), s:'홈런·끝내기 같은 큰 장면을 다시 봅니다.', act: v => hlStart(v) },
   ] };
   if(G.league) return { board:true, q:'경기가 끝났습니다. 무엇을 할까요?', opts:[
     { n:1, t:'리그 화면으로', act: v => { G = null; go(leagueHome, v); } },
     { n:2, t:'점수판', act: v => note(scoreboard(G), v, 'score') },
     { n:3, t:'경기 기록 전체', act: v => go(() => logScreen(), v) },
+    { n:4, t:'명장면 다시 보기', hide: typeof hlHas !== 'function' || !hlHas(), s:'홈런·끝내기 같은 큰 장면을 다시 봅니다.', act: v => hlStart(v) },
   ] };
   if(NET.on) return { board:true, q: NET.role === 'host' ? '경기가 끝났습니다. 한 판 더 할까요?' : '경기가 끝났습니다. 방장이 한 판 더를 고르면 새 경기가 시작됩니다.', opts:[
     { n:1, t:'한 판 더', hide: NET.role !== 'host', s:'같은 팀으로 새 경기를 시작합니다. 선수 능력치와 날씨는 새로 정해집니다.', act: v => netStartGame(v) },
     { n:2, t:'점수판', act: v => note(scoreboard(G), v, 'score') },
     { n:3, t:'경기 기록 전체', act: v => go(() => logScreen(), v) },
     { n:4, t:'채팅과 음성 대화', act: v => go(talkScreen, v) },
+    { n:5, t:'명장면 다시 보기', hide: typeof hlHas !== 'function' || !hlHas(), s:'홈런·끝내기 같은 큰 장면을 다시 봅니다.', act: v => hlStart(v) },
     { n:9, t:'방에서 나가기', act: () => leaveRoomAsk() },
   ] };
   return { board:true, q:'경기가 끝났습니다. 무엇을 할까요?', opts:[
@@ -680,6 +685,7 @@ function endScreen(){
     { n:2, t:'점수판', act: v => note(scoreboard(G), v, 'score') },
     { n:3, t:'경기 기록 전체', s:'처음부터 끝까지 한 줄씩 읽을 수 있습니다.', act: v => go(() => logScreen(), v) },
     { n:4, t:'처음 화면으로', act: v => { G = null; go(homeScreen, v); } },
+    { n:5, t:'명장면 다시 보기', hide: typeof hlHas !== 'function' || !hlHas(), s:'홈런·끝내기 같은 큰 장면을 다시 봅니다.', act: v => hlStart(v) },
   ] };
 }
 function logScreen(){

@@ -202,6 +202,8 @@ function settingsScreen(backTo, tab){
       { t:`판정 과정 보기: ${onOff(SET.dice)}`, s:'주사위와 확률을 기록에 함께 보여 줍니다. 테이블 게임처럼 판정을 확인할 수 있습니다.', act: ch(() => { SET.dice = !SET.dice; }, () => `판정 과정 보기 ${onOff(SET.dice)}`) },
       { t:`송구 선택 시간: ${SET.throwSec ? SET.throwSec + '초' : '제한 없음'}`, hide: SET.pickThrow === false, s:'시간 안에 고르지 않으면 컴퓨터가 정합니다. 6초, 10초, 제한 없음 순서로 바뀝니다.', act: ch(() => { SET.throwSec = SET.throwSec === 6 ? 10 : SET.throwSec === 10 ? 0 : 6; }, () => `송구 선택 시간 ${SET.throwSec ? SET.throwSec + '초' : '제한 없음'}`) },
       { t:`비디오 판독 기회: 팀마다 ${SET.rev ?? 2}번`, s:'새로 시작하는 경기부터 적용합니다. 0번이면 판독이 없습니다. (리그와 육성은 늘 2번)', act: ch(() => { SET.rev = ((SET.rev ?? 2) + 1) % 4; }, () => `비디오 판독 기회 ${SET.rev}번`) },
+      { t:`콜드게임: ${onOff(!!SET.mercy)}`, s:'켜면 9이닝 경기에서 7회가 끝난 뒤 10점 이상 차이가 나면 그대로 경기를 끝냅니다. 내가 하는 경기에만 적용하고, 리그의 다른 팀 경기는 끝까지 합니다. 새로 시작하는 경기부터 적용합니다.', act: ch(() => { SET.mercy = !SET.mercy; }, () => `콜드게임 ${onOff(!!SET.mercy)}`) },
+      { t:`날씨와 비: ${onOff(SET.weather !== false)}`, s:'켜면 리그와 선수 육성에서 가끔 비 때문에 경기가 취소(시즌 끝에 다시 함)되거나, 경기 중에 잠시 멈춥니다. 5회를 마친 뒤에 비가 그치지 않으면 강우 콜드게임으로 끝납니다. 돔구장은 비가 오지 않습니다.', act: ch(() => { SET.weather = SET.weather === false; }, () => `날씨와 비 ${onOff(SET.weather !== false)}`) },
     ],
     // 조작·접근성
     [

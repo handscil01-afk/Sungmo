@@ -81,7 +81,9 @@ function flush(G){
     (G.hist ||= []).push({ n: G.anim.n, t: G.anim.t, vel: G.anim.vel || 0, x: Math.round(G.anim.x * 100) / 100, y: Math.round(G.anim.y * 100) / 100, l: pitchLabel(evs), ...(fb && fb.to ? { land: [Math.round(fb.to[0]), Math.round(fb.to[1])] } : {}) });
     if(G.hist.length > 3) G.hist.shift();
   }
-  const r = { lines: G.out, fx: G.fx, events: G.evs || [] }; G.out = []; G.fx = []; G.evs = []; return r; }
+  const r = { lines: G.out, fx: G.fx, events: G.evs || [] }; G.out = []; G.fx = []; G.evs = [];
+  if(typeof hlFlush === 'function') hlFlush(G, r);   // 명장면 모으기 (highlights.js, 브라우저에서만)
+  return r; }
 
 /* ---------- 선수 만들기 ---------- */
 function newName(G){
@@ -342,6 +344,10 @@ function endHalf(G){
   emit(G, `3아웃. ${halfName(G)} 끝. ${scoreText(G)}.`, 'i');
   halfEnd(G); fx(G, 'change');
   const a = runsOf(G.teams[0]), h = runsOf(G.teams[1]);
+  // 콜드게임(설정, G.mercy): 9이닝 경기 7회 이후 10점 차. 초가 끝났을 때는 홈 팀이 앞설 때만 (원정 팀이 앞서면 말 공격까지)
+  if(G.mercy && G.innings === 9 && G.inning >= 7 && (G.top ? h - a >= 10 : Math.abs(a - h) >= 10)){
+    G.called = 'mercy'; emit(G, `${Math.abs(a - h)}점 차가 나서 콜드게임으로 경기를 끝냅니다.`, 'i'); gameOver(G); return;
+  }
   if(G.top){
     if(G.inning >= G.innings && h > a){ gameOver(G); return; }
     G.top = false;

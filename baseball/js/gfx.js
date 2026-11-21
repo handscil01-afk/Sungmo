@@ -660,6 +660,7 @@ function gfxStart(G, fx, lines, pre, skip, evs){
   list.forEach(a => { a.start = now; if(a.kind !== 'card') a.pre = pre; });
   GX.anim = list.shift(); GX.queue = list;
   if(!GX.raf && GX.cv) GX.raf = requestAnimationFrame(gfxTick);
+  if(typeof cutinCheck === 'function') cutinCheck(skip ? skip.events || evs : evs, pre, lines, GX.anim);   // 홈런·끝내기 컷인 (cutin.js): 결과 글씨 뒤에
 }
 // 시간이 흐른 만큼 단계를 정함. 끝났으면 false
 function stepAnim(A, el){
@@ -701,7 +702,7 @@ function gfxTick(){
   if(!G) return;
   const real = G;
   try{ G = viewOf(GX.anim); gfxDraw(); } finally { G = real; }
-  if(GX.anim) GX.raf = requestAnimationFrame(gfxTick);
+  if(GX.anim || (typeof wxRaining === 'function' && wxRaining(G))) GX.raf = requestAnimationFrame(gfxTick);   // 비가 오면 빗줄기가 계속 움직임
 }
 function gfxDraw(){
   const now = performance.now();
@@ -722,6 +723,7 @@ function gfxDraw(){
   else if(A.kind === 'reviewEnd') drawReview(A.o, A.t0, A.phase);
   else if(A.ph === 'fly' || A.ph === 'fresult') drawFieldScene(G, A);
   else drawPitchScene(G, A.res === 'inplay' && A.ph === 'result' && A.bb ? { ...A, banner:null } : A);
+  if(typeof wxDraw === 'function') wxDraw(G);   // 빗줄기 (weather.js)
 }
 // 그림판 내부 해상도 = 보이는 크기 × 기기 픽셀 비율. 그림은 언제나 256×224 좌표로 그림
 function gfxSize(){

@@ -114,13 +114,14 @@ function finalCardHTML(){
   const wl = (G.log || []).map(l => l.s).reverse().find(s => /^승리 투수/.test(s || ''));
   const pit = wl ? wl.replace(/\.$/, '').split(', ').map(x => { const m = /^(승리 투수|패전 투수|세이브|홀드) (.+)$/.exec(x); return m ? `<span><em>${{ '승리 투수':'승', '패전 투수':'패', '세이브':'세', '홀드':'홀' }[m[1]]}</em>${esc(m[2])}</span>` : ''; }).join('') : '';
   const tm = (i) => `<span class="fin-t${win === i ? ' w' : ''}">${emb(G.teams[i], 'big')}<b>${esc(G.teams[i].short)}</b></span>`;
-  return `<div class="fin" role="status"><span class="fin-h">경기 종료${G.inning > G.innings ? ` · 연장 ${G.inning}회` : ''}</span>
+  return `<div class="fin" role="status"><span class="fin-h">경기 종료${G.called ? ` · ${G.called === 'rain' ? '강우 ' : ''}콜드게임` : G.inning > G.innings ? ` · 연장 ${G.inning}회` : ''}</span>
     <div class="fin-sc">${tm(0)}<strong class="${win === 0 ? 'w' : ''}">${r[0]}</strong><i>:</i><strong class="${win === 1 ? 'w' : ''}">${r[1]}</strong>${tm(1)}</div>
     ${ban3(ban, 'fin-ban')}${pit ? `<div class="fin-p">${pit}</div>` : ''}</div>`;
 }
 function endDeckHTML(S){
+  if(S.kind === 'hl' && typeof hlDeckHTML === 'function') return hlDeckHTML(S);   // 명장면 다시 보기 (highlights.js)
   const want = (S.opts || []).filter(o => !o.hide);
-  const ico = t => /다시|한 판 더/.test(t) ? 'again' : /점수판/.test(t) ? 'score' : /기록 전체/.test(t) ? 'list' : /채팅/.test(t) ? 'chat' : /나가기/.test(t) ? 'exit' : /상황/.test(t) ? 'list' : /처음/.test(t) ? 'home' : /육성|리그|올스타/.test(t) ? 'home' : 'go';
+  const ico = t => /명장면/.test(t) ? 'rec' : /다시|한 판 더/.test(t) ? 'again' : /점수판/.test(t) ? 'score' : /기록 전체/.test(t) ? 'list' : /채팅/.test(t) ? 'chat' : /나가기/.test(t) ? 'exit' : /상황/.test(t) ? 'list' : /처음/.test(t) ? 'home' : /육성|리그|올스타/.test(t) ? 'home' : 'go';
   const main = want.filter(o => o.key !== 'status');
   return `${lineScoreHTML()}<div class="hb c${main.length <= 3 ? main.length : main.length === 4 ? 2 : 3} end">${main.map(o => `<button type="button" class="hb-b${o.n === 1 ? ' pri' : ''}" data-sk="opt" data-n="${o.n}">${hubIco(ico(o.t))}<b>${esc(o.t.replace('같은 설정으로 다시 하기', '다시 하기').replace(' 돌아가기', '').replace('으로 돌아가기', ''))}</b></button>`).join('')}</div>`;
 }
@@ -174,7 +175,7 @@ Object.assign(CAREER_SK, { 'cr-shop2':crShop2, 'cr-bag2':crBag2 });
 function scShowSkin(S){
   const L = LG(); if(!L) return null;
   const game = g => { const A = teamInfo(g.a), H = teamInfo(g.h), done = g.ra != null, aw = done && g.ra > g.rh, hw = done && g.rh > g.ra, mine = g.a === L.my || g.h === L.my;
-    return `<span class="sg${mine ? ' me' : ''}">${emb(A, 'sm')}<b class="${aw ? 'w' : ''}">${esc(A.short)}</b><strong>${done ? `${g.ra} : ${g.rh}` : 'vs'}</strong><b class="${hw ? 'w' : ''}">${esc(H.short)}</b>${emb(H, 'sm')}</span>`; };
+    return `<span class="sg${mine ? ' me' : ''}">${emb(A, 'sm')}<b class="${aw ? 'w' : ''}">${esc(A.short)}</b><strong>${done ? `${g.ra} : ${g.rh}` : g.rain ? '우천' : 'vs'}</strong><b class="${hw ? 'w' : ''}">${esc(H.short)}</b>${emb(H, 'sm')}</span>`; };
   const days = (S.days || []).map(d => `<div class="pg-r sd"><span class="sd-h">${d.day}일째</span><div class="sd-g">${d.games.map(game).join('')}</div></div>`);
   const next = (S.next || []).length ? `<div class="sn"><span class="sd-h">우리 팀 다음 일정</span><div class="sn-l">${S.next.map(g => { const o = g.h === L.my ? g.a : g.h; return `<span><small>${g.day}일째</small>${emb(teamInfo(o), 'sm')}<b>${esc(teamInfo(o).short)}</b><i class="${g.h === L.my ? 'home' : ''}">${g.h === L.my ? '홈' : '원정'}</i></span>`; }).join('')}</div></div>` : '';
   return `${days.length ? `<div class="pg ar-list">${days.join('')}${pgNav()}</div>` : `<div class="ar-empty panel"><p>아직 경기 결과가 없습니다.</p></div>`}${next}`;
