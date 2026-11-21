@@ -32,7 +32,7 @@ function centerHomeScreen(){
     { n:2, t:`줄인 이름: ${c.short}`, s:'점수판과 중계에서 부르는 짧은 이름입니다. 예: 센터', act: v => go(() => textScreen('줄인 이름', c.short, 6, t => { c.short = t; }, centerHomeScreen), v) },
     { n:3, t:`팀 색: ${colorName(c.color)}`, s:'유니폼과 점수판 색입니다.', act: () => { const i = CENTER_COLORS.findIndex(x => x[1] === c.color); c.color = CENTER_COLORS[(i + 1) % CENTER_COLORS.length][1]; stay(`팀 색 ${colorName(c.color)}`); } },
     { n:4, t:`엠블럼: ${c.emblem == null ? '이름 첫 글자' : `${TEAMS[c.emblem].short} 그림`}`, hide: !VIEW.gfx, s:'화면 보며 하기에서 팀 표시로 쓰는 그림입니다.', act: () => { c.emblem = c.emblem == null ? 0 : c.emblem >= 9 ? null : c.emblem + 1; stay(`엠블럼 ${c.emblem == null ? '이름 첫 글자' : TEAMS[c.emblem].short + ' 그림'}`); } },
-    { n:11, key:'embimg', t: c.embImg ? '엠블럼 사진 바꾸기' : '엠블럼 사진 넣기', hide: !VIEW.gfx, s:'갖고 있는 그림 파일을 엠블럼으로 씁니다. 가운데를 정사각형으로 잘라 이 기기에만 저장합니다.', act: () => centerPickImage(c) },
+    { n:11, key:'embimg', t: c.embImg ? '엠블럼 사진 바꾸기' : '엠블럼 사진 넣기', hide: !VIEW.gfx, s:'갖고 있는 그림 파일을 엠블럼으로 씁니다. 가운데를 정사각형으로 잘라 이 기기에만 저장합니다.', act: () => centerPickImage(c, 'embImg', '엠블럼 사진을 넣었습니다.') },
     { n:12, key:'embdel', t:'엠블럼 사진 빼기', hide: !VIEW.gfx || !c.embImg, act: () => { delete c.embImg; stay('엠블럼 사진을 뺐습니다.'); } },
     { n:5, t:`팀 스타일: ${STYLES[c.style].name}`, s: STYLES[c.style].desc, act: () => { const k = Object.keys(STYLES); c.style = k[(k.indexOf(c.style) + 1) % k.length]; stay(`팀 스타일 ${STYLES[c.style].name}`); } },
     { n:6, t:`홈구장: ${parkInfo(c.park).name}`, s: parkInfo(c.park).desc, act: () => { const k = TEAMS.map(t => t.key); c.park = k[(k.indexOf(c.park) + 1) % k.length]; stay(`홈구장 ${parkInfo(c.park).name}`); } },
@@ -44,7 +44,7 @@ function centerHomeScreen(){
   ] };
 }
 // 엠블럼 사진: 파일을 골라 가운데 정사각형을 96×96으로 줄여 저장 (저장하기를 눌러야 반영)
-function centerPickImage(c){
+function centerPickImage(c, field = 'embImg', okMsg = '사진을 넣었습니다.'){
   const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
   inp.onchange = () => {
     const f = inp.files && inp.files[0]; if(!f) return;
@@ -54,8 +54,8 @@ function centerPickImage(c){
       const s = Math.min(im.width, im.height), x = cv.getContext('2d');
       x.imageSmoothingQuality = 'high'; x.drawImage(im, (im.width - s) / 2, (im.height - s) / 2, s, s, 0, 0, S, S);
       URL.revokeObjectURL(url);
-      try{ c.embImg = cv.toDataURL('image/png'); }catch(e){ stay('그림을 읽지 못했습니다.'); return; }
-      stay('엠블럼 사진을 넣었습니다. 저장하기를 눌러 주세요.');
+      try{ c[field] = cv.toDataURL(field === 'photo' ? 'image/jpeg' : 'image/png', 0.85); }catch(e){ stay('그림을 읽지 못했습니다.'); return; }
+      stay(`${okMsg} 저장하기를 눌러 주세요.`);
     };
     im.onerror = () => { URL.revokeObjectURL(url); stay('그림 파일을 열지 못했습니다.'); };
     im.src = url;
@@ -102,6 +102,9 @@ function batEditScreen(i){
     { n:4, t:`치는 손: ${p.hand === 'L' ? '왼손' : '오른손'}`, act: () => { p.hand = p.hand === 'L' ? 'R' : 'L'; stay(`${p.hand === 'L' ? '왼손' : '오른손'} 타자`); } },
     ...BAT_STATS.map(([k, n], j) => ({ n: j + 5, key:k, t:`${n}: ${p[k]}`, act: v => go(() => numScreen(n, k, p, back), v) })),
     { n:10, t:`능력치 한꺼번에: ${(LEVELS.find(l => BAT_STATS.every(([k]) => p[k] === l[1])) || ['직접 정함'])[0]}`, s:'아주 잘함 · 잘함 · 보통 · 조금 약함 · 약함 순서로 바뀝니다.', act: () => { const cur = LEVELS.findIndex(l => BAT_STATS.every(([k]) => p[k] === l[1])), L = LEVELS[(cur + 1) % LEVELS.length]; BAT_STATS.forEach(([k]) => { p[k] = L[1]; }); stay(`능력치 모두 ${L[0]}(${L[1]})`); } },
+    { n:11, key:'face', hide: !VIEW.gfx, t:'얼굴 꾸미기', s:'머리·눈·입·장식을 고릅니다. 고르지 않으면 이름으로 정해진 얼굴입니다.', act: v => go(() => playerLookScreen(p, back), v) },
+    { n:12, key:'photo', hide: !VIEW.gfx, t: p.photo ? '얼굴 사진 바꾸기' : '얼굴 사진 넣기', s:'사진을 넣으면 경기 화면과 기록에 사진이 나옵니다. 이 기기에만 저장합니다.', act: () => centerPickImage(p, 'photo', '얼굴 사진을 넣었습니다.') },
+    { n:13, key:'nophoto', hide: !VIEW.gfx || !p.photo, t:'얼굴 사진 빼기', act: () => { delete p.photo; stay('얼굴 사진을 뺐습니다.'); } },
   ] };
 }
 function pitEditScreen(i){
@@ -112,5 +115,8 @@ function pitEditScreen(i){
     { n:3, t:`보직: ${p.role}`, s:'선발은 길게, 마무리는 경기 끝에 던집니다.', act: () => { p.role = roles[(roles.indexOf(p.role) + 1) % roles.length]; stay(`보직 ${p.role}`); } },
     { n:4, t:`던지는 손: ${p.hand === 'L' ? '왼손' : '오른손'}`, act: () => { p.hand = p.hand === 'L' ? 'R' : 'L'; stay(`${p.hand === 'L' ? '왼손' : '오른손'} 투수`); } },
     ...PIT_STATS.map(([k, n], j) => ({ n: j + 5, key:k, t:`${n}: ${p[k]}${k === 'vel' ? '킬로' : ''}`, act: v => go(() => numScreen(n, k, p, back), v) })),
+    { n:11, key:'face', hide: !VIEW.gfx, t:'얼굴 꾸미기', s:'머리·눈·입·장식을 고릅니다. 고르지 않으면 이름으로 정해진 얼굴입니다.', act: v => go(() => playerLookScreen(p, back), v) },
+    { n:12, key:'photo', hide: !VIEW.gfx, t: p.photo ? '얼굴 사진 바꾸기' : '얼굴 사진 넣기', s:'사진을 넣으면 경기 화면과 기록에 사진이 나옵니다. 이 기기에만 저장합니다.', act: () => centerPickImage(p, 'photo', '얼굴 사진을 넣었습니다.') },
+    { n:13, key:'nophoto', hide: !VIEW.gfx || !p.photo, t:'얼굴 사진 빼기', act: () => { delete p.photo; stay('얼굴 사진을 뺐습니다.'); } },
   ] };
 }

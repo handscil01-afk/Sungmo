@@ -131,7 +131,7 @@ const PORT = 8767;
     if(!made || made.join() !== `시험선수,6,2,18,L,2,불펜,break,${t5}`) errors.push(`${tag}: 선수 만들기 결과가 다름 ${JSON.stringify(made)}`);
     if(await page.evaluate(() => armSlot(CR().career.p)) !== 2) errors.push(`${tag}: 투구 폼이 경기 그림에 쓰이지 않음`);
     // 내 선수 화면에서 얼굴 꾸미기: 고르기만 하면 그대로, "바꾸기"를 눌러야 저장
-    await page.evaluate(() => go(careerInfoScreen, 'click')); await page.click('#sk [data-sk="opt"][data-n="3"]');
+    await page.evaluate(() => { CR().career.look.hat = 0; go(careerInfoScreen, 'click'); }); await page.click('#sk [data-sk="opt"][data-n="3"]');
     if(await kind() !== 'cr-look') errors.push(`${tag}: 얼굴 꾸미기 화면이 아님 ${await kind()}`);
     await page.click('[data-k="lt"][data-v="hat"]'); await page.click('[data-k="lk"][data-v="2"]'); await fit('얼굴 꾸미기');
     if(await page.evaluate(() => CR().career.look.hat) === 2) errors.push(`${tag}: 바꾸기 전에 얼굴이 저장됨`);

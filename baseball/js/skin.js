@@ -199,8 +199,9 @@ function plateHTML(){
   const B = curBatter(G), P = curPitcher(G), bi = batIdx(G), fi = 1 - bi, s = B.st;
   const left = Math.round(clamp(1 - P.load / P.sta, 0, 1) * 100), col = left > 60 ? 'g' : left > 30 ? 'y' : 'r';
   const ownB = ownTeam(bi);
-  return `<button type="button" class="np np-p" data-sk="stats" aria-label="투수 ${esc(P.name)} 능력치 보기">${emb(G.teams[fi], 'sm')}<span class="np-tx"><small>투수 · ${P.hand === 'L' ? '좌' : '우'} · ${P.n}구</small><b>${esc(P.name)}${P.nick ? ` <i class="nick">${esc(P.nick)}</i>` : ''}</b><span class="sta ${col}"><i style="width:${Math.max(4, left)}%"></i></span></span></button>
-    <button type="button" class="np np-b" data-sk="stats" aria-label="타자 ${esc(B.name)} 능력치 보기">${emb(G.teams[bi], 'sm')}<span class="np-tx"><small>${batTeam(G).bi + 1}번 · ${B.hand === 'L' ? '좌타' : '우타'}${B.cond && (ownB || B.seen) ? ` <em class="${B.cond > 0 ? 'up' : 'dn'}">${B.cond > 0 ? '▲' : '▼'}</em>` : ''}</small><b>${esc(B.name)}${B.nick ? ` <i class="nick">${esc(B.nick)}</i>` : ''}</b><span class="np-st">${s.ab}타수 ${s.h}안타${s.hr ? ` · ${s.hr}홈런` : ''}</span></span></button>`;
+  const face = (X, ti) => typeof playerFace === 'function' ? playerFace(X, G.teams[ti].key, 'np-f') : emb(G.teams[ti], 'sm');   // 선수마다 정해진 얼굴(팀 모자)
+  return `<button type="button" class="np np-p" data-sk="stats" aria-label="투수 ${esc(P.name)} 능력치 보기">${face(P, fi)}<span class="np-tx"><small>투수 · ${P.hand === 'L' ? '좌' : '우'} · ${P.n}구</small><b>${esc(P.name)}${P.nick ? ` <i class="nick">${esc(P.nick)}</i>` : ''}</b><span class="sta ${col}"><i style="width:${Math.max(4, left)}%"></i></span></span></button>
+    <button type="button" class="np np-b" data-sk="stats" aria-label="타자 ${esc(B.name)} 능력치 보기">${face(B, bi)}<span class="np-tx"><small>${batTeam(G).bi + 1}번 · ${B.hand === 'L' ? '좌타' : '우타'}${B.cond && (ownB || B.seen) ? ` <em class="${B.cond > 0 ? 'up' : 'dn'}">${B.cond > 0 ? '▲' : '▼'}</em>` : ''}</small><b>${esc(B.name)}${B.nick ? ` <i class="nick">${esc(B.nick)}</i>` : ''}</b><span class="np-st">${s.ab}타수 ${s.h}안타${s.hr ? ` · ${s.hr}홈런` : ''}</span></span></button>`;
 }
 // 결과 한 줄: 뜸 들이는 동안은 앞부분(투구 설명)만
 function tickHTML(S){
@@ -452,7 +453,7 @@ function timingEnd(tm){
 /* ---------- 메뉴 화면 ---------- */
 function topHTML(S){
   const fsOn = typeof FS !== 'undefined' && FS.on(), canFs = typeof isStandalone === 'function' && !isStandalone();
-  const CRT = { 'setup':'경기 설정', 'lg-home':'리그', 'ar-home':'기록실', 'ar-show': S.title || '기록실', 'cr-shop2':'스포츠 용품점', 'cr-coach':'특별 코치 레슨', 'sc-show':'일정과 결과', 'cr-bag2':'내 가방', 'lg-setup':'새 리그', 'wz-1':'선수 만들기', 'wz-2':'선수 만들기', 'wz-3':'선수 만들기', 'team-pick':'팀 고르기', 'cr-look':'얼굴 꾸미기', 'as-home':'올스타 휴식기', 'as-derby':'홈런 더비', 'fo-home':'구단 사무실', 'fo-list':'구단 사무실', 'cr-camp':'스프링캠프', 'ct-home':'우리 센터 팀', 'ct-list':'선수 고르기', 'ct-player':'선수 고치기', 'ct-num':'능력치', 'cr-home':'라커룸', 'cr-visit':'마을', 'cr-train':'훈련', 'cr-bag':'내 가방', 'cr-info':'내 선수', 'cr-face':'얼굴 고르기', 'cr-log':'업적과 경력', 'cr-game':'오늘 경기' };
+  const CRT = { 'setup':'경기 설정', 'lg-home':'리그', 'ar-home':'기록실', 'ar-show': S.title || '기록실', 'cr-shop2':'스포츠 용품점', 'cr-coach':'특별 코치 레슨', 'sc-show':'일정과 결과', 'cr-bag2':'내 가방', 'lg-setup':'새 리그', 'wz-1':'선수 만들기', 'wz-2':'선수 만들기', 'wz-3':'선수 만들기', 'team-pick':'팀 고르기', 'cr-look':'얼굴 꾸미기', 'pl-look':'선수 얼굴 꾸미기', 'as-home':'올스타 휴식기', 'as-derby':'홈런 더비', 'fo-home':'구단 사무실', 'fo-list':'구단 사무실', 'cr-camp':'스프링캠프', 'ct-home':'우리 센터 팀', 'ct-list':'선수 고르기', 'ct-player':'선수 고치기', 'ct-num':'능력치', 'cr-home':'라커룸', 'cr-visit':'마을', 'cr-train':'훈련', 'cr-bag':'내 가방', 'cr-info':'내 선수', 'cr-face':'얼굴 고르기', 'cr-log':'업적과 경력', 'cr-game':'오늘 경기' };
   if(S.kind === 'cr-talk') CRT['cr-talk'] = S.who === 'gm' ? '연봉 계약' : S.who === 'agent' ? 'FA 시장' : '이벤트!';
   const title = S.hero ? '' : S.onTab ? '설정' : CRT[S.kind] || S.skTitle || menuTitle(S).title;   // 새 화면은 S.skTitle로 제목을 정할 수 있음
   return `<div class="bar">${S.back ? `<button type="button" class="rb" data-sk="back" aria-label="뒤로">${skIco('back')}</button>` : ''}

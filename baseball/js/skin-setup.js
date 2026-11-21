@@ -98,6 +98,14 @@ function crLookSkin(S){
     <div class="su-r"><div class="su panel">${lookEditor(S.draft(), col)}</div></div>`;
 }
 
+/* ---------- 우리 센터 팀 선수 얼굴 꾸미기 ---------- */
+function plLookSkin(S){
+  const c = typeof CE !== 'undefined' && CE.c, col = c ? c.color : '#3b82f6', p = S.who;
+  return `<div class="su-l"><div class="wz-top one"><div class="wz-card" style="--tc:${col}">${crFace(S.draft(), col, 'big', 'center')}<div class="wz-jer" aria-hidden="true"><span class="wz-nm">${esc(p.name)}</span><b>${esc(p.nick || '')}</b></div></div></div>
+    ${suGo(suOpt(S, 'done'), '고른 얼굴로 바꾸기')}</div>
+    <div class="su-r"><div class="su panel">${lookEditor(S.draft(), col)}</div></div>`;
+}
+
 /* ---------- 팀 고르기 (눌러 고르고 "이 팀으로") ---------- */
 function teamPickSkin(S){
   const teams = (S.opts || []).filter(o => o.key && !o.hide), sel = teams.find(o => o.key === TSEL) || teams[0];
@@ -109,7 +117,7 @@ function teamPickSkin(S){
     <button type="button" class="crplay su-go" data-sk="opt" data-n="${sel.n}"><span class="pp">▶</span><span><b>이 팀으로</b><small>${esc(T.name)}</small></span></button>`;
 }
 
-Object.assign(CAREER_SK, { 'lg-setup':lgSetupSkin, 'wz-1':wz1Skin, 'wz-2':wz2Skin, 'wz-3':wz3Skin, 'team-pick':teamPickSkin, 'cr-look':crLookSkin });
+Object.assign(CAREER_SK, { 'lg-setup':lgSetupSkin, 'wz-1':wz1Skin, 'wz-2':wz2Skin, 'wz-3':wz3Skin, 'team-pick':teamPickSkin, 'cr-look':crLookSkin, 'pl-look':plLookSkin });
 
 // 이름 칸: 적는 동안 다시 그리지 않고(글자판이 닫히지 않게) 카드의 이름과 "다음" 단추만 고침
 if(typeof document !== 'undefined'){

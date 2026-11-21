@@ -46,6 +46,17 @@ function careerLookScreen(back){
     ] };
 }
 
+/* ---------- 우리 센터 팀 선수 얼굴 꾸미기: 고른 뒤 "바꾸기"를 눌러야 정해짐 (팀 저장은 저장하기) ---------- */
+function playerLookScreen(p, back){
+  if(!LOOK_DRAFT) LOOK_DRAFT = lookFix(playerLook(p));
+  return { kind:'pl-look', who: p, q:`${p.name} 선수의 얼굴을 꾸미세요. 다 되면 바꾸기를 누르세요.`, draft: () => LOOK_DRAFT,
+    set: (k, v) => { LOOK_DRAFT = lookSet(LOOK_DRAFT, k, v); },
+    back: v => { LOOK_DRAFT = null; go(back, v); }, opts:[
+      { n:1, key:'rand', t:'무작위로 꾸미기', act: () => { LOOK_DRAFT = lookRandom(); stay('얼굴을 새로 꾸몄습니다.'); } },
+      { n:9, key:'done', t:'바꾸기', act: v => { p.look = { ...LOOK_DRAFT, hat:0 }; LOOK_DRAFT = null; go(back, v, ['얼굴을 바꿨습니다. 저장하기를 눌러야 팀에 저장됩니다.']); } },
+    ] };
+}
+
 /* ---------- 선수 만들기 (세 단계) ---------- */
 const FORMS = ['오버핸드', '사이드암', '언더핸드'];
 const BAT_POS9 = ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH'];

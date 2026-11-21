@@ -143,6 +143,7 @@ function playerLook(p){
     acc: pick(10) < 7 ? -1 : [0, 2, 4, 5, 6][pick(5)], hat: 0 });
 }
 function playerFace(p, teamKey, cls = ''){
+  if(p && p.photo) return `<span class="crf lk-f pic ${cls}" style="background-image:url(${p.photo})" aria-hidden="true"></span>`;   // 우리 센터 팀 선수 사진
   const T = typeof teamInfo === 'function' && teamKey ? teamInfo(teamKey) : null;
   return typeof crFace === 'function' ? crFace(playerLook(p), T ? T.color : '#3b82f6', cls, teamKey) : '';
 }

@@ -1014,3 +1014,5 @@ html.skin .sg{ font-size:.82rem; padding:3px 8px; } html.skin .sg strong{ font-s
   html.skin .k-ct-home .cards.sets{ grid-template-columns:repeat(3, minmax(0, 1fr)); } html.skin .k-ct-home .card.row{ min-height:2.4rem; padding:.3rem .5rem; } html.skin .k-ct-home .card.row small{ display:none; }
 }
 html.skin .hb-b{ align-items:center; }
+html.skin .crf.pic{ background-size:cover !important; background-position:center !important; border-radius:22%; box-shadow:0 0 0 2px #fff, 0 2px 0 rgba(0,0,0,.3); }
+html.skin .crf.np-f{ width:2.4rem; height:2.4rem; flex:none; margin:-4px 0 -4px -4px; }

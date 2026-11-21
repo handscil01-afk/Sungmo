@@ -140,11 +140,11 @@ function makeBench(G, S, b, bias){
 const centerSta = (v, starter) => starter ? Math.round(60 + v * 0.56) : Math.round(18 + v * 0.28);
 function centerBatter(G, S, c, slot){
   const b = makeBatter(G, S, slot, 0);
-  return { ...b, name: c.name || b.name, nick: c.nick || '', pos: c.pos || b.pos, hand: c.hand || b.hand, con: c.con ?? b.con, pow: c.pow ?? b.pow, eye: c.eye ?? b.eye, spd: c.spd ?? b.spd, def: c.def ?? b.def };
+  return { ...b, name: c.name || b.name, nick: c.nick || '', ...(c.look ? { look: c.look } : {}), ...(c.photo ? { photo: c.photo } : {}), pos: c.pos || b.pos, hand: c.hand || b.hand, con: c.con ?? b.con, pow: c.pow ?? b.pow, eye: c.eye ?? b.eye, spd: c.spd ?? b.spd, def: c.def ?? b.def };
 }
 function centerPitcher(G, S, c, starter){
   const p = makePitcher(G, S, starter, 0);
-  return { ...p, name: c.name || p.name, nick: c.nick || '', hand: c.hand || p.hand, vel: c.vel ?? p.vel, ctl: c.ctl ?? p.ctl, stf: c.stf ?? p.stf, sta: c.sta != null ? centerSta(c.sta, starter) : p.sta };
+  return { ...p, name: c.name || p.name, nick: c.nick || '', ...(c.look ? { look: c.look } : {}), ...(c.photo ? { photo: c.photo } : {}), hand: c.hand || p.hand, vel: c.vel ?? p.vel, ctl: c.ctl ?? p.ctl, stf: c.stf ?? p.stf, sta: c.sta != null ? centerSta(c.sta, starter) : p.sta };
 }
 function makeTeam(G, key, bias){
   if(key === 'center' && CENTER) return makeCenterTeam(G);
