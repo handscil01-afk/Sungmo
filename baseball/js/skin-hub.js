@@ -54,7 +54,7 @@ function lgHomeSkin(S){
     const sp = k => { const X = L.teams[k]; return X.sp[X.rot % 5].name; };
     mid = g ? `<div class="lh-g"><span class="lh-gh">오늘 경기 · ${L.day + 1}일째 · 남은 ${L.sched.length - L.day}경기</span>
         <div class="vs3"><span class="vs3-t">${emb(teamInfo(g.a), 'big')}<b>${esc(teamInfo(g.a).short)}</b><small>원정 · 선발 ${esc(sp(g.a))}</small></span><span class="vs-x">VS</span><span class="vs3-t">${emb(teamInfo(g.h), 'big')}<b>${esc(teamInfo(g.h).short)}</b><small>홈 · 선발 ${esc(sp(g.h))}</small></span></div>
-        <span class="lh-park">${esc(parkInfo(g.h).name)}</span></div>`
+        <span class="lh-park">${esc(parkInfo(g.h).name)}${typeof h2hToday === 'function' && h2hToday(L) ? ` · <b class="lh-h2h">${esc(h2hToday(L).text)}</b>` : ''}</span></div>`
       : `<div class="lh-g"><span class="lh-gh">${L.day + 1}일째 · 남은 ${L.sched.length - L.day}경기</span><p class="lh-none">오늘은 우리 팀 경기가 없습니다.</p></div>`;
   } else if(L.phase === 'post'){
     const g = todayGames(L)[0];
@@ -68,7 +68,7 @@ function lgHomeSkin(S){
   // 순위 미리보기: 위 다섯 팀 (내 팀이 밖이면 다섯째 줄에 내 팀)
   const sd = standings(L); let top = sd.slice(0, 5); if(!top.some(x => x.T.key === L.my)) top = [...sd.slice(0, 4), sd.find(x => x.T.key === L.my)];
   const mini = `<div class="lh-mini">${top.map(x => `<span class="${x.T.key === L.my ? 'me' : ''}"><i>${x.rank}</i>${emb(teamInfo(x.T.key), 'sm')}<b>${esc(teamInfo(x.T.key).short)}</b><em>${x.T.w}-${x.T.l}${x.T.d ? `-${x.T.d}` : ''}</em><small>${x.gb ? x.gb : '-'}</small></span>`).join('')}</div>`;
-  return `${st}${mid}${mini}${hubPlay(play, play && play.s)}
+  return `${st}${mid}${mini}${typeof paperBanner === 'function' ? paperBanner(hubOpt(S, 'paper')) : ''}${hubPlay(play, play && play.s)}
     ${hubBtns([[hubOpt(S, 'sim'), 'sim', L.phase === 'done' ? '' : '결과만 보기'], [hubOpt(S, 'skip'), 'skip', '여러 날'], [hubOpt(S, 'stand'), 'stand', '순위표'], [hubOpt(S, 'lead'), 'lead', '기록 순위'],
       [hubOpt(S, 'office'), 'office', '구단 사무실'], [hubOpt(S, 'sched'), 'sched', L.phase === 'season' ? '일정' : '포스트시즌'], [hubOpt(S, 'arch'), 'arch', '기록실'], [hubOpt(S, 'set'), 'set', '리그 설정']].filter(x => x[0]))}`;
 }

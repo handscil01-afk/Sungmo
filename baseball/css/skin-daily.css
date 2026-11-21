@@ -1,0 +1,130 @@
+/* 손잡다 야구: 화면 보며 하기의 오늘의 목표·출석 도장·주간 리그 신문 (js/skin-daily.js). 모든 규칙은 html.skin 아래에서만 */
+
+/* ---------- 라커룸 띠: 출석 도장 · 오늘의 목표 · 신문 ---------- */
+html.skin .dly{ display:flex; gap:6px; flex:none; }
+html.skin .dly-g{ flex:1 1 auto; min-width:0; display:flex; align-items:center; gap:7px; padding:4px 8px; border-radius:12px; border:2px solid var(--line); background:var(--pan); color:var(--ink); text-align:left; box-shadow:0 2px 0 var(--line2); }
+html.skin .dly-g.new{ border-color:#e2501a; background:#fff4e6; }
+html.skin .dly-at{ position:relative; flex:none; display:grid; justify-items:center; color:#d33447; }
+html.skin .dly-at svg{ width:1.5rem; height:1.5rem; }
+html.skin .dly-at em{ font-style:normal; font-size:.58rem; font-weight:900; color:var(--ink2); line-height:1; }
+html.skin .dly-at .dot{ position:absolute; top:-7px; right:-14px; font-size:.52rem; font-weight:900; color:#fff; background:#ff3d7f; border-radius:999px; padding:1px 5px; white-space:nowrap; animation:dlPop 1.2s ease-in-out infinite; }
+@keyframes dlPop{ 50%{ transform:scale(1.12); } }
+html.skin .dly-l{ display:grid; gap:2px; min-width:0; }
+html.skin .dly-l small{ font-size:.6rem; font-weight:900; color:var(--ink2); }
+html.skin .dly-c{ display:flex; gap:4px; flex-wrap:nowrap; overflow:hidden; }
+html.skin .dly-c i{ font-style:normal; font-size:.68rem; font-weight:900; padding:1px 7px; border-radius:999px; background:#fff; border:1.5px solid #9cc8f5; color:var(--ink2); white-space:nowrap; }
+html.skin .dly-c i.ok{ background:#16893f; border-color:#16893f; color:#fff; }
+html.skin .dly-c i.none{ border-style:dashed; }
+html.skin .dly-p{ flex:none; display:grid; justify-items:center; align-content:center; gap:1px; padding:3px 9px; border-radius:12px; border:2px solid #8a6d3b; background:#f6f0e1; color:#3b2f1c; box-shadow:0 2px 0 #6b5428; position:relative; }
+html.skin .dly-p svg{ width:1.3rem; height:1.3rem; }
+html.skin .dly-p b{ font-size:.6rem; font-weight:900; white-space:nowrap; }
+html.skin .dly-p.new::after{ content:''; position:absolute; top:-4px; right:-4px; width:.7rem; height:.7rem; border-radius:50%; background:#ff3d7f; border:2px solid #fff; }
+html.skin .sk-body.f3 .dly-at em{ display:none; }
+
+/* ---------- 리그 첫 화면: 신문 띠 · 상대 전적 ---------- */
+html.skin .pp-ban{ flex:none; display:flex; align-items:center; gap:8px; padding:4px 10px; border-radius:12px; border:2px solid #8a6d3b; background:#f6f0e1; color:#3b2f1c; text-align:left; box-shadow:0 2px 0 #6b5428; }
+html.skin .pp-ban svg{ width:1.4rem; height:1.4rem; flex:none; }
+html.skin .pp-ban span{ display:grid; min-width:0; } html.skin .pp-ban b{ font-size:.8rem; font-weight:900; } html.skin .pp-ban small{ font-size:.62rem; color:#6b5428; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+html.skin .pp-ban em{ margin-left:auto; font-style:normal; font-size:.62rem; font-weight:900; padding:1px 8px; border-radius:999px; background:#8a6d3b; color:#fff; white-space:nowrap; }
+html.skin .pp-ban.new em{ background:#e2501a; }
+html.skin .lh-h2h{ color:#c25a00; font-weight:900; }
+html.skin .vs-hh{ text-align:center; font-size:.72rem; font-weight:900; color:#c25a00; }
+
+/* ---------- 오늘의 목표와 출석 도장 ---------- */
+html.skin .dl-h{ display:flex; align-items:baseline; gap:8px; margin-bottom:4px; }
+html.skin .dl-h b{ font-size:.92rem; font-weight:900; color:var(--ink); } html.skin .dl-h small{ font-size:.66rem; font-weight:800; color:var(--ink2); }
+html.skin .dl-goals, html.skin .dl-card{ flex:none; padding:7px 10px; }
+html.skin .dl-r{ display:flex; align-items:center; gap:8px; padding:5px 0; border-top:2px solid #c5ddf7; }
+html.skin .dl-r:first-of-type{ border-top:0; }
+html.skin .dl-ck{ flex:none; width:1.5rem; height:1.5rem; border-radius:50%; border:2px solid #9cc8f5; background:#fff; display:grid; place-items:center; font-weight:900; color:#fff; font-size:.85rem; }
+html.skin .dl-r.ok .dl-ck{ background:#16893f; border-color:#16893f; }
+html.skin .dl-t{ flex:1; min-width:0; display:grid; gap:3px; } html.skin .dl-t b{ font-size:.84rem; font-weight:900; color:var(--ink); }
+html.skin .dl-r.ok .dl-t b{ color:var(--ink3); text-decoration:line-through; }
+html.skin .dl-t .fb{ height:6px; background:#c5ddf7; } html.skin .dl-t .fb i{ background:#2ec463; }
+html.skin .dl-rw{ flex:none; display:inline-flex; align-items:center; gap:3px; font-size:.7rem; font-weight:900; color:#6a4300; background:#fff8d6; border:1.5px solid #ffcf4d; border-radius:999px; padding:1px 8px 1px 3px; white-space:nowrap; }
+html.skin .dl-ri{ display:inline-grid; place-items:center; width:1rem; height:1rem; border-radius:50%; font-style:normal; font-size:.58rem; color:#fff; flex:none; }
+html.skin .dl-ri.m{ background:#2ec463 url(../img/items.png) 100% 100% / 500% 400% no-repeat; image-rendering:pixelated; }
+html.skin .dl-ri.f{ background:#ff4d7a; } html.skin .dl-ri.p{ background:#3f63d6; } html.skin .dl-ri.g{ background:#e2501a; }
+html.skin .dl-none{ margin:4px 0; font-size:.8rem; color:var(--ink2); font-weight:800; }
+html.skin .dl-ss{ display:grid; grid-template-columns:repeat(6, minmax(0, 1fr)) minmax(0, 1.5fr); gap:4px; }
+html.skin .dl-s{ position:relative; display:grid; justify-items:center; align-content:start; gap:2px; min-height:4.2rem; padding:3px 2px; border-radius:10px; border:2px dashed #9cc8f5; background:#fff; overflow:hidden; }
+html.skin .dl-s.big{ border:2px solid #d4a017; background:linear-gradient(180deg, #fff8d6, #ffe9a3); }
+html.skin .dl-s.now{ border:2px solid #e2501a; box-shadow:0 0 0 2px rgba(226,80,26,.25); }
+html.skin .dl-s small{ font-size:.58rem; font-weight:900; color:var(--ink2); }
+html.skin .dl-sr{ display:grid; justify-items:center; gap:1px; }
+html.skin .dl-sr em{ display:inline-flex; align-items:center; gap:2px; font-style:normal; font-size:.56rem; font-weight:900; color:var(--ink); white-space:nowrap; }
+html.skin .dl-s.big .dl-sr{ grid-template-columns:1fr; }
+html.skin .dl-st{ position:absolute; inset:auto 0 50% 0; transform:translateY(50%) rotate(-14deg); margin:0 auto; width:2.6rem; height:2.6rem; border-radius:50%; border:3px solid #d33447; color:#d33447; background:rgba(255,255,255,.75);
+  display:grid; place-items:center; font-size:.66rem; font-weight:900; animation:dlStamp .35s ease-out both; }
+html.skin .dl-s.big .dl-st{ width:3.2rem; height:3.2rem; font-size:.8rem; }
+@keyframes dlStamp{ from{ transform:translateY(50%) rotate(-14deg) scale(1.8); opacity:0; } }
+html.skin .dl-ms{ display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:6px; }
+html.skin .dl-m{ display:grid; grid-template-columns:auto minmax(0, 1fr) auto; grid-template-rows:auto auto; align-items:center; column-gap:6px; padding:3px 6px; border-radius:10px; background:#fff; border:2px solid #c5ddf7; filter:grayscale(.85); opacity:.85; }
+html.skin .dl-m.ok{ filter:none; opacity:1; border-color:#d4a017; }
+html.skin .dl-m .dl-bd{ grid-row:span 2; }
+html.skin .dl-m small{ font-size:.62rem; font-weight:900; color:var(--ink2); } html.skin .dl-m b{ grid-row:span 2; font-size:.7rem; font-weight:900; color:var(--ink); }
+html.skin .dl-m .fb{ height:6px; background:#c5ddf7; } html.skin .dl-m .fb i{ background:#ffb800; }
+html.skin .dl-bd{ display:block; flex:none; width:2.2rem; height:2.2rem; background:url(../img/badges.png) no-repeat; background-size:600% 400%; image-rendering:pixelated; }
+html.skin .hb-b .dl-bi{ width:2.2rem; height:2.2rem; color:#fff; }
+html.skin .k-dl-home .hb{ margin-top:auto; } html.skin .k-dl-home .hb-b{ min-height:3.4rem; }
+html.skin .sk-body.f1 .dl-s{ min-height:3.6rem; } html.skin .sk-body.f1 .dl-r{ padding:3px 0; }
+html.skin .sk-body.f2 .dl-ms{ display:none; } html.skin .sk-body.f2 .k-dl-home .hb-b{ min-height:2.8rem; }
+html.skin .sk-body.f3 .dl-sr em:not(:first-child){ display:none; } html.skin .sk-body.f3 .dl-t .fb{ display:none; }
+@media (orientation:landscape) and (max-height:620px){
+  html.skin .sk-body.k-dl-home{ display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.25fr); grid-auto-rows:min-content; align-content:start; column-gap:8px; row-gap:6px; }
+  html.skin .k-dl-home > .crres, html.skin .k-dl-home > .toast, html.skin .k-dl-home > .hb{ grid-column:1 / -1; }
+  html.skin .k-dl-home > .dl-goals{ grid-column:1; } html.skin .k-dl-home > .dl-card{ grid-column:2; }
+  html.skin .k-dl-home .hb{ margin-top:0; } html.skin .k-dl-home .hb-b{ min-height:2.6rem; }
+  html.skin .dl-s{ min-height:3.4rem; }
+}
+
+/* ---------- 주간 리그 신문 ---------- */
+html.skin .pp-paper{ flex:1 1 auto; min-height:0; display:flex; flex-direction:column; border-radius:6px; background:#f4ecd8;
+  background-image:linear-gradient(rgba(120,90,40,.05) 1px, transparent 1px); background-size:100% 4px; border:2px solid #8a6d3b; box-shadow:0 4px 0 #6b5428, inset 0 0 30px rgba(120,90,40,.18); color:#2b2216; overflow:hidden; font-family:'Noto Serif KR', 'Nanum Myeongjo', 'Batang', serif; }
+html.skin .pp-mast{ flex:none; text-align:center; padding:6px 10px 4px; border-bottom:3px double #2b2216; }
+html.skin .pp-mast b{ display:block; font-size:1.5rem; font-weight:900; letter-spacing:.12em; line-height:1.1; }
+html.skin .pp-mast small{ display:flex; justify-content:space-between; gap:6px; font-size:.62rem; font-weight:700; border-top:1px solid #2b2216; margin-top:3px; padding-top:2px; font-family:inherit; }
+html.skin .pp-pg{ padding:6px 10px !important; gap:7px; background:transparent; }
+html.skin .pp-paper h3{ margin:0; font-size:1.15rem; font-weight:900; line-height:1.2; }
+html.skin .pp-paper h4{ margin:0 0 3px; font-size:.7rem; font-weight:900; letter-spacing:.06em; border-bottom:1.5px solid #2b2216; padding-bottom:1px; }
+html.skin .pp-paper p{ margin:0; }
+html.skin .pp-head{ display:flex; align-items:center; gap:10px; padding-bottom:6px; border-bottom:1px solid #8a6d3b; }
+html.skin .pp-head p{ font-size:.74rem; color:#4a3b24; margin-top:2px; }
+html.skin .pp-head.dn h3{ color:#8f1d1d; }
+html.skin .pp-mvps{ display:grid; grid-template-columns:1fr 1fr; gap:0; }
+html.skin .pp-mv{ display:grid; justify-items:center; text-align:center; gap:1px; padding:0 6px; min-width:0; }
+html.skin .pp-mv + .pp-mv{ border-left:1px solid #8a6d3b; }
+html.skin .pp-mv > small{ font-size:.62rem; font-weight:900; letter-spacing:.08em; background:#2b2216; color:#f4ecd8; padding:0 8px; border-radius:2px; }
+html.skin .pp-mf{ position:relative; } html.skin .pp-mf .crf{ border-radius:50%; background-color:#e6dcc3; border:2px solid #2b2216; filter:sepia(.25); }
+html.skin .pp-mf strong{ position:absolute; right:-1.4rem; bottom:0; font-size:.7rem; font-weight:900; background:#c0392b; color:#fff; padding:0 5px; border-radius:3px; transform:rotate(-8deg); white-space:nowrap; font-family:sans-serif; }
+html.skin .pp-mv b{ font-size:.9rem; font-weight:900; }
+html.skin .pp-tm{ display:inline-flex; align-items:center; gap:3px; font-size:.62rem; color:#4a3b24; font-weight:700; }
+html.skin .pp-mv p{ font-size:.64rem; color:#3b2f1c; line-height:1.25; }
+html.skin .pp-mv.none p{ font-size:.7rem; color:#6b5428; padding:1rem 0; }
+html.skin .pp-sts{ display:grid; grid-template-columns:1fr 1fr; column-gap:10px; }
+html.skin .pp-sc{ display:grid; gap:1px; }
+html.skin .pp-sc span{ display:grid; grid-template-columns:1.1rem auto minmax(0, 1fr) 2rem auto; align-items:center; gap:3px; font-size:.7rem; padding:1px 2px; border-bottom:1px dotted #8a6d3b; font-family:sans-serif; }
+html.skin .pp-sc span.me{ background:rgba(255,200,60,.35); font-weight:900; }
+html.skin .pp-sc i{ font-style:normal; font-weight:900; text-align:center; } html.skin .pp-sc b{ font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } html.skin .pp-sc em{ font-style:normal; font-variant-numeric:tabular-nums; color:#4a3b24; font-size:.64rem; }
+html.skin .pp-ar{ font-style:normal; font-size:.62rem; font-weight:900; color:#6b5428; text-align:center; }
+html.skin .pp-ar.up{ color:#c0392b; } html.skin .pp-ar.dn{ color:#1f5fbf; }
+html.skin .pp-gl{ display:grid; gap:2px; }
+html.skin .pp-g{ display:grid; grid-template-columns:2.2rem auto minmax(0, 1fr) auto minmax(0, 1fr) auto 3.4rem; align-items:center; gap:4px; font-size:.72rem; font-family:sans-serif; }
+html.skin .pp-g.me{ font-weight:900; } html.skin .pp-g small{ font-size:.6rem; color:#6b5428; } html.skin .pp-g b{ font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } html.skin .pp-g b.w{ font-weight:900; }
+html.skin .pp-g b:nth-of-type(2){ text-align:right; }
+html.skin .pp-g strong{ font-variant-numeric:tabular-nums; font-weight:900; }
+html.skin .pp-g em{ font-style:normal; font-size:.58rem; font-weight:900; color:#fff; background:#8a6d3b; border-radius:3px; padding:0 4px; text-align:center; white-space:nowrap; }
+html.skin .pp-nt p{ font-size:.7rem; line-height:1.3; } html.skin .pp-nt p::before{ content:'■ '; font-size:.5rem; vertical-align:middle; }
+html.skin .pp-my{ display:flex; align-items:center; gap:8px; padding:5px 6px; border:1.5px solid #2b2216; border-radius:4px; background:rgba(255,255,255,.35); }
+html.skin .pp-myt{ display:grid; gap:1px; min-width:0; } html.skin .pp-myt small{ font-size:.6rem; font-weight:900; color:#6b5428; } html.skin .pp-myt b{ font-size:.86rem; font-weight:900; display:inline-flex; align-items:center; gap:4px; }
+html.skin .pp-my .dots i{ border-color:#2b2216; }
+html.skin .pp-ms{ margin-left:auto; display:flex; align-items:center; gap:5px; min-width:0; } html.skin .pp-ms > span{ display:grid; min-width:0; } html.skin .pp-ms b{ font-size:.76rem; } html.skin .pp-ms small{ font-size:.6rem; color:#4a3b24; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+html.skin .pp-paper .pg-nav .pg-b{ background:#2b2216; color:#f4ecd8; border-color:#2b2216; }
+html.skin .pp-paper .pg-no{ color:#2b2216; }
+html.skin .k-pp-show .hb-b{ min-height:2.9rem; }
+html.skin .sk-body.f1 .pp-mast b{ font-size:1.25rem; } html.skin .sk-body.f2 .pp-mv p{ display:none; }
+@media (orientation:landscape) and (max-height:620px){
+  html.skin .pp-mast b{ font-size:1.1rem; display:inline; margin-right:10px; } html.skin .pp-mast small{ display:inline-flex; border:0; } html.skin .pp-mast{ display:flex; align-items:center; justify-content:center; padding:3px 8px; }
+  html.skin .pp-mvps .crf.mid{ width:3rem; height:3rem; }
+  html.skin .k-pp-show .hb-b{ min-height:2.3rem; grid-auto-flow:column; } html.skin .k-pp-show .hb-b .gico{ width:1.6rem; height:1.6rem; }
+}

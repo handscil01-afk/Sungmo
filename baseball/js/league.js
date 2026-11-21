@@ -204,7 +204,7 @@ function leagueAdvance(L, myG){
     if(post) seriesResult(L, g, G);
   });
   if(!post && typeof cpuTradeDay === 'function') cpuTradeDay(L);   // 컴퓨터 구단끼리 트레이드 (office.js)
-  if(!post){ L.day++; if(L.day >= L.sched.length) startPost(L); }
+  if(!post){ L.day++; if(typeof paperDay === 'function') paperDay(L); if(L.day >= L.sched.length) startPost(L); }   // 7일마다 주간 리그 신문 (paper.js)
   return out;
 }
 
