@@ -116,7 +116,7 @@ function finalCardHTML(){
   const tm = (i) => `<span class="fin-t${win === i ? ' w' : ''}">${emb(G.teams[i], 'big')}<b>${esc(G.teams[i].short)}</b></span>`;
   return `<div class="fin" role="status"><span class="fin-h">경기 종료${G.inning > G.innings ? ` · 연장 ${G.inning}회` : ''}</span>
     <div class="fin-sc">${tm(0)}<strong class="${win === 0 ? 'w' : ''}">${r[0]}</strong><i>:</i><strong class="${win === 1 ? 'w' : ''}">${r[1]}</strong>${tm(1)}</div>
-    ${ban3(ban, 'fin-ban')}${pit ? `<div class="fin-p">${pit}</div>` : ''}</div>`;
+    ${ban3(ban, 'fin-ban')}${pit ? `<div class="fin-p">${pit}</div>` : ''}${typeof rankFinTag === 'function' ? rankFinTag() : ''}</div>`;
 }
 function endDeckHTML(S){
   const want = (S.opts || []).filter(o => !o.hide);

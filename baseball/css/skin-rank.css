@@ -1,0 +1,33 @@
+/* 화면 보며 하기: 내 전적 · 순위표 · 경기 끝 상대 전적 (js/skin-rank.js, js/rank.js) */
+html.skin .rk-tabs{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+html.skin .rk-tabs button{ font-size:.82rem; }
+html.skin .rk-list{ gap:5px; }
+html.skin .rk-m .arc-tx b{ font-variant-numeric:tabular-nums; }
+html.skin .rk-wl{ flex:none; display:grid; place-items:center; width:2.1rem; height:2.1rem; border-radius:10px; font-size:1rem; font-weight:900; color:#fff; border:2px solid rgba(0,0,0,.25); }
+html.skin .rk-wl.w{ background:#1f9d4a; } html.skin .rk-wl.l{ background:#d8402c; } html.skin .rk-wl.d{ background:#7d8798; }
+html.skin .rk-av{ flex:none; display:grid; place-items:center; width:2.4rem; height:2.4rem; border-radius:50%; background:linear-gradient(180deg, #4f86e8, #1d4fb0); color:#fff; font-weight:900; font-size:1.05rem; border:2px solid #0c3f99; }
+html.skin .rk-big{ font-size:1rem; color:var(--ink); white-space:nowrap; }
+html.skin .rk-empty{ flex:1; align-content:center; }
+html.skin .rk-empty .gico{ width:2.6rem; height:2.6rem; border-radius:14px; } html.skin .rk-empty .gico svg{ width:1.5rem; height:1.5rem; }
+html.skin .rk-err{ margin:0 4px; font-size:.74rem; font-weight:800; color:#fff; text-shadow:0 1px 0 #0b3a8c; text-align:center; }
+html.skin .rk-act{ margin-top:auto; }
+html.skin .rk-act .hb-b{ min-height:3.3rem; grid-auto-flow:column; justify-content:center; gap:6px; }
+html.skin .rk-act .hb-b b{ font-size:.85rem; white-space:nowrap; }
+html.skin .sk-body.f2 .rk-act .hb-b{ min-height:2.8rem; }
+
+/* 순위표 */
+html.skin .rk-board{ gap:4px; }
+html.skin .rk-row{ display:grid; grid-template-columns:2rem minmax(0, 1fr) auto 3.4rem; align-items:center; gap:8px; padding:6px 10px; border-radius:12px; background:var(--pan); border:2px solid var(--line); color:var(--ink); }
+html.skin .rk-row .rk-n{ font-style:normal; display:grid; place-items:center; height:1.7rem; border-radius:8px; background:#e4ecfa; font-weight:900; font-size:.85rem; font-variant-numeric:tabular-nums; }
+html.skin .rk-row.t1 .rk-n{ background:#ffd84d; color:#4a2a00; } html.skin .rk-row.t2 .rk-n{ background:#d6dde8; } html.skin .rk-row.t3 .rk-n{ background:#f0b27a; }
+html.skin .rk-row b{ font-size:.92rem; font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+html.skin .rk-row b em{ font-style:normal; font-size:.62rem; padding:1px 6px; border-radius:999px; background:#e2501a; color:#fff; vertical-align:middle; }
+html.skin .rk-row small{ font-size:.7rem; font-weight:800; color:var(--ink2); white-space:nowrap; }
+html.skin .rk-row strong{ text-align:right; font-size:1.05rem; font-weight:900; color:#1d5fd0; font-variant-numeric:tabular-nums; }
+html.skin .rk-row.me{ background:linear-gradient(180deg, #fff6d6, #ffe08a); border-color:#c89100; box-shadow:0 0 0 2px #ffcf33; }
+html.skin .rk-row.pin{ flex:none; }
+
+/* 온라인 경기 끝 점수 카드 아래: 상대 전적 · 점수 변화 */
+html.skin .fin-rk{ display:inline-flex; align-items:center; gap:4px; margin-top:3px; padding:2px 10px; border-radius:999px; background:rgba(255,255,255,.14); font-size:.72rem; font-weight:800; color:#fff; white-space:nowrap; }
+html.skin .fin-rk b{ color:#ffd84d; font-weight:900; }
+html.skin .fin-rk em{ font-style:normal; font-weight:900; } html.skin .fin-rk em.up{ color:#7dff9a; } html.skin .fin-rk em.dn{ color:#ff9a8a; }

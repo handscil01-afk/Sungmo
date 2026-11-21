@@ -668,7 +668,7 @@ function endScreen(){
     { n:2, t:'점수판', act: v => note(scoreboard(G), v, 'score') },
     { n:3, t:'경기 기록 전체', act: v => go(() => logScreen(), v) },
   ] };
-  if(NET.on) return { board:true, q: NET.role === 'host' ? '경기가 끝났습니다. 한 판 더 할까요?' : '경기가 끝났습니다. 방장이 한 판 더를 고르면 새 경기가 시작됩니다.', opts:[
+  if(NET.on) return { board:true, q: NET.role === 'host' ? '경기가 끝났습니다. 한 판 더 할까요?' : '경기가 끝났습니다. 방장이 한 판 더를 고르면 새 경기가 시작됩니다.', note: VIEW.a11y && typeof rankEndNote === 'function' ? rankEndNote() : undefined, opts:[
     { n:1, t:'한 판 더', hide: NET.role !== 'host', s:'같은 팀으로 새 경기를 시작합니다. 선수 능력치와 날씨는 새로 정해집니다.', act: v => netStartGame(v) },
     { n:2, t:'점수판', act: v => note(scoreboard(G), v, 'score') },
     { n:3, t:'경기 기록 전체', act: v => go(() => logScreen(), v) },
