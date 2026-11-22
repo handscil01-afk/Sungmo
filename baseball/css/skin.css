@@ -1031,3 +1031,18 @@ html.skin .bag2 .slot .dur{ width:80%; }
 html.skin .bld{ position:relative; aspect-ratio:16 / 9; margin-bottom:8px; border-radius:14px; border:3px solid var(--line); background-size:cover; background-position:center; image-rendering:pixelated; box-shadow:0 3px 0 var(--line2); }
 html.skin .bld span{ position:absolute; left:8px; bottom:6px; padding:2px 10px; border-radius:999px; background:rgba(10, 28, 70, .8); color:#fff; font-size:.8rem; font-weight:900; }
 html.skin .bag2 .slot .sl-i em, html.skin .slot .sl-i em{ white-space:nowrap; line-height:1.3; } html.skin .bag2 .slot .iico{ width:1.7rem; height:1.7rem; }
+html.skin .ig-wrap{ display:grid; gap:6px; }
+@media (orientation:landscape) and (max-height:620px){
+  html.skin .k-cr-shop2 > .ig-wrap, html.skin .k-cr-bag2 > .ig-wrap, html.skin .k-cr-bag2 > .bag2{ grid-column:1; }
+  html.skin .k-cr-shop2 > .ig-wrap{ grid-row:2 / span 3; } html.skin .k-cr-bag2 > .ig-wrap{ grid-row:3 / span 2; }
+  html.skin .k-cr-shop2 .ig, html.skin .k-cr-bag2 .ig{ grid-template-columns:repeat(8, minmax(0, 1fr)) !important; grid-row:auto !important; }
+  html.skin .k-cr-shop2 > .idt, html.skin .k-cr-bag2 > .idt{ grid-row:2; } html.skin .k-cr-shop2 > .hb, html.skin .k-cr-bag2 > .hb{ grid-row:3; }
+  html.skin .ig-h{ font-size:.66rem; }
+}
+/* 가방·용품점 칸의 아이콘은 화면이 좁아져도(f2·f3) 숨기지 않고 칸 크기에 맞춤 */
+html.skin .sk-body .ic .iico{ display:block !important; width:86% !important; height:auto !important; aspect-ratio:1; }
+html.skin .sk-body .slot .iico{ display:block !important; } html.skin .sk-body .idt .iico{ display:block !important; }
+@media (orientation:landscape) and (max-height:620px){
+  html.skin .k-cr-bag2 > .bag2{ grid-row:2; } html.skin .k-cr-bag2 > .ig-wrap{ grid-row:3 / span 2; } html.skin .k-cr-bag2 > .idt{ grid-row:2; } html.skin .k-cr-bag2 > .hb{ grid-row:3; }
+  html.skin .k-cr-bag2 .ig{ grid-template-columns:repeat(10, minmax(0, 1fr)) !important; }
+}

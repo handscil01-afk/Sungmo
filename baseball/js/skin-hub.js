@@ -148,7 +148,7 @@ function crShop2(S){
   const it = itemOf(id), price = (it || goodsOf(id)).price;
   const buy = hubOpt(S, 'buy'), eq = hubOpt(S, 'buyeq'), bag = hubOpt(S, 'bag');
   const gear = S.ids.filter(x => itemOf(x)), goods = S.ids.filter(x => !itemOf(x));
-  return `${crRes(L)}${lifeMsg(S)}<p class="ig-h">장비</p><div class="ig">${gear.map(cell).join('')}</div><p class="ig-h">소모품</p><div class="ig">${goods.map(cell).join('')}</div>
+  return `${crRes(L)}${lifeMsg(S)}<div class="ig-wrap"><p class="ig-h">장비</p><div class="ig">${gear.map(cell).join('')}</div><p class="ig-h">소모품</p><div class="ig">${goods.map(cell).join('')}</div></div>
     ${lifeDetail(id, c, p, `<strong class="idt-pr${c.money < price ? ' poor' : ''}">${esc(won(price))}</strong>`)}
     <div class="hb c${[buy, eq, bag].filter(Boolean).length} act">${[buy, eq, bag].filter(Boolean).map(o => `<button type="button" class="hb-b${o.key === 'buyeq' || (o.key === 'buy' && !eq) ? ' pri' : ''}${o.key === 'buy' && it && c.owned.includes(it.id) ? ' off' : ''}" data-sk="opt" data-n="${o.n}">${hubIco(o.key === 'bag' ? 'bag' : o.key === 'buyeq' ? 'play' : 'go')}<b>${esc(o.t)}</b></button>`).join('')}</div>`;
 }
@@ -167,8 +167,8 @@ function crBag2(S){
   const ico = { equip:'play', repair:'set', enh:'rec', use:'play', shop:'bag' };
   return `${crRes(L)}${lifeMsg(S)}
     <div class="bag2"><div class="bag-me">${crFace(crFaceOf(L, c, p), col, 'mid')}<div class="slots">${['bat', 'glove', 'shoes', 'wrist', 'acc'].map(slot).join('')}</div></div></div>
-    <p class="ig-h">장비 ${gear.length}개</p><div class="ig bagi">${fill(gear, 10)}</div>
-    <p class="ig-h">소모품</p><div class="ig bagi">${fill(goods, 5)}</div>
+    <div class="ig-wrap"><p class="ig-h">장비 ${gear.length}개</p><div class="ig bagi">${fill(gear, 10)}</div>
+    <p class="ig-h">소모품</p><div class="ig bagi">${fill(goods, 5)}</div></div>
     ${lifeDetail(id, c, p)}
     <div class="hb c${Math.min(4, acts.length)} act">${acts.map(o => `<button type="button" class="hb-b${o.key === 'equip' || o.key === 'use' ? ' pri' : ''}" data-sk="opt" data-n="${o.n}">${hubIco(ico[o.key])}<span class="tx"><b>${esc(o.t)}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</span></button>`).join('')}</div>`;
 }
