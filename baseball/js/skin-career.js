@@ -133,9 +133,13 @@ function crSpot(id){
     return;
   }
   const os = t.keys.map(k => crOpt(UI.S, k)).filter(Boolean);
-  if(os.length === 1){ choose(os[0].n, 'click'); return; }
-  skinNote(null, `<div class="spotm">${os.map(o => `<button type="button" class="card" data-sk="opt" data-n="${o.n}"><span class="tx"><b>${esc(o.t)}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</span></button>`).join('')}</div>`, t.name);
+  // 건물마다 그 건물 그림을 위에 보여 주고, 할 수 있는 일을 고름. 새 그림(img/cr-<건물>.png)이 없으면 비슷한 그림을 대신 씀
+  const L = crL(), col = L ? crColor(L) : '#3b82f6', img = BLD_IMG[id] || [];
+  const bg = img.map(n => `url(${skTint(n, col)})`).join(', ');
+  skinNote(null, `${bg ? `<div class="bld" style="background-image:${bg}" aria-hidden="true"><span>${esc(t.name)}</span></div>` : ''}<div class="spotm">${os.map(o => `<button type="button" class="card" data-sk="opt" data-n="${o.n}"><span class="tx"><b>${esc(o.t)}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</span></button>`).join('')}</div>`, t.name);
 }
+// 건물 그림: [새 그림, 없을 때 쓰는 그림]
+const BLD_IMG = { office:['cr-office'], shop:['cr-shop'], plaza:['cr-plaza', 'cr-fansign'], academy:['cr-academy', 'cr-cage'], hospital:['cr-hospital', 'cr-rehab'], house:['cr-house', 'cr-room'], airport:['cr-airport', 'cr-beach'], mini:['cr-cage'] };
 
 /* ---------- 용품점 ---------- */
 function crShop(S){

@@ -153,6 +153,9 @@ function mgPrep(){
   const PT = [['빠른 공', 740, 840], ['보통 공', 860, 960], ['느린 커브', 1000, 1120]];
   const p = PT[Math.floor(Math.random() * PT.length)];
   st.pitch = { name: p[0], T: Math.round(mgRand(p[1], p[2])) };
+  // 공이 오는 코스: 다섯 군데 가운데 무작위 (동그라미도 그 자리로), 커브는 휘어 들어옴
+  st.aim = [[44, 70], [52, 73], [60, 70], [46, 77], [58, 77]][Math.floor(Math.random() * 5)];
+  st.bend = p[0] === '느린 커브' ? (Math.random() < 0.5 ? -7 : 7) : 0;
   if(st.g === 'bat'){
     st.loc = Math.floor(Math.random() * 3);
     const h = Math.random() < 0.65 ? st.loc : Math.floor(Math.random() * 3);
@@ -175,7 +178,7 @@ function mgPlay(){
   if(st.phase === 'end') return { ...base, q:`${g.n}${g.unit} 모두 끝났습니다. 합계 ${st.score}점. 1번을 누르면 결과를 봅니다.`, opts:[{ n:1, key:'k1', t:'결과 보기', act: v => mgFinish(v) }] };
   if(st.phase === 'live'){
     const lab = { bat:'스윙!', bunt:'번트!', steal:'뛰기!' }[st.g], k = st.g === 'bat' ? 1 : 3;
-    const q = st.g === 'steal' ? '투수를 읽으세요. 둥 소리에 바로 누르고, 딱딱 소리에는 참으세요.' : '삐 소리에 맞춰 누르세요.';
+    const q = st.g === 'steal' ? `투수를 읽으세요. 둥 소리(투구)에 바로 누르면 2루로 뜁니다.${st.lead ? ' 딱딱 소리(견제)가 나면 바로 눌러 귀루하세요.' : ' 짧은 리드라 견제는 그냥 참으면 됩니다.'}` : '삐 소리에 맞춰 누르세요.';
     return { ...base, q, opts: Array.from({ length:k }, (_, i) => ({ n: i + 1, key:'k' + (i + 1), t: lab, act: () => mgTap() })) };
   }
   if(st.g === 'bat'){
@@ -224,7 +227,10 @@ function mgPitchStart(){
 function mgTap(){
   const r = MG.run; if(!r || r.done) return;
   if(UI.make !== mgPlay){ mgStop(); return; }
-  if(r.g === 'steal') mgStealTap(performance.now()); else mgPitchEnd(performance.now());
+  const now = performance.now();
+  if(r.g === 'steal'){ mgStealTap(now); return; }
+  if(now < r.rel) return;   // 공을 놓기 전에 누른 것은 무시 (헛스윙으로 치지 않음)
+  mgPitchEnd(now);
 }
 function mgPitchEnd(tap){
   const r = MG.run, st = MG.st; if(!r || r.done || !st) return;
@@ -281,7 +287,7 @@ function mgBuntTier(e){
   if(e == null) return 'none';
   if(e === -1) return 'miss';
   const a = Math.abs(e) / mgTol();
-  return a <= 0.06 ? 'perfect' : a <= 0.12 ? 'good' : a <= 0.2 ? 'weak' : e < 0 ? 'miss' : 'pop';
+  return a <= 0.09 ? 'perfect' : a <= 0.18 ? 'good' : a <= 0.3 ? 'weak' : e < 0 ? 'miss' : 'pop';   // 번트는 공을 갖다 대기만 하면 되므로 폭을 넓게
 }
 function mgBuntRes(e, dir, def, timed = false, tier0){
   const tier = tier0 || mgBuntTier(e), max = mgBuntMax(dir, def), zone = ['1루 선상', '3루 선상', '투수 앞'][dir];
@@ -309,8 +315,10 @@ const MG_TELL = {
   pitch:['투수가 포수 사인에 고개를 끄덕이고 홈 쪽으로 어깨를 닫습니다.', '투수의 앞다리 무릎이 안쪽으로 모입니다.', '투수가 1루는 보지 않고 포수 미트만 봅니다.'],
   pick:['투수가 1루 쪽을 힐끗 봅니다.', '투수의 뒷발 뒤꿈치가 살짝 들립니다.', '투수가 공을 쥔 채 유난히 오래 멈춥니다.'],
 };
-const MG_LEAD_T = [3.30, 3.20, 3.10];   // 리드별 2루까지 걸리는 시간(초, 반응 시간 빼고)
-const MG_LEAD_RISK = [0, 0.05, 0.2];   // 견제가 오면 귀루하다 잡힐 확률
+const MG_LEAD_T = [3.15, 3.02, 2.90];   // 리드별 2루까지 걸리는 시간(초, 반응 시간 빼고)
+const MG_LEAD_RISK = [0, 0.03, 0.1];   // 고르기로 하기: 견제가 오면 귀루하다 잡힐 확률
+// 타이밍으로 하기: 견제가 오면 단추가 '귀루!'로 바뀌고 이 시간(초) 안에 누르면 세이프. 짧은 리드는 누르지 않아도 세이프
+const MG_BACK_WIN = [null, 0.75, 0.5];
 function mgMoves(){
   const n = mgPickW([45, 35, 20]), out = [];
   for(let i = 0; i < n; i++) out.push({ type:'pick' }); out.push({ type:'pitch' });
@@ -335,32 +343,34 @@ function mgLead(lead, via){
     run.timers.push(setTimeout(() => {
       if(MG.run !== run || run.done) return;
       run.cue = m.type; run.cueAt = m.at; run.mi = i;
-      if(m.type === 'pick') run.timers.push(setTimeout(() => mgPickoffEnd(run), 500 * sc));
+      if(m.type === 'pick') run.timers.push(setTimeout(() => mgPickoffEnd(run, i), (MG_BACK_WIN[run.lead] ? MG_BACK_WIN[run.lead] * 1000 : 500) * sc));
       else run.timers.push(setTimeout(() => mgStealEnd(run, null), (fast ? 450 : 1100)));
     }, Math.max(0, m.at - performance.now())));
   });
   st.phase = 'live';
   rerender();
 }
-// 견제가 지나감: 크게 리드했으면 가끔 잡힘, 아니면 1점
-function mgPickoffEnd(run){
+// 견제가 지나감: 귀루 단추를 제때 눌렀으면(짧은 리드는 저절로) 세이프 1점(큰 리드는 2점), 아니면 견제사
+function mgPickoffEnd(run, i){
   if(MG.run !== run || run.done) return;
-  if(Math.random() < MG_LEAD_RISK[run.lead]){ mgStealOut(run, `견제구! ${MG_LEAD[run.lead]} 리드라 귀루가 늦어 아웃.`); return; }
-  MG.st.survived++;
+  const backed = (run.backed || {})[i];
+  if(!backed && MG_BACK_WIN[run.lead]){ mgStealOut(run, `견제구! 귀루가 늦어 아웃. ${MG_LEAD[run.lead]} 리드에서는 견제가 오면 바로 눌러야 합니다.`); return; }
+  MG.st.survived += run.lead === 2 ? 2 : 1;
   run.cue = 'reset';
 }
 function mgStealTap(t){
   const run = MG.run, sc = mgFast() ? 0.12 : 1;
   // 시각으로 따짐 (타이머가 조금 늦게 와도 같은 판정): cur 이미 나온 마지막 동작 · next 아직 안 나온 동작
   const idx = run.moves.findIndex(m => m.at > t);
-  const cur = idx === -1 ? run.moves[run.moves.length - 1] : idx > 0 ? run.moves[idx - 1] : null, next = idx === -1 ? null : run.moves[idx];
+  const ci = idx === -1 ? run.moves.length - 1 : idx - 1, cur = ci >= 0 ? run.moves[ci] : null, next = idx === -1 ? null : run.moves[idx];
   if(cur && cur.type === 'pitch'){ mgStealEnd(run, (t - cur.at) / 1000); return; }
-  if(cur && cur.type === 'pick' && t < cur.at + 1200 * sc){ mgStealOut(run, '견제구인데 뛰었습니다. 견제사.'); return; }
-  // 아직 다음 동작 전: 견제가 올 차례면 걸리고, 투구 직전이면 미리 스타트(아주 일찍이면 들킴)
+  // 견제 중: 누르면 귀루 (제때면 세이프). 이미 귀루했으면 무시
+  if(cur && cur.type === 'pick' && t < cur.at + 1400 * sc){ (run.backed ||= {})[ci] = true; run.backAt = t; return; }
+  // 아직 다음 동작 전: 투구 직전이면 미리 스타트, 그보다 이르면 무시 (견제를 기다리는 중의 실수로 아웃되지 않게)
   if(!next){ mgStealEnd(run, null); return; }
-  if(next.type === 'pick'){ mgStealOut(run, '먼저 움직였다가 견제에 걸렸습니다.'); return; }
+  if(next.type === 'pick') return;
   const early = next.at - t;
-  if(early > 350 * sc){ mgStealOut(run, '너무 일찍 뛰어 투수에게 들켰습니다. 아웃.'); return; }
+  if(early > 350 * sc) return;
   mgStealEnd(run, -Math.min(0.15, early / 1000 / sc));
 }
 function mgStealOut(run, text){
@@ -382,7 +392,7 @@ function mgStealRes(lead, rt, timed){
   const runner = MG_LEAD_T[lead] + Math.max(-0.15, rt) * 1.05, catcher = mgRand(3.3, 3.6), margin = catcher - runner;
   const start = !timed ? '' : rt < 0.02 ? '스타트가 아주 빨랐습니다! ' : `반응 ${mgSec(rt * 1000)}초. `;
   if(margin <= 0) return { g:'steal', k:'out', pts: 0, lead, rt, margin, text:`${start}포수의 송구가 빨랐습니다. 2루에서 아웃.` };
-  const pts = 6 + Math.min(9, Math.round(margin * 40)) + sv;
+  const pts = 6 + Math.min(9, Math.round(margin * 40)) + sv + lead;
   return { g:'steal', k:'safe', pts, lead, rt, margin, text:`${start}2루 ${margin > 0.15 ? '여유 있게' : margin < 0.05 ? '간발의 차로' : ''} 세이프! ${pts}점.${bonus}`.replace('  ', ' ') };
 }
 function mgStealRead(run, via){

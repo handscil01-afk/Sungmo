@@ -147,7 +147,8 @@ function crShop2(S){
     return `<button type="button" class="ic${x === id ? ' on' : ''}${own ? ' own' : ''}${poor ? ' poor' : ''}" data-sk="set" data-k="it" data-v="${x}" aria-pressed="${x === id}" aria-label="${esc((it || g).name)}">${itemIco(lifeIdx(x))}<small>${own ? '보유' : esc(won(pr).replace(' 원', ''))}</small>${g && c.goods[x] ? `<em>${c.goods[x]}</em>` : ''}</button>`; };
   const it = itemOf(id), price = (it || goodsOf(id)).price;
   const buy = hubOpt(S, 'buy'), eq = hubOpt(S, 'buyeq'), bag = hubOpt(S, 'bag');
-  return `${crRes(L)}${lifeMsg(S)}<div class="ig">${S.ids.map(cell).join('')}</div>
+  const gear = S.ids.filter(x => itemOf(x)), goods = S.ids.filter(x => !itemOf(x));
+  return `${crRes(L)}${lifeMsg(S)}<p class="ig-h">장비</p><div class="ig">${gear.map(cell).join('')}</div><p class="ig-h">소모품</p><div class="ig">${goods.map(cell).join('')}</div>
     ${lifeDetail(id, c, p, `<strong class="idt-pr${c.money < price ? ' poor' : ''}">${esc(won(price))}</strong>`)}
     <div class="hb c${[buy, eq, bag].filter(Boolean).length} act">${[buy, eq, bag].filter(Boolean).map(o => `<button type="button" class="hb-b${o.key === 'buyeq' || (o.key === 'buy' && !eq) ? ' pri' : ''}${o.key === 'buy' && it && c.owned.includes(it.id) ? ' off' : ''}" data-sk="opt" data-n="${o.n}">${hubIco(o.key === 'bag' ? 'bag' : o.key === 'buyeq' ? 'play' : 'go')}<b>${esc(o.t)}</b></button>`).join('')}</div>`;
 }
@@ -155,17 +156,19 @@ function crBag2(S){
   const L = crL(); if(!L || !L.career) return null;
   const c = L.career, p = myP(L), col = crColor(L), id = BAG_SEL;
   const slot = sl => { const x = c.equip && c.equip[sl], it = x && itemOf(x), st = it ? gearState(c, x) : null;
-    return it ? `<button type="button" class="slot on${x === id ? ' sel' : ''}" data-sk="set" data-k="it" data-v="${x}"><small>${esc(SLOT_NAME[sl])}</small>${itemIco(ITEMS.indexOf(it))}<span class="dur"><i style="width:${st.dur}%"></i></span>${st.lv ? `<em>+${st.lv}</em>` : ''}</button>`
+    return it ? `<button type="button" class="slot on${x === id ? ' sel' : ''}" data-sk="set" data-k="it" data-v="${x}"><small>${esc(SLOT_NAME[sl])}</small><span class="sl-i">${itemIco(ITEMS.indexOf(it))}${st.lv ? `<em>+${st.lv}</em>` : ''}</span><span class="dur"><i style="width:${st.dur}%"></i></span></button>`
       : `<div class="slot"><small>${esc(SLOT_NAME[sl])}</small><span class="empty">비어 있음</span></div>`; };
-  const cells = S.ids.map(x => { const it = itemOf(x), on = it && c.equip[it.slot] === x;
-    return `<button type="button" class="ic${x === id ? ' on' : ''}${on ? ' eq' : ''}" data-sk="set" data-k="it" data-v="${x}" aria-pressed="${x === id}" aria-label="${esc((it || goodsOf(x)).name)}">${itemIco(lifeIdx(x))}${it ? (on ? '<small>장착</small>' : '') : `<em>${c.goods[x]}</em>`}</button>`; });
-  const n = Math.max(15, Math.ceil(cells.length / 5) * 5);
-  while(cells.length < n) cells.push('<span class="ic emp" aria-hidden="true"></span>');
+  // 장비와 소모품을 나눈 두 칸 (빈칸으로 줄을 채움)
+  const cell = x => { const it = itemOf(x), on = it && c.equip[it.slot] === x, lv = it ? gearState(c, x).lv : 0;
+    return `<button type="button" class="ic${x === id ? ' on' : ''}${on ? ' eq' : ''}" data-sk="set" data-k="it" data-v="${x}" aria-pressed="${x === id}" aria-label="${esc((it || goodsOf(x)).name)}">${itemIco(lifeIdx(x))}${it ? `${on ? '<small>장착</small>' : ''}${lv ? `<i class="lv">+${lv}</i>` : ''}` : `<em>${c.goods[x]}</em>`}</button>`; };
+  const fill = (list, min) => { const out = list.map(cell), n = Math.max(min, Math.ceil(out.length / 5) * 5); while(out.length < n) out.push('<span class="ic emp" aria-hidden="true"></span>'); return out.join(''); };
+  const gear = S.ids.filter(x => itemOf(x)), goods = S.ids.filter(x => !itemOf(x));
   const acts = ['equip', 'repair', 'enh', 'use', 'shop'].map(k => hubOpt(S, k)).filter(Boolean);
   const ico = { equip:'play', repair:'set', enh:'rec', use:'play', shop:'bag' };
   return `${crRes(L)}${lifeMsg(S)}
     <div class="bag2"><div class="bag-me">${crFace(crFaceOf(L, c, p), col, 'mid')}<div class="slots">${['bat', 'glove', 'shoes', 'wrist', 'acc'].map(slot).join('')}</div></div></div>
-    <div class="ig bagi">${cells.join('')}</div>
+    <p class="ig-h">장비 ${gear.length}개</p><div class="ig bagi">${fill(gear, 10)}</div>
+    <p class="ig-h">소모품</p><div class="ig bagi">${fill(goods, 5)}</div>
     ${lifeDetail(id, c, p)}
     <div class="hb c${Math.min(4, acts.length)} act">${acts.map(o => `<button type="button" class="hb-b${o.key === 'equip' || o.key === 'use' ? ' pri' : ''}" data-sk="opt" data-n="${o.n}">${hubIco(ico[o.key])}<span class="tx"><b>${esc(o.t)}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</span></button>`).join('')}</div>`;
 }

@@ -99,11 +99,28 @@ function aiSimpleDef(G){
   return rnd(G) < 0.4 ? 'nibble' : 'attack';
 }
 
+/* ---------- 육성: 내가 불펜 투수면 감독이 나를 씀 ----------
+   2군: 6회 시작(늦어도 7회)에 반드시 등판 · 1군: 7회부터 이닝 시작마다 접전(4점 차 이내)이면 30%, 선발이 지치면 35% (1군 경기의 60%쯤 등판).
+   (불펜 투수가 경기에 한 번도 나가지 못해 할 일이 없던 문제) */
+function focusRelief(G, ti, P, f, bench){
+  if(G.focusTeam !== ti) return false;
+  const me = bench.find(x => x.p.id === G.focus); if(!me || me.p.role === '마무리' || P.id === G.focus) return false;
+  const inningStart = G.outs === 0 && !G.bases.some(x => x != null), lead = leadFor(G, ti), late = G.innings >= 9 ? 7 : Math.max(2, G.innings - 2);
+  let go = false;
+  if(G.career && G.career.minor) go = inningStart && G.inning >= late - 1 && (G.inning >= late || rnd(G) < 0.6);
+  else if(inningStart && G.inning >= late) go = Math.abs(lead) <= 4 ? rnd(G) < 0.3 : rnd(G) < 0.12;
+  if(!go && f > 0.55) go = rnd(G) < (G.career && G.career.minor ? 0.7 : 0.35);
+  if(!go) return false;
+  swapPitcher(G, ti, me.i);
+  return true;
+}
+
 /* ---------- 감독 판단 (컴퓨터 수비 팀, 타석이 시작될 때) ---------- */
 function aiManage(G){
-  if(!detailed(G)) return;
+  if(!detailed(G) && !G.focus) return;   // 간단 모드는 투수를 바꾸지 않음 (육성 경기는 내 불펜 투수를 쓰려고 바꿈)
   const ti = 1 - batIdx(G), T = G.teams[ti], P = curPitcher(G), B = curBatter(G);
   const f = fatigue(P), bench = benchPitchers(G, ti);
+  if(G.focus != null && focusRelief(G, ti, P, f, bench)) return;
   const shelled = P.st.r >= (P.starter ? 5 : 3);
   const lead = leadFor(G, ti), closer = bench.find(x => x.p.role === '마무리'), others = bench.filter(x => x.p.role !== '마무리');
   const best = list => list.sort((a, b) => (b.p.ctl + b.p.stf) - (a.p.ctl + a.p.stf))[0];

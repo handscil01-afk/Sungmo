@@ -363,7 +363,7 @@ function careerMinorDay(via, listen){
   const L = CR(), c = C(L), p = myP(L), out = [];
   if(L.phase === 'season'){
     const { opp, o } = minorGameOpts(L, 'detail');
-    const G2 = newGame(o);
+    const G2 = newGame(o); G2.focus = c.id; G2.focusTeam = 0; G2.career = { minor:true };   // 불펜 투수면 감독이 등판시킴 (ai.js focusRelief)
     const mine = simMine(G2, c.id);
     out.push(`퓨처스리그 경기: ${teamName(L.my)} ${runsOf(G2.teams[0])} 대 ${runsOf(G2.teams[1])} ${teamName(opp)}.`);
     if(listen) out.push(...(mine.length ? mine : ['오늘은 내 차례가 없었습니다.']));
@@ -389,6 +389,7 @@ function careerSimDay(via, listen){
   const L = CR(), g = myGameToday(L), c = C(L); if(!g) return;
   if(typeof wxRainDay === 'function' && wxRainDay(L, g, via)) return;   // 우천 취소 (weather.js)
   const G2 = newGame(leagueGameOpts(L, g.a, g.h, ['cpu', 'cpu'], listen ? 'detail' : 'manager', 'pitch'));
+  G2.focus = c.id; G2.focusTeam = g.a === L.my ? 0 : 1;
   const mine = simMine(G2, c.id);
   const out = [`${g.label || `${L.day + 1}일째`}: ${teamName(g.a)} ${runsOf(G2.teams[0])} 대 ${runsOf(G2.teams[1])} ${teamName(g.h)}.`];
   if(listen) out.push(...(mine.length ? mine : ['오늘은 내 차례가 없었습니다.']));

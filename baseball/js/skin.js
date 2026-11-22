@@ -181,6 +181,7 @@ function listHTML(lines, cls = ''){
 function skinHudRefresh(){
   const ov = $('#skOv'); if(!ov || !VIEW.gfx || !G || !isGame(UI.S)) return;
   ov.innerHTML = skOvHTML(UI.S, false);
+  if(G.over) skinBody();   // 경기 끝: 뜸 들이기가 끝난 뒤에 경기 끝 단추를 그림
 }
 // 그림 위 점수판·선수 상자·경기 끝 카드·날씨 아이콘. 명장면 다시 보기(highlights.js)는 그 장면의 점수판만
 function skOvHTML(S, hold){
@@ -251,12 +252,14 @@ function playLogHTML(S){
 function deckHTML(S){
   const notes = S.note ? `<div class="dk-note">${S.note.map(l => `<p>${esc(l)}</p>`).join('')}</div>` : '';
   if(S.kind === 'pitch' && !G.over) return deckHead(S, true) + pitchDeck(S);
-  if(S.kind === 'bat' && !G.over) return deckHead(S, true) + playLogHTML(S) + batDeck(S);
+  if(S.kind === 'bat' && !G.over) return deckHead(S, true) + batDeck(S);   // 화면 보며 하기는 글 중계 기록을 따로 두지 않음 (결과는 위 한 줄과 그림으로)
   if(S.kind === 'roster') return deckHead(S) + rosterHTML(S.ti) + optsHTML(S, true);
   if(S.kind === 'log') return deckHead(S) + listHTML(S.say || [], 'log') + optsHTML(S, true);
   // 그 밖의 경기 화면: 위에 질문, 가운데 지난 기록(남는 자리), 아래쪽 엄지 닿는 곳에 단추
+  // 마지막 타구의 결과를 보여 주기 전(뜸 들이는 동안)에는 경기 끝 화면을 미리 보이지 않음 (끝나면 skinHudRefresh가 다시 그림)
+  if(G.over && document.documentElement.classList.contains('hold')) return '';
   if(G.over && typeof endDeckHTML === 'function') return endDeckHTML(S) + notes;   // 경기 끝: 점수 카드는 그림 위, 아래는 줄 점수표와 같은 크기 단추
-  const mid = G.over ? resultBanner() + lineScoreHTML() : S.grid || S.sub ? '' : playLogHTML(S);
+  const mid = G.over ? resultBanner() + lineScoreHTML() : '';
   return deckHead(S, !G.over && !G.pre && !S.sub) + mid + notes + (S.grid ? gridHTML(S) : optsHTML(S, true));
 }
 // 명단: 타자(오늘 기록)와 투수

@@ -98,6 +98,8 @@
 - 9-10 (완료) 미니게임: js/mini.js(화면 정의·판정·소리 신호, 저장 bb_mini), js/skin-mini.js·css/skin-mini.css(그림, kind mg-home·mg-start·mg-play·mg-res). 타격 연습장·번트 챌린지·도루 챌린지, 타이밍(MG.run: 오디오 시계로 신호를 맞추고 누른 때와 칠 때의 차이로 판정, 소리와 글로 하기는 판정 폭 1.3배)과 고르기로 하기. 처음 화면 10번, 육성 마을(어디 가기 10번·지도의 미니게임 연습장). 시험 tests/mini.js.
 - 9-10 (완료) 시즌 끝 시상식(awards-show.js, 한 번만: L.awShow), 업적 배지 24개(badges.js: L.career.badges·L.badges, badgeGive·badgeCheck, 새 배지는 ui.js go·rerender의 badgeFlush로 알림), 골든글러브(league.js endSeason → awardsGG), 트로피 진열장(육성 첫 화면 10번·기록실 8번, 그림 skin-awards.js). 시험 tests/awards.js.
 
+- 9-11 (완료) 사용자 점검 반영: 육성 불펜 투수 등판(ai.js focusRelief: 2군은 늘, 1군은 접전 7회부터), 간단 모드 3루타 타구 찾기 240번·꾸민 그림 고침, 경기 끝 화면은 결과 연출 뒤에, 화면 보며 하기 경기 화면의 글 중계 기록 뺌, 미니게임(코스 무작위·커브, 번트 판정 폭, 도루 귀루 단추, 그림 미리 칠하기, 위로 붙인 배치), 가방(장비·소모품 나눔, 아이콘 잘림·강화 표시), 모자 양옆 머리카락, 얼굴 부위 다시 자르기(덩어리 기준), 동작 그림 같은 배율(tools/frames.py), 마을 건물 창 그림(BLD_IMG), 구속 훈련 공 방향.
+
 ## 7.7단계 (예정): 시각장애인들이 아는 숫자 야구 규칙
 
 - 투수 숫자와 타자 숫자로 판정표에서 결과를 찾는 방식. 규칙(숫자 범위, 결과표, 볼카운트, 주자)을 받으면 판정표를 채움. 결과마다 이유를 한 줄로 알려 주기.

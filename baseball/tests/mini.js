@@ -154,7 +154,7 @@ const PORT = 8772;
       Object.assign(NEWC, { name:'시험', pit:false, pos:'SS', type:'power', team:'star' }); NEW.len = 18; NEW.mode = 'simple';
       LSRC = 'career'; const L = careerNew(); setLG(L); saveLeague(); go(visitScreen, 'click');
     });
-    if(view === 'gfx'){ await page.click('[data-spot="mini"]'); }
+    if(view === 'gfx'){ await page.click('[data-spot="mini"]'); await page.waitForSelector('#skSheet .card'); await page.click('#skSheet .card'); }
     else { const o = await page.$('#opts .opt[data-n="10"]'); if(!o) errors.push(`${tag}: 어디 가기에 10번 미니게임 연습장이 없음`); else await o.click(); }
     if(await page.evaluate(() => UI.S.kind) !== 'mg-home') errors.push(`${tag}: 미니게임으로 가지 않음`);
     if(view === 'gfx') await fits(page, `${tag} 목록`);

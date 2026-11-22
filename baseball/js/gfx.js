@@ -870,12 +870,12 @@ function drawSceneImg(sc, t){
     ball(128 + (fx - 128) * k2, 180 - h, 3 + h / 18);
   } else if(k === 'vel' || k === 'ctl' || k === 'stf'){
     bgImg('cr-bullpen');
-    // 왼쪽 마운드에서 저 멀리 포수 자리(홈플레이트)로
+    // 투수 그림은 앞모습(우리 쪽을 봄)이라, 공도 우리 쪽(화면 아래 포수 미트)으로 날아옴: 멀리서 작게 → 가까이 크게
     const pose = loop < 0.25 ? 'set' : loop < 0.45 ? 'lift' : loop < 0.55 ? 'throw' : 'follow';
-    const hx = 68, hy = 76, q = Math.max(0, Math.min(1, (loop - 0.5) / 0.4));
-    if(k === 'ctl'){ GX.ctx.strokeStyle = PAL.red; GX.ctx.lineWidth = 1.5; GX.ctx.beginPath(); GX.ctx.arc(hx, hy, 5, 0, 6.3); GX.ctx.stroke(); GX.ctx.lineWidth = 1; }
-    if(loop >= 0.5){ const bend = k === 'stf' ? Math.sin(q * Math.PI) * 18 : 0; ball(70 + (hx - 70) * q + bend, 150 + (hy - 150) * q, 4 - q * 2.5); }
+    const hx = 118, hy = 206, q = Math.max(0, Math.min(1, (loop - 0.5) / 0.4));
     big(() => drawPerson('pitcher', 0, 0, col, pose, false, 0), 70, 140, 1.6);
+    if(k === 'ctl'){ GX.ctx.strokeStyle = PAL.red; GX.ctx.lineWidth = 2; GX.ctx.beginPath(); GX.ctx.arc(hx, hy, 11, 0, 6.3); GX.ctx.stroke(); GX.ctx.lineWidth = 1; }
+    if(loop >= 0.5){ const bend = k === 'stf' ? Math.sin(q * Math.PI) * 22 : 0; ball(78 + (hx - 78) * q + bend, 112 + (hy - 112) * q, 2 + q * q * 7); }
     if(k === 'vel' && loop > 0.85){ R(176, 34, 70, 22, '#000'); pxText(`${140 + Math.floor((t * 7) % 15)}km`, 211, 38, PAL.red, 13); }
   } else if(k === 'rest'){
     bgImg('cr-room');

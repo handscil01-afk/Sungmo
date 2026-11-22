@@ -158,5 +158,7 @@ html.skin .sk-body.f3 .mg-res .mg-dots, html.skin .sk-body.f3 .mg-rh small{ disp
 html.skin .spot[data-spot="mini"] .sign{ background:linear-gradient(180deg, #ff8a2a, #d2560f); }
 /* 받은 그림: 카드(mg-cards.png 3칸), 피칭 머신(mg-machine.png 4칸), 견제 투수(pitcher-pick.png 4칸) */
 html.skin .mg-thumb.t-img{ background-size:300% 100%; background-repeat:no-repeat; background-color:#2a5bb8; aspect-ratio:1; image-rendering:pixelated; }
-html.skin .mg-spr.mach{ width:15%; aspect-ratio:80 / 96; z-index:1; }
-html.skin .mg-spr.pick{ width:10%; aspect-ratio:80 / 96; z-index:2; }
+html.skin .mg-spr.mach{ width:17%; aspect-ratio:1; z-index:1; }
+html.skin .mg-spr.pick{ width:12%; aspect-ratio:1; z-index:2; }
+html.skin .mg-go.tap.back{ background:linear-gradient(180deg, #6cc3ff, #1a62c9) !important; border-color:#0d3f8f !important; animation:mgBack .25s ease-in-out infinite alternate; }
+@keyframes mgBack{ to{ transform:scale(1.04); } }

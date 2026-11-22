@@ -165,7 +165,7 @@ const PORT = 8767;
     await need('.lock .pcard', '라커룸'); await need('.crplay', '라커룸'); await fit('라커룸');
     await page.click('.crtiles .ct:nth-child(2)'); await need('.town .spot', '마을'); await fit('마을');
     // 한 화면 용품점: 물건을 누르면 고르기만, 사기 단추로 삼. 소모품도 같은 화면
-    await page.click('[data-spot="shop"]'); await need('.ig .ic', '용품점'); await fit('용품점');
+    await page.click('[data-spot="shop"]'); await page.waitForSelector('#skSheet .card'); await page.click('#skSheet .card'); await need('.ig .ic', '용품점'); await fit('용품점');
     await page.click('.ig .ic:nth-child(2)'); if(await page.evaluate(() => CR().career.owned.length)) errors.push(`${tag}: 물건을 누르자마자 샀음`);
     await page.click('.hb.act .hb-b:nth-child(1)');
     const owned = await page.evaluate(() => CR().career.owned.slice());

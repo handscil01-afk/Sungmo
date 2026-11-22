@@ -83,6 +83,16 @@ function lookURL(look, color, letter = ''){
     part(hv, LOOK_ROW.hair, l.hair);
     // 모자 옆으로 가늘게 삐져나온 가닥까지 지우도록 열마다 양옆 4칸 안의 가장 낮은 모자 줄을 씀
     if(hatBot) hatBot.forEach((_, xx) => { let y = -1; for(let k = Math.max(0, xx - 4); k <= Math.min(C - 1, xx + 4); k++) y = Math.max(y, hatBot[k]); if(y > 0) h.clearRect(xx, 0, 1, y - 1); });
+    // 모자 바깥 양옆: 모자 가장자리(챙 끝)보다 높이 튀어나온 머리카락도 지움 (그 아래로 내려오는 옆머리·긴 머리는 남김)
+    if(hatBot){
+      const xs = hatBot.map((y, x) => y > 0 ? x : -1).filter(x => x >= 0);
+      if(xs.length){
+        const x0 = xs[0], x1 = xs[xs.length - 1], edge = (a, b) => Math.max(...hatBot.slice(a, b + 1));
+        const yL = edge(x0, x0 + 5), yR = edge(x1 - 5, x1);
+        if(yL > 0) h.clearRect(0, 0, x0, yL - 1);
+        if(yR > 0) h.clearRect(x1 + 1, 0, C - x1 - 1, yR - 1);
+      }
+    }
     const col = HAIR_COLORS[l.hc];
     if(col){   // 머리색: 어두운 점의 밝기를 그 색의 명암으로 (윤곽선은 그대로 어두움)
       const d = h.getImageData(0, 0, C, C), p = d.data, H = [1, 3, 5].map(j => parseInt(col.slice(j, j + 2), 16));

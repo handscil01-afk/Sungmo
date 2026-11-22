@@ -32,13 +32,17 @@ function mgThumb(g, cls = ''){
 const mgRecChip = g => { const a = mgBest(g, 'tm'), b = mgBest(g, 'pick'); return a || b ? `${a ? `<em>최고 ${a.best}점</em>` : ''}${b ? `<em class="c">고르기 ${b.best}점</em>` : ''}` : '<em class="no">기록 없음</em>'; };
 
 /* ---------- 미니게임 목록 ---------- */
+// 팀 색으로 칠한 그림을 미리 만들어 둠: 처음 보이는 순간(슬라이딩 등)에 칠하지 않은 그림이 잠깐 보였다가 색이 바뀌지 않게
+function mgPreload(){ const col = mgCol(); ['batter', 'runner-s', 'run-b', 'slide', 'fielder-set', 'pitcher', 'pitcher-pick', 'mg-machine', 'mg-cards'].forEach(n => skTint(n, col)); }
 function mgHomeSkin(S){
+  mgPreload();
   const cards = (S.opts || []).filter(o => !o.hide && MG_GAMES[o.key]).map(o => `<button type="button" class="mg-card" data-sk="opt" data-n="${o.n}">${mgThumb(o.key)}<span class="tx"><b>${esc(o.t)}</b><small>${esc(MG_GAMES[o.key].short)}</small><span class="mg-rc">${mgRecChip(o.key)}</span></span></button>`).join('');
   const out = (S.opts || []).find(o => o.key === 'out');
   return `<div class="mg-cards">${cards}</div>${out ? `<div class="mback"><button type="button" class="gb b" data-sk="opt" data-n="${out.n}">${skIco('back')}${esc(out.t)}</button></div>` : ''}`;
 }
 /* ---------- 설명 화면 ---------- */
 function mgStartSkin(S){
+  mgPreload();
   const g = MG_GAMES[S.g], op = k => (S.opts || []).find(o => o.key === k && !o.hide);
   const tm = op('tm'), pk = op('pick'), hr = op('hear'), ls2 = op('list');
   const heard = (S.say || []).length && (S.say[0].s || S.say[0]) !== g.rules[0] ? `<div class="crmsg">${S.say.map(l => `<p>${esc(l.s || l)}</p>`).join('')}</div>` : '';
@@ -60,7 +64,7 @@ function mgPlaySkin(S){
   const stage = st.g === 'bat' ? mgCage(st) : st.g === 'bunt' ? mgBuntField(st) : mgStealField(st);
   // 알림 줄: 지금 할 일 또는 방금 결과
   const last = st.last, fresh = last && !live;
-  const msg = st.phase === 'read' && !fresh ? '투수의 움직임을 읽고 뛸지 고르세요.' : live ? (st.g === 'steal' ? '둥(투구)에 뛰고, 딱딱(견제)에는 참으세요!' : '삐 소리 · 노란 동그라미에 맞춰 누르세요!')
+  const msg = st.phase === 'read' && !fresh ? '투수의 움직임을 읽고 뛸지 고르세요.' : live ? (st.g === 'steal' ? (st.lead ? '투구면 뛰기! 견제가 오면 단추가 귀루!로 바뀝니다. 바로 누르세요.' : '투구(둥)에 바로 뛰세요! 짧은 리드라 견제는 참으면 됩니다.') : '삐 소리 · 노란 동그라미에 맞춰 누르세요!')
     : fresh ? last.text : st.g === 'bat' ? (st.mode === 'tm' ? '공 던지기를 누르면 피칭 머신이 던집니다.' : `코치: "${st.hint}"`) : st.g === 'bunt' ? mgDefText(st.def) + ' 방향을 고르세요.' : st.phase === 'read' ? '투수의 움직임을 읽고 뛸지 고르세요.' : '리드를 고르면 투수가 세트에 들어갑니다.';
   const msgCls = fresh ? (last.pts >= 10 ? 'top' : last.pts > 0 ? 'ok' : 'bad') : live ? 'live' : '';
   if(live && !SKM.raf) SKM.raf = requestAnimationFrame(mgTick);
@@ -97,11 +101,12 @@ function mgCage(st){
   if(L && !live && L.g === 'bat'){
     f = L.k === 'take' ? 0 : 2;
     const x1 = 50 + (L.x || 0) * 42, end = { hr:[x1, -8, .25], b3:[x1, 6, .3], b2:[x1, 10, .32], hit:[50 + (L.x || 0) * 34, 26, .4], foul:[L.e != null && L.e < 0 ? -6 : 106, 58, .5], whiff:[50, 112, 1.7], take:[50, 112, 1.7] }[L.k];
-    fx = `<span class="mg-fly k-${L.k}" style="--x0:${MGC.hit[0]}%;--y0:${MGC.hit[1]}%;--x1:${end[0]}%;--y1:${end[1]}%;--s1:${end[2]}"></span>`
+    fx = `<span class="mg-fly k-${L.k}" style="--x0:${(st.aim || MGC.hit)[0]}%;--y0:${(st.aim || MGC.hit)[1]}%;--x1:${end[0]}%;--y1:${end[1]}%;--s1:${end[2]}"></span>`
       + (MG_BAN_ROW[L.k] != null ? mgBan(MG_BAN_ROW[L.k]) : `<span class="mg-tx">지켜봄</span>`) + (L.dist ? `<b class="mg-dist">${L.dist}m</b>` : '') + (L.tier === 'perfect' ? '<b class="mg-perf">딱 맞음!</b>' : '');
   }
   const tag = !live && st.phase !== 'end' ? `<span class="mg-tag">${esc(st.mode === 'tm' ? '다음 공 · ' + st.pitch.name : '노릴 코스를 고르세요')}</span>` : '';
-  return `<div class="mg-st cage" id="mgSt"><span class="mg-ring${live ? ' on' : ''}" id="mgRing" style="${mgAt(MGC.hit)}"></span>
+  const aim = st.aim || MGC.hit;
+  return `<div class="mg-st cage" id="mgSt"><span class="mg-ring${live ? ' on' : ''}" id="mgRing" style="${mgAt(aim)}"></span>
     ${mgSpr('batter', live ? 0 : f, 4, 1, 0, 'bat-me' + (L && !live && f ? ' swung' : ''), '', 'mgBat')}
     ${mgSpr('mg-machine', live ? 1 : 0, 4, 1, 0, 'mach', mgAt([MGC.mach[0], MGC.mach[1] + 6]), 'mgMach')}
     <span class="mg-ball" id="mgBall" style="${mgAt(MGC.mach)}"></span>${fx}${tag}</div>`;
@@ -144,6 +149,7 @@ function mgStealField(st){
     } else fx = `<span class="mg-tx">출발 못함${L.pts ? ` +${L.pts}` : ''}</span>`;
   }
   return `<div class="mg-st fld steal" id="mgSt">${mgFielder([MGF.b1[0] + 6, MGF.b1[1] + 7])}${mgFielder([58, 30], 'ss')}${mgFielder([50, 95], 'c')}
+    ${live ? mgSpr('slide', 2, 4, 1, 0, 'run-me', mgAt([MGF.b1[0] - 1, MGF.b1[1] + 1]) + 'visibility:hidden;', 'mgDive') : ''}
     ${mgSpr('pitcher', 0, 4, 3, 0, 'pit', mgAt([MGF.mound[0], MGF.mound[1] + 1]), 'mgPit')}${mgSpr('pitcher-pick', 0, 4, 1, 0, 'pick', mgAt([MGF.mound[0] + 1, MGF.mound[1] + 1]) + 'visibility:hidden;', 'mgPick')}${runner}
     <span class="mg-ball sm" id="mgBall" style="${mgAt(MGF.mound)};opacity:0"></span>${fx}
     ${live ? '<span class="mg-cue" id="mgCue"></span>' : ''}</div>`;
@@ -163,8 +169,8 @@ function mgTickPitch(r, now){
   // 피칭 머신: 던지기 전 바퀴 돌기(1) → 발사(2) → 반동(3) → 멈춤(0)
   const mach = $('#mgMach'); if(mach){ const f = k < 0 ? 1 : k < 0.12 ? 2 : k < 0.35 ? 3 : 0; mach.style.backgroundPosition = `${f * 100 / 3}% 0%`; }
   if(k < 0){ ball.style.opacity = '0'; return; }
-  const kk = Math.min(k, 1.5), a = bat ? MGC.mach : [50, 53], b = bat ? MGC.hit : [50, 83];
-  const p = mgLerp(a, b, kk);
+  const st = MG.st || {}, kk = Math.min(k, 1.5), a = bat ? MGC.mach : [50, 53], b = bat ? (st.aim || MGC.hit) : [50, 83];
+  const p = mgLerp(a, b, kk); if(bat && st.bend) p[0] += Math.sin(Math.min(1, kk) * Math.PI * 0.9) * st.bend;   // 커브는 옆으로 휘어 들어옴
   ball.style.opacity = '1'; ball.style.left = p[0] + '%'; ball.style.top = p[1] + '%';
   ball.style.transform = `translate(-50%, -50%) scale(${bat ? 0.3 + kk * 1.1 : 0.7 + kk * 0.6})`;
   if(ring) ring.classList.toggle('hot', Math.abs(k - 1) < 0.1);
@@ -187,6 +193,11 @@ function mgTickSteal(r, now){
     if(picking) pk.style.backgroundPosition = `${(t < 200 ? 1 : t < 450 ? 2 : t < 700 ? 3 : 0) * 100 / 3}% 0%`; }
   if(ball){ ball.style.opacity = bp ? '1' : '0'; if(bp){ ball.style.left = bp[0] + '%'; ball.style.top = (bp[1] - 4) + '%'; } }
   if(run) run.style.backgroundPosition = `${Math.floor(now / 380) % 2 ? 100 / 3 : 0}% 0%`;
+  // 견제가 오는 동안: 단추가 '귀루!'로 바뀜. 누르면 주자가 1루로 슬라이딩(귀루)
+  const btn = document.querySelector('.mg-go.tap'), back = !!(m && m.type === 'pick' && (now - m.at) / sc < 900);
+  if(btn){ btn.classList.toggle('back', back); const b = btn.querySelector('b'), sm = btn.querySelector('small'); if(b) b.textContent = back ? '귀루!' : '뛰기!'; if(sm) sm.textContent = back ? '견제! 빨리 눌러 1루로' : '둥 소리(투구)에 바로'; }
+  const dv = $('#mgDive'), ri = MG.run && MG.run.moves ? MG.run.moves.indexOf(m) : -1, backed = back && MG.run && MG.run.backed && MG.run.backed[ri];
+  if(dv){ dv.style.visibility = backed ? 'visible' : 'hidden'; if(run) run.style.visibility = backed ? 'hidden' : 'visible'; }
   if(cue){ cue.textContent = word; cue.className = 'mg-cue' + (word ? ' on ' + (m.type === 'pick' ? 'pk' : 'pt') : ''); }
 }
 
