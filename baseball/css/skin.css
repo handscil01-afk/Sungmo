@@ -1028,7 +1028,7 @@ html.skin .sl-i{ position:relative; display:flex; align-items:center; }
 html.skin .bag2 .slot .sl-i em, html.skin .slot .sl-i em{ position:static; margin-left:1px; font-style:normal; font-size:.6rem; font-weight:900; color:#fff; background:#e2501a; border-radius:999px; padding:0 3px; align-self:flex-start; }
 html.skin .bag2 .slot .dur{ width:80%; }
 /* 마을 건물 창: 위에 건물 그림 */
-html.skin .bld{ position:relative; aspect-ratio:16 / 9; margin-bottom:8px; border-radius:14px; border:3px solid var(--line); background-size:cover; background-position:center; image-rendering:pixelated; box-shadow:0 3px 0 var(--line2); }
+html.skin .bld{ position:relative; aspect-ratio:2 / 1; margin-bottom:8px; border-radius:14px; border:3px solid var(--line); background-size:cover; background-position:center; image-rendering:pixelated; box-shadow:0 3px 0 var(--line2); }
 html.skin .bld span{ position:absolute; left:8px; bottom:6px; padding:2px 10px; border-radius:999px; background:rgba(10, 28, 70, .8); color:#fff; font-size:.8rem; font-weight:900; }
 html.skin .bag2 .slot .sl-i em, html.skin .slot .sl-i em{ white-space:nowrap; line-height:1.3; } html.skin .bag2 .slot .iico{ width:1.7rem; height:1.7rem; }
 html.skin .ig-wrap{ display:grid; gap:6px; }

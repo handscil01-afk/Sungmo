@@ -114,6 +114,7 @@ function crCamp(S){
 }
 /* ---------- 마을 지도 ---------- */
 function crVisit(S){
+  { const L0 = crL(); if(L0) Object.values(BLD_IMG).flat().forEach(n => skTint(n, crColor(L0))); }   // 건물 창 그림을 미리 팀 색으로 칠해 둠
   const L = crL(); if(!L || !L.career) return null;
   const c = L.career, done = !!S.done;
   const spots = TOWN.map(t => {
@@ -139,7 +140,7 @@ function crSpot(id){
   skinNote(null, `${bg ? `<div class="bld" style="background-image:${bg}" aria-hidden="true"><span>${esc(t.name)}</span></div>` : ''}<div class="spotm">${os.map(o => `<button type="button" class="card" data-sk="opt" data-n="${o.n}"><span class="tx"><b>${esc(o.t)}</b>${o.s ? `<small>${esc(o.s)}</small>` : ''}</span></button>`).join('')}</div>`, t.name);
 }
 // 건물 그림
-const BLD_IMG = { office:['cr-office'], shop:['cr-shop'], plaza:['cr-fansign'], academy:['cr-cage'], hospital:['cr-rehab'], house:['cr-room'], airport:['cr-beach'], mini:['cr-cage'] };   // 새 건물 그림(cr-academy·cr-hospital·cr-house·cr-airport·cr-plaza)이 오면 바꿔 넣음
+const BLD_IMG = { office:['cr-office'], shop:['cr-shop'], plaza:['cr-plaza'], academy:['cr-academy'], hospital:['cr-hospital'], house:['cr-house'], airport:['cr-airport'], mini:['cr-cage'] };
 
 /* ---------- 용품점 ---------- */
 function crShop(S){

@@ -32,3 +32,4 @@ GPT가 만든 원본은 `python3 -I baseball/tools/sprites.py <원본 폴더>`�
 | mg-cards.png | 576×192 | 미니게임 카드 그림(192×192 칸): 타격 연습장 · 번트 · 도루 (자홍색은 팀 색) |
 | mg-machine.png | 384×96 | 피칭 머신 정면(96×96 칸, 같은 배율): 멈춤 · 바퀴 돌기 · 발사 · 반동 |
 | pitcher-pick.png | 384×96 | 1루 견제 투수(96×96 칸, 같은 배율): 1루 보기 · 발 빼기 · 견제 · 다시 자세 |
+| cr-academy · cr-hospital · cr-house · cr-airport · cr-plaza .png | 512×약 250 | 마을 건물 창 그림(코치 아카데미·병원·내 집·공항·광장). 자홍색은 팀 색. `tools/bld_bg.py`로 초록 배경을 지우고 자름 |
